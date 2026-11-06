@@ -1,6 +1,6 @@
 -- Azeroth Survivors jewelry icon catalog, generated from assets/items.txt.
 -- Icon texture paths are the database key so native worn-item textures can be recognized.
-AZSMinorModsItemCatalog = {
+SlimSuiteItemCatalog = {
     ["INV_Jewelry_Ring_15"] = "Band of Accuria",
     ["INV_Jewelry_Ring_07"] = "Quick Strike Ring",
     ["INV_Jewelry_Ring_14"] = "Heavy Dark Iron Ring",

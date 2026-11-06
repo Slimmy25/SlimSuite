@@ -1,8 +1,8 @@
 -- Slim Suite meter: authoritative totals/checkpoints plus explicitly observed hit samples.
 -- MeterQuery v1 and combat-text stream v1 from Aethus's addon_docs(2).md.
 local K = AZSKIT;
-local M = { view = 'damage', sort = 'amount', offset = 0, checkpoints = {}, samples = {damage={},healing={}} };
-AZSMinorModsMeter = M;
+local M = { view = 'damage', sort = 'amount', offset = 0, checkpoints = {}, samples = {damage={},healing={}}, listeners = {} };
+SlimSuiteMeter = M;
 local function Count(t) return table.getn(t or {}); end
 local function Num(v) return type(v)=='number' and v or 0; end
 local function Text(v) return tostring(math.floor(Num(v)+0.5)); end
@@ -22,19 +22,31 @@ local function AddSample(metric, key, amount, crit, owner)
  key=owner.."|"..key;local bucket=M.samples[metric];local s=bucket[key];
  if not s then s={count=0,crits=0,regular=0};bucket[key]=s;end
  s.count=s.count+1;s.low=s.low and math.min(s.low,amount) or amount;s.high=math.max(s.high or 0,amount);
- if crit then s.crits=s.crits+1;s.minCrit=s.minCrit and math.min(s.minCrit,amount) or amount;s.maxCrit=math.max(s.maxCrit or 0,amount);s.highCrit=math.max(s.highCrit or 0,amount);
- else s.regular=s.regular+1;s.highNormal=math.max(s.highNormal or 0,amount);end
+ if crit then s.crits=s.crits+1;s.critSum=(s.critSum or 0)+amount;s.minCrit=s.minCrit and math.min(s.minCrit,amount) or amount;s.maxCrit=math.max(s.maxCrit or 0,amount);s.highCrit=math.max(s.highCrit or 0,amount);
+ else s.regular=s.regular+1;s.normalSum=(s.normalSum or 0)+amount;s.minNormal=s.minNormal and math.min(s.minNormal,amount) or amount;s.highNormal=math.max(s.highNormal or 0,amount);end
 end
 local function Release(view)
  local id=M.checkpoints[view];
  if id and AZS_ReleaseMeterCheckpoint then pcall(AZS_ReleaseMeterCheckpoint,id);end
  M.checkpoints[view]=nil;
 end
+-- Hit samples are kept in the saved settings for the current run, so the tooltips keep their numbers after a
+-- /reload just as the game's own meter totals do. A new run (or a new counter epoch/authority) starts fresh.
+local function SavedSamples(context)
+ if type(SlimSuiteDB)~='table' then return nil;end
+ local saved=SlimSuiteDB.meterSamples;
+ if type(saved)=='table' and saved.runId==context.runId and saved.epoch==context.counterEpoch and saved.authority==context.authorityId
+  and type(saved.samples)=='table' and type(saved.samples.damage)=='table' and type(saved.samples.healing)=='table' then
+  return saved.samples;
+ end
+ return nil;
+end
 local function SyncContext(context)
  if not context then return;end
  if M.runId~=context.runId or M.sessionId~=context.uiSessionId or M.epoch~=context.counterEpoch or M.authority~=context.authorityId then
   for view in pairs(M.checkpoints) do Release(view);end
-  M.samples={damage={},healing={}};M.knownActors={};M.cursor=nil;M.dropped=0;M.owner=nil;M.offset=0;
+  M.samples=SavedSamples(context) or {damage={},healing={}};M.knownActors={};M.cursor=nil;M.dropped=0;M.owner=nil;M.offset=0;
+  if type(SlimSuiteDB)=='table' then SlimSuiteDB.meterSamples={runId=context.runId,epoch=context.counterEpoch,authority=context.authorityId,samples=M.samples};end
   M.runId,M.sessionId,M.epoch,M.authority=context.runId,context.uiSessionId,context.counterEpoch,context.authorityId;
  end
  M.context=context;
@@ -99,6 +111,8 @@ local function Samples(source,owner)
    if s.maxCrit then result.maxCrit=math.max(result.maxCrit or 0,s.maxCrit);end
    if s.highCrit then result.highCrit=math.max(result.highCrit or 0,s.highCrit);end
    if s.highNormal then result.highNormal=math.max(result.highNormal or 0,s.highNormal);end
+   if s.minNormal then result.minNormal=result.minNormal and math.min(result.minNormal,s.minNormal) or s.minNormal;end
+   result.normalSum=(result.normalSum or 0)+(s.normalSum or 0);result.critSum=(result.critSum or 0)+(s.critSum or 0);
   end
  end
  return result.count>0 and result or nil;
@@ -109,16 +123,22 @@ local function Tooltip(button)
  GameTooltip:SetOwner(button,'ANCHOR_RIGHT');GameTooltip:AddLine(button.label or 'Ability',1,0.82,0);
  if M.view=='group' and not M.owner then GameTooltip:AddLine('Click for this player\'s abilities',1,1,1);GameTooltip:Show();return;end
  local sample=Samples(source,row.ownerId);
- GameTooltip:AddLine(M.view=='boss' and 'Observed hits: all targets' or M.view=='healing' and 'Observed combat-log samples' or 'Observed samples since load / reset',0.7,0.7,0.7);
+ local healing=M.view=='healing';local noun=healing and 'Heal' or 'Hit';
+ GameTooltip:AddLine(M.view=='boss' and 'Observed hits: all targets' or healing and 'Observed combat-log samples this run' or 'Observed samples this run (kept through /reload)',0.7,0.7,0.7);
  local function Value(n) return n and Text(n) or 'Not recorded';end
- GameTooltip:AddLine('Min Hit: '..Value(sample and sample.low),1,1,1);
- GameTooltip:AddLine('Max Hit: '..Value(sample and sample.high),1,1,1);
- GameTooltip:AddLine('Min Crit: '..Value(sample and sample.minCrit),1,1,1);
- GameTooltip:AddLine('Max Crit: '..Value(sample and sample.maxCrit),1,1,1);
+ local function Avg(sum,n) return (sum and n and n>0) and Text(sum/n) or 'Not recorded';end
+ GameTooltip:AddDoubleLine(noun..'s recorded',sample and tostring(sample.count) or '0',1,1,1,1,1,1);
+ GameTooltip:AddDoubleLine('Normal '..string.lower(noun)..'s (min / avg / max)',sample and (Value(sample.minNormal)..' / '..Avg(sample.normalSum,sample.regular)..' / '..Value(sample.highNormal)) or 'Not recorded',1,1,1,1,1,1);
+ GameTooltip:AddDoubleLine('Crits (min / avg / max)',sample and (Value(sample.minCrit)..' / '..Avg(sample.critSum,sample.crits)..' / '..Value(sample.maxCrit)) or 'Not recorded',1,1,1,1,1,1);
+ if sample and sample.regular>0 and sample.crits>0 and (sample.normalSum or 0)>0 then
+  GameTooltip:AddDoubleLine('Crit multiplier (avg)',string.format('x%.2f',(sample.critSum/sample.crits)/(sample.normalSum/sample.regular)),1,1,1,1,1,1);
+ end
  if sample then
   GameTooltip:AddLine(string.format('Crit %%: %.1f%% (%d / %d)',sample.crits/sample.count*100,sample.crits,sample.count),1,1,1);
  else GameTooltip:AddLine('Crit %: Not recorded',1,1,1);end
  GameTooltip:AddLine(string.format('Share of total: %.1f%%',Num(row.share)*100),1,0.82,0);
+ if row.displayRate and row.displayRate.status=='ready' then GameTooltip:AddLine((healing and 'HPS: ' or 'DPS: ')..Text(row.displayRate.value),1,0.82,0);end
+ if (row.displayAmount or 0)>0 then GameTooltip:AddLine('Total: '..Text(row.displayAmount),1,0.82,0);end
  if (M.dropped or 0)>0 then GameTooltip:AddLine('Some damage samples were missed.',1,0.5,0);end
  GameTooltip:Show();
 end
@@ -195,7 +215,7 @@ function M.Draw(active,editing)
    button.entry=row;button.source=source;button.label=source and source.name or actor and actor.name or 'Unknown source';
    local rowWidth=math.max(20,width-16);button:SetWidth(rowWidth);
    local rateText=row.displayRate and row.displayRate.status=='ready' and Text(row.displayRate.value) or '--';
-   local amountText=Text(row.displayAmount)..' dmg';
+   local amountText=Text(row.displayAmount)..(healing and ' heal' or ' dmg');
    local primary=M.sort=='rate' and (rateText..' '..unit) or amountText;
    local valueWidth=math.max(72,math.floor(rowWidth*0.47));
    local nameWidth=math.max(24,rowWidth-20-valueWidth-4);
@@ -216,6 +236,7 @@ function M.Drain()
   if not batch then if err and err.code=='STREAM_CHANGED' then M.cursor=nil;end;return;end
   M.cursor=batch.cursor;M.dropped=(M.dropped or 0)+Num(batch.droppedCount);
   for _,event in ipairs(batch.events or {}) do
+   for _,fn in ipairs(M.listeners) do pcall(fn,event);end
    if event.kind=='damage' then AddSample('damage',event.meterSourceKey or (event.spellId and ('spell:'..tostring(event.spellId)) or ('name:'..Name(event.abilityName or event.damageType))),event.amount,event.critical==true);end
   end
   if not batch.hasMore then break;end

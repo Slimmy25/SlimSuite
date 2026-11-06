@@ -1,13 +1,13 @@
 -- Slim Suite: chat filters, HUD controls, and other optional player tools.
 --   * Optional chat filters independently hide level-up stat-bonus lines, newly learned spell lines, racial-buff
 --     notices, selected opening/lair lines, and game-authored
---     NPC/boss dialogue and run-roleplay lines. /azsmods hide <words> also hides matching non-player text. Player chat is never hidden.
+--     NPC/boss dialogue and run-roleplay lines. /slimsuite hide <words> also hides matching non-player text. Player chat is never hidden.
 --   * The camera goes as far out as the game allows, 50 yards (the Max Camera Distance setting at its top), and starts there. Turn it off in
---     /azsmods to keep the game's own setting.
+--     /slimsuite to keep the game's own setting.
 --   * Boss markers follow the live API spawn order: oldest active boss gets Skull, then Cross, Circle and Star.
 --     Awake Guardians join after the real bosses; ordinary enemies are never marked by name guesses.
 --   * In co-op, a friend who falls gets a marker over their head, blinking on and off 16 times. Each friend has their
---     own (Square, Moon, Circle), so several can be down at once. Those three are kept for this alone.
+--     own (Diamond, Triangle, Moon, Square), so several can be down at once. Those four are kept for this alone.
 --   * Play the included sound once when you or a teammate dies (off until enabled).
 --   * Move, resize and scale the UI: drag a green handle to move it; right-click for width, height and scale.
 --     The action bar, XP bar, buffs, cast bar, party frames and kills/gold/cache tally can switch between horizontal and vertical layouts.
@@ -28,7 +28,7 @@
 --   * Plain action bar: the gryphons and the bar's art go, and only the six spell squares are left, with the bar
 --     no wider than they are (and the two page arrows), so it leaves no empty space.
 --   * Cooldown numbers: each spell square shows the seconds until its spell is ready again.
--- /azsmods (or the gear by the minimap) opens the settings window: every one of these on or off.
+-- /slimsuite (or the gear by the minimap) opens the settings window: every one of these on or off.
 -- Lua 5.0 / 1.12 interface: scripts read `this`, `event`, `arg1`, `arg2`; no # operator; only the 1.12 API.
 
 local K = AZSKIT;
@@ -36,13 +36,31 @@ local NAME = "Slim Suite";
 
 -- the stat bonus a level-up gives, in each of the game's languages (a piece of the line that has no number in it), as
 -- the game itself writes "You have gained {damage}% damage, {health} maximum health and {regen} health per second."
+-- SlimSuite_UnitKind(unit): what an enemy is, as one lowercase word ("final", "boss", "guardian", "elite", ...).
+-- Pass a unit token ("target"), an id, or an entry from AZS_UNITS / AZS_GetBosses / AZS_GetGuardians. The game's
+-- AZS_UnitKind (0.87) answers first; an entry's own kind field is the fallback. Use this everywhere instead of
+-- reading .kind directly, so every feature classifies enemies the same way.
+function SlimSuite_UnitKind(unit)
+	local key = unit;
+	if ( type(unit) == "table" ) then key = unit.id; end
+	if ( key ~= nil and type(AZS_UnitKind) == "function" ) then
+		local ok, kind = pcall(AZS_UnitKind, key);
+		if ( ok and type(kind) == "string" and kind ~= "" ) then return string.lower(kind); end
+	end
+	if ( type(unit) == "table" ) then
+		if ( unit.final ) then return "final"; end
+		if ( type(unit.kind) == "string" ) then return string.lower(unit.kind); end
+	end
+	return nil;
+end
+local UnitKind = SlimSuite_UnitKind;
+
 local function DB()
-	if ( type(AZSMinorModsDB) ~= "table" ) then AZSMinorModsDB = {}; end
-	local d = AZSMinorModsDB;
+	if ( type(SlimSuiteDB) ~= "table" ) then SlimSuiteDB = {}; end
+	local d = SlimSuiteDB;
 	if ( d.hideLevel == nil ) then d.hideLevel = true; end
  if ( d.hideNewSpells == nil ) then d.hideNewSpells = d.hideLevel; end
 	if ( d.hideRP == nil ) then d.hideRP = false; end
-	if ( d.helloOnStart == nil ) then d.helloOnStart = true; end
 	if ( d.hideRacialInfo == nil ) then d.hideRacialInfo = false; end
 	if ( d.hideOpeningLine == nil ) then d.hideOpeningLine = false; end
 	if ( d.hideLairLine == nil ) then d.hideLairLine = false; end
@@ -57,9 +75,22 @@ local function DB()
 	if ( d.camera == nil ) then d.camera = true; end
 	if ( d.plainBar == nil ) then d.plainBar = false; end
 	if ( d.cooldowns == nil ) then d.cooldowns = false; end
-	d.box, d.bloat, d.x, d.y = nil, nil, nil, nil;          -- the retired Say & Party box and "Remove bloat"
+	d.box, d.bloat, d.x, d.y, d.helloOnStart = nil, nil, nil, nil, nil;          -- the retired Say & Party box and "Remove bloat"
 	if ( d.bossMarks == nil ) then d.bossMarks = true; end
 	if ( d.deathMarks == nil ) then d.deathMarks = true; end
+	if ( d.prePullMarks == nil ) then d.prePullMarks = false; end
+	if ( d.encounterDebuffs == nil ) then d.encounterDebuffs = true; end
+	if ( d.onTopOfScreens == nil ) then d.onTopOfScreens = true; end
+	if ( d.replaceRevive == nil ) then d.replaceRevive = false; end
+	if ( d.procMeter == nil ) then d.procMeter = false; end
+	if ( d.combatTextBox == nil ) then d.combatTextBox = false; end
+	if ( d.minimapCaches == nil ) then d.minimapCaches = false; end
+	if ( d.minimapBosses == nil ) then d.minimapBosses = false; end
+	if ( d.minimapLairs == nil ) then d.minimapLairs = false; end
+	if ( d.zoneLine == nil ) then d.zoneLine = true; end
+	if ( d.replaceLocalClock == nil ) then d.replaceLocalClock = false; end
+	if ( d.partyMeter == nil ) then d.partyMeter = false; end
+	if ( d.floatingText == nil ) then d.floatingText = false; end
 	if ( d.deathSound == nil ) then d.deathSound = false; end
 	if ( d.hideTarget == nil ) then d.hideTarget = false; end
 	if ( d.moveLevelButton == nil ) then d.moveLevelButton = false; end
@@ -279,12 +310,21 @@ end -- scoped chat filter helpers
 
 -- ---------------------------------------------------------------- the camera at its farthest: 50
 -- The game's Max Camera Distance slider is cameraDistanceMaxFactor, a factor of cameraDistanceMax (15 yards): its
--- top, 3.33, is 50 yards. Minor Mods sets it to 50 yards when the game starts (and zooms out to it once); turned off
--- in /azsmods, the game's own setting stays.
+-- top, 3.33, is 50 yards. Slim Suite sets it to 50 yards when the game starts (and zooms out to it once); turned off
+-- in /slimsuite, the game's own setting stays.
 local MAX_CAMERA = 50;
 
 local function Camera(zoomOut)
-	if ( not DB().camera or not SetCVar ) then return; end
+	if ( not SetCVar ) then return; end
+	local d = DB();
+	if ( not d.camera ) then
+		if ( d.cameraOriginal ) then pcall(SetCVar, "cameraDistanceMaxFactor", d.cameraOriginal); d.cameraOriginal = nil; end
+		return;
+	end
+	if ( not d.cameraOriginal and GetCVar ) then
+		local ok, v = pcall(GetCVar, "cameraDistanceMaxFactor");
+		if ( ok and v ) then d.cameraOriginal = v; end
+	end
 	local base = 15;
 	if ( GetCVar ) then
 		local ok, v = pcall(GetCVar, "cameraDistanceMax");
@@ -300,238 +340,20 @@ local function ApplyGuardianFlag()
 	end
 end
 
--- ---------------------------------------------------------------- raid markers on bosses and guardians, and on friends who fall
--- The API returns real bosses in spawn order. Awake Guardians follow that list, as requested by the shared
--- boss/Guardian marker rule. Rebuild the four kill markers from the current ordered API data on each update.
--- Boss markers: Skull (8), Cross (7), Circle (2), Star (1). Friendly death markers: Diamond (3),
--- Triangle (4), Moon (5), Square (6).
-local BOSS_ICONS = { 8, 7, 2, 1 };
-local DEATH_ICONS = { 3, 4, 5, 6 };
-local DEATH_BLINKS = 16;                                 -- on and off this many times
-local DEATH_SOUND = "Interface\\AddOns\\AZSMinorMods\\Baby Crying.mp3";
+-- ---------------------------------------------------------------- the death sound
+-- Boss, guardian and downed-friend markers live in SlimSuiteWorld.lua. They draw their own markers through the
+-- game's world-anchor API and never change your target.
+local DEATH_SOUND = "Interface\\AddOns\\SlimSuite\\Baby Crying.mp3";
 local function PlayDeathSound()
 	if ( not DB().deathSound or not PlaySoundFile ) then return; end
 	pcall(PlaySoundFile, DEATH_SOUND);
 end
+SlimSuite_PlayDeathSound = PlayDeathSound;
+SlimSuite_DB = DB;
 
 local deathSoundFrame = CreateFrame("Frame");
 deathSoundFrame:RegisterEvent("PLAYER_DEAD");
 deathSoundFrame:SetScript("OnEvent", function() PlayDeathSound(); end);
-
-local marked = {};                                        -- boss/guardian id -> { icon, name }
-local tries = {};                                         -- boss id -> target-and-back tries (at most 3)
-local fallen = {};                                        -- party unit -> was down at the last look
-local partyNames = {};                                    -- party unit -> identity, so a replacement in the same slot is new
-local blinks = {};                                        -- party unit -> { left = times, at = next change, on = shown }
-
-local function Units()
-	local u = { "target", "mouseover", "targettarget" };
-	for i = 1, 4 do table.insert(u, "party" .. i .. "target"); end
-	return u;
-end
-
-local function Mark(unit, icon)
-	if ( not SetRaidTarget or not UnitExists(unit) ) then return false; end
-	if ( GetRaidTargetIndex and GetRaidTargetIndex(unit) == icon ) then return true; end
-	return pcall(SetRaidTarget, unit, icon);
-end
-
-local function MarkBoss(name, icon, id, duplicateName)
-	local list = Units();
-	for i = 1, table.getn(list) do
-		local u = list[i];
-		if ( UnitExists(u) and UnitName(u) == name and not UnitIsPlayer(u) and not UnitIsDead(u) ) then
-			-- A name alone cannot distinguish simultaneous same-name spawns. The API exposes
-			-- the current target's spawn id, so use it for that token and never guess between twins.
-			local targetMatches = not (u == "target" and type(AZS_TARGET) == "table" and
-				AZS_TARGET.id ~= nil and AZS_TARGET.id ~= id);
-			if ( targetMatches and (not duplicateName or (u == "target" and type(AZS_TARGET) == "table" and AZS_TARGET.id == id)) ) then
-				return Mark(u, icon);
-			end
-		end
-	end
-	if ( duplicateName ) then return false; end
-	-- not one of them: target it by its name, mark it, and give back the target there was
-	if ( not TargetByName or (tries[id] or 0) >= 3 ) then return false; end
-	tries[id] = (tries[id] or 0) + 1;
-	local had = UnitExists("target") and UnitName("target") or nil;
-	if ( not pcall(TargetByName, name, true) ) then return false; end
-	local ok = false;
-	if ( UnitExists("target") and UnitName("target") == name and
-		(type(AZS_TARGET) ~= "table" or AZS_TARGET.id == nil or AZS_TARGET.id == id) ) then ok = Mark("target", icon); end
-	if ( had and had ~= name ) then
-		if ( TargetLastTarget ) then pcall(TargetLastTarget); end
-	elseif ( not had and ClearTarget ) then
-		pcall(ClearTarget);
-	end
-	return ok;
-end
-
-local function ClearBossMark(id, assignment, duplicateName)
-	if ( type(assignment) ~= "table" or not assignment.icon or not SetRaidTarget ) then return; end
-	local list = Units();
-	for i = 1, table.getn(list) do
-		local u = list[i];
-		if ( UnitExists(u) and UnitName(u) == assignment.name and not UnitIsPlayer(u) and
-			not UnitIsDead(u) and GetRaidTargetIndex and GetRaidTargetIndex(u) == assignment.icon ) then
-			local targetMatches = not (u == "target" and type(AZS_TARGET) == "table" and
-				AZS_TARGET.id ~= nil and AZS_TARGET.id ~= id);
-			if ( targetMatches and (not duplicateName or (u == "target" and type(AZS_TARGET) == "table" and AZS_TARGET.id == id)) ) then
-				pcall(SetRaidTarget, u, 0);
-				return;
-			end
-		end
-	end
-	-- If it is uniquely named and not in the common unit tokens, target it briefly to clear only our old
-	-- marker. Requiring the API spawn ID prevents clearing a same-name replacement by mistake.
-	if ( duplicateName or not TargetByName or not UnitExists("target") and not ClearTarget ) then return; end
-	local had = UnitExists("target") and UnitName("target") or nil;
-	if ( not pcall(TargetByName, assignment.name, true) ) then return; end
-	if ( UnitExists("target") and UnitName("target") == assignment.name and type(AZS_TARGET) == "table" and
-		AZS_TARGET.id == id and GetRaidTargetIndex and GetRaidTargetIndex("target") == assignment.icon ) then
-		pcall(SetRaidTarget, "target", 0);
-	end
-	if ( had and TargetLastTarget ) then pcall(TargetLastTarget);
-	elseif ( not had and ClearTarget ) then pcall(ClearTarget); end
-end
-
-local function BossMarks()
-	local d = DB();
-	if ( not d.bossMarks ) then
-		for id, assignment in pairs(marked) do ClearBossMark(id, assignment, assignment.duplicate); marked[id] = nil; end
-		return;
-	end
-	-- only while a run is being played: out of it the list can still hold the last run's bosses
-	if ( type(AZS_GetPhase) == "function" and AZS_GetPhase() ~= "playing" ) then return; end
-	local active, alive, ordered = {}, {}, {};
-	-- The creator guarantees AZS_GetBosses() is in spawn order. Keep all current real bosses
-	-- ahead of guardians so the first living boss always owns Skull and the next owns Cross.
-	-- Do not keep stale IDs from a prior list order: this is recomputed on each AZSUNITS update.
-	local function AddInOrder(list, defaultKind, includeSleepingGuardians)
-		if type(list) ~= "table" then return; end
-		for i = 1, table.getn(list) do
-			local unit = list[i];
-			local kind = type(unit) == "table" and (unit.kind or (unit.final and "final") or defaultKind) or nil;
-			if type(unit) == "table" and unit.id and unit.name and
-				(kind ~= "guardian" or includeSleepingGuardians or unit.awake == true or unit.state == 1) then
-					if not active[unit.id] then
-						local item = { id = unit.id, name = unit.name, kind = kind or "boss" };
-						active[unit.id] = item;
-						table.insert(ordered, item);
-					end
-			end
-		end
-	end
-	local ok, bosses = false, nil;
-	if type(AZS_GetBosses) == "function" then ok, bosses = pcall(AZS_GetBosses); end
-	if ok then AddInOrder(bosses, "boss", false); end
-	local okGuardians, guardians = false, nil;
-	if type(AZS_GetGuardians) == "function" then okGuardians, guardians = pcall(AZS_GetGuardians); end
-	if okGuardians then AddInOrder(guardians, "guardian", false); end
-	-- Keep compatibility with the raw stream when a client build has not exposed the getters yet.
-	if table.getn(ordered) == 0 then
-		local units = type(AZS_UNITS) == "table" and AZS_UNITS or {};
-		for i = 1, table.getn(units) do
-			local u = units[i];
-			if type(u) == "table" and (u.kind == "final" or u.kind == "boss" or u.kind == "guardian") and
-				u.id and u.name and (u.kind ~= "guardian" or u.state == 1) then
-				AddInOrder({u}, u.kind, false);
-			end
-		end
-	end
-	for i = 1, table.getn(ordered) do alive[ordered[i].id] = true; end
-	local nameCounts = {};
-	for i = 1, table.getn(ordered) do nameCounts[ordered[i].name] = (nameCounts[ordered[i].name] or 0) + 1; end
-	for id, assignment in pairs(marked) do
-		local index;
-		for i = 1, table.getn(ordered) do if ( ordered[i].id == id ) then index = i; break; end end
-		local nextIcon = index and BOSS_ICONS[index] or nil;
-		if ( not alive[id] or assignment.icon ~= nextIcon ) then
-			local sameNameReplacement = false;
-			for i = 1, table.getn(ordered) do
-				if ( ordered[i].name == assignment.name and ordered[i].id ~= id ) then sameNameReplacement = true; break; end
-			end
-			ClearBossMark(id, assignment, assignment.duplicate or sameNameReplacement);
-			marked[id] = nil;
-		end
-	end
-	for i = 1, table.getn(ordered) do
-		local b, icon = ordered[i], BOSS_ICONS[i];
-		if ( icon and (not marked[b.id] or marked[b.id].icon ~= icon) ) then
-			local duplicateName = nameCounts[b.name] > 1;
-			if ( MarkBoss(b.name, icon, b.id, duplicateName) ) then marked[b.id] = { icon = icon, name = b.name, duplicate = duplicateName }; end
-		end
-	end
-	for id in pairs(tries) do if ( not alive[id] ) then tries[id] = nil; end end
-end
-
--- a friend down in co-op: their own marker over their head, on and off 16 times. The first three friends have their
--- own (Square, Moon, Circle); a fourth (a party of 5) takes whichever of the three is free, or waits for one.
-local function DeathIcon(u, i)
-	local used = {};
-	for v, b in pairs(blinks) do if ( v ~= u and b.icon ) then used[b.icon] = true; end end
-	if ( DEATH_ICONS[i] and not used[DEATH_ICONS[i]] ) then return DEATH_ICONS[i]; end
-	for k = 1, table.getn(DEATH_ICONS) do if ( not used[DEATH_ICONS[k]] ) then return DEATH_ICONS[k]; end end
-	return nil;
-end
-
-local function DeathMarks(now)
-	local d = DB();
-	for i = 1, 4 do
-		local u = "party" .. i;
-		if ( not UnitExists(u) ) then
-			fallen[u] = nil; partyNames[u] = nil;
-		else
-			local name = UnitName(u);
-			-- Wait for the unit's identity before counting a transition; this avoids double-alerts while the party frame loads.
-			if ( name ) then
-				if ( partyNames[u] ~= name ) then partyNames[u] = name; fallen[u] = false; end
-				local connected = not UnitIsConnected or UnitIsConnected(u);
-				local down = connected and (UnitIsDeadOrGhost and UnitIsDeadOrGhost(u) or UnitHealth(u) == 0) and true or false;
-				if ( down and not fallen[u] ) then
-					if ( d.deathSound ) then PlayDeathSound(); end
-					if ( d.deathMarks ) then blinks[u] = { left = DEATH_BLINKS * 2, at = now, on = false, slot = i }; end
-				end
-				fallen[u] = down;
-			end
-		end
-	end
-	if ( not d.deathMarks ) then
-		for u in pairs(blinks) do if ( UnitExists(u) ) then pcall(SetRaidTarget, u, 0); end; blinks[u] = nil; end
-		return;
-	end
-	for u, b in pairs(blinks) do
-		if ( not b.icon ) then b.icon = DeathIcon(u, b.slot); end
-		if ( b.icon and now >= b.at ) then
-			b.on = not b.on;
-			if ( UnitExists(u) ) then pcall(SetRaidTarget, u, b.on and b.icon or 0); end
-			b.left = b.left - 1;
-			b.at = now + 0.4;
-			if ( b.left <= 0 ) then
-				if ( UnitExists(u) ) then pcall(SetRaidTarget, u, 0); end
-				blinks[u] = nil;
-			end
-		end
-	end
-end
-
-local markFrame = CreateFrame("Frame");
-local nextBoss = 0;
-markFrame:RegisterEvent("CHAT_MSG_ADDON");
-markFrame:SetScript("OnEvent", function()
-	if ( arg1 == "AZSUNITS" ) then
-		nextBoss = GetTime() + 0.75;
-		pcall(BossMarks);
-	end
-end);
-markFrame:SetScript("OnUpdate", function()
-	local now = GetTime();
-	pcall(DeathMarks, now);
-	if ( now >= nextBoss ) then
-		nextBoss = now + 0.75;
-		pcall(BossMarks);
-	end
-end);
 
 
 -- ---------------------------------------------------------------- moving the UI, and the target frame
@@ -540,19 +362,24 @@ end);
 local MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "PartyMemberFrame1", "Party" },
                   { "MinimapCluster", "Minimap" }, { "BuffFrame", "Buffs" },
                   { "MainMenuBar", "Action bars" }, { "MainMenuExpBar", "XP bar" }, { "ChatFrame1", "Chat" },
-                  { "AZSMinorModsMeterFrame", "Damage meter" },
-                  { "AZSMinorModsStoredLevelsButton", "Level Up" },
-                  { "AZSMinorModsClockFrame", "Run clock / Next boss" },
-                  { "AZSMinorModsBossFrames", "Encounter bars" },
-                  { "AZSMinorModsAnnouncementFrame", "Event announcements" },
-                  { "AZSMinorModsSpellRowFrame", "Build spell row" },
-                  { "AZSMinorModsItemRowFrame", "Worn rings / trinkets" },
-                  { "AZSMinorModsTallyFrame", "Kills / Gold / Cache" }, { "GameTooltip", "Tooltip" } };
+                  { "SlimSuiteMeterFrame", "Damage meter" },
+                  { "SlimSuiteStoredLevelsButton", "Level Up" },
+                  { "SlimSuiteClockFrame", "Run clock / Next boss" },
+                  { "SlimSuiteBossFrames", "Encounter bars" },
+                  { "SlimSuiteAnnouncementFrame", "Event announcements" },
+                  { "SlimSuiteSpellRowFrame", "Build spell row" },
+                  { "SlimSuiteItemRowFrame", "Worn rings / trinkets" },
+                  { "SlimSuiteTallyFrame", "Kills / Gold / Cache" }, { "GameTooltip", "Tooltip" },
+                  { "SlimSuiteReviveFrame", "Revive bar" },
+                  { "SlimSuiteCombatTextFrame", "Combat text (test)" },
+                  { "SlimSuiteLocalClockFrame", "Local clock" },
+                  { "SlimSuitePartyMeterFrame", "Party meter" } };
 local handles = {};
 local editOnly;
 local function IsEditing(name)
  return DB().unlocked and (not editOnly or editOnly == name);
 end
+SlimSuite_IsEditing = IsEditing;
 local baseSizes = {};
 local basePoints = {};
 local mutedBaseAlphas = {};
@@ -569,6 +396,7 @@ local editGrid, editGridLines = nil, {};
 local sizeTarget;
 local lockPanel;
 local ShowEditGrid;
+local PlaceAll, ApplyActionSlotGrid;
 local SetAnchorSnap;
 local xpBarDetached = false;
 local buffButtonOriginalPoints = {};
@@ -617,16 +445,16 @@ end
 local function LayoutItemRow()
 	if ( not itemRow ) then return; end
 	local gap = 4;
-	if ( not DB().sizes.AZSMinorModsItemRowFrame ) then
-		-- Keep the four equipment slots visible when empty so the row can always be placed and sized.
-		if ( DB().orientations.AZSMinorModsItemRowFrame == "vertical" ) then
-			itemRow:SetWidth(36); itemRow:SetHeight(4 * 32 + 3 * gap);
-		else itemRow:SetWidth(4 * 32 + 3 * gap); itemRow:SetHeight(36); end
+	if ( not DB().sizes.SlimSuiteItemRowFrame ) then
+		-- Keep the five jewelry slots visible when empty so the row can always be placed and sized.
+		if ( DB().orientations.SlimSuiteItemRowFrame == "vertical" ) then
+			itemRow:SetWidth(36); itemRow:SetHeight(5 * 32 + 4 * gap);
+		else itemRow:SetWidth(5 * 32 + 4 * gap); itemRow:SetHeight(36); end
 	end
-	local vertical = DB().orientations.AZSMinorModsItemRowFrame == "vertical";
+	local vertical = DB().orientations.SlimSuiteItemRowFrame == "vertical";
 	local width, height = itemRow:GetWidth() or 36, itemRow:GetHeight() or 36;
-	local iconSize = vertical and math.max(12, math.min(width - 4, (height - gap * 3) / 4))
-		or math.max(12, math.min(height - 4, (width - gap * 3) / 4));
+	local iconSize = vertical and math.max(12, math.min(width - 4, (height - gap * 4) / 5))
+		or math.max(12, math.min(height - 4, (width - gap * 4) / 5));
 	for i = 1, table.getn(itemRowButtons) do
 		local button = itemRowButtons[i];
 		button:ClearAllPoints();
@@ -639,12 +467,12 @@ end
 local function LayoutSpellRow()
 	if ( not spellRow ) then return; end
 	local gap = 4;
-	if ( not DB().sizes.AZSMinorModsSpellRowFrame ) then
-		if ( DB().orientations.AZSMinorModsSpellRowFrame == "vertical" ) then
+	if ( not DB().sizes.SlimSuiteSpellRowFrame ) then
+		if ( DB().orientations.SlimSuiteSpellRowFrame == "vertical" ) then
 			spellRow:SetWidth(36); spellRow:SetHeight(6 * 32 + 5 * gap);
 		else spellRow:SetWidth(6 * 32 + 5 * gap); spellRow:SetHeight(36); end
 	end
-	local vertical = DB().orientations.AZSMinorModsSpellRowFrame == "vertical";
+	local vertical = DB().orientations.SlimSuiteSpellRowFrame == "vertical";
 	local width, height = spellRow:GetWidth() or 36, spellRow:GetHeight() or 36;
 	local iconSize = vertical and math.max(12, math.min(width - 4, (height - gap * 5) / 6))
 		or math.max(12, math.min(height - 4, (width - gap * 5) / 6));
@@ -660,11 +488,11 @@ end
 
 -- Default replacement rows mirror the native build cluster: six spells in the upper row,
 -- worn jewelry directly below. The spell row uses the screenshot-based lower-left-center anchor.
-function AZSMinorMods_BuildRowDefaultPlace(name)
+function SlimSuite_BuildRowDefaultPlace(name)
 	local x, y = UIParent:GetWidth() * 0.275, UIParent:GetHeight() * 0.35;
-	if ( name == "AZSMinorModsItemRowFrame" ) then
+	if ( name == "SlimSuiteItemRowFrame" ) then
 		if ( DB().buildRowsAttached ) then
-			return { relative = "AZSMinorModsSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -4 };
+			return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -4 };
 		end
 		return { x = x, y = y - 40, coordinateSpace = "uiParent" };
 	end
@@ -693,7 +521,7 @@ local function RefreshItemRow()
 				d.itemRowEquipped[slot] = previous;
 			end
 			equipped[slot] = { texture = texture, link = link, order = previous.order,
-			                   knownName = AZSMinorModsItemCatalog and AZSMinorModsItemCatalog[ItemTextureKey(texture)] or nil };
+			                   knownName = SlimSuiteItemCatalog and SlimSuiteItemCatalog[ItemTextureKey(texture)] or nil };
 			table.insert(visible, { slot = slot, item = equipped[slot] });
 		else
 			d.itemRowEquipped[slot] = nil;
@@ -722,26 +550,26 @@ local function RefreshItemRow()
 	end
 	LayoutItemRow();
 	if ( d.replaceBuildRows ) then itemRow:Show(); else itemRow:Hide(); end
-	if ( IsEditing("AZSMinorModsItemRowFrame") and d.replaceBuildRows and handles.AZSMinorModsItemRowFrame ) then handles.AZSMinorModsItemRowFrame:Show(); end
+	if ( IsEditing("SlimSuiteItemRowFrame") and d.replaceBuildRows and handles.SlimSuiteItemRowFrame ) then handles.SlimSuiteItemRowFrame:Show(); end
 end
 
 local function CreateItemRow()
 	if ( itemRow or not UIParent ) then return; end
-	itemRow = CreateFrame("Frame", "AZSMinorModsItemRowFrame", UIParent);
-	itemRow:SetWidth(140); itemRow:SetHeight(36);
+	itemRow = CreateFrame("Frame", "SlimSuiteItemRowFrame", UIParent);
+	itemRow:SetWidth(176); itemRow:SetHeight(36);
 	local d = DB();
-	local oldItemPlace = d.places.AZSMinorModsItemRowFrame;
+	local oldItemPlace = d.places.SlimSuiteItemRowFrame;
 	if ( d.buildRowsAttached and type(oldItemPlace) == "table" and oldItemPlace.relative == "MainMenuBar"
 		and K.Num(oldItemPlace.dx) == 0 and K.Num(oldItemPlace.dy) == -4 ) then
-		oldItemPlace.relative = "AZSMinorModsSpellRowFrame";
+		oldItemPlace.relative = "SlimSuiteSpellRowFrame";
 	end
-	if ( not d.places.AZSMinorModsItemRowFrame ) then
-		d.places.AZSMinorModsItemRowFrame = AZSMinorMods_BuildRowDefaultPlace("AZSMinorModsItemRowFrame");
+	if ( not d.places.SlimSuiteItemRowFrame ) then
+		d.places.SlimSuiteItemRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteItemRowFrame");
 	end
 	itemRow:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 8, -130);
 	itemRow:SetFrameStrata("MEDIUM");
-	for i = 1, 4 do
-		local button = CreateFrame("Button", "AZSMinorModsItemButton" .. i, itemRow);
+	for i = 1, table.getn(ITEM_EQUIP_SLOTS) do
+		local button = CreateFrame("Button", "SlimSuiteItemButton" .. i, itemRow);
 		button:SetWidth(32); button:SetHeight(32);
 		button:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2");
 		button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
@@ -850,15 +678,15 @@ local function RefreshSpellRow()
 	end
 	LayoutSpellRow();
 	if ( DB().replaceBuildRows ) then spellRow:Show(); else spellRow:Hide(); end
-	if ( IsEditing("AZSMinorModsSpellRowFrame") and DB().replaceBuildRows and handles.AZSMinorModsSpellRowFrame ) then handles.AZSMinorModsSpellRowFrame:Show(); end
+	if ( IsEditing("SlimSuiteSpellRowFrame") and DB().replaceBuildRows and handles.SlimSuiteSpellRowFrame ) then handles.SlimSuiteSpellRowFrame:Show(); end
 end
 
 local function CreateSpellRow()
 	if ( spellRow or not UIParent ) then return; end
-	spellRow = CreateFrame("Frame", "AZSMinorModsSpellRowFrame", UIParent);
+	spellRow = CreateFrame("Frame", "SlimSuiteSpellRowFrame", UIParent);
 	spellRow:SetWidth(212); spellRow:SetHeight(36); spellRow:SetFrameStrata("MEDIUM");
 	local d = DB();
-	local oldSpellPlace = d.places.AZSMinorModsSpellRowFrame;
+	local oldSpellPlace = d.places.SlimSuiteSpellRowFrame;
 	if ( type(oldSpellPlace) == "table" and oldSpellPlace.relative == "MainMenuBar"
 		and oldSpellPlace.point == "TOPLEFT" and oldSpellPlace.relativePoint == "BOTTOMLEFT"
 		and K.Num(oldSpellPlace.dx) == 0 and K.Num(oldSpellPlace.dy) == -4 ) then
@@ -866,12 +694,12 @@ local function CreateSpellRow()
 		oldSpellPlace.dx, oldSpellPlace.dy = nil, nil;
 		oldSpellPlace.x, oldSpellPlace.y, oldSpellPlace.coordinateSpace = UIParent:GetWidth() * 0.275, UIParent:GetHeight() * 0.35, "uiParent";
 	end
-	if ( not d.places.AZSMinorModsSpellRowFrame ) then
-		d.places.AZSMinorModsSpellRowFrame = AZSMinorMods_BuildRowDefaultPlace("AZSMinorModsSpellRowFrame");
+	if ( not d.places.SlimSuiteSpellRowFrame ) then
+		d.places.SlimSuiteSpellRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteSpellRowFrame");
 	end
 	spellRow:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 8, 170);
 	for i = 1, 6 do
-		local button = CreateFrame("Button", "AZSMinorModsSpellButton" .. i, spellRow);
+		local button = CreateFrame("Button", "SlimSuiteSpellButton" .. i, spellRow);
 		button:SetID(i); button:SetWidth(32); button:SetHeight(32);
 		button:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2");
 		button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
@@ -940,12 +768,12 @@ itemRowEvents:SetScript("OnEvent", function()
 	if ( event == "UNIT_INVENTORY_CHANGED" and arg1 ~= "player" ) then return; end
 	pcall(RefreshItemRow);
 end);
--- Some game gear changes are applied by the run rather than a bag click. Poll the four exposed
+-- Some game gear changes are applied by the run rather than a bag click. Poll the five jewelry
 -- equipment slots as a fallback so the item deck updates even if that transition omits the event.
 local itemRowPoll = 0;
 itemRowEvents:SetScript("OnUpdate", function()
 	itemRowPoll = itemRowPoll + (arg1 or 0);
-	if ( itemRowPoll >= 0.5 ) then itemRowPoll = 0; pcall(RefreshItemRow); pcall(RefreshSpellRow); pcall(ApplyBuildRowReplacement); end
+	if ( itemRowPoll >= 0.5 ) then itemRowPoll = 0; pcall(RefreshSpellRow); pcall(ApplyBuildRowReplacement); end
 end);
 
 local spellRowEvents = CreateFrame("Frame");
@@ -999,7 +827,7 @@ local function UpdateTally()
 		end
 		tallyFrame:Show();
 		SetNativeTallyHidden(true);
-	elseif ( IsEditing("AZSMinorModsTallyFrame") ) then
+	elseif ( IsEditing("SlimSuiteTallyFrame") ) then
 		if ( DB().tallyVertical ) then tallyFrame.text:SetText("Kills  -\nGold  -\nCache  -");
 		else tallyFrame.text:SetText("Kills -    Gold -    Cache -"); end
 		tallyFrame:Show();
@@ -1011,7 +839,7 @@ local function UpdateTally()
 end
 
 local function CreateTallyFrame()
-	tallyFrame = CreateFrame("Frame", "AZSMinorModsTallyFrame", UIParent);
+	tallyFrame = CreateFrame("Frame", "SlimSuiteTallyFrame", UIParent);
 	tallyFrame:SetWidth(252);
 	tallyFrame:SetHeight(28);
 	tallyFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 12, 24);
@@ -1070,7 +898,7 @@ local function MeterNumber(value)
 end
 
 local function CreateMeterFrame()
-	meterFrame = CreateFrame("Frame", "AZSMinorModsMeterFrame", UIParent);
+	meterFrame = CreateFrame("Frame", "SlimSuiteMeterFrame", UIParent);
 	meterFrame:SetWidth(250); meterFrame:SetHeight(180);
 	meterFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -8, 44);
 	meterFrame:SetFrameStrata("HIGH");
@@ -1079,7 +907,7 @@ local function CreateMeterFrame()
 	meterFrame:SetBackdropColor(0.025, 0.02, 0.035, 0.88);
 	meterFrame:SetBackdropBorderColor(0.7, 0.52, 0.2, 0.9);
 	meterFrame:EnableMouse(false);
-	AZSMinorModsMeter.Attach(meterFrame);
+	SlimSuiteMeter.Attach(meterFrame);
 	local savedOriginal = DB().meterNativeOriginal;
 	if ( savedOriginal ~= nil ) then
 		meterNativeWasShown = savedOriginal and true or false;
@@ -1104,7 +932,7 @@ UpdateMeter = function()
 	if ( not meterFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local active = phase and phase ~= "ready";
-	local editing = IsEditing("AZSMinorModsMeterFrame") and DB().moveMeter;
+	local editing = IsEditing("SlimSuiteMeterFrame") and DB().moveMeter;
 	if ( not DB().moveMeter ) then
 		meterFrame:Hide(); SetNativeMeterHidden(false); return;
 	end
@@ -1113,7 +941,7 @@ UpdateMeter = function()
 	end
 	SetNativeMeterHidden(true);
 	meterFrame:Show();
-	AZSMinorModsMeter.Draw(active, editing);
+	SlimSuiteMeter.Draw(active, editing);
 end
 
 local meterPoll = CreateFrame("Frame");
@@ -1207,6 +1035,18 @@ local function UpdateLevelButton()
 	local canReplace = type(AZS_OpenStoredLevels) == "function";
 	local replacing = DB().moveLevelButton and canReplace;
 	SetNativeLevelButtonHidden(replacing);
+	if ( levelButton.store ) then
+		local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
+		local inRun = phase == "playing" or phase == "choosing" or phase == "paused";
+		if ( replacing and type(AZS_SetStoringLevels) == "function" and (inRun or IsEditing("SlimSuiteStoredLevelsButton")) ) then
+			local ok, storing = false, nil;
+			if ( type(AZS_IsStoringLevels) == "function" ) then ok, storing = pcall(AZS_IsStoringLevels); end
+			levelButton.store:SetChecked((ok and storing) and 1 or nil);
+			levelButton.store:Show();
+		else
+			levelButton.store:Hide();
+		end
+	end
 	if ( not replacing ) then levelButton:Hide(); return; end
 	local count = 0;
 	if ( type(AZS_GetStoredLevels) == "function" ) then
@@ -1230,6 +1070,8 @@ local function RestoreNativeHudOnLogout()
 	local d = DB();
 	local restore = {
 		{ "build", "buildNativeOriginal" },
+		{ "revive", "reviveNativeOriginal" },
+		{ "localClock", "localClockNativeOriginal" },
 		{ "tally", "tallyNativeOriginal" },
 		{ "meter", "meterNativeOriginal" },
 		{ "clock", "clockNativeOriginal" },
@@ -1245,6 +1087,33 @@ local function RestoreNativeHudOnLogout()
 		end
 	end
 end
+
+-- The Create* functions below run while this file loads, before WoW has loaded SlimSuiteDB, so they
+-- never see an original saved by a session that crashed. Once the saved settings are in, put back any
+-- native HUD element that session left hidden and remember it as the original state.
+local function RestoreNativeHudAfterLoad()
+	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
+	local d = DB();
+	local keys = { "build", "buildNativeOriginal", "tally", "tallyNativeOriginal", "meter", "meterNativeOriginal",
+		"clock", "clockNativeOriginal", "bosses", "bossNativeOriginal", "banners", "bannerNativeOriginal",
+		"levels", "levelNativeOriginal", "revive", "reviveNativeOriginal", "localClock", "localClockNativeOriginal" };
+	for i = 1, table.getn(keys), 2 do
+		local part, key = keys[i], keys[i + 1];
+		local original = d[key];
+		if ( type(original) == "boolean" and pcall(AZS_SetHudShown, part, original) ) then
+			d[key] = nil;
+			if ( part == "build" ) then buildNativeWasShown = original;
+			elseif ( part == "tally" ) then tallyNativeWasShown = original;
+			elseif ( part == "meter" ) then meterNativeWasShown = original;
+			elseif ( part == "clock" ) then clockNativeWasShown = original;
+			elseif ( part == "bosses" ) then bossNativeWasShown = original;
+			elseif ( part == "banners" ) then bannerNativeWasShown = original;
+			elseif ( part == "levels" ) then levelNativeWasShown = original;
+			elseif ( SlimSuiteWorld and SlimSuiteWorld.SetNativeOriginal ) then SlimSuiteWorld.SetNativeOriginal(part, original); end
+		end
+	end
+end
+SlimSuite_RestoreNativeHudAfterLoad = RestoreNativeHudAfterLoad;
 
 local nativeHudShutdown = CreateFrame("Frame");
 nativeHudShutdown:RegisterEvent("PLAYER_LOGOUT");
@@ -1288,7 +1157,7 @@ local function CreateLevelButton()
 		if ( shown == nil ) then shown = true; end
 		levelNativeWasShown = shown;
 	end
-	levelButton = CreateFrame("Button", "AZSMinorModsStoredLevelsButton", UIParent);
+	levelButton = CreateFrame("Button", "SlimSuiteStoredLevelsButton", UIParent);
 	levelButton:SetWidth(184);
 	levelButton:SetHeight(58);
 	levelButton:SetFrameStrata("MEDIUM");
@@ -1331,7 +1200,7 @@ local function CreateLevelButton()
 	levelButton.count:SetPoint("TOPRIGHT", levelButton.classIcon, "TOPRIGHT", 7, 7);
 	levelButton.count:SetTextColor(1, 0.78, 0.18);
 	local function LevelButtonBaseScale()
-		return type(DB().scales.AZSMinorModsStoredLevelsButton) == "number" and DB().scales.AZSMinorModsStoredLevelsButton or 1;
+		return type(DB().scales.SlimSuiteStoredLevelsButton) == "number" and DB().scales.SlimSuiteStoredLevelsButton or 1;
 	end
 	local function CaptureLevelButtonPoints()
 		local points = {};
@@ -1382,6 +1251,27 @@ local function CreateLevelButton()
 	if ( MainMenuBar ) then levelButton:SetPoint("BOTTOMLEFT", MainMenuBar, "TOPLEFT", 0, 6);
 	else levelButton:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 32, 100); end
 	levelButton:Hide();
+	-- A tiny toggle to the right of the button: store level-ups or take them as they come (AZS_SetStoringLevels).
+	-- It is its own frame, anchored to the button, so it stays visible while the button hides at 0 stored levels
+	-- (otherwise storing could be switched off but never back on).
+	local store = CreateFrame("CheckButton", "SlimSuiteStoreLevelsToggle", UIParent, "UICheckButtonTemplate");
+	store:SetWidth(20); store:SetHeight(20);
+	store:SetPoint("LEFT", levelButton, "RIGHT", 2, 0);
+	store:SetFrameStrata("MEDIUM");
+	store:SetScript("OnClick", function()
+		if ( type(AZS_SetStoringLevels) == "function" ) then pcall(AZS_SetStoringLevels, this:GetChecked() and true or false); end
+		pcall(UpdateLevelButton);
+	end);
+	store:SetScript("OnEnter", function()
+		if ( not GameTooltip ) then return; end
+		GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+		GameTooltip:AddLine("Store level-ups", 1, 0.82, 0);
+		GameTooltip:AddLine(this:GetChecked() and "On: level-ups wait here until you spend them." or "Off: level-up choices open as soon as you level.", 1, 1, 1, 1);
+		GameTooltip:Show();
+	end);
+	store:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
+	store:Hide();
+	levelButton.store = store;
 end
 
 local function ClockText(seconds)
@@ -1391,10 +1281,10 @@ local function ClockText(seconds)
 end
 
 local function FramePaddingLimit(name)
-	if ( name == "AZSMinorModsClockFrame" ) then return 6; end
-	if ( name == "AZSMinorModsBossFrames" ) then return 8; end
-	if ( name == "AZSMinorModsTallyFrame" ) then return 8; end
-	if ( name == "AZSMinorModsAnnouncementFrame" ) then return 20; end
+	if ( name == "SlimSuiteClockFrame" ) then return 6; end
+	if ( name == "SlimSuiteBossFrames" ) then return 8; end
+	if ( name == "SlimSuiteTallyFrame" ) then return 8; end
+	if ( name == "SlimSuiteAnnouncementFrame" ) then return 20; end
 	if ( name == "BuffFrame" ) then return 16; end
 	return 0;
 end
@@ -1406,9 +1296,9 @@ end
 
 local function ApplyClockLayout()
 	if ( not clockFrame or not clockFrame.time or not clockFrame.next ) then return; end
-	local orientation = DB().orientations.AZSMinorModsClockFrame;
+	local orientation = DB().orientations.SlimSuiteClockFrame;
 	if ( orientation ~= "horizontal" ) then orientation = "vertical"; end
-	local padding = FramePadding("AZSMinorModsClockFrame");
+	local padding = FramePadding("SlimSuiteClockFrame");
 	if ( orientation == "vertical" ) then
 		clockFrame.time:ClearAllPoints();
 		clockFrame.time:SetPoint("TOP", clockFrame, "TOP", 0, -padding);
@@ -1431,7 +1321,7 @@ local function ApplyClockLayout()
 end
 
 local function CreateClockFrame()
-	clockFrame = CreateFrame("Frame", "AZSMinorModsClockFrame", UIParent);
+	clockFrame = CreateFrame("Frame", "SlimSuiteClockFrame", UIParent);
 	clockFrame:SetWidth(220);
 	clockFrame:SetHeight(54);
 	clockFrame:SetPoint("TOP", UIParent, "TOP", 0, -6);
@@ -1447,6 +1337,10 @@ local function CreateClockFrame()
 	clockFrame.next:SetWidth(220);
 	clockFrame.next:SetJustifyH("CENTER");
 	clockFrame.next:SetTextColor(0.74, 0.72, 0.66);
+	-- The zone line (AZS_ZONE): where you are and the run's Heroic affixes, just under the clock.
+	clockFrame.zone = clockFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	clockFrame.zone:SetPoint("TOP", clockFrame, "BOTTOM", 0, -1);
+	clockFrame.zone:SetTextColor(0.85, 0.75, 0.55);
 	-- Both lines share one parent and one movement handle; they cannot be separated while repositioning.
 	ApplyClockLayout();
 	local savedOriginal = DB().clockNativeOriginal;
@@ -1483,15 +1377,16 @@ local function CreateClockFrame()
 end
 
 local function BossPriority(unit)
-	if ( unit.kind == "final" ) then return 1; end
-	if ( unit.kind == "boss" ) then return 2; end
-	if ( unit.kind == "guardian" ) then return 3; end
-	if ( unit.kind == "elite" ) then return 4; end
+	local kind = UnitKind(unit);
+	if ( kind == "final" ) then return 1; end
+	if ( kind == "boss" ) then return 2; end
+	if ( kind == "guardian" ) then return 3; end
+	if ( kind == "elite" ) then return 4; end
 	return nil;
 end
 
 local function EncounterVertical()
-	return DB().orientations.AZSMinorModsBossFrames == "vertical";
+	return DB().orientations.SlimSuiteBossFrames == "vertical";
 end
 
 local function SetGameDefaultFont(fontString, size)
@@ -1508,10 +1403,10 @@ local function EncounterList()
 	for i = 1, table.getn(units) do
 		local unit = units[i];
 		local priority = type(unit) == "table" and BossPriority(unit) or nil;
-		local awake = type(unit) == "table" and (unit.kind ~= "guardian" or unit.state == 1);
+		local awake = type(unit) == "table" and (UnitKind(unit) ~= "guardian" or unit.state == 1);
 		if ( priority and awake and type(unit.id) == "number" and type(unit.name) == "string"
 			and type(unit.hp) == "number" and type(unit.hpm) == "number" and unit.hp > 0 and unit.hpm > 0 ) then
-			table.insert(list, { id = unit.id, name = unit.name, kind = unit.kind, hp = unit.hp, hpm = unit.hpm, priority = priority, order = i });
+			table.insert(list, { id = unit.id, name = unit.name, kind = UnitKind(unit), hp = unit.hp, hpm = unit.hpm, priority = priority, order = i });
 		end
 	end
 	table.sort(list, function(a, b)
@@ -1595,9 +1490,9 @@ local function UpdateEncounterRows(list)
 	local count = table.getn(list);
 	if ( count == 0 ) then return 0; end
 	local vertical = EncounterVertical();
-	local padding = FramePadding("AZSMinorModsBossFrames");
+	local padding = FramePadding("SlimSuiteBossFrames");
 	local gap = (vertical and 10 or 8) + padding;
-	local configured = DB().sizes.AZSMinorModsBossFrames;
+	local configured = DB().sizes.SlimSuiteBossFrames;
 	-- Match the default boss target-frame scale shown in the reference: a readable, substantial
 	-- nameplate and health bar rather than a tiny floating strip. Cards still distribute evenly
 	-- when several enemies are active.
@@ -1653,10 +1548,33 @@ local function UpdateEncounterRows(list)
 		local health = math.max(0, math.min(1, unit.hp / unit.hpm));
 		row.bar:SetMinMaxValues(0, 1);
 		row.bar:SetValue(health);
+		if ( SlimSuiteWorld and SlimSuiteWorld.DrawDebuffs ) then
+			pcall(SlimSuiteWorld.DrawDebuffs, row, unit, vertical, DB().encounterDebuffs);
+		end
 		row:Show();
 	end
 	for i = table.getn(list) + 1, table.getn(encounterRows) do encounterRows[i]:Hide(); end
 	return frameHeight;
+end
+
+-- AZS_ZONE (0.87; affixes added in 0.124): the zone, how long it lasts, and the run's Heroic affixes as lowercase
+-- English words ("sanguine,explosive"). Shown as "Zone  -  Sanguine, Explosive".
+local function ZoneText()
+	local z = type(AZS_ZONE) == "table" and AZS_ZONE or nil;
+	if ( not z ) then return nil; end
+	local name = z.name or z.zone or z.title;
+	local affixes = z.affixes;
+	local list = {};
+	if ( type(affixes) == "string" ) then
+		for word in string.gfind(affixes, "[^,%s]+") do table.insert(list, word); end
+	elseif ( type(affixes) == "table" ) then
+		for i = 1, table.getn(affixes) do if ( type(affixes[i]) == "string" ) then table.insert(list, affixes[i]); end end
+	end
+	for i = 1, table.getn(list) do list[i] = string.upper(string.sub(list[i], 1, 1)) .. string.sub(list[i], 2); end
+	local text = type(name) == "string" and name or "";
+	if ( table.getn(list) > 0 ) then text = (text ~= "" and (text .. "  -  ") or "") .. table.concat(list, ", "); end
+	if ( text == "" ) then return nil; end
+	return text;
 end
 
 local function UpdateClock()
@@ -1666,7 +1584,7 @@ local function UpdateClock()
 	local live = phase == "ready" or phase == "playing" or phase == "choosing" or phase == "paused";
 	-- This movable replacement must not inherit the native clock's independent HUD visibility flag.
 	local showClock = live;
-	local preview = IsEditing("AZSMinorModsClockFrame") and not showClock;
+	local preview = IsEditing("SlimSuiteClockFrame") and not showClock;
 	if ( showClock ) then
 		local elapsed = type(AZS_GetRunTime) == "function" and AZS_GetRunTime() or nil;
 		if ( phase == "ready" and type(elapsed) ~= "number" ) then elapsed = 0; end
@@ -1699,9 +1617,13 @@ local function UpdateClock()
 			clockFrame.next:Hide();
 		end
 	end
+	if ( clockFrame.zone ) then
+		local zone = DB().zoneLine and (ZoneText() or (preview and "Scholomance  -  Sanguine, Explosive")) or nil;
+		if ( zone and (showClock or preview) ) then clockFrame.zone:SetText(zone); clockFrame.zone:Show(); else clockFrame.zone:Hide(); end
+	end
 	if ( showClock or preview ) then
 		clockFrame:Show();
-		ClampAbsoluteFrame("AZSMinorModsClockFrame", clockFrame);
+		ClampAbsoluteFrame("SlimSuiteClockFrame", clockFrame);
 	else clockFrame:Hide(); end
 end
 
@@ -1717,20 +1639,20 @@ local function UpdateBossFrames()
 		local height = UpdateEncounterRows(list);
 		if ( height > 0 ) then
 			bossFrame:SetHeight(height);
-			ClampAbsoluteFrame("AZSMinorModsBossFrames", bossFrame);
+			ClampAbsoluteFrame("SlimSuiteBossFrames", bossFrame);
 			SetNativeBossesHidden(true);
 			bossFrame:Show();
 		else
 			SetNativeBossesHidden(false);
 			bossFrame:Hide();
 		end
-	elseif ( IsEditing("AZSMinorModsBossFrames") ) then
+	elseif ( IsEditing("SlimSuiteBossFrames") ) then
 		for i = 1, table.getn(encounterRows) do encounterRows[i]:Hide(); end
 		local vertical = EncounterVertical();
-		local configured = DB().sizes.AZSMinorModsBossFrames;
+		local configured = DB().sizes.SlimSuiteBossFrames;
 		bossFrame:SetWidth(type(configured) == "table" and configured.w or (vertical and 76 or 520));
 		bossFrame:SetHeight(type(configured) == "table" and configured.h or (vertical and 252 or 48));
-		ClampAbsoluteFrame("AZSMinorModsBossFrames", bossFrame);
+		ClampAbsoluteFrame("SlimSuiteBossFrames", bossFrame);
 		SetNativeBossesHidden(false);
 		bossFrame:Show();
 	else
@@ -1747,7 +1669,7 @@ encounterUpdates:SetScript("OnEvent", function()
 end);
 
 CreateClockFrame();
-bossFrame = CreateFrame("Frame", "AZSMinorModsBossFrames", UIParent);
+bossFrame = CreateFrame("Frame", "SlimSuiteBossFrames", UIParent);
 bossFrame:SetWidth(520);
 bossFrame:SetHeight(48);
 -- Match the game's centered encounter nameplate, with the independent run clock above it.
@@ -1757,7 +1679,7 @@ bossFrame:EnableMouse(false);
 bossFrame:Hide();
 
 local function CreateAnnouncementFrame()
-	announcementFrame = CreateFrame("Frame", "AZSMinorModsAnnouncementFrame", UIParent);
+	announcementFrame = CreateFrame("Frame", "SlimSuiteAnnouncementFrame", UIParent);
 	local bannerWidth = math.max(280, math.min(920, UIParent:GetWidth() - 24));
 	announcementFrame:SetWidth(bannerWidth);
 	announcementFrame:SetHeight(60);
@@ -1791,18 +1713,7 @@ local function CreateAnnouncementFrame()
 	announcementFrame:Hide();
 end
 
--- Posts "hello world" to /say when a run starts (its opening banner). Off when DB().helloOnStart is false.
-local lastHelloAt;
-local function MaybeHelloOnStart(banner)
-	if ( not DB().helloOnStart or type(banner) ~= "table" or type(banner.text) ~= "string" ) then return; end
-	if ( string.find(string.lower(banner.text), "survive the onslaught", 1, true) == nil ) then return; end
-	if ( lastHelloAt and GetTime() - lastHelloAt < 60 ) then return; end
-	lastHelloAt = GetTime();
-	pcall(SendChatMessage, "hello world", "SAY");
-end
-
 local function ShowAnnouncement(banner)
-	MaybeHelloOnStart(banner);
 	if ( not DB().replaceBanners ) then
 		if ( announcementFrame ) then announcementFrame:Hide(); end
 		SetNativeBannersHidden(false);
@@ -1824,7 +1735,7 @@ local function ShowAnnouncement(banner)
 	announcementStarted = GetTime();
 	announcementFrame:SetAlpha(0);
 	announcementFrame:Show();
-	ClampAbsoluteFrame("AZSMinorModsAnnouncementFrame", announcementFrame);
+	ClampAbsoluteFrame("SlimSuiteAnnouncementFrame", announcementFrame);
 	SetNativeBannersHidden(true);
 end
 
@@ -1848,12 +1759,12 @@ local function UpdateAnnouncementFrame()
 			alpha = (announcementDuration - elapsed) / announcementFade;
 		end
 		announcementFrame:SetAlpha(math.max(0, math.min(1, alpha)));
-	elseif ( IsEditing("AZSMinorModsAnnouncementFrame") ) then
+	elseif ( IsEditing("SlimSuiteAnnouncementFrame") ) then
 		announcementFrame.text:SetText("Hogger enters the battlefield!");
 		announcementFrame.text:SetTextColor(1, 0.24, 0.13);
 		announcementFrame:SetAlpha(1);
 		announcementFrame:Show();
-		ClampAbsoluteFrame("AZSMinorModsAnnouncementFrame", announcementFrame);
+		ClampAbsoluteFrame("SlimSuiteAnnouncementFrame", announcementFrame);
 	else
 		announcementFrame:Hide();
 	end
@@ -1959,10 +1870,10 @@ local function ApplySize(name, f)
 		f:SetWidth(s.w);
 		f:SetHeight(s.h);
 	end
-	if ( name == "AZSMinorModsClockFrame" ) then ApplyClockLayout(); end
+	if ( name == "SlimSuiteClockFrame" ) then ApplyClockLayout(); end
 	if ( name == "MainMenuBar" and ApplyMovableOrientation ) then ApplyMovableOrientation(name); end
-	if ( name == "AZSMinorModsItemRowFrame" ) then LayoutItemRow(); end
-	if ( name == "AZSMinorModsSpellRowFrame" ) then LayoutSpellRow(); end
+	if ( name == "SlimSuiteItemRowFrame" ) then LayoutItemRow(); end
+	if ( name == "SlimSuiteSpellRowFrame" ) then LayoutSpellRow(); end
 	local scale = DB().scales[name];
 	if ( type(scale) == "number" ) then
 		if ( name == "PartyMemberFrame1" ) then
@@ -2106,7 +2017,7 @@ end
 local function CurrentOrientation(name)
 	local orientation = DB().orientations[name];
 	if ( orientation == "vertical" or orientation == "horizontal" ) then return orientation; end
-	if ( name == "AZSMinorModsClockFrame" ) then return "vertical"; end
+	if ( name == "SlimSuiteClockFrame" ) then return "vertical"; end
 	if ( name == "PartyMemberFrame1" ) then return "vertical"; end
 	return "horizontal";
 end
@@ -2210,7 +2121,7 @@ local function ApplyBuffOrientation()
 	buffLayoutApplying = false;
 end
 
-local function ApplyActionSlotGrid()
+ApplyActionSlotGrid = function()
 	local on = DB().showEmptyActionSlots and true or false;
 	if ( on == actionSlotsGridApplied ) then return; end
 	local action = on and ActionButton_ShowGrid or ActionButton_HideGrid;
@@ -2272,7 +2183,7 @@ CaptureActionBarLayout = function()
 	end
 end
 
-function AZSMinorMods_RestoreRacialActionButtonLayout()
+function SlimSuite_RestoreRacialActionButtonLayout()
 	local original = actionBarOriginal;
 	if ( not original or not original.racial or not ActionButton12 ) then return; end
 	ActionButton12:SetWidth(original.racial.w); ActionButton12:SetHeight(original.racial.h);
@@ -2323,7 +2234,7 @@ ApplyMovableOrientation = function(name)
                 if ( showRacial and i == 7 ) then button:Show(); end
             end
         end
-		if ( not showRacial ) then AZSMinorMods_RestoreRacialActionButtonLayout(); end
+		if ( not showRacial ) then SlimSuite_RestoreRacialActionButtonLayout(); end
         MainMenuBar:SetWidth(vertical and side or side * buttonCount + gap * (buttonCount - 1) + racialGap);
         MainMenuBar:SetHeight(vertical and side * buttonCount + gap * (buttonCount - 1) + racialGap or side);
         if ( ActionBarUpButton ) then
@@ -2353,7 +2264,7 @@ ApplyMovableOrientation = function(name)
 		end
 	elseif ( name == "BuffFrame" ) then
 		ApplyBuffOrientation();
-	elseif ( name == "AZSMinorModsBossFrames" ) then
+	elseif ( name == "SlimSuiteBossFrames" ) then
 		UpdateBossFrames();
 	elseif ( name == "PartyMemberFrame1" ) then
 		local d = DB();
@@ -2378,7 +2289,7 @@ ApplyMovableOrientation = function(name)
 	end
 end
 
-function AZSMinorMods_RestoreNativeActionBarLayout()
+function SlimSuite_RestoreNativeActionBarLayout()
 	local original = actionBarOriginal;
 	if ( not original or not MainMenuBar ) then return; end
 	MainMenuBar:SetWidth(original.w); MainMenuBar:SetHeight(original.h);
@@ -2393,7 +2304,7 @@ function AZSMinorMods_RestoreNativeActionBarLayout()
 			end
 		end
 	end
-	AZSMinorMods_RestoreRacialActionButtonLayout();
+	SlimSuite_RestoreRacialActionButtonLayout();
 	for name, layout in pairs(original.arrows or {}) do
 		local arrow = getglobal(name);
 		if ( arrow ) then
@@ -2403,13 +2314,13 @@ function AZSMinorMods_RestoreNativeActionBarLayout()
 	end
 end
 
-function AZSMinorMods_SetRacialAbility(on)
+function SlimSuite_SetRacialAbility(on)
 	local d = DB();
 	d.showRacialAbility = on and true or false;
 	if ( on and CaptureActionBarLayout ) then pcall(CaptureActionBarLayout); end
 	if ( not d.showRacialAbility and not d.unlocked and not d.plainBar and d.orientations.MainMenuBar ~= "vertical"
 		and type(d.sizes.MainMenuBar) ~= "table" ) then
-		pcall(AZSMinorMods_RestoreNativeActionBarLayout);
+		pcall(SlimSuite_RestoreNativeActionBarLayout);
 	else
 		pcall(ApplyMovableOrientation, "MainMenuBar");
 	end
@@ -2463,7 +2374,7 @@ local function Place(name, ignoreAnchor)
 	end
 end
 
-local function PlaceAll()
+PlaceAll = function()
 	for i = 1, table.getn(MOVABLE) do pcall(Place, MOVABLE[i][1], true); end
 	-- Reapply saved frame-to-frame anchors after every movable frame has its stored size and base position.
 	for pass = 1, table.getn(MOVABLE) do
@@ -2480,11 +2391,11 @@ end
 local function ApplyTallyLayout(resetSize)
 	if ( not tallyFrame ) then return; end
 	local vertical = DB().tallyVertical and true or false;
-	local padding = FramePadding("AZSMinorModsTallyFrame");
+	local padding = FramePadding("SlimSuiteTallyFrame");
 	if ( resetSize ) then
 		local w, h = vertical and 104 or 252, vertical and 54 or 28;
 		tallyFrame:SetWidth(w); tallyFrame:SetHeight(h);
-		DB().sizes.AZSMinorModsTallyFrame = { w = w, h = h };
+		DB().sizes.SlimSuiteTallyFrame = { w = w, h = h };
 	end
 	if ( vertical ) then
 		tallyFrame.text:ClearAllPoints();
@@ -2503,21 +2414,21 @@ local function ApplyTallyLayout(resetSize)
 end
 
 local function ToggleMovableOrientation(name)
-	if ( name == "AZSMinorModsItemRowFrame" or name == "AZSMinorModsSpellRowFrame" ) then
+	if ( name == "SlimSuiteItemRowFrame" or name == "SlimSuiteSpellRowFrame" ) then
 		DB().orientations[name] = CurrentOrientation(name) == "vertical" and "horizontal" or "vertical";
-		if ( name == "AZSMinorModsItemRowFrame" ) then LayoutItemRow(); else LayoutSpellRow(); end
+		if ( name == "SlimSuiteItemRowFrame" ) then LayoutItemRow(); else LayoutSpellRow(); end
 		DB().sizes[name] = { w = getglobal(name):GetWidth(), h = getglobal(name):GetHeight() };
 		PlaceAll();
 		return;
 	end
-	if ( name == "AZSMinorModsTallyFrame" ) then
+	if ( name == "SlimSuiteTallyFrame" ) then
 		DB().tallyVertical = not DB().tallyVertical;
 		ApplyTallyLayout(true);
 		return;
 	end
 	local nextOrientation = CurrentOrientation(name) == "vertical" and "horizontal" or "vertical";
 	DB().orientations[name] = nextOrientation;
-	if ( name == "AZSMinorModsClockFrame" ) then
+	if ( name == "SlimSuiteClockFrame" ) then
 		local w, h = nextOrientation == "vertical" and 220 or 360, nextOrientation == "vertical" and 54 or 32;
 		clockFrame:SetWidth(w); clockFrame:SetHeight(h);
 		DB().sizes[name] = { w = w, h = h };
@@ -2527,7 +2438,7 @@ local function ToggleMovableOrientation(name)
 		return;
 	end
 	if ( name == "BuffFrame" ) then DB().buffCustomLayout = true; end
-	if ( name == "AZSMinorModsBossFrames" ) then DB().sizes[name] = nil; end
+	if ( name == "SlimSuiteBossFrames" ) then DB().sizes[name] = nil; end
 
 	if ( name == "MainMenuExpBar" or name == "MainMenuBar" ) then
 		local f = getglobal(name);
@@ -2546,10 +2457,10 @@ local function ToggleMovableOrientation(name)
 end
 
 local function ApplyMovablePadding(name)
-	if ( name == "AZSMinorModsClockFrame" ) then ApplyClockLayout();
-	elseif ( name == "AZSMinorModsBossFrames" ) then UpdateBossFrames();
-	elseif ( name == "AZSMinorModsTallyFrame" ) then ApplyTallyLayout(false);
-	elseif ( name == "AZSMinorModsAnnouncementFrame" and announcementFrame and announcementFrame.text ) then
+	if ( name == "SlimSuiteClockFrame" ) then ApplyClockLayout();
+	elseif ( name == "SlimSuiteBossFrames" ) then UpdateBossFrames();
+	elseif ( name == "SlimSuiteTallyFrame" ) then ApplyTallyLayout(false);
+	elseif ( name == "SlimSuiteAnnouncementFrame" and announcementFrame and announcementFrame.text ) then
 		local padding = FramePadding(name);
 		announcementFrame.text:ClearAllPoints();
 		announcementFrame.text:SetPoint("TOPLEFT", announcementFrame, "TOPLEFT", padding + 10, -padding);
@@ -2611,7 +2522,7 @@ end
 local function ToggleBuildRowsAttached()
 	if ( not itemRow or not spellRow or not MainMenuBar ) then return; end
 	if ( DB().buildRowsAttached ) then
-		for _, name in ipairs({ "AZSMinorModsSpellRowFrame", "AZSMinorModsItemRowFrame" }) do
+		for _, name in ipairs({ "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame" }) do
 			local frame = getglobal(name);
 			SavePosition(name, frame);
 			local p = DB().places[name];
@@ -2620,11 +2531,11 @@ local function ToggleBuildRowsAttached()
 		DB().buildRowsAttached = false;
 	else
 		-- Keep the spell row where the player left it; attach only the jewelry row beneath it.
-		SavePosition("AZSMinorModsSpellRowFrame", spellRow);
-		local spellPlace = DB().places.AZSMinorModsSpellRowFrame;
+		SavePosition("SlimSuiteSpellRowFrame", spellRow);
+		local spellPlace = DB().places.SlimSuiteSpellRowFrame;
 		if ( spellPlace ) then spellPlace.relative, spellPlace.point, spellPlace.relativePoint, spellPlace.dx, spellPlace.dy = nil, nil, nil, nil, nil; end
 		DB().buildRowsAttached = true;
-		DB().places.AZSMinorModsItemRowFrame = AZSMinorMods_BuildRowDefaultPlace("AZSMinorModsItemRowFrame");
+		DB().places.SlimSuiteItemRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteItemRowFrame");
 	end
 	PlaceAll();
 	if ( sizeMenu and sizeMenu.attachButton ) then
@@ -2687,25 +2598,25 @@ local function OpenSizeMenu(name, label)
 			local scaleRatio = effective / rootScale;
 			if ( scaleRatio <= 0 ) then scaleRatio = 1; end
 			if ( axis == "w" ) then
-				local minWidth = sizeTarget == "AZSMinorModsClockFrame" and CurrentOrientation(sizeTarget) == "horizontal" and 280 or 40;
-				if ( sizeTarget == "AZSMinorModsItemRowFrame" ) then minWidth = CurrentOrientation(sizeTarget) == "vertical" and 36 or 76; end
-				if ( sizeTarget == "AZSMinorModsSpellRowFrame" ) then minWidth = CurrentOrientation(sizeTarget) == "vertical" and 36 or 92; end
+				local minWidth = sizeTarget == "SlimSuiteClockFrame" and CurrentOrientation(sizeTarget) == "horizontal" and 280 or 40;
+				if ( sizeTarget == "SlimSuiteItemRowFrame" ) then minWidth = CurrentOrientation(sizeTarget) == "vertical" and 36 or 76; end
+				if ( sizeTarget == "SlimSuiteSpellRowFrame" ) then minWidth = CurrentOrientation(sizeTarget) == "vertical" and 36 or 92; end
 				if ( sizeTarget == "GameTooltip" ) then minWidth = 160; end
-				if ( sizeTarget == "AZSMinorModsMeterFrame" ) then minWidth = 300; end
+				if ( sizeTarget == "SlimSuiteMeterFrame" ) then minWidth = 300; end
 				w = math.max(minWidth, math.min((UIParent:GetWidth() or 1920) / scaleRatio, w + delta));
 			else
-				local minHeight = sizeTarget == "AZSMinorModsBossFrames" and CurrentOrientation(sizeTarget) == "vertical" and 60
-					or sizeTarget == "AZSMinorModsClockFrame" and CurrentOrientation(sizeTarget) == "vertical" and 40 or 24;
-				if ( sizeTarget == "AZSMinorModsBossFrames" ) then
+				local minHeight = sizeTarget == "SlimSuiteBossFrames" and CurrentOrientation(sizeTarget) == "vertical" and 60
+					or sizeTarget == "SlimSuiteClockFrame" and CurrentOrientation(sizeTarget) == "vertical" and 40 or 24;
+				if ( sizeTarget == "SlimSuiteBossFrames" ) then
 					local pad = FramePadding(sizeTarget);
 					minHeight = CurrentOrientation(sizeTarget) == "vertical" and math.max(60, 52 + (pad * 3)) or math.max(36, 36 + (pad * 4));
-				elseif ( sizeTarget == "AZSMinorModsClockFrame" and CurrentOrientation(sizeTarget) == "vertical" ) then
+				elseif ( sizeTarget == "SlimSuiteClockFrame" and CurrentOrientation(sizeTarget) == "vertical" ) then
 					minHeight = 36 + (FramePadding(sizeTarget) * 3);
-				elseif ( sizeTarget == "AZSMinorModsItemRowFrame" and CurrentOrientation(sizeTarget) == "vertical" ) then
+				elseif ( sizeTarget == "SlimSuiteItemRowFrame" and CurrentOrientation(sizeTarget) == "vertical" ) then
 					minHeight = 60;
-				elseif ( sizeTarget == "AZSMinorModsSpellRowFrame" and CurrentOrientation(sizeTarget) == "vertical" ) then
+				elseif ( sizeTarget == "SlimSuiteSpellRowFrame" and CurrentOrientation(sizeTarget) == "vertical" ) then
 					minHeight = 92;
-				elseif ( sizeTarget == "AZSMinorModsMeterFrame" ) then
+				elseif ( sizeTarget == "SlimSuiteMeterFrame" ) then
 					minHeight = 148;
 				elseif ( sizeTarget == "GameTooltip" ) then
 					minHeight = 80;
@@ -2721,8 +2632,9 @@ local function OpenSizeMenu(name, label)
 				t:SetWidth(w); t:SetHeight(h);
 			end
 			DB().sizes[sizeTarget] = { w = w, h = h };
+			if ( sizeTarget == "GameTooltip" ) then DB().tooltipCustom = true; end
 			if ( sizeTarget == "BuffFrame" ) then pcall(ApplyBuffOrientation); end
-			if ( sizeTarget == "AZSMinorModsClockFrame" ) then ApplyClockLayout(); end
+			if ( sizeTarget == "SlimSuiteClockFrame" ) then ApplyClockLayout(); end
 			PlaceAll();
 			sizeMenuWidth:SetText("Width: " .. math.floor(w + 0.5));
 			sizeMenuHeight:SetText("Height: " .. math.floor(h + 0.5));
@@ -2791,7 +2703,7 @@ local function OpenSizeMenu(name, label)
 				sizeMenuWidth:SetText("Width: " .. math.floor(t:GetWidth() + 0.5));
 				sizeMenuHeight:SetText("Height: " .. math.floor(t:GetHeight() + 0.5));
 			end
-			local orientation = sizeTarget == "AZSMinorModsTallyFrame" and (DB().tallyVertical and "vertical" or "horizontal") or CurrentOrientation(sizeTarget);
+			local orientation = sizeTarget == "SlimSuiteTallyFrame" and (DB().tallyVertical and "vertical" or "horizontal") or CurrentOrientation(sizeTarget);
 			sizeMenu.layoutButton:SetText(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical");
 		end);
 		layout:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -116);
@@ -2839,7 +2751,7 @@ local function OpenSizeMenu(name, label)
 		attachButton:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -208);
 		sizeMenu.attachButton = attachButton;
 		local reset = K.Button(sizeMenu, "Reset", 62, function()
-			if ( not AZSMinorMods_ResetElement(sizeTarget) ) then
+			if ( not SlimSuite_ResetElement(sizeTarget) ) then
 				K.Print(NAME, "the original size is not available yet; try again after the frame appears.");
 				return;
 			end
@@ -2857,11 +2769,11 @@ local function OpenSizeMenu(name, label)
 	local scale = DB().scales[name] or 1;
 	sizeMenuScaleInput:SetText(tostring(math.max(1, math.min(200, math.floor(scale * 100 + 0.5)))));
 	if ( sizeMenu.layoutButton ) then
-		local canOrient = name == "AZSMinorModsTallyFrame" or name == "AZSMinorModsClockFrame" or name == "AZSMinorModsBossFrames" or name == "AZSMinorModsSpellRowFrame" or name == "AZSMinorModsItemRowFrame" or name == "MainMenuBar" or name == "MainMenuExpBar" or name == "BuffFrame" or name == "PartyMemberFrame1";
+		local canOrient = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "SlimSuiteBossFrames" or name == "SlimSuiteSpellRowFrame" or name == "SlimSuiteItemRowFrame" or name == "MainMenuBar" or name == "MainMenuExpBar" or name == "BuffFrame" or name == "PartyMemberFrame1";
 		if ( canOrient ) then
 			sizeMenu.layoutButton:Show();
 			sizeMenu.layoutButton:SetWidth(name == "BuffFrame" and 116 or 138);
-			local orientation = name == "AZSMinorModsTallyFrame" and (DB().tallyVertical and "vertical" or "horizontal") or CurrentOrientation(name);
+			local orientation = name == "SlimSuiteTallyFrame" and (DB().tallyVertical and "vertical" or "horizontal") or CurrentOrientation(name);
 			sizeMenu.layoutButton:SetText(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical");
 		else
 			sizeMenu.layoutButton:Hide();
@@ -2872,11 +2784,11 @@ local function OpenSizeMenu(name, label)
 				sizeMenu.growthButton:SetText("Grow " .. BuffGrowthDirection());
 			else sizeMenu.growthButton:Hide(); end
 		end
-		if ( name == "AZSMinorModsSpellRowFrame" ) then
+		if ( name == "SlimSuiteSpellRowFrame" ) then
 			sizeMenu.attachButton:Show();
 			sizeMenu.attachButton:SetText(DB().buildRowsAttached and "Detach build rows" or "Attach build rows");
 		else sizeMenu.attachButton:Hide(); end
-		local canPad = name == "AZSMinorModsClockFrame" or name == "AZSMinorModsBossFrames" or name == "AZSMinorModsTallyFrame" or name == "AZSMinorModsAnnouncementFrame" or name == "BuffFrame";
+		local canPad = name == "SlimSuiteClockFrame" or name == "SlimSuiteBossFrames" or name == "SlimSuiteTallyFrame" or name == "SlimSuiteAnnouncementFrame" or name == "BuffFrame";
 		if ( canPad ) then
 			sizeMenu.paddingWheel:Show();
 			sizeMenuPadding:Show(); sizeMenu.padDown:Show(); sizeMenu.padUp:Show();
@@ -2906,7 +2818,7 @@ end
 
 local function ShowLockPanel()
 	if ( not lockPanel ) then
-		lockPanel = CreateFrame("Frame", "AZSMinorModsMovePanel", UIParent);
+		lockPanel = CreateFrame("Frame", "SlimSuiteMovePanel", UIParent);
 		lockPanel:SetWidth(374);
 		lockPanel:SetHeight(198);
 		lockPanel:SetFrameStrata("DIALOG");
@@ -2969,7 +2881,7 @@ local function ShowLockPanel()
 		snap:SetScript("OnClick", function() SetAnchorSnap(this:GetChecked() and true or false); end);
 		local snapLabel = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		snapLabel:SetPoint("LEFT", snap, "RIGHT", 0, 0); snapLabel:SetText("Snap nearby frames together");
-		local button = K.Button(lockPanel, "Done", 76, function() AZSMinorMods_SetUnlocked(false); end);
+		local button = K.Button(lockPanel, "Done", 76, function() SlimSuite_SetUnlocked(false); end);
 		button:SetPoint("BOTTOMRIGHT", lockPanel, "BOTTOMRIGHT", -8, 7);
 		lockPanel.doneButton = button;
 		local choose = K.Button(lockPanel, "Choose element", 210, nil);
@@ -2987,7 +2899,7 @@ local function ShowLockPanel()
 			local row = K.Button(choices, label, 208, function()
 				editOnly = name; choose:SetText(label .. " ▼"); all:UnlockHighlight(); choices:Hide();
 				if ( sizeMenu ) then sizeMenu:Hide(); end
-				AZSMinorMods_SetUnlocked(true, true);
+				SlimSuite_SetUnlocked(true, true);
 			end);
 			row:SetPoint("TOPLEFT", choices, "TOPLEFT", 4, -4 - (i - 1) * 23);
 		end
@@ -2996,7 +2908,7 @@ local function ShowLockPanel()
 		all = K.Button(lockPanel, "ALL?", 62, function()
 			editOnly = nil; choose:SetText("Choose element ▼"); all:LockHighlight(); choices:Hide();
 			if ( sizeMenu ) then sizeMenu:Hide(); end
-			AZSMinorMods_SetUnlocked(true, true);
+			SlimSuite_SetUnlocked(true, true);
 		end);
 		all:SetPoint("LEFT", choose, "RIGHT", 6, 0); all:LockHighlight();
 	end
@@ -3023,7 +2935,7 @@ ShowEditGrid = function()
 	HideEditGrid();
 	if ( not DB().showEditGrid or not DB().unlocked ) then return; end
 	if ( not editGrid ) then
-		editGrid = CreateFrame("Frame", "AZSMinorModsEditGrid", UIParent);
+		editGrid = CreateFrame("Frame", "SlimSuiteEditGrid", UIParent);
 		editGrid:SetAllPoints(UIParent);
 		editGrid:SetFrameStrata("HIGH");
 		editGrid:EnableMouse(false);
@@ -3219,7 +3131,7 @@ local function Handle(name, label)
 end
 
 -- unlocked: the handles show (the frames are shown too, so even an empty party frame can be placed)
-function AZSMinorMods_SetUnlocked(on, quiet)
+function SlimSuite_SetUnlocked(on, quiet)
 	DB().unlocked = on and true or false;
 	if ( on and GameTooltip ) then
 		local size = DB().sizes.GameTooltip;
@@ -3275,6 +3187,8 @@ local function HookTooltipOwner()
 	GameTooltip.SetOwner = function(self, owner, anchor, x, y)
 		tooltipOwnerOriginal(self, owner, anchor, x, y);
 		if ( self.SetClampedToScreen ) then self:SetClampedToScreen(true); end
+		-- Leave every tooltip at the game's own size until the player resizes it or moves it.
+		if ( not DB().tooltipCustom and not DB().unlocked ) then return; end
 		local size = DB().sizes.GameTooltip;
 		if ( type(size) ~= "table" ) then size = { w = 260, h = 140 }; DB().sizes.GameTooltip = size; end
 		self:SetWidth(size.w); self:SetHeight(size.h);
@@ -3286,7 +3200,7 @@ local function HookTooltipOwner()
 	if ( GameTooltip.Show and not tooltipShowOriginal ) then
 		tooltipShowOriginal = GameTooltip.Show;
 		GameTooltip.Show = function(self)
-			local size = DB().sizes.GameTooltip;
+			local size = (DB().tooltipCustom or DB().unlocked) and DB().sizes.GameTooltip or nil;
 			-- Set wrapping width before the game lays out its rows. Applying it only after Show
 			-- leaves the old row heights in place and lets long text paint outside the tooltip.
 			if ( type(size) == "table" and size.w ) then self:SetWidth(size.w); end
@@ -3318,7 +3232,7 @@ SetAnchorSnap = function(on)
 	K.Print(NAME, on and "nearby frames will latch together when you move them." or "frames will move independently now.");
 end
 
-function AZSMinorMods_ResetPlaces()
+function SlimSuite_ResetPlaces()
 	for i = 1, table.getn(MOVABLE) do
 		local name = MOVABLE[i][1];
 		DB().places[name] = nil;
@@ -3331,21 +3245,21 @@ function AZSMinorMods_ResetPlaces()
 			end
 		end
 	end
-	DB().places.AZSMinorModsSpellRowFrame = AZSMinorMods_BuildRowDefaultPlace("AZSMinorModsSpellRowFrame");
-	DB().places.AZSMinorModsItemRowFrame = AZSMinorMods_BuildRowDefaultPlace("AZSMinorModsItemRowFrame");
+	DB().places.SlimSuiteSpellRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteSpellRowFrame");
+	DB().places.SlimSuiteItemRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteItemRowFrame");
 	PlaceAll();
 	K.Print(NAME, "movable elements are back at their original locations.");
 end
 
-function AZSMinorMods_ResetElement(name)
+function SlimSuite_ResetElement(name)
 	local frame = name and getglobal(name);
 	if ( not frame ) then return false; end
 	local d = DB();
 	d.places[name], d.sizes[name], d.scales[name], d.padding[name], d.orientations[name] = nil, nil, nil, nil, nil;
-	if ( name == "AZSMinorModsTallyFrame" ) then d.tallyVertical = false; end
+	if ( name == "SlimSuiteTallyFrame" ) then d.tallyVertical = false; end
 	if ( name == "BuffFrame" ) then d.buffCustomLayout = false; d.buffGrowthDirection = "down"; end
-	if ( name == "AZSMinorModsSpellRowFrame" or name == "AZSMinorModsItemRowFrame" ) then
-		d.places[name] = AZSMinorMods_BuildRowDefaultPlace(name);
+	if ( name == "SlimSuiteSpellRowFrame" or name == "SlimSuiteItemRowFrame" ) then
+		d.places[name] = SlimSuite_BuildRowDefaultPlace(name);
 	end
 	local points = basePoints[name];
 	if ( points and name ~= "GameTooltip" ) then
@@ -3362,12 +3276,12 @@ function AZSMinorMods_ResetElement(name)
 	end
 	local base = baseSizes[name];
 	if ( base ) then frame:SetWidth(base.w); frame:SetHeight(base.h); end
-	if ( name == "GameTooltip" ) then frame:SetWidth(260); frame:SetHeight(140); end
+	if ( name == "GameTooltip" ) then frame:SetWidth(260); frame:SetHeight(140); d.tooltipCustom = nil; end
 	if ( name == "GameTooltip" ) then frame:Hide(); end
 	ApplySize(name, frame);
-	if ( name == "AZSMinorModsTallyFrame" ) then ApplyTallyLayout(false); end
-	if ( name == "AZSMinorModsBossFrames" ) then UpdateBossFrames(); end
-	if ( name == "AZSMinorModsAnnouncementFrame" ) then ApplyMovablePadding(name); end
+	if ( name == "SlimSuiteTallyFrame" ) then ApplyTallyLayout(false); end
+	if ( name == "SlimSuiteBossFrames" ) then UpdateBossFrames(); end
+	if ( name == "SlimSuiteAnnouncementFrame" ) then ApplyMovablePadding(name); end
 	if ( name == "BuffFrame" ) then pcall(ApplyBuffOrientation); end
 	if ( name == "PartyMemberFrame1" or name == "MainMenuExpBar" or name == "MainMenuBar" ) then pcall(ApplyMovableOrientation, name); end
 	if ( d.muted[name] ) then d.muted[name] = nil; pcall(ApplyFeatureMute, name); end
@@ -3375,13 +3289,14 @@ function AZSMinorMods_ResetElement(name)
 	return true;
 end
 
-function AZSMinorMods_ResetUI()
+function SlimSuite_ResetUI()
 	local d = DB();
 	d.places, d.sizes, d.scales, d.padding, d.orientations, d.muted = {}, {}, {}, {}, {}, {};
 	d.tallyVertical, d.buffCustomLayout, d.buffGrowthDirection = false, false, "down";
+	d.tooltipCustom = nil;
 	d.buildRowsAttached = true;
-	d.places.AZSMinorModsSpellRowFrame = AZSMinorMods_BuildRowDefaultPlace("AZSMinorModsSpellRowFrame");
-	d.places.AZSMinorModsItemRowFrame = AZSMinorMods_BuildRowDefaultPlace("AZSMinorModsItemRowFrame");
+	d.places.SlimSuiteSpellRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteSpellRowFrame");
+	d.places.SlimSuiteItemRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteItemRowFrame");
 	d.chatOffsets = {};
 	for i = 1, table.getn(MOVABLE) do
 		local name = MOVABLE[i][1];
@@ -3405,7 +3320,7 @@ function AZSMinorMods_ResetUI()
 	if ( type(PrepareChatWindow) == "function" ) then pcall(PrepareChatWindow); end
 	if ( type(ApplyTallyLayout) == "function" ) then pcall(ApplyTallyLayout, false); end
 	if ( type(UpdateBossFrames) == "function" ) then pcall(UpdateBossFrames); end
-	pcall(ApplyMovablePadding, "AZSMinorModsAnnouncementFrame");
+	pcall(ApplyMovablePadding, "SlimSuiteAnnouncementFrame");
 	if ( type(ApplyBuffOrientation) == "function" ) then pcall(ApplyBuffOrientation); end
 	for _, name in ipairs({ "MainMenuBar", "MainMenuExpBar", "PartyMemberFrame1" }) do pcall(ApplyMovableOrientation, name); end
 	for i = 1, table.getn(MOVABLE) do
@@ -3567,7 +3482,7 @@ local function Check(parent, label, y, get, set)
 end
 
 local function WinBuild()
-	win = K.Window("AZSMinorModsFrame", "Slim Suite", 470, 560);
+	win = K.Window("SlimSuiteFrame", "Slim Suite", 470, 560);
 	local hero = K.Hero(win, 380);
 	hero:SetWidth(430);
 	hero:SetPoint("TOPLEFT", win, "TOPLEFT", 20, -30);
@@ -3579,13 +3494,13 @@ local function WinBuild()
 	local tabOther = K.Button(win, "New/Unique, But Minor Features", 210, nil);
 	tabOther:SetPoint("TOPLEFT", tabUi, "TOPRIGHT", 4, 0);
 	local bodyTop = -132;
-	local uiScroll, uiChild = K.Scroll("AZSMinorModsUiScroll", win, 422);
+	local uiScroll, uiChild = K.Scroll("SlimSuiteUiScroll", win, 422);
 	uiScroll:SetPoint("TOPLEFT", win, "TOPLEFT", 20, bodyTop);
 	uiScroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 48);
-	local otherScroll, otherChild = K.Scroll("AZSMinorModsOtherScroll", win, 422);
+	local otherScroll, otherChild = K.Scroll("SlimSuiteOtherScroll", win, 422);
 	otherScroll:SetPoint("TOPLEFT", win, "TOPLEFT", 20, bodyTop);
 	otherScroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 48);
-	local addonsScroll, addonsChild = K.Scroll("AZSMinorModsAddonsScroll", win, 422);
+	local addonsScroll, addonsChild = K.Scroll("SlimSuiteAddonsScroll", win, 422);
 	addonsScroll:SetPoint("TOPLEFT", win, "TOPLEFT", 20, bodyTop);
 	addonsScroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 48);
 	local function AddRows(parent, entries, startY)
@@ -3602,21 +3517,30 @@ local function WinBuild()
 		note:SetPoint("TOPLEFT", noteTitle, "BOTTOMLEFT", 0, -3); note:SetWidth(390); note:SetHeight(38);
 		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetText("Most custom game UI is not available as reusable addon art or code. This section recreates it as faithfully as possible so it can be moved; a few implementation choices are unavoidable. <3");
 		AddRows(uiChild, {
-			{"Toggle UI Settings (drag, resize and scale)", function() return DB().unlocked; end, function(v) AZSMinorMods_SetUnlocked(v); end},
+			{"Toggle UI Settings (drag, resize and scale)", function() return DB().unlocked; end, function(v) SlimSuite_SetUnlocked(v); end},
 			{"Hide the target frame", function() return DB().hideTarget; end, function(v) DB().hideTarget = v; TargetFrameHidden(v); end},
 			{"Replace Default Level Up with Movable Version?", function() return DB().moveLevelButton; end, function(v) DB().moveLevelButton = v; pcall(UpdateLevelButton); end},
 			{"Open UI modifier at startup", function() return DB().startUnlocked; end, function(v) DB().startUnlocked = v; end},
 			{"Replace Default Build Rows with Movable Versions?", function() return DB().replaceBuildRows; end, function(v) DB().replaceBuildRows = v; ApplyBuildRowReplacement(); end},
 			{"Replace Default Damage Meter with Movable Version?", function() return DB().moveMeter; end, function(v) SetMeterReplacement(v); end},
 			{"Replace Default Run Clock with Movable Version?", function() return DB().replaceClock;end,function(v) DB().replaceClock=v;UpdateClock();end},
+			{"   ...show the zone and Heroic affixes under it", function() return DB().zoneLine;end,function(v) DB().zoneLine=v;UpdateClock();end},
 			{"Replace Default Encounter Bars with Movable Versions?", function() return DB().replaceEncounters;end,function(v) DB().replaceEncounters=v;UpdateBossFrames();end},
 			{"Replace Default Kills / Gold / Cache with Movable Version?", function() return DB().replaceTally;end,function(v) DB().replaceTally=v;UpdateTally();end},
 			{"Replace Default Announcements with Movable Version?", function() return DB().replaceBanners;end,function(v) DB().replaceBanners=v;UpdateAnnouncementFrame();end},
 			{"Replace Default Action Bar Art with Plain Version?", function() return DB().plainBar; end, function(v) DB().plainBar = v; PlainBar(v); end},
-			{"Add racial ability as a 7th Action Bar 1 button?", function() return DB().showRacialAbility; end, function(v) AZSMinorMods_SetRacialAbility(v); end},
-			{"Show empty slots in Action Bar 1", function() return DB().showEmptyActionSlots; end, function(v) DB().showEmptyActionSlots = v; ApplyActionSlotGrid(); end}
+			{"Add racial ability as a 7th Action Bar 1 button?", function() return DB().showRacialAbility; end, function(v) SlimSuite_SetRacialAbility(v); end},
+			{"Show empty slots in Action Bar 1", function() return DB().showEmptyActionSlots; end, function(v) DB().showEmptyActionSlots = v; ApplyActionSlotGrid(); end},
+			{"Replace Default Revive Bar with Movable Version?", function() return DB().replaceRevive; end, function(v) DB().replaceRevive = v; end},
+			{"Show debuffs on the movable encounter bars", function() return DB().encounterDebuffs; end, function(v) DB().encounterDebuffs = v; pcall(UpdateBossFrames); end},
+			{"Class proc meter under the player frame", function() return DB().procMeter; end, function(v) DB().procMeter = v; end},
+			{"Combat text test box (movable)", function() return DB().combatTextBox; end, function(v) DB().combatTextBox = v; end},
+			{"Floating combat text over enemies (Slim Suite's own)", function() return DB().floatingText; end, function(v) DB().floatingText = v; end},
+			{"Replace Default Local Clock with Movable Version?", function() return DB().replaceLocalClock; end, function(v) DB().replaceLocalClock = v; end},
+			{"Party meter (movable)", function() return DB().partyMeter; end, function(v) DB().partyMeter = v; end},
+			{"Keep Slim Suite above level-up and new-item cards", function() return DB().onTopOfScreens; end, function(v) DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -72);
-		uiChild:SetHeight(505);
+		uiChild:SetHeight(762);
 	end
 	local function BuildOther()
 		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
@@ -3631,12 +3555,16 @@ local function WinBuild()
 			{"Hide 'Who dares to enter my lair'", function() return DB().hideLairLine;end,function(v) DB().hideLairLine=v;end},
 			{"Hide in-game roleplay lines from chat", function() return DB().hideRP;end,function(v) DB().hideRP=v;end},
 			{"Camera as far out as it goes (50)", function() return DB().camera; end, function(v) DB().camera = v; Camera(v); end},
-			{"Mark bosses in spawn order (Skull, X, Circle, Star)", function() return DB().bossMarks; end, function(v) DB().bossMarks = v; pcall(BossMarks); end},
+			{"Mark pulled bosses and Guardians (Skull, X, Circle, Star)", function() return DB().bossMarks; end, function(v) DB().bossMarks = v; end},
+			{"   ...and Guardians and lairs before they're pulled", function() return DB().prePullMarks; end, function(v) DB().prePullMarks = v; end},
+			{"Show caches on the minimap", function() return DB().minimapCaches; end, function(v) DB().minimapCaches = v; end},
+			{"Show bosses on the minimap", function() return DB().minimapBosses; end, function(v) DB().minimapBosses = v; end},
+			{"Show lairs on the minimap, with their 3:00 refill timer", function() return DB().minimapLairs; end, function(v) DB().minimapLairs = v; end},
 			{"Show the game's nearest Guardian lair flag on minimap", function() return DB().showGuardianFlag; end, function(v) DB().showGuardianFlag = v; ApplyGuardianFlag(); end},
-			{"Blink a marker over a friend who falls (16 times)", function() return DB().deathMarks; end, function(v) DB().deathMarks = v; end},
+			{"Mark where a downed friend can be revived", function() return DB().deathMarks; end, function(v) DB().deathMarks = v; end},
 			{"Play a sound when you or a teammate dies", function() return DB().deathSound; end, function(v) DB().deathSound = v; end},
 			{"Cooldown numbers on the spell squares", function() return DB().cooldowns; end, function(v) DB().cooldowns = v; end},
-			{"Minimap button", function() local m = DB().minimap; return not (m and m.hide); end, function(v) if ( AZSMinorMods_Mini ) then local m = DB().minimap; if ( (m and m.hide and true or false) == v ) then AZSMinorMods_Mini.Toggle(); end end end}
+			{"Minimap button", function() local m = DB().minimap; return not (m and m.hide); end, function(v) if ( SlimSuite_Mini ) then local m = DB().minimap; if ( (m and m.hide and true or false) == v ) then SlimSuite_Mini.Toggle(); end end end}
 		}, -68);
 	end
 	local function BuildAddonManager()
@@ -3649,7 +3577,7 @@ local function WinBuild()
 		for index = 1, n do
 			local name, addonTitle, addonNotes, enabled = GetAddOnInfo(index);
 			local state = GetAddOnEnableState and GetAddOnEnableState(nil, index) or (enabled and 1 or 0);
-			if ( name and string.sub(string.lower(name), 1, 9) ~= "blizzard_" and (state or 0) > 0 ) then
+			if ( name and string.sub(string.lower(name), 1, 9) ~= "blizzard_" and name ~= "SlimSuite" ) then
 				local cb = CreateFrame("CheckButton", nil, addonsChild, "UICheckButtonTemplate");
 				cb:SetPoint("TOPLEFT", addonsChild, "TOPLEFT", 6, y); cb:SetWidth(24); cb:SetHeight(24);
 				cb:SetChecked((state or 0) > 0 and 1 or nil);
@@ -3668,25 +3596,26 @@ local function WinBuild()
 	end
 	CheckboxRows(); BuildOther(); BuildAddonManager();
 	local tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -420);
+	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -676);
 	tooltipTitle:SetText("Tooltip size");
 	local function AdjustTooltipSize(delta)
 		local size = DB().sizes.GameTooltip;
 		if ( type(size) ~= "table" ) then size = { w = 260, h = 140 }; DB().sizes.GameTooltip = size; end
+		DB().tooltipCustom = true;
 		size.w = math.max(160, math.min(600, size.w + delta));
 		size.h = math.max(80, math.min(500, size.h + delta));
 		if ( GameTooltip ) then GameTooltip:SetWidth(size.w); GameTooltip:SetHeight(size.h); end
 		PlaceAll();
 	end
 	local tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
-	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -438);
+	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -694);
 	local tooltipLarger = K.Button(uiChild, "Larger", 82, function() AdjustTooltipSize(20); end);
 	tooltipLarger:SetPoint("LEFT", tooltipSmaller, "RIGHT", 6, 0);
-	local reset = K.Button(uiChild, "Reset positions", 140, function() AZSMinorMods_ResetPlaces(); end);
-	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -472);
-	local resetAll = K.Button(uiChild, "Reset all UI", 126, function() AZSMinorMods_ResetUI(); end);
+	local reset = K.Button(uiChild, "Reset positions", 140, function() SlimSuite_ResetPlaces(); end);
+	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -728);
+	local resetAll = K.Button(uiChild, "Reset all UI", 126, function() SlimSuite_ResetUI(); end);
 	resetAll:SetPoint("LEFT", reset, "RIGHT", 8, 0);
-	uiChild:SetHeight(505);
+	uiChild:SetHeight(762);
 	local function SelectPage(which)
 		uiScroll:Hide(); otherScroll:Hide(); addonsScroll:Hide();
 		if ( win.reloadButton ) then win.reloadButton:Hide(); end
@@ -3697,12 +3626,12 @@ local function WinBuild()
 	tabUi:SetScript("OnClick", function() SelectPage("ui"); end);
 	tabOther:SetScript("OnClick", function() SelectPage("other"); end);
 	local addonsTab = K.Button(otherChild, "Manage Addons", 132, function() SelectPage("addons"); end);
-	addonsTab:SetPoint("TOPLEFT", otherChild, "TOPLEFT", 10, -340);
-	otherChild:SetHeight(378);
+	addonsTab:SetPoint("TOPLEFT", otherChild, "TOPLEFT", 10, -556);
+	otherChild:SetHeight(594);
 	SelectPage("other");
 end
 
-function AZSMinorMods_Toggle()
+function SlimSuite_Toggle()
 	if ( not win ) then
 		local ok, err = pcall(WinBuild);
 		if ( not ok ) then K.Print(NAME, "|cffff4040the settings window could not be made:|r " .. tostring(err)); win = nil; return; end
@@ -3710,9 +3639,9 @@ function AZSMinorMods_Toggle()
 	if ( win:IsShown() ) then win:Hide(); else win:Show(); end
 end
 
-SLASH_AZSMINORMODS1 = "/azsmods";
-SLASH_AZSMINORMODS2 = "/minormods";
-SlashCmdList["AZSMINORMODS"] = function(msg)
+SLASH_SLIMSUITE1 = "/slimsuite";
+SLASH_SLIMSUITE2 = "/slim";
+SlashCmdList["SLIMSUITE"] = function(msg)
 	msg = msg or "";
 	local _, _, cmd, rest = string.find(msg, "^(%S*)%s*(.-)$");
 	cmd = string.lower(cmd or "");
@@ -3725,14 +3654,14 @@ SlashCmdList["AZSMINORMODS"] = function(msg)
 		for i = table.getn(d.words), 1, -1 do if ( d.words[i] == rest ) then table.remove(d.words, i); end end
 		K.Print(NAME, "chat lines with \"" .. rest .. "\" are shown again.");
 	elseif ( cmd == "minimap" ) then
-		local shown = AZSMinorMods_Mini and AZSMinorMods_Mini.Toggle();
-		K.Print(NAME, shown and "the minimap button is back." or "the minimap button is hidden. /azsmods minimap brings it back.");
+		local shown = SlimSuite_Mini and SlimSuite_Mini.Toggle();
+		K.Print(NAME, shown and "the minimap button is back." or "the minimap button is hidden. /slimsuite minimap brings it back.");
 	elseif ( cmd == "unlock" or cmd == "move" ) then
-		AZSMinorMods_SetUnlocked(true);
+		SlimSuite_SetUnlocked(true);
 	elseif ( cmd == "lock" ) then
-		AZSMinorMods_SetUnlocked(false);
+		SlimSuite_SetUnlocked(false);
 	else
-		AZSMinorMods_Toggle();
+		SlimSuite_Toggle();
 	end
 end
 
@@ -3745,7 +3674,10 @@ loader:SetScript("OnEvent", function()
 	if ( not ok ) then K.Print(NAME, "|cffff4040the chat could not be changed:|r " .. tostring(err)); end
 	-- The editor state is a user choice, not a leftover from an earlier session. Clear legacy
 	-- unlocked saves at load; only the explicit startup option may reopen the mover after login.
-	if ( event == "VARIABLES_LOADED" ) then DB().unlocked = DB().startUnlocked and true or false; end
+	if ( event == "VARIABLES_LOADED" ) then
+		DB().unlocked = DB().startUnlocked and true or false;
+		pcall(SlimSuite_RestoreNativeHudAfterLoad);
+	end
 	pcall(Camera, event == "PLAYER_ENTERING_WORLD");
 	pcall(ApplyGuardianFlag);
 	-- the frames back where they were put (the game places some of them again as it loads), and the target frame
@@ -3766,7 +3698,7 @@ loader:SetScript("OnEvent", function()
 	pcall(HookTooltipOwner);
 	pcall(PlaceAll);
 	pcall(UpdateMeter);
-	if ( event == "PLAYER_ENTERING_WORLD" ) then pcall(AZSMinorMods_SetUnlocked, DB().startUnlocked and true or false, true); end
+	if ( event == "PLAYER_ENTERING_WORLD" ) then pcall(SlimSuite_SetUnlocked, DB().startUnlocked and true or false, true); end
 end);
 local buffLayoutUpdater = CreateFrame("Frame");
 buffLayoutUpdater:RegisterEvent("UNIT_AURA");
@@ -3778,13 +3710,13 @@ pcall(HookChat);                                          -- right away too, so 
 -- the minimap button: a gear, at the left of the minimap (AZS Stats' is at the bottom, AZS Handbook's at the top
 -- left)
 local okMini, errMini = pcall(function()
-	AZSMinorMods_Mini = K.Minimap({ name = "AZSMinorModsMinimapButton", icon = "INV_Misc_Gear_02", angle = 190, db = DB,
-		click = function() AZSMinorMods_Toggle(); end,
+	SlimSuite_Mini = K.Minimap({ name = "SlimSuiteMinimapButton", icon = "INV_Misc_Gear_02", angle = 190, db = DB,
+		click = function() SlimSuite_Toggle(); end,
 		tooltip = function(tt)
 			tt:AddLine(NAME);
 			tt:AddLine("Gameplay helpers and UI controls.", 1, 1, 1);
 			tt:AddLine(" ");
-			tt:AddLine("Click: the settings. /azsmods minimap hides this button.", 0.6, 0.6, 0.6);
+			tt:AddLine("Click: the settings. /slimsuite minimap hides this button.", 0.6, 0.6, 0.6);
 		end });
 end);
 if ( not okMini ) then K.Print(NAME, "|cffff4040the minimap button could not be made:|r " .. tostring(errMini)); end

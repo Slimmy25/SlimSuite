@@ -1,0 +1,11 @@
+## Interface: 11200
+## Title: Slim Suite
+## Notes: A Swiss-army knife of useful gameplay tools and movable, resizable interface controls. /slimsuite or the minimap button.
+## Author: Slimjim
+## Version: 1.02
+## SavedVariables: SlimSuiteDB
+AZSKit.lua
+SlimSuiteItems.lua
+SlimSuiteMeter.lua
+SlimSuite.lua
+SlimSuiteWorld.lua
