@@ -117,6 +117,18 @@ local function Samples(source,owner)
  end
  return result.count>0 and result or nil;
 end
+-- Class colours for the Party tab. The actor's class comes from the meter data when it has one, else from the party.
+local CLASS_COLORS={WARRIOR='c79c6e',MAGE='69ccf0',ROGUE='fff569',DRUID='ff7d0a',HUNTER='abd473',SHAMAN='0070de',PRIEST='ffffff',WARLOCK='9482c9',PALADIN='f58cba'};
+local function ClassOf(actor)
+ if type(actor)~='table' then return nil;end
+ local c=actor.class or actor.classToken or actor.classFile;
+ if type(c)=='string' then return string.upper(c);end
+ local units={'player','party1','party2','party3','party4'};
+ for _,u in ipairs(units) do
+  if UnitExists and UnitExists(u) and UnitName(u)==actor.name then local _,token=UnitClass(u);return token;end
+ end
+ return nil;
+end
 local function Tooltip(button)
  if not GameTooltip or not button.entry then return;end
  local row,source=button.entry,button.source;
@@ -145,7 +157,7 @@ end
 function M.Attach(frame)
  M.frame=frame;frame:SetWidth(340);frame:SetHeight(220);frame:EnableMouse(true);frame:EnableMouseWheel(true);
  frame.rows={};frame.tabs={};
- local views={{'damage','Damage'},{'healing','Healing'},{'boss','Boss'},{'group','Group'}};
+ local views={{'damage','Damage'},{'healing','Healing'},{'boss','Boss'},{'group','Party'}};
  for i=1,4 do
   local view,label=views[i][1],views[i][2];
   local tab=K.Button(frame,label,78,function() M.view=view;M.owner=nil;M.offset=0;M.message=nil;M.nextRead=0;end);
@@ -200,7 +212,7 @@ function M.Draw(active,editing)
  M.offset=math.max(0,math.min(M.offset,math.max(0,Count(rows)-M.visible)));
  local totals=snapshot and snapshot.totals;
  local totalText=totals and (Text(totals.displayAmount)..' | '..(totals.displayRate and totals.displayRate.status=='ready' and Text(totals.displayRate.value) or '--')..' '..unit)
-  or (type(M.error)=='table' and (M.error.code=='NO_PARTY' and 'Join a party to see group damage' or M.error.code=='NO_ENCOUNTER' and 'No boss fight yet' or 'Waiting: '..tostring(M.error.code)) or M.error or 'Waiting for meter data');
+  or (type(M.error)=='table' and (M.error.code=='NO_PARTY' and 'Join a party to see party damage' or M.error.code=='NO_ENCOUNTER' and 'No boss fight yet' or 'Waiting: '..tostring(M.error.code)) or M.error or 'Waiting for meter data');
  if healing then
   if M.absorbed and M.absorbed>0 then totalText=totalText..' | Absorbed: '..Text(M.absorbed);end
   if type(AZS_RUN)=='table' and type(AZS_RUN.sh)=='number' then totalText=totalText..' | Current shield: '..Text(AZS_RUN.sh);end
@@ -213,6 +225,7 @@ function M.Draw(active,editing)
   if row then
    local source=snapshot.sources and snapshot.sources[row.sourceKey];local actor=snapshot.actors and snapshot.actors[row.ownerId];
    button.entry=row;button.source=source;button.label=source and source.name or actor and actor.name or 'Unknown source';
+   local color=M.view=='group' and not M.owner and CLASS_COLORS[ClassOf(actor) or ''];
    local rowWidth=math.max(20,width-16);button:SetWidth(rowWidth);
    local rateText=row.displayRate and row.displayRate.status=='ready' and Text(row.displayRate.value) or '--';
    local amountText=Text(row.displayAmount)..(healing and ' heal' or ' dmg');
@@ -220,6 +233,7 @@ function M.Draw(active,editing)
    local valueWidth=math.max(72,math.floor(rowWidth*0.47));
    local nameWidth=math.max(24,rowWidth-20-valueWidth-4);
    FitString(button.name,button.label,nameWidth,7);
+   if color then button.name:SetTextColor(tonumber(string.sub(color,1,2),16)/255,tonumber(string.sub(color,3,4),16)/255,tonumber(string.sub(color,5,6),16)/255);else button.name:SetTextColor(1,1,1);end
    FitString(button.value,primary..' | '..string.format('%.1f%%',Num(row.share)*100),valueWidth,7);
    if source and source.icon and source.icon.status=='ready' then button.icon:SetTexture(source.icon.path);button.icon:Show();else button.icon:Hide();end
    button:Show();

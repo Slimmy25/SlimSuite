@@ -17,9 +17,9 @@ The addon files are in the `SlimSuite` folder. Edit them, then zip that folder t
 
 - `SlimSuite.lua`: settings, chat filters, the movable UI and its replacements.
 - `SlimSuiteWorld.lua`: features built on the game's newer addon API (world markers, downed friends, minimap pins,
-  lairs, revive bar, proc meter, party meter, local clock, combat text). Its adapter section at the top is the only
+  lairs, revive bar, proc meter, local clock, combat text). Its adapter section at the top is the only
   place that reads those API calls.
-- `SlimSuiteMeter.lua`: the movable damage meter.
+- `SlimSuiteMeter.lua`: the movable damage meter (Damage, Healing, Boss and Party tabs).
 - `SlimSuiteItems.lua`: the jewelry icon catalog.
 - `AZSKit.lua`: the shared look of the AZS addons (window, buttons, minimap button), a copy of the launcher's file.
 

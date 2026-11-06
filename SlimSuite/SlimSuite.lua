@@ -89,7 +89,7 @@ local function DB()
 	if ( d.minimapLairs == nil ) then d.minimapLairs = false; end
 	if ( d.zoneLine == nil ) then d.zoneLine = true; end
 	if ( d.replaceLocalClock == nil ) then d.replaceLocalClock = false; end
-	if ( d.partyMeter == nil ) then d.partyMeter = false; end
+	d.partyMeter = nil;                                     -- the party meter is now the damage meter's Party tab
 	if ( d.floatingText == nil ) then d.floatingText = false; end
 	if ( d.deathSound == nil ) then d.deathSound = false; end
 	if ( d.hideTarget == nil ) then d.hideTarget = false; end
@@ -372,8 +372,7 @@ local MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "P
                   { "SlimSuiteTallyFrame", "Kills / Gold / Cache" }, { "GameTooltip", "Tooltip" },
                   { "SlimSuiteReviveFrame", "Revive bar" },
                   { "SlimSuiteCombatTextFrame", "Combat text (test)" },
-                  { "SlimSuiteLocalClockFrame", "Local clock" },
-                  { "SlimSuitePartyMeterFrame", "Party meter" } };
+                  { "SlimSuiteLocalClockFrame", "Local clock" } };
 local handles = {};
 local editOnly;
 local function IsEditing(name)
@@ -3537,10 +3536,9 @@ local function WinBuild()
 			{"Combat text test box (movable)", function() return DB().combatTextBox; end, function(v) DB().combatTextBox = v; end},
 			{"Floating combat text over enemies (Slim Suite's own)", function() return DB().floatingText; end, function(v) DB().floatingText = v; end},
 			{"Replace Default Local Clock with Movable Version?", function() return DB().replaceLocalClock; end, function(v) DB().replaceLocalClock = v; end},
-			{"Party meter (movable)", function() return DB().partyMeter; end, function(v) DB().partyMeter = v; end},
 			{"Keep Slim Suite above level-up and new-item cards", function() return DB().onTopOfScreens; end, function(v) DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -72);
-		uiChild:SetHeight(762);
+		uiChild:SetHeight(734);
 	end
 	local function BuildOther()
 		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
@@ -3596,7 +3594,7 @@ local function WinBuild()
 	end
 	CheckboxRows(); BuildOther(); BuildAddonManager();
 	local tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -676);
+	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -648);
 	tooltipTitle:SetText("Tooltip size");
 	local function AdjustTooltipSize(delta)
 		local size = DB().sizes.GameTooltip;
@@ -3608,14 +3606,14 @@ local function WinBuild()
 		PlaceAll();
 	end
 	local tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
-	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -694);
+	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -666);
 	local tooltipLarger = K.Button(uiChild, "Larger", 82, function() AdjustTooltipSize(20); end);
 	tooltipLarger:SetPoint("LEFT", tooltipSmaller, "RIGHT", 6, 0);
 	local reset = K.Button(uiChild, "Reset positions", 140, function() SlimSuite_ResetPlaces(); end);
-	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -728);
+	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -700);
 	local resetAll = K.Button(uiChild, "Reset all UI", 126, function() SlimSuite_ResetUI(); end);
 	resetAll:SetPoint("LEFT", reset, "RIGHT", 8, 0);
-	uiChild:SetHeight(762);
+	uiChild:SetHeight(734);
 	local function SelectPage(which)
 		uiScroll:Hide(); otherScroll:Hide(); addonsScroll:Hide();
 		if ( win.reloadButton ) then win.reloadButton:Hide(); end

@@ -387,7 +387,7 @@ end
 local ON_TOP = { "SlimSuiteWorldMarkers", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteClockFrame",
 	"SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame",
 	"SlimSuiteTallyFrame", "SlimSuiteReviveFrame", "SlimSuiteCombatTextFrame", "SlimSuiteProcMeter",
-	"SlimSuiteLocalClockFrame", "SlimSuitePartyMeterFrame", "SlimSuiteFloatingText", "SlimSuiteStoreLevelsToggle" };
+	"SlimSuiteLocalClockFrame", "SlimSuiteFloatingText", "SlimSuiteStoreLevelsToggle" };
 function W.ApplyOnTop()
 	if ( not A.Has("AZS_SetOnTopOfScreens") ) then return; end
 	local on = DB().onTopOfScreens and true or false;
@@ -874,101 +874,6 @@ local function UpdateLocalClock()
 	clock:Show();
 end
 
--- ---------------------------------------------------------------- party meter
--- A small movable list: each hero in the party, their damage and DPS. It reads the same documented MeterQuery v1 as
--- the big meter's Group tab (party scope, grouped by owner), and AZS_GetPartyMeter (0.113) only as a fallback.
-local party = CreateFrame("Frame", "SlimSuitePartyMeterFrame", UIParent);
-party:SetWidth(200); party:SetHeight(96);
-party:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -270, 44);
-party:SetFrameStrata("MEDIUM");
-party:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
-party:SetBackdropColor(0.025, 0.02, 0.035, 0.8);
-party:SetBackdropBorderColor(0.7, 0.52, 0.2, 0.8);
-party.title = party:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-party.title:SetPoint("TOPLEFT", party, "TOPLEFT", 8, -6);
-party.title:SetText("Party damage");
-party.rows = {};
-party:Hide();
-
-local CLASS_COLORS = { WARRIOR = { 0.78, 0.61, 0.43 }, MAGE = { 0.41, 0.8, 0.94 }, ROGUE = { 1, 0.96, 0.41 }, DRUID = { 1, 0.49, 0.04 },
-	HUNTER = { 0.67, 0.83, 0.45 }, SHAMAN = { 0, 0.44, 0.87 }, PRIEST = { 1, 1, 1 }, WARLOCK = { 0.58, 0.51, 0.79 }, PALADIN = { 0.96, 0.55, 0.73 } };
-
-local function PartyRows()
-	local rows = {};
-	local ctx = A.Call("AZS_GetMeterContext");
-	if ( type(ctx) == "table" and ctx.runId and A.Has("AZS_GetMeterSnapshot") ) then
-		local snap = A.Call("AZS_GetMeterSnapshot", { apiVersion = 1, runId = ctx.runId, metric = "damage", scope = "party",
-			period = "run", groupBy = "owner", windowSeconds = 0 });
-		if ( type(snap) == "table" and type(snap.rows) == "table" ) then
-			for _, row in ipairs(snap.rows) do
-				local actor = snap.actors and snap.actors[row.ownerId];
-				table.insert(rows, { name = (actor and actor.name) or "?", class = actor and A.Field(actor, "class", "classToken"),
-					amount = tonumber(row.displayAmount) or 0,
-					rate = row.displayRate and row.displayRate.status == "ready" and tonumber(row.displayRate.value) or nil,
-					me = row.ownerId ~= nil and row.ownerId == ctx.localOwnerId });
-			end
-			return rows;
-		end
-	end
-	local list = A.Call("AZS_GetPartyMeter");
-	if ( type(list) == "table" ) then
-		for _, e in ipairs(list) do
-			if ( type(e) == "table" ) then
-				table.insert(rows, { name = A.Field(e, "name", "hero") or "?", class = A.Field(e, "class"),
-					amount = tonumber(A.Field(e, "damage", "amount", "total")) or 0, rate = tonumber(A.Field(e, "dps", "rate")) });
-			end
-		end
-	end
-	return rows;
-end
-
-local function Short(v)
-	if ( v >= 1000000 ) then return string.format("%.1fm", v / 1000000); end
-	if ( v >= 10000 ) then return string.format("%.1fk", v / 1000); end
-	return tostring(math.floor(v + 0.5));
-end
-
-local partyRead = 0;
-local function UpdatePartyMeter()
-	local editing = Editing("SlimSuitePartyMeterFrame");
-	if ( not DB().partyMeter and not editing ) then party:Hide(); return; end
-	local now = GetTime();
-	if ( now < partyRead ) then return; end
-	partyRead = now + 0.5;
-	local rows = PartyRows();
-	if ( table.getn(rows) == 0 and editing ) then rows = { { name = "Party meter", amount = 0 } }; end
-	if ( table.getn(rows) == 0 ) then party:Hide(); return; end
-	table.sort(rows, function(a, b) return a.amount > b.amount; end);
-	local top = rows[1].amount > 0 and rows[1].amount or 1;
-	local width = party:GetWidth() or 200;
-	for i = 1, 5 do
-		local r = party.rows[i];
-		if ( not r ) then
-			r = CreateFrame("StatusBar", nil, party);
-			r:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar");
-			r:SetHeight(14);
-			r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"); r.name:SetPoint("LEFT", r, "LEFT", 3, 0);
-			r.value = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"); r.value:SetPoint("RIGHT", r, "RIGHT", -3, 0);
-			party.rows[i] = r;
-		end
-		local e = rows[i];
-		if ( e ) then
-			r:ClearAllPoints();
-			r:SetPoint("TOPLEFT", party, "TOPLEFT", 6, -20 - (i - 1) * 15);
-			r:SetWidth(width - 12);
-			r:SetMinMaxValues(0, 1); r:SetValue(e.amount / top);
-			local c = e.class and CLASS_COLORS[string.upper(tostring(e.class))] or (e.me and { 0.3, 0.7, 1 }) or { 0.5, 0.5, 0.55 };
-			r:SetStatusBarColor(c[1], c[2], c[3], 0.75);
-			r.name:SetText(e.name);
-			r.value:SetText(Short(e.amount) .. (e.rate and ("  (" .. Short(e.rate) .. ")") or ""));
-			r:Show();
-		else r:Hide(); end
-	end
-	party:SetHeight(26 + math.min(5, table.getn(rows)) * 15);
-	party:Show();
-end
-
 -- ---------------------------------------------------------------- floating combat text (0.138)
 -- Each of your hits floats up from the enemy it struck, stays over the spot where an enemy fell, and hides when that
 -- spot leaves your view. Text is sized by distance. Crits are bigger, pop, and stay twice as long. Positions are
@@ -1080,7 +985,6 @@ ticker:SetScript("OnUpdate", function()
 	pcall(UpdateProc);
 	pcall(UpdateMinimapPins);
 	pcall(UpdateLocalClock);
-	pcall(UpdatePartyMeter);
 end);
 ticker:RegisterEvent("PLAYER_ENTERING_WORLD");
 ticker:SetScript("OnEvent", function() pcall(W.ApplyOnTop); end);
