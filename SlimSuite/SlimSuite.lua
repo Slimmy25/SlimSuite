@@ -441,48 +441,70 @@ local function ItemTextureKey(texture)
 	return string.gsub(texture, "^Interface.Icons.", "");
 end
 
+-- The game's own build cluster (measured from its default UI): 28-pixel icons with a 1-pixel silver border,
+-- spells in one row and the worn jewelry 8 pixels below it, both starting at the same left edge.
+local BUILD_ICON, BUILD_GAP, BUILD_ROW_GAP = 28, 4, 8;
+
 local function LayoutItemRow()
 	if ( not itemRow ) then return; end
-	local gap = 4;
+	local gap = BUILD_GAP;
 	if ( not DB().sizes.SlimSuiteItemRowFrame ) then
-		-- Keep the five jewelry slots visible when empty so the row can always be placed and sized.
 		if ( DB().orientations.SlimSuiteItemRowFrame == "vertical" ) then
-			itemRow:SetWidth(36); itemRow:SetHeight(5 * 32 + 4 * gap);
-		else itemRow:SetWidth(5 * 32 + 4 * gap); itemRow:SetHeight(36); end
+			itemRow:SetWidth(BUILD_ICON); itemRow:SetHeight(5 * BUILD_ICON + 4 * gap);
+		else itemRow:SetWidth(5 * BUILD_ICON + 4 * gap); itemRow:SetHeight(BUILD_ICON); end
 	end
 	local vertical = DB().orientations.SlimSuiteItemRowFrame == "vertical";
-	local width, height = itemRow:GetWidth() or 36, itemRow:GetHeight() or 36;
-	local iconSize = vertical and math.max(12, math.min(width - 4, (height - gap * 4) / 5))
-		or math.max(12, math.min(height - 4, (width - gap * 4) / 5));
+	local width, height = itemRow:GetWidth() or BUILD_ICON, itemRow:GetHeight() or BUILD_ICON;
+	local iconSize = vertical and math.max(12, math.min(width, (height - gap * 4) / 5))
+		or math.max(12, math.min(height, (width - gap * 4) / 5));
 	for i = 1, table.getn(itemRowButtons) do
 		local button = itemRowButtons[i];
 		button:ClearAllPoints();
 		button:SetWidth(iconSize); button:SetHeight(iconSize);
-		if ( vertical ) then button:SetPoint("TOP", itemRow, "TOP", 0, -((i - 1) * (iconSize + gap)));
-		else button:SetPoint("LEFT", itemRow, "LEFT", (i - 1) * (iconSize + gap), 0); end
+		if ( vertical ) then button:SetPoint("TOPLEFT", itemRow, "TOPLEFT", 0, -((i - 1) * (iconSize + gap)));
+		else button:SetPoint("TOPLEFT", itemRow, "TOPLEFT", (i - 1) * (iconSize + gap), 0); end
 	end
 end
 
 local function LayoutSpellRow()
 	if ( not spellRow ) then return; end
-	local gap = 4;
+	local gap = BUILD_GAP;
 	if ( not DB().sizes.SlimSuiteSpellRowFrame ) then
 		if ( DB().orientations.SlimSuiteSpellRowFrame == "vertical" ) then
-			spellRow:SetWidth(36); spellRow:SetHeight(6 * 32 + 5 * gap);
-		else spellRow:SetWidth(6 * 32 + 5 * gap); spellRow:SetHeight(36); end
+			spellRow:SetWidth(BUILD_ICON); spellRow:SetHeight(6 * BUILD_ICON + 5 * gap);
+		else spellRow:SetWidth(6 * BUILD_ICON + 5 * gap); spellRow:SetHeight(BUILD_ICON); end
 	end
 	local vertical = DB().orientations.SlimSuiteSpellRowFrame == "vertical";
-	local width, height = spellRow:GetWidth() or 36, spellRow:GetHeight() or 36;
-	local iconSize = vertical and math.max(12, math.min(width - 4, (height - gap * 5) / 6))
-		or math.max(12, math.min(height - 4, (width - gap * 5) / 6));
+	local width, height = spellRow:GetWidth() or BUILD_ICON, spellRow:GetHeight() or BUILD_ICON;
+	local iconSize = vertical and math.max(12, math.min(width, (height - gap * 5) / 6))
+		or math.max(12, math.min(height, (width - gap * 5) / 6));
 	for i = 1, 6 do
 		local button = spellRowButtons[i];
 		if ( button ) then
 			button:ClearAllPoints(); button:SetWidth(iconSize); button:SetHeight(iconSize);
-			if ( vertical ) then button:SetPoint("TOP", spellRow, "TOP", 0, -((i - 1) * (iconSize + gap)));
-			else button:SetPoint("LEFT", spellRow, "LEFT", (i - 1) * (iconSize + gap), 0); end
+			if ( vertical ) then button:SetPoint("TOPLEFT", spellRow, "TOPLEFT", 0, -((i - 1) * (iconSize + gap)));
+			else button:SetPoint("TOPLEFT", spellRow, "TOPLEFT", (i - 1) * (iconSize + gap), 0); end
 		end
 	end
+end
+
+-- One build icon as the game draws it: the icon inset by one pixel inside a silver border that is lighter at the top,
+-- a dark fill for an empty slot (shown only while placing the rows), and the standard hover highlight.
+local function BuildIconLook(button)
+	button.border = button:CreateTexture(nil, "BACKGROUND");
+	button.border:SetAllPoints(button);
+	button.border:SetTexture(1, 1, 1, 1);
+	if ( button.border.SetGradient ) then button.border:SetGradient("VERTICAL", 0.26, 0.25, 0.27, 0.53, 0.52, 0.54);
+	else button.border:SetVertexColor(0.42, 0.41, 0.43); end
+	button.empty = button:CreateTexture(nil, "BORDER");
+	button.empty:SetPoint("TOPLEFT", button, "TOPLEFT", 1, -1);
+	button.empty:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1);
+	button.empty:SetTexture(0, 0, 0, 0.6);
+	button.icon = button:CreateTexture(nil, "ARTWORK");
+	button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 1, -1);
+	button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1);
+	button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
+	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
 end
 
 -- Default replacement rows mirror the native build cluster: six spells in the upper row,
@@ -491,7 +513,7 @@ function SlimSuite_BuildRowDefaultPlace(name)
 	local x, y = UIParent:GetWidth() * 0.275, UIParent:GetHeight() * 0.35;
 	if ( name == "SlimSuiteItemRowFrame" ) then
 		if ( DB().buildRowsAttached ) then
-			return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -4 };
+			return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -BUILD_ROW_GAP };
 		end
 		return { x = x, y = y - 40, coordinateSpace = "uiParent" };
 	end
@@ -541,9 +563,9 @@ local function RefreshItemRow()
 			else
 				button.slot, button.itemTexture, button.itemName = nil, nil, nil;
 				button.icon:SetTexture(nil);
-				-- The empty quickslot frame is intentional: it keeps the custom second row visible
-				-- and movable before the first item is equipped.
-				button:Show();
+				-- Like the game, an empty slot is not drawn. While the rows are being placed, empty slots show
+				-- as dark squares so the row can still be found, moved and sized before anything is worn.
+				if ( IsEditing("SlimSuiteItemRowFrame") ) then button:Show(); else button:Hide(); end
 			end
 		end
 	end
@@ -569,13 +591,8 @@ local function CreateItemRow()
 	itemRow:SetFrameStrata("MEDIUM");
 	for i = 1, table.getn(ITEM_EQUIP_SLOTS) do
 		local button = CreateFrame("Button", "SlimSuiteItemButton" .. i, itemRow);
-		button:SetWidth(32); button:SetHeight(32);
-		button:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2");
-		button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
-		button.icon = button:CreateTexture(nil, "ARTWORK");
-		button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3);
-		button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3);
-		button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
+		button:SetWidth(BUILD_ICON); button:SetHeight(BUILD_ICON);
+		BuildIconLook(button);
 		button:EnableMouse(true);
 		button:SetScript("OnEnter", function()
 			if ( not this.slot or not GameTooltip ) then return; end
@@ -673,7 +690,7 @@ local function RefreshSpellRow()
 				button.icon:SetTexture(nil); button.icon:Hide();
 			end
 		end
-		button:Show();
+		if ( iconLoaded or IsEditing("SlimSuiteSpellRowFrame") ) then button:Show(); else button:Hide(); end
 	end
 	LayoutSpellRow();
 	if ( DB().replaceBuildRows ) then spellRow:Show(); else spellRow:Hide(); end
@@ -699,13 +716,9 @@ local function CreateSpellRow()
 	spellRow:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 8, 170);
 	for i = 1, 6 do
 		local button = CreateFrame("Button", "SlimSuiteSpellButton" .. i, spellRow);
-		button:SetID(i); button:SetWidth(32); button:SetHeight(32);
-		button:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2");
-		button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
-		button.icon = button:CreateTexture(nil, "ARTWORK");
-		button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3);
-		button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3);
-		button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
+		button:SetID(i);
+		button:SetWidth(BUILD_ICON); button:SetHeight(BUILD_ICON);
+		BuildIconLook(button);
 		button:EnableMouse(true);
 		button:SetScript("OnEnter", function()
 			if ( not this.spell or not GameTooltip ) then return; end
@@ -1844,6 +1857,7 @@ end
 -- a stable absolute location. Save the corrected place immediately so it survives /reload.
 local function ClampToClient(name, frame)
 	if ( not frame or not UIParent ) then return; end
+	if ( name == "SlimSuiteItemRowFrame" and DB().buildRowsAttached ) then return; end   -- the spell row is clamped for both
 	local left, right, bottom = RootBounds(frame);
 	if ( not left or not bottom ) then return; end
 	local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(frame);
@@ -1944,6 +1958,13 @@ VisualInsets = function(frame)
 		end
 	end
 	IncludeDescendants(frame, {});
+	if ( frame == spellRow and itemRow and DB().buildRowsAttached and itemRow:IsShown() ) then
+		local l, r, b, t = RootBounds(itemRow);
+		if ( l and r and b and t ) then
+			minX = math.min(minX, l - baseLeft); maxX = math.max(maxX, r - baseLeft);
+			minY = math.min(minY, b - baseBottom); maxY = math.max(maxY, t - baseBottom);
+		end
+	end
 	return minX, minY, maxX, maxY;
 end;
 
@@ -2379,10 +2400,21 @@ function SlimSuite_SetRacialAbility(on)
 	PlaceAll();
 end
 
+-- True when the worn-jewelry row is joined under the spell row. Only the player separates them, with the
+-- "Detach build rows" button; nothing else in Slim Suite may break that join.
+local function BuildRowsJoined(name)
+	return name == "SlimSuiteItemRowFrame" and DB().buildRowsAttached and true or false;
+end
+
 local function Place(name, ignoreAnchor)
 	local f = getglobal(name);
 	local p = DB().places[name];
 	if ( not f ) then return; end
+	if ( (name == "SlimSuiteSpellRowFrame" and type(p) ~= "table") or (name == "SlimSuiteItemRowFrame" and
+		(type(p) ~= "table" or (BuildRowsJoined(name) and p.relative ~= "SlimSuiteSpellRowFrame"))) ) then
+		p = SlimSuite_BuildRowDefaultPlace(name);
+		DB().places[name] = p;
+	end
 	local w, h = f:GetWidth(), f:GetHeight();
 	if ( w and h and w > 0 and h > 0 and not baseSizes[name] ) then baseSizes[name] = { w = w, h = h }; end
 	if ( name ~= "GameTooltip" and not basePoints[name] and f.GetNumPoints ) then
@@ -3064,6 +3096,7 @@ local function SnapPosition(name, f)
 end
 
 local function FinishHandleMove(h, name)
+	name = h.mover or name;
 	local t = getglobal(name);
 	if ( not t or not h.dragging ) then return; end
 	h.dragging = nil;
@@ -3125,7 +3158,9 @@ local function Handle(name, label)
 				ToggleFeatureMute(name);
 				return;
 			end
-			local t = getglobal(name);
+			-- The joined jewelry row moves with the spell row: dragging either handle moves the pair.
+			this.mover = (name == "SlimSuiteItemRowFrame" and DB().buildRowsAttached) and "SlimSuiteSpellRowFrame" or name;
+			local t = getglobal(this.mover);
 			if ( not t ) then return; end
 			t:SetMovable(true);
 			-- We clamp the visible child bounds ourselves below; native clamping would keep the
@@ -3137,7 +3172,7 @@ local function Handle(name, label)
 			this.dragStartX, this.dragStartY = x, y;
 			local left, right, bottom = RootBounds(t);
 			this.frameStartX, this.frameStartY = left or x, bottom or y;
-			local saved = DB().places[name];
+			local saved = DB().places[this.mover];
 			if ( type(saved) == "table" ) then saved.relative, saved.point, saved.relativePoint, saved.dx, saved.dy = nil, nil, nil, nil, nil; end
 			this.dragging = true;
 		end);
@@ -3157,13 +3192,14 @@ local function Handle(name, label)
 				local x, y = GetCursorPosition(); x, y = x / scale, y / scale;
 				local deltaX, deltaY = x - this.dragStartX, y - this.dragStartY;
 				local nextX, nextY = this.frameStartX + deltaX, this.frameStartY + deltaY;
-				local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(t);
+				local moved = getglobal(this.mover or name) or t;
+				local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(moved);
 				local maxX = UIParent:GetWidth() - maxOffsetX;
 				local maxY = UIParent:GetHeight() - maxOffsetY;
 				nextX = math.max(-minX, math.min(maxX, nextX));
 				nextY = math.max(-minY, math.min(maxY, nextY));
-				SetRootPosition(t, nextX, nextY);
-				SavePosition(name, t);          -- keep the newest location even if /reload happens mid-session
+				SetRootPosition(moved, nextX, nextY);
+				SavePosition(this.mover or name, moved);          -- keep the newest location even if /reload happens mid-session
 			end
 			if ( name == "GameTooltip" and t:IsShown() ) then
 				this:SetFrameStrata("TOOLTIP");
@@ -3274,7 +3310,7 @@ SetAnchorSnap = function(on)
 			local name = MOVABLE[i][1];
 			local p = DB().places[name];
 			local f = getglobal(name);
-			if ( type(p) == "table" and p.relative and f ) then
+			if ( type(p) == "table" and p.relative and f and not (name == "SlimSuiteItemRowFrame" and DB().buildRowsAttached) ) then
 				SavePosition(name, f);
 				p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
 			end
@@ -3297,6 +3333,7 @@ function SlimSuite_ResetPlaces()
 			end
 		end
 	end
+	DB().buildRowsAttached = true;
 	DB().places.SlimSuiteSpellRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteSpellRowFrame");
 	DB().places.SlimSuiteItemRowFrame = SlimSuite_BuildRowDefaultPlace("SlimSuiteItemRowFrame");
 	PlaceAll();
