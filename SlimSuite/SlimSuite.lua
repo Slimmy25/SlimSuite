@@ -80,7 +80,10 @@ local function DB()
 	if ( d.deathMarks == nil ) then d.deathMarks = true; end
 	if ( d.prePullMarks == nil ) then d.prePullMarks = false; end
 	if ( d.encounterDebuffs == nil ) then d.encounterDebuffs = true; end
-	if ( d.onTopOfScreens == nil ) then d.onTopOfScreens = true; end
+	-- Slim Suite stays under the game's level-up and new-item cards unless the player turns this on. An early
+	-- test build had it on by default; this switches it off once for anyone who got that default.
+	if ( (tonumber(d.onTopDefaultVersion) or 0) < 1 ) then d.onTopOfScreens = false; d.onTopDefaultVersion = 1; end
+	if ( d.onTopOfScreens == nil ) then d.onTopOfScreens = false; end
 	if ( d.replaceRevive == nil ) then d.replaceRevive = false; end
 	if ( d.procMeter == nil ) then d.procMeter = false; end
 	if ( d.combatTextBox == nil ) then d.combatTextBox = false; end
@@ -3732,7 +3735,7 @@ local function WinBuild()
 			{"Combat text test box (movable)", function() return DB().combatTextBox; end, function(v) DB().combatTextBox = v; end},
 			{"Floating combat text over enemies (Slim Suite's own)", function() return DB().floatingText; end, function(v) DB().floatingText = v; end},
 			{"Replace Default Local Clock with Movable Version?", function() return DB().replaceLocalClock; end, function(v) DB().replaceLocalClock = v; end},
-			{"Keep Slim Suite above level-up and new-item cards", function() return DB().onTopOfScreens; end, function(v) DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
+			{"Show Slim Suite above the level-up and new-item cards", function() return DB().onTopOfScreens; end, function(v) DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -72);
 		uiChild:SetHeight(790);
 	end

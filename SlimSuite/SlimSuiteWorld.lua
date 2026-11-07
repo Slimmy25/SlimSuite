@@ -388,6 +388,8 @@ local ON_TOP = { "SlimSuiteWorldMarkers", "SlimSuiteMeterFrame", "SlimSuiteStore
 	"SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame",
 	"SlimSuiteTallyFrame", "SlimSuiteReviveFrame", "SlimSuiteCombatTextFrame", "SlimSuiteProcMeter",
 	"SlimSuiteLocalClockFrame", "SlimSuiteFloatingText", "SlimSuiteStoreLevelsToggle" };
+-- Off by default: the game's cards then cover Slim Suite like the rest of the HUD. Only when the player turns the
+-- setting on are Slim Suite's frames lifted above them.
 function W.ApplyOnTop()
 	if ( not A.Has("AZS_SetOnTopOfScreens") ) then return; end
 	local on = DB().onTopOfScreens and true or false;
