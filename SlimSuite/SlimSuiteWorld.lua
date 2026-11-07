@@ -834,33 +834,76 @@ end
 -- AZS_GetLocalTime() gives the clock's text, hour, minute and format, even with the clock or minimap hidden and out of
 -- a run. While this is on, the game's own clock under the minimap is hidden with AZS_SetHudShown("localClock", false).
 local localNative = Native("localClock", "localClockNativeOriginal");
+-- It is drawn like the game's own clock: cream text in the game's font on a dark see-through box with soft edges
+-- and no border. The right-click menu can remove the box, switch between 12- and 24-hour time and shift the time an
+-- hour for daylight saving.
+local CLOCK_TEXT, CLOCK_BOX = { 0.88, 0.82, 0.72 }, 0.6;
 local clock = CreateFrame("Frame", "SlimSuiteLocalClockFrame", UIParent);
-clock:SetWidth(70); clock:SetHeight(20);
-if ( Minimap ) then clock:SetPoint("TOP", Minimap, "BOTTOM", 0, -6); else clock:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -60, -170); end
+clock:SetWidth(60); clock:SetHeight(20);
+if ( Minimap ) then clock:SetPoint("TOP", Minimap, "BOTTOM", 0, -2); else clock:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -60, -170); end
 clock:SetFrameStrata("MEDIUM");
-clock:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	tile = true, tileSize = 16, edgeSize = 10, insets = { left = 2, right = 2, top = 2, bottom = 2 } });
-clock:SetBackdropColor(0.03, 0.03, 0.05, 0.75);
-clock:SetBackdropBorderColor(0.7, 0.52, 0.2, 0.8);
-clock.text = clock:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+clock.left = clock:CreateTexture(nil, "BACKGROUND");
+clock.left:SetPoint("TOPLEFT", clock, "TOPLEFT", 0, 0); clock.left:SetPoint("BOTTOMLEFT", clock, "BOTTOMLEFT", 0, 0); clock.left:SetWidth(5);
+clock.right = clock:CreateTexture(nil, "BACKGROUND");
+clock.right:SetPoint("TOPRIGHT", clock, "TOPRIGHT", 0, 0); clock.right:SetPoint("BOTTOMRIGHT", clock, "BOTTOMRIGHT", 0, 0); clock.right:SetWidth(5);
+clock.bg = clock:CreateTexture(nil, "BACKGROUND");
+clock.bg:SetPoint("TOPLEFT", clock.left, "TOPRIGHT", 0, 0); clock.bg:SetPoint("BOTTOMRIGHT", clock.right, "BOTTOMLEFT", 0, 0);
+for _, t in ipairs({ clock.bg, clock.left, clock.right }) do t:SetTexture(1, 1, 1, 1); t:SetVertexColor(0, 0, 0, CLOCK_BOX); end
+if ( clock.left.SetGradientAlpha ) then
+	clock.left:SetGradientAlpha("HORIZONTAL", 0, 0, 0, 0, 0, 0, 0, CLOCK_BOX);
+	clock.right:SetGradientAlpha("HORIZONTAL", 0, 0, 0, CLOCK_BOX, 0, 0, 0, 0);
+end
+clock.text = clock:CreateFontString(nil, "OVERLAY");
+clock.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 13);
+clock.text:SetShadowColor(0, 0, 0, 1); clock.text:SetShadowOffset(1, -1);
+clock.text:SetTextColor(CLOCK_TEXT[1], CLOCK_TEXT[2], CLOCK_TEXT[3]);
 clock.text:SetPoint("CENTER", clock, "CENTER", 0, 0);
 clock:Hide();
 
-local function LocalTimeText()
+-- The game's time as hour (0-23) and minute, and whether the game shows it as 24-hour. AZS_GetLocalTime gives the
+-- clock's text, hour, minute and format (0.136); if only the text comes back, it is read as "7:09 PM" or "19:09".
+local function GameTime()
 	local t = A.Call("AZS_GetLocalTime");
-	if ( type(t) == "string" ) then return t; end
-	if ( type(t) ~= "table" ) then return nil; end
-	local text = A.Field(t, "text", "label");
-	if ( type(text) == "string" and text ~= "" ) then return text; end
-	local h, m = tonumber(A.Field(t, "hour", "h")), tonumber(A.Field(t, "minute", "min", "m"));
-	if ( not h or not m ) then return nil; end
-	local fmt = tostring(A.Field(t, "format", "fmt") or "24");
-	if ( string.find(fmt, "12", 1, true) ) then
-		local suffix = h >= 12 and " PM" or " AM";
-		h = math.mod(h, 12); if ( h == 0 ) then h = 12; end
-		return string.format("%d:%02d%s", h, m, suffix);
+	local text, h, m, fmt;
+	if ( type(t) == "string" ) then text = t;
+	elseif ( type(t) == "table" ) then
+		text = A.Field(t, "text", "label");
+		h, m = tonumber(A.Field(t, "hour", "h")), tonumber(A.Field(t, "minute", "min", "m"));
+		fmt = A.Field(t, "format", "fmt");
 	end
-	return string.format("%02d:%02d", h, m);
+	local is24;
+	if ( fmt ~= nil ) then is24 = not string.find(tostring(fmt), "12", 1, true); end
+	if ( (not h or not m) and type(text) == "string" ) then
+		local _, _, hh, mm, ampm = string.find(text, "(%d+):(%d+)%s*([AaPp]?[Mm]?)");
+		h, m = tonumber(hh), tonumber(mm);
+		if ( h and ampm and ampm ~= "" ) then
+			local pm = string.upper(string.sub(ampm, 1, 1)) == "P";
+			if ( pm and h < 12 ) then h = h + 12; elseif ( not pm and h == 12 ) then h = 0; end
+			if ( is24 == nil ) then is24 = false; end
+		elseif ( h and is24 == nil ) then is24 = true; end
+	end
+	if ( h and m ) then return h, m, is24 ~= false, text; end
+	return nil, nil, nil, text;
+end
+
+-- what the right-click menu shows for the clock
+function W.ClockIs24()
+	local mode = DB().localClock24;
+	if ( mode ~= nil ) then return mode and true or false; end
+	local _, _, gameIs24 = GameTime();
+	return gameIs24 and true or false;
+end
+
+local function LocalTimeText()
+	local h, m, gameIs24, text = GameTime();
+	if ( not h ) then return text; end
+	h = math.mod(h + (tonumber(DB().localClockDST) or 0) + 24, 24);
+	local use24 = DB().localClock24;
+	if ( use24 == nil ) then use24 = gameIs24; end
+	if ( use24 ) then return string.format("%02d:%02d", h, m); end
+	local suffix = h >= 12 and " PM" or " AM";
+	local h12 = math.mod(h, 12); if ( h12 == 0 ) then h12 = 12; end
+	return string.format("%d:%02d%s", h12, m, suffix);
 end
 
 local function UpdateLocalClock()
@@ -869,10 +912,16 @@ local function UpdateLocalClock()
 	local text = LocalTimeText();
 	if ( not text and not editing ) then clock:Hide(); SetNativeHidden(localNative, false); return; end
 	SetNativeHidden(localNative, true);
-	clock.text:SetText(text or "12:00");
-	clock:SetWidth(math.max(50, (clock.text:GetStringWidth() or 40) + 16));
+	clock.text:SetText(text or "7:09 PM");
+	local band = DB().localClockBackground ~= false;
+	for _, t in ipairs({ clock.bg, clock.left, clock.right }) do if ( band ) then t:Show(); else t:Hide(); end end
+	local custom = DB().sizes and DB().sizes.SlimSuiteLocalClockFrame;
+	local w, h = (clock.text:GetStringWidth() or 40) + 18, 20;
+	if ( type(custom) == "table" ) then w, h = math.max(w, custom.w or 0), math.max(h, custom.h or 0); end
+	clock:SetWidth(w); clock:SetHeight(h);
 	clock:Show();
 end
+W.UpdateLocalClock = function() pcall(UpdateLocalClock); end
 
 -- ---------------------------------------------------------------- floating combat text (0.138)
 -- Each of your hits floats up from the enemy it struck, stays over the spot where an enemy fell, and hides when that

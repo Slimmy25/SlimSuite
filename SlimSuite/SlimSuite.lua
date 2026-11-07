@@ -2898,6 +2898,35 @@ local function OpenSizeMenu(name, label)
 		local attachButton = K.Button(sizeMenu, "Detach item row", 184, function() ToggleBuildRowsAttached(); end);
 		attachButton:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -208);
 		sizeMenu.attachButton = attachButton;
+		-- the local clock's own options: its dark box, 12- or 24-hour time, and an hour's shift for daylight saving
+		local function ClockLabels()
+			local d = DB();
+			sizeMenu.clockBox:SetText(d.localClockBackground == false and "Show background" or "Remove background");
+			local is24 = SlimSuiteWorld and SlimSuiteWorld.ClockIs24 and SlimSuiteWorld.ClockIs24();
+			sizeMenu.clock24:SetText(is24 and "Switch to 12-hour" or "Switch to 24-hour");
+			local dst = tonumber(d.localClockDST) or 0;
+			sizeMenu.clockDst:SetText("Daylight saving: " .. (dst > 0 and "+1 hour" or (dst < 0 and "-1 hour" or "off")));
+		end
+		local function ClockChanged()
+			if ( SlimSuiteWorld and SlimSuiteWorld.UpdateLocalClock ) then SlimSuiteWorld.UpdateLocalClock(); end
+			ClockLabels();
+		end
+		sizeMenu.clockBox = K.Button(sizeMenu, "Remove background", 184, function()
+			DB().localClockBackground = DB().localClockBackground == false; ClockChanged();
+		end);
+		sizeMenu.clockBox:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -208);
+		sizeMenu.clock24 = K.Button(sizeMenu, "Switch to 24-hour", 184, function()
+			local is24 = SlimSuiteWorld and SlimSuiteWorld.ClockIs24 and SlimSuiteWorld.ClockIs24();
+			DB().localClock24 = not is24; ClockChanged();
+		end);
+		sizeMenu.clock24:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -236);
+		-- off -> +1 hour -> -1 hour -> off
+		sizeMenu.clockDst = K.Button(sizeMenu, "Daylight saving: off", 184, function()
+			local dst = tonumber(DB().localClockDST) or 0;
+			DB().localClockDST = dst == 0 and 1 or (dst > 0 and -1 or 0); ClockChanged();
+		end);
+		sizeMenu.clockDst:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -264);
+		sizeMenu.ClockLabels = ClockLabels;
 		local reset = K.Button(sizeMenu, "Reset", 62, function()
 			if ( not SlimSuite_ResetElement(sizeTarget) ) then
 				K.Print(NAME, "the original size is not available yet; try again after the frame appears.");
@@ -2947,6 +2976,12 @@ local function OpenSizeMenu(name, label)
 		end
 		sizeMenu.muteButton:SetText(DB().muted[name] and "Show feature" or "Hide feature");
 	end
+	if ( sizeMenu.clockBox ) then
+		local isClock = name == "SlimSuiteLocalClockFrame";
+		for _, b in ipairs({ sizeMenu.clockBox, sizeMenu.clock24, sizeMenu.clockDst }) do if ( isClock ) then b:Show(); else b:Hide(); end end
+		if ( isClock ) then sizeMenu.ClockLabels(); end
+		sizeMenu:SetHeight(isClock and 326 or 270);
+	end
 	sizeMenu:ClearAllPoints();
 	local saved = DB().sizeMenuPosition;
 	local sw, sh = UIParent:GetWidth(), UIParent:GetHeight();
@@ -2958,7 +2993,7 @@ local function OpenSizeMenu(name, label)
 		x, y = GetCursorPosition(); x, y = x / scale, y / scale; x, y = x + 8, y + 8;
 	end
 	x = math.max(0, math.min(sw - 206, x));
-	y = math.max(0, math.min(sh - 270, y));
+	y = math.max(0, math.min(sh - (sizeMenu:GetHeight() or 270), y));
 	sizeMenu:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y);
 	if ( type(saved) ~= "table" ) then DB().sizeMenuPosition = { x = x, y = y }; end
 	sizeMenu:Show();
