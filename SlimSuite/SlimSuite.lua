@@ -115,7 +115,7 @@ local function DB()
 	if ( d.showEditGrid == nil ) then d.showEditGrid = true; end
 	if ( d.gridCenterVertical == nil ) then d.gridCenterVertical = true; end
 	if ( d.gridCenterHorizontal == nil ) then d.gridCenterHorizontal = true; end
-	if ( d.startUnlocked == nil ) then d.startUnlocked = false; end
+	d.startUnlocked = nil;                                  -- the retired "Open UI modifier at startup": the UI always starts locked
 	if ( d.tallyVertical == nil ) then d.tallyVertical = false; end
 	if ( d.tallyBossKills == nil ) then d.tallyBossKills = true; end
 	if ( d.tallyBackground == nil ) then d.tallyBackground = true; end
@@ -3714,7 +3714,6 @@ local function WinBuild()
 			{"Toggle UI Settings (drag, resize and scale)", function() return DB().unlocked; end, function(v) SlimSuite_SetUnlocked(v); end},
 			{"Hide the target frame", function() return DB().hideTarget; end, function(v) DB().hideTarget = v; TargetFrameHidden(v); end},
 			{"Replace Default Level Up with Movable Version?", function() return DB().moveLevelButton; end, function(v) DB().moveLevelButton = v; pcall(UpdateLevelButton); end},
-			{"Open UI modifier at startup", function() return DB().startUnlocked; end, function(v) DB().startUnlocked = v; end},
 			{"Replace Default Build Rows with Movable Versions?", function() return DB().replaceBuildRows; end, function(v) DB().replaceBuildRows = v; ApplyBuildRowReplacement(); end},
 			{"Replace Default Damage Meter with Movable Version?", function() return DB().moveMeter; end, function(v) SetMeterReplacement(v); end},
 			{"Replace Default Run Clock with Movable Version?", function() return DB().replaceClock;end,function(v) DB().replaceClock=v;UpdateClock();end},
@@ -3735,7 +3734,7 @@ local function WinBuild()
 			{"Replace Default Local Clock with Movable Version?", function() return DB().replaceLocalClock; end, function(v) DB().replaceLocalClock = v; end},
 			{"Show Slim Suite above the level-up and new-item cards", function() return DB().onTopOfScreens; end, function(v) DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -72);
-		uiChild:SetHeight(790);
+		uiChild:SetHeight(762);
 	end
 	local function BuildOther()
 		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
@@ -3791,7 +3790,7 @@ local function WinBuild()
 	end
 	CheckboxRows(); BuildOther(); BuildAddonManager();
 	local tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -704);
+	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -676);
 	tooltipTitle:SetText("Tooltip size");
 	local function AdjustTooltipSize(delta)
 		local size = DB().sizes.GameTooltip;
@@ -3803,14 +3802,14 @@ local function WinBuild()
 		PlaceAll();
 	end
 	local tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
-	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -722);
+	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -694);
 	local tooltipLarger = K.Button(uiChild, "Larger", 82, function() AdjustTooltipSize(20); end);
 	tooltipLarger:SetPoint("LEFT", tooltipSmaller, "RIGHT", 6, 0);
 	local reset = K.Button(uiChild, "Reset positions", 140, function() SlimSuite_ResetPlaces(); end);
-	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -756);
+	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -728);
 	local resetAll = K.Button(uiChild, "Reset all UI", 126, function() SlimSuite_ResetUI(); end);
 	resetAll:SetPoint("LEFT", reset, "RIGHT", 8, 0);
-	uiChild:SetHeight(790);
+	uiChild:SetHeight(762);
 	local function SelectPage(which)
 		uiScroll:Hide(); otherScroll:Hide(); addonsScroll:Hide();
 		if ( win.reloadButton ) then win.reloadButton:Hide(); end
@@ -3870,13 +3869,13 @@ loader:SetScript("OnEvent", function()
 	-- The editor state is a user choice, not a leftover from an earlier session. Clear legacy
 	-- unlocked saves at load; only the explicit startup option may reopen the mover after login.
 	if ( event == "VARIABLES_LOADED" ) then
-		DB().unlocked = DB().startUnlocked and true or false;
+		DB().unlocked = false;
 		pcall(SlimSuite_RestoreNativeHudAfterLoad);
 	end
 	pcall(Camera, event == "PLAYER_ENTERING_WORLD");
 	pcall(ApplyGuardianFlag);
 	-- the frames back where they were put (the game places some of them again as it loads), and the target frame
-	if ( DB().unlocked or DB().startUnlocked or type(DB().places.MainMenuExpBar) == "table"
+	if ( DB().unlocked or type(DB().places.MainMenuExpBar) == "table"
 		or type(DB().sizes.MainMenuExpBar) == "table" or type(DB().scales.MainMenuExpBar) == "number"
 		or DB().orientations.MainMenuExpBar ~= nil ) then pcall(DetachExperienceBar); end
 	if ( type(DB().places.ChatFrame1) == "table" ) then pcall(PrepareChatWindow); end
@@ -3893,7 +3892,7 @@ loader:SetScript("OnEvent", function()
 	pcall(HookTooltipOwner);
 	pcall(PlaceAll);
 	pcall(UpdateMeter);
-	if ( event == "PLAYER_ENTERING_WORLD" ) then pcall(SlimSuite_SetUnlocked, DB().startUnlocked and true or false, true); end
+	if ( event == "PLAYER_ENTERING_WORLD" ) then pcall(SlimSuite_SetUnlocked, false, true); end
 end);
 local buffLayoutUpdater = CreateFrame("Frame");
 buffLayoutUpdater:RegisterEvent("UNIT_AURA");
