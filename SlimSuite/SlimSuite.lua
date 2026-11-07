@@ -96,6 +96,7 @@ local function DB()
 	if ( d.floatingText == nil ) then d.floatingText = false; end
 	if ( d.deathSound == nil ) then d.deathSound = false; end
 	if ( d.hideTarget == nil ) then d.hideTarget = false; end
+	if ( d.mirrorTarget == nil ) then d.mirrorTarget = false; end
 	if ( d.moveLevelButton == nil ) then d.moveLevelButton = false; end
 	if ( d.moveMeter == nil ) then d.moveMeter = false; end
 	if ( d.showRacialAbility == nil ) then d.showRacialAbility = false; end
@@ -2559,6 +2560,32 @@ PlaceAll = function()
 		local frame = getglobal(name);
 		if ( frame ) then pcall(ClampToClient, name, frame); end
 	end
+	if ( DB().mirrorTarget ) then pcall(SlimSuite_MirrorTarget); end
+end
+
+-- "Mirror target": the target frame stands where the player frame would be if the screen were folded at its center
+-- line: same height, same scale, the same distance from the right edge as the player frame is from the left.
+function SlimSuite_MirrorTarget()
+	if ( not DB().mirrorTarget or not PlayerFrame or not TargetFrame ) then return; end
+	local scale = DB().scales.PlayerFrame;
+	DB().scales.TargetFrame = scale;
+	if ( TargetFrame.SetScale ) then TargetFrame:SetScale(type(scale) == "number" and scale or 1); end
+	local l, r, b, t = RootBounds(PlayerFrame);
+	if ( not l or not t ) then return; end
+	local factor = RootFactor(TargetFrame);
+	local tw, th = (TargetFrame:GetWidth() or 0) * factor, (TargetFrame:GetHeight() or 0) * factor;
+	local x, y = UIParent:GetWidth() - l - tw, t - th;
+	if ( TargetFrame.SetUserPlaced ) then TargetFrame:SetUserPlaced(true); end
+	SetRootPosition(TargetFrame, x, y);
+	local p = DB().places.TargetFrame;
+	if ( type(p) ~= "table" ) then p = {}; DB().places.TargetFrame = p; end
+	p.x, p.y, p.coordinateSpace = x, y, "uiParent";
+	p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
+end
+
+function SlimSuite_SetMirrorTarget(on)
+	DB().mirrorTarget = on and true or false;
+	if ( on ) then pcall(SlimSuite_MirrorTarget); end
 end
 
 local function ApplyTallyLayout(resetSize)
@@ -2934,6 +2961,14 @@ local function OpenSizeMenu(name, label)
 		end);
 		sizeMenu.clockDst:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -264);
 		sizeMenu.ClockLabels = ClockLabels;
+		-- the player frame's own option
+		sizeMenu.mirror = CreateFrame("CheckButton", nil, sizeMenu, "UICheckButtonTemplate");
+		sizeMenu.mirror:SetWidth(22); sizeMenu.mirror:SetHeight(22);
+		sizeMenu.mirror:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 8, -207);
+		sizeMenu.mirror.label = sizeMenu.mirror:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+		sizeMenu.mirror.label:SetPoint("LEFT", sizeMenu.mirror, "RIGHT", 2, 1); sizeMenu.mirror.label:SetText("Mirror target");
+		sizeMenu.mirror:SetScript("OnClick", function() SlimSuite_SetMirrorTarget(this:GetChecked() and true or false); end);
+		sizeMenu.mirror:Hide();
 		local reset = K.Button(sizeMenu, "Reset", 62, function()
 			if ( not SlimSuite_ResetElement(sizeTarget) ) then
 				K.Print(NAME, "the original size is not available yet; try again after the frame appears.");
@@ -2984,6 +3019,10 @@ local function OpenSizeMenu(name, label)
 		sizeMenu.muteButton:SetText(DB().muted[name] and "Show feature" or "Hide feature");
 	end
 	if ( sizeMenu.clockBox ) then
+		if ( sizeMenu.mirror ) then
+			if ( name == "PlayerFrame" ) then sizeMenu.mirror:SetChecked(DB().mirrorTarget and 1 or nil); sizeMenu.mirror:Show();
+			else sizeMenu.mirror:Hide(); end
+		end
 		local isClock = name == "SlimSuiteLocalClockFrame";
 		for _, b in ipairs({ sizeMenu.clockBox, sizeMenu.clock24, sizeMenu.clockDst }) do if ( isClock ) then b:Show(); else b:Hide(); end end
 		if ( isClock ) then sizeMenu.ClockLabels(); end
@@ -3270,6 +3309,11 @@ local function Handle(name, label)
 			end
 			-- The joined jewelry row moves with the spell row: dragging either handle moves the pair.
 			this.mover = (name == "SlimSuiteItemRowFrame" and DB().buildRowsAttached) and "SlimSuiteSpellRowFrame" or name;
+			if ( name == "TargetFrame" and DB().mirrorTarget ) then
+				DB().mirrorTarget = false;
+				if ( sizeMenu and sizeMenu.mirror ) then sizeMenu.mirror:SetChecked(nil); end
+				K.Print(NAME, "Mirror target is off: the target frame now stays where you put it.");
+			end
 			local t = getglobal(this.mover);
 			if ( not t ) then return; end
 			t:SetMovable(true);
@@ -3310,6 +3354,7 @@ local function Handle(name, label)
 				nextY = math.max(-minY, math.min(maxY, nextY));
 				SetRootPosition(moved, nextX, nextY);
 				SavePosition(this.mover or name, moved);          -- keep the newest location even if /reload happens mid-session
+				if ( (this.mover or name) == "PlayerFrame" and DB().mirrorTarget ) then pcall(SlimSuite_MirrorTarget); end
 			end
 			if ( name == "GameTooltip" and t:IsShown() ) then
 				this:SetFrameStrata("TOOLTIP");
@@ -3676,7 +3721,7 @@ local SU = {};                                           -- the setup's panel, o
 function SU.Steps()
 	local d = DB();
 	local steps = {
-		{ frame = "PlayerFrame", title = "Unit frame",
+		{ frame = "PlayerFrame", title = "Unit frame", mirror = true,
 		  text = "Your hero's frame: health, power and level. Drag the green handle to place it. Right-click the handle for size and scale." },
 		{ frame = "PartyMemberFrame1", title = "Party frames",
 		  text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Right-click to stack them across or down." },
@@ -3716,6 +3761,7 @@ function SU.Check(parent, label, y, get, set)
 	fs:SetPoint("LEFT", cb, "RIGHT", 2, 0); fs:SetJustifyH("LEFT"); fs:SetText(label);
 	cb.Refresh = function() cb:SetChecked(get() and 1 or nil); end;
 	cb:SetScript("OnClick", function() set(this:GetChecked() and true or false); end);
+	cb:Hide();
 	return cb;
 end
 
@@ -3772,6 +3818,8 @@ function SU.Build()
 		function() return DB().plainBar; end, function(v) DB().plainBar = v; pcall(PlainBar, v); end);
 	SU.panel.slots = SU.Check(SU.panel, "Show all six buttons at all times, even empty ones", -116,
 		function() return DB().showEmptyActionSlots; end, function(v) DB().showEmptyActionSlots = v; pcall(ApplyActionSlotGrid); end);
+	SU.panel.mirror = SU.Check(SU.panel, "Mirror target", -92,
+		function() return DB().mirrorTarget; end, function(v) SlimSuite_SetMirrorTarget(v); end);
 	SU.panel.back = K.Button(SU.panel, "Back", 70, function() SlimSuite_SetupGo(DB().setupStep - 1); end);
 	SU.panel.back:SetPoint("BOTTOMLEFT", SU.panel, "BOTTOMLEFT", 10, 8);
 	SU.panel.skip = K.Button(SU.panel, "Skip setup", 90, function() SlimSuite_SetupEnd(false); end);
@@ -3818,6 +3866,13 @@ function SlimSuite_SetupGo(n)
 		h = h + 48;
 	else
 		SU.panel.art:Hide(); SU.panel.slots:Hide();
+	end
+	if ( step.mirror ) then
+		SU.panel.mirror:ClearAllPoints(); SU.panel.mirror:SetPoint("TOPLEFT", SU.panel.text, "BOTTOMLEFT", -2, -4);
+		SU.panel.mirror.Refresh(); SU.panel.mirror:Show();
+		h = h + 26;
+	else
+		SU.panel.mirror:Hide();
 	end
 	SU.panel:SetHeight(h);
 	SU.grid.Refresh(); SU.centre.Refresh(); SU.snap.Refresh();
