@@ -114,6 +114,8 @@ local function DB()
 	if ( d.gridCenterHorizontal == nil ) then d.gridCenterHorizontal = true; end
 	if ( d.startUnlocked == nil ) then d.startUnlocked = false; end
 	if ( d.tallyVertical == nil ) then d.tallyVertical = false; end
+	if ( d.tallyBossKills == nil ) then d.tallyBossKills = true; end
+	if ( d.tallyBackground == nil ) then d.tallyBackground = true; end
 	if ( d.showEmptyActionSlots == nil ) then d.showEmptyActionSlots = false; end
 	if ( d.buildRowsAttached == nil ) then d.buildRowsAttached = true; end
 	if ( d.replaceBuildRows == nil ) then d.replaceBuildRows = false; end
@@ -819,9 +821,100 @@ local function SetNativeTallyHidden(on)
 	end
 end
 
+local function FramePaddingLimit(name)
+	if ( name == "SlimSuiteClockFrame" ) then return 6; end
+	if ( name == "SlimSuiteBossFrames" ) then return 8; end
+	if ( name == "SlimSuiteTallyFrame" ) then return 8; end
+	if ( name == "SlimSuiteAnnouncementFrame" ) then return 20; end
+	if ( name == "BuffFrame" ) then return 16; end
+	return 0;
+end
+
+local function FramePadding(name)
+	local value = DB().padding[name];
+	return type(value) == "number" and math.max(0, math.min(FramePaddingLimit(name), value)) or 0;
+end
+
+-- Kills / Gold / Cache in the game's own style (measured from its HUD): muted tan labels, gold numbers, a lowercase
+-- gold "cache" for the next cache's cost, and a soft dark band behind that fades out at both ends. The band can be
+-- turned off completely. Boss and Guardian kills sit next to Kills by default.
+local TALLY_LABEL, TALLY_VALUE = { 0.69, 0.63, 0.47 }, { 0.97, 0.82, 0.41 };
+local TALLY_FONT_SIZE, TALLY_WORD_GAP, TALLY_PART_GAP, TALLY_LINE = 15, 6, 16, 19;
+
 local function TallyValue(value)
 	if ( type(value) ~= "number" ) then return "-"; end
 	return tostring(math.floor(value));
+end
+
+local function TallyParts(run)
+	local parts = { { "Kills", TallyValue(run and run.kills) } };
+	if ( DB().tallyBossKills ) then
+		local bosses, guardians;
+		if ( run and SlimSuiteWorld and SlimSuiteWorld.RunKills ) then bosses, guardians = SlimSuiteWorld.RunKills(); end
+		table.insert(parts, { "Bosses", TallyValue(bosses) });
+		table.insert(parts, { "Guardians", TallyValue(guardians) });
+	end
+	table.insert(parts, { "Gold", TallyValue(run and run.gold) });
+	table.insert(parts, { "cache", TallyValue(run and run.chest), true });   -- the game draws all of it in gold
+	return parts;
+end
+
+local function TallyString(list, i, justify)
+	local fs = list[i];
+	if ( not fs ) then
+		fs = tallyFrame:CreateFontString(nil, "OVERLAY");
+		fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", TALLY_FONT_SIZE);
+		fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1);
+		list[i] = fs;
+	end
+	fs:SetJustifyH(justify or "LEFT");
+	return fs;
+end
+
+local function DrawTally(parts)
+	local vertical = DB().tallyVertical and true or false;
+	local pad = 10 + FramePadding("SlimSuiteTallyFrame");
+	local x, widest, n = pad, 0, table.getn(parts);
+	for i = 1, n do
+		local label, value = TallyString(tallyFrame.labels, i), TallyString(tallyFrame.values, i, vertical and "RIGHT" or "LEFT");
+		label:SetText(parts[i][1]); value:SetText(parts[i][2]);
+		local c = parts[i][3] and TALLY_VALUE or TALLY_LABEL;
+		label:SetTextColor(c[1], c[2], c[3]); value:SetTextColor(TALLY_VALUE[1], TALLY_VALUE[2], TALLY_VALUE[3]);
+		widest = math.max(widest, (label:GetStringWidth() or 0) + TALLY_WORD_GAP + (value:GetStringWidth() or 0));
+		label:Show(); value:Show();
+	end
+	for i = n + 1, table.getn(tallyFrame.labels) do tallyFrame.labels[i]:Hide(); tallyFrame.values[i]:Hide(); end
+	local custom = DB().sizes.SlimSuiteTallyFrame;
+	local width, height;
+	if ( vertical ) then
+		width, height = widest + pad * 2, n * TALLY_LINE + 12;
+	else
+		for i = 1, n do x = x + (tallyFrame.labels[i]:GetStringWidth() or 0) + TALLY_WORD_GAP + (tallyFrame.values[i]:GetStringWidth() or 0) + TALLY_PART_GAP; end
+		width, height = x - TALLY_PART_GAP + pad, 30;
+	end
+	-- a size set in the resize menu is kept as a minimum; the band always fits its text
+	if ( type(custom) == "table" ) then width, height = math.max(width, custom.w or 0), math.max(height, custom.h or 0); end
+	tallyFrame:SetWidth(width); tallyFrame:SetHeight(height);
+	x = pad;
+	for i = 1, n do
+		local label, value = tallyFrame.labels[i], tallyFrame.values[i];
+		label:ClearAllPoints(); value:ClearAllPoints();
+		if ( vertical ) then
+			local y = -6 - (i - 1) * TALLY_LINE;
+			label:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", pad, y);
+			value:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", -pad, y);
+		else
+			label:SetPoint("LEFT", tallyFrame, "LEFT", x, 0);
+			x = x + (label:GetStringWidth() or 0) + TALLY_WORD_GAP;
+			value:SetPoint("LEFT", tallyFrame, "LEFT", x, 0);
+			x = x + (value:GetStringWidth() or 0) + TALLY_PART_GAP;
+		end
+	end
+	-- the band: flat in the middle, fading out over its last 14 pixels on each side; nothing at all when turned off
+	local band = DB().tallyBackground and true or false;
+	local fade = math.min(14, width / 4);
+	tallyFrame.bgLeft:SetWidth(fade); tallyFrame.bgRight:SetWidth(fade);
+	for _, t in ipairs({ tallyFrame.bg, tallyFrame.bgLeft, tallyFrame.bgRight }) do if ( band ) then t:Show(); else t:Hide(); end end
 end
 
 local function UpdateTally()
@@ -831,17 +924,11 @@ local function UpdateTally()
 	local active = phase and phase ~= "ready";
 	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
 	if ( active and run ) then
-		local kills, gold, cache = TallyValue(run.kills), TallyValue(run.gold), TallyValue(run.chest);
-		if ( DB().tallyVertical ) then
-			tallyFrame.text:SetText("Kills  " .. kills .. "\nGold  " .. gold .. "\nCache  " .. cache);
-		else
-			tallyFrame.text:SetText("Kills " .. kills .. "    Gold " .. gold .. "    Cache " .. cache);
-		end
+		DrawTally(TallyParts(run));
 		tallyFrame:Show();
 		SetNativeTallyHidden(true);
 	elseif ( IsEditing("SlimSuiteTallyFrame") ) then
-		if ( DB().tallyVertical ) then tallyFrame.text:SetText("Kills  -\nGold  -\nCache  -");
-		else tallyFrame.text:SetText("Kills -    Gold -    Cache -"); end
+		DrawTally(TallyParts(nil));
 		tallyFrame:Show();
 		SetNativeTallyHidden(false);
 	else
@@ -857,10 +944,19 @@ local function CreateTallyFrame()
 	tallyFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 12, 24);
 	tallyFrame:SetFrameStrata("HIGH");
 	tallyFrame:EnableMouse(false);
-	tallyFrame.text = tallyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-	tallyFrame.text:SetPoint("LEFT", tallyFrame, "LEFT", 4, 0);
-	tallyFrame.text:SetPoint("RIGHT", tallyFrame, "RIGHT", -4, 0);
-	tallyFrame.text:SetJustifyH("LEFT");
+	tallyFrame.labels, tallyFrame.values = {}, {};
+	local BAND = 0.5;
+	tallyFrame.bgLeft = tallyFrame:CreateTexture(nil, "BACKGROUND");
+	tallyFrame.bgLeft:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", 0, 0); tallyFrame.bgLeft:SetPoint("BOTTOMLEFT", tallyFrame, "BOTTOMLEFT", 0, 0);
+	tallyFrame.bgRight = tallyFrame:CreateTexture(nil, "BACKGROUND");
+	tallyFrame.bgRight:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", 0, 0); tallyFrame.bgRight:SetPoint("BOTTOMRIGHT", tallyFrame, "BOTTOMRIGHT", 0, 0);
+	tallyFrame.bg = tallyFrame:CreateTexture(nil, "BACKGROUND");
+	tallyFrame.bg:SetPoint("TOPLEFT", tallyFrame.bgLeft, "TOPRIGHT", 0, 0); tallyFrame.bg:SetPoint("BOTTOMRIGHT", tallyFrame.bgRight, "BOTTOMLEFT", 0, 0);
+	for _, t in ipairs({ tallyFrame.bg, tallyFrame.bgLeft, tallyFrame.bgRight }) do t:SetTexture(1, 1, 1, 1); t:SetVertexColor(0, 0, 0, BAND); end
+	if ( tallyFrame.bgLeft.SetGradientAlpha ) then
+		tallyFrame.bgLeft:SetGradientAlpha("HORIZONTAL", 0, 0, 0, 0, 0, 0, 0, BAND);
+		tallyFrame.bgRight:SetGradientAlpha("HORIZONTAL", 0, 0, 0, BAND, 0, 0, 0, 0);
+	end
 	local savedOriginal = DB().tallyNativeOriginal;
 	if ( savedOriginal ~= nil ) then
 		tallyNativeWasShown = savedOriginal and true or false;
@@ -1290,20 +1386,6 @@ local function ClockText(seconds)
 	if ( type(seconds) ~= "number" or seconds < 0 ) then return "--:--"; end
 	seconds = math.floor(seconds);
 	return string.format("%02d:%02d", math.floor(seconds / 60), math.mod(seconds, 60));
-end
-
-local function FramePaddingLimit(name)
-	if ( name == "SlimSuiteClockFrame" ) then return 6; end
-	if ( name == "SlimSuiteBossFrames" ) then return 8; end
-	if ( name == "SlimSuiteTallyFrame" ) then return 8; end
-	if ( name == "SlimSuiteAnnouncementFrame" ) then return 20; end
-	if ( name == "BuffFrame" ) then return 16; end
-	return 0;
-end
-
-local function FramePadding(name)
-	local value = DB().padding[name];
-	return type(value) == "number" and math.max(0, math.min(FramePaddingLimit(name), value)) or 0;
 end
 
 local function ApplyClockLayout()
@@ -2474,25 +2556,7 @@ end
 
 local function ApplyTallyLayout(resetSize)
 	if ( not tallyFrame ) then return; end
-	local vertical = DB().tallyVertical and true or false;
-	local padding = FramePadding("SlimSuiteTallyFrame");
-	if ( resetSize ) then
-		local w, h = vertical and 104 or 252, vertical and 54 or 28;
-		tallyFrame:SetWidth(w); tallyFrame:SetHeight(h);
-		DB().sizes.SlimSuiteTallyFrame = { w = w, h = h };
-	end
-	if ( vertical ) then
-		tallyFrame.text:ClearAllPoints();
-		tallyFrame.text:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", 4 + padding, -(2 + padding));
-		tallyFrame.text:SetJustifyH("LEFT");
-		tallyFrame.text:SetJustifyV("TOP");
-	else
-		tallyFrame.text:ClearAllPoints();
-		tallyFrame.text:SetPoint("LEFT", tallyFrame, "LEFT", 4 + padding, 0);
-		tallyFrame.text:SetPoint("RIGHT", tallyFrame, "RIGHT", -(4 + padding), 0);
-		tallyFrame.text:SetJustifyH("LEFT");
-		tallyFrame.text:SetJustifyV("MIDDLE");
-	end
+	if ( resetSize ) then DB().sizes.SlimSuiteTallyFrame = nil; end
 	PlaceAll();
 	UpdateTally();
 end
@@ -3616,6 +3680,8 @@ local function WinBuild()
 			{"   ...show the zone and Heroic affixes under it", function() return DB().zoneLine;end,function(v) DB().zoneLine=v;UpdateClock();end},
 			{"Replace Default Encounter Bars with Movable Versions?", function() return DB().replaceEncounters;end,function(v) DB().replaceEncounters=v;UpdateBossFrames();end},
 			{"Replace Default Kills / Gold / Cache with Movable Version?", function() return DB().replaceTally;end,function(v) DB().replaceTally=v;UpdateTally();end},
+			{"   ...show boss and Guardian kills next to Kills", function() return DB().tallyBossKills;end,function(v) DB().tallyBossKills=v;UpdateTally();end},
+			{"   ...dark band behind it", function() return DB().tallyBackground;end,function(v) DB().tallyBackground=v;UpdateTally();end},
 			{"Replace Default Announcements with Movable Version?", function() return DB().replaceBanners;end,function(v) DB().replaceBanners=v;UpdateAnnouncementFrame();end},
 			{"Replace Default Action Bar Art with Plain Version?", function() return DB().plainBar; end, function(v) DB().plainBar = v; PlainBar(v); end},
 			{"Add racial ability as a 7th Action Bar 1 button?", function() return DB().showRacialAbility; end, function(v) SlimSuite_SetRacialAbility(v); end},
@@ -3628,7 +3694,7 @@ local function WinBuild()
 			{"Replace Default Local Clock with Movable Version?", function() return DB().replaceLocalClock; end, function(v) DB().replaceLocalClock = v; end},
 			{"Keep Slim Suite above level-up and new-item cards", function() return DB().onTopOfScreens; end, function(v) DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -72);
-		uiChild:SetHeight(734);
+		uiChild:SetHeight(790);
 	end
 	local function BuildOther()
 		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
@@ -3684,7 +3750,7 @@ local function WinBuild()
 	end
 	CheckboxRows(); BuildOther(); BuildAddonManager();
 	local tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -648);
+	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -704);
 	tooltipTitle:SetText("Tooltip size");
 	local function AdjustTooltipSize(delta)
 		local size = DB().sizes.GameTooltip;
@@ -3696,14 +3762,14 @@ local function WinBuild()
 		PlaceAll();
 	end
 	local tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
-	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -666);
+	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -722);
 	local tooltipLarger = K.Button(uiChild, "Larger", 82, function() AdjustTooltipSize(20); end);
 	tooltipLarger:SetPoint("LEFT", tooltipSmaller, "RIGHT", 6, 0);
 	local reset = K.Button(uiChild, "Reset positions", 140, function() SlimSuite_ResetPlaces(); end);
-	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -700);
+	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -756);
 	local resetAll = K.Button(uiChild, "Reset all UI", 126, function() SlimSuite_ResetUI(); end);
 	resetAll:SetPoint("LEFT", reset, "RIGHT", 8, 0);
-	uiChild:SetHeight(734);
+	uiChild:SetHeight(790);
 	local function SelectPage(which)
 		uiScroll:Hide(); otherScroll:Hide(); addonsScroll:Hide();
 		if ( win.reloadButton ) then win.reloadButton:Hide(); end

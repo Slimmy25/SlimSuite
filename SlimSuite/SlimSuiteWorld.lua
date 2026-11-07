@@ -973,6 +973,73 @@ if ( not (A.Has("AZS_RegisterCombatTextFrameHandler") and pcall(AZS_RegisterComb
 	floatLayer:SetScript("OnUpdate", function() pcall(DrawFloats); end);
 end
 
+-- ---------------------------------------------------------------- boss and Guardian kills this run
+-- For the Kills / Gold / Cache tally. The game's run summary counts bosses and Guardians only once a run ends, so
+-- during a run Slim Suite counts them itself: a boss or Guardian it saw alive in AZS_UNITS that dies (health 0) or
+-- leaves the list while the run is still being played. A Guardian that walks back to its lair stays in the list,
+-- so it is not counted. If the game ever puts its own counts in AZS_RUN, those are used instead.
+-- The counts are kept in the saved settings per run, so they survive a /reload.
+local tally = { bosses = 0, guardians = 0, alive = {}, run = nil, lastKills = nil };
+
+local function TrackKills()
+	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
+	local phase = A.Call("AZS_GetPhase");
+	local playing = phase == "playing" or phase == "choosing" or phase == "paused";
+	local ctx = A.Call("AZS_GetMeterContext");
+	local key = type(ctx) == "table" and ctx.runId or nil;
+	local kills = run and tonumber(run.kills) or nil;
+	-- a new run: its id changes, or the run's kill count goes back down
+	if ( (key ~= nil and key ~= tally.run) or (kills and tally.lastKills and kills < tally.lastKills) ) then
+		local saved = DB().runKills;
+		if ( key ~= nil and type(saved) == "table" and saved.run == key ) then
+			tally.bosses, tally.guardians = tonumber(saved.bosses) or 0, tonumber(saved.guardians) or 0;
+		else
+			tally.bosses, tally.guardians = 0, 0;
+		end
+		tally.alive, tally.run = {}, key;
+	end
+	tally.lastKills = kills;
+	if ( not playing ) then tally.alive = {}; return; end
+	local units = type(AZS_UNITS) == "table" and AZS_UNITS or {};
+	local seen, any = {}, false;
+	for i = 1, table.getn(units) do
+		local u = units[i];
+		if ( type(u) == "table" and u.id ~= nil ) then
+			any = true;
+			local kind = SlimSuite_UnitKind(u);
+			local boss = kind == "boss" or kind == "final";
+			if ( boss or kind == "guardian" ) then
+				seen[u.id] = true;
+				local hp = tonumber(u.hp);
+				if ( hp == nil or hp > 0 ) then
+					tally.alive[u.id] = boss and "boss" or "guardian";
+				elseif ( tally.alive[u.id] ) then
+					if ( tally.alive[u.id] == "boss" ) then tally.bosses = tally.bosses + 1; else tally.guardians = tally.guardians + 1; end
+					tally.alive[u.id] = nil;
+				end
+			end
+		end
+	end
+	-- gone from the list while the run goes on means slain; an empty list (a loading screen) counts nothing
+	if ( any ) then
+		for id, kind in pairs(tally.alive) do
+			if ( not seen[id] ) then
+				if ( kind == "boss" ) then tally.bosses = tally.bosses + 1; else tally.guardians = tally.guardians + 1; end
+				tally.alive[id] = nil;
+			end
+		end
+	end
+	DB().runKills = { run = key, bosses = tally.bosses, guardians = tally.guardians };
+end
+
+-- bosses, guardians slain this run
+function W.RunKills()
+	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
+	local b = run and tonumber(A.Field(run, "bossKills", "bossesKilled", "bk"));
+	local g = run and tonumber(A.Field(run, "guardianKills", "guardiansKilled", "gk"));
+	return b or tally.bosses, g or tally.guardians;
+end
+
 -- ---------------------------------------------------------------- tickers
 local ticker = CreateFrame("Frame");
 ticker.elapsed = 0;
@@ -981,6 +1048,7 @@ ticker:SetScript("OnUpdate", function()
 	this.elapsed = this.elapsed + (arg1 or 0);
 	if ( this.elapsed < 0.1 ) then return; end
 	this.elapsed = 0;
+	pcall(TrackKills);
 	pcall(UpdateRevive);
 	pcall(UpdateProc);
 	pcall(UpdateMinimapPins);
