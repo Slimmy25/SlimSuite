@@ -1043,9 +1043,7 @@ UpdateMeter = function()
 	if ( not DB().moveMeter ) then
 		meterFrame:Hide(); SetNativeMeterHidden(false); return;
 	end
-	if ( not active and not editing ) then
-		meterFrame:Hide(); SetNativeMeterHidden(false); return;
-	end
+	-- Shown before a run too, like the game's own meter (it reads "No damage yet." until the run starts).
 	-- closed with its "x": hidden for the rest of this run (the game's meter stays hidden too)
 	if ( not editing and SlimSuiteMeter.IsClosed and SlimSuiteMeter.IsClosed() ) then
 		meterFrame:Hide(); SetNativeMeterHidden(true); return;

@@ -317,16 +317,24 @@ function M.Attach(frame)
  if ok then M.viewList = list; end
 end
 
--- "x": the meter stays hidden for the rest of this run and comes back with the next one
+-- "x": the meter stays hidden for the rest of this run and comes back with the next one. Closed before a run, it
+-- comes back when that run starts.
+local function CurrentRunId()
+ if not AZS_GetMeterContext then return nil; end
+ local ok, ctx = pcall(AZS_GetMeterContext);
+ if ok and type(ctx) == 'table' then return ctx.runId; end
+ return nil;
+end
 function M.Close()
- M.closedRun = (M.context and M.context.runId) or true;
+ M.closed = true;
+ M.closedRun = CurrentRunId() or 'before a run';
  if M.viewList then M.viewList:Hide(); end
  if M.frame then M.frame:Hide(); end
 end
 function M.IsClosed()
- if not M.closedRun then return false; end
- local ctx = AZS_GetMeterContext and AZS_GetMeterContext();
- if M.closedRun ~= true and type(ctx) == 'table' and ctx.runId and ctx.runId ~= M.closedRun then M.closedRun = nil; return false; end
+ if not M.closed then return false; end
+ local run = CurrentRunId();
+ if run ~= nil and run ~= M.closedRun then M.closed, M.closedRun = nil, nil; return false; end
  return true;
 end
 
@@ -387,6 +395,7 @@ function M.Draw(active, editing)
  M.offset = math.max(0, math.min(M.offset, math.max(0, Count(rows) - M.visible)));
  if Count(rows) == 0 then
   local msg = M.message;
+  if not active and not msg then M.error = nil; end
   if not msg and type(M.error) == 'table' then
    msg = M.error.code == 'NO_PARTY' and 'Join a party to see party DPS.' or M.error.code == 'NO_ENCOUNTER' and 'No boss fight yet.' or nil;
   elseif not msg and type(M.error) == 'string' and not editing then msg = M.error; end
