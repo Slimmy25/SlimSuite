@@ -383,6 +383,80 @@ function W.DrawDebuffs(row, unit, vertical, enabled)
 	if ( row.debuffs ) then for i = n + 1, table.getn(row.debuffs) do row.debuffs[i]:Hide(); end end
 end
 
+-- ---------------------------------------------------------------- debuffs and DoTs on the target frame
+-- On by default. Bosses and Guardians report theirs through AZS_GetDebuffs (0.93) with stacks and time left; any
+-- other target uses the 1.12 UnitDebuff (icon and stacks). Nothing is drawn while the game's own target frame
+-- already shows its debuffs, so they never appear twice.
+local targetDebuffs = { icons = {} };
+local function TargetDebuffIcon(i)
+	local b = targetDebuffs.icons[i];
+	if ( b ) then return b; end
+	b = CreateFrame("Frame", nil, TargetFrame);
+	b:SetWidth(17); b:SetHeight(17); b:EnableMouse(true);
+	b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetAllPoints(b); b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
+	b.border = b:CreateTexture(nil, "OVERLAY"); b.border:SetPoint("TOPLEFT", b, "TOPLEFT", -1, 1); b.border:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 1, -1);
+	b.border:SetTexture("Interface\\Buttons\\UI-Debuff-Border");
+	b.border:SetVertexColor(0.8, 0, 0);
+	b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall");
+	b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 2, -1);
+	b.time = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	b.time:SetPoint("TOP", b, "BOTTOM", 0, 0);
+	local font, _, flags = b.time:GetFont(); if ( font ) then b.time:SetFont(font, 8, flags); end
+	b:SetScript("OnEnter", function()
+		if ( not GameTooltip ) then return; end
+		GameTooltip:SetOwner(this, "ANCHOR_BOTTOMRIGHT");
+		if ( this.index and GameTooltip.SetUnitDebuff ) then GameTooltip:SetUnitDebuff("target", this.index);
+		else GameTooltip:AddLine(this.name or "Debuff", 1, 0.3, 0.3); if ( this.stacks and this.stacks > 1 ) then GameTooltip:AddLine("Stacks: " .. this.stacks, 1, 1, 1); end end
+		GameTooltip:Show();
+	end);
+	b:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
+	targetDebuffs.icons[i] = b;
+	return b;
+end
+
+local function NativeTargetDebuffsShown()
+	local first = getglobal("TargetFrameDebuff1");
+	return first and first:IsVisible() and true or false;
+end
+
+local function UpdateTargetDebuffs()
+	local list = {};
+	if ( DB().targetDebuffs and TargetFrame and TargetFrame:IsVisible() and UnitExists and UnitExists("target") and not NativeTargetDebuffsShown() ) then
+		local id = type(AZS_TARGET) == "table" and AZS_TARGET.id or nil;
+		local api = id ~= nil and A.Call("AZS_GetDebuffs", id) or nil;
+		if ( type(api) == "table" and table.getn(api) > 0 ) then
+			for i = 1, table.getn(api) do
+				local db = api[i];
+				local icon = A.Field(db, "icon", "texture");
+				if ( type(icon) == "string" ) then
+					if ( not string.find(icon, "\\", 1, true) ) then icon = "Interface\\Icons\\" .. icon; end
+					table.insert(list, { icon = icon, stacks = tonumber(A.Field(db, "stacks", "count", "applications")) or 0,
+						left = tonumber(A.Field(db, "left", "timeLeft", "remaining")), name = A.Field(db, "name", "spell") });
+				end
+			end
+		elseif ( UnitDebuff ) then
+			for i = 1, 16 do
+				local texture, stacks = UnitDebuff("target", i);
+				if ( not texture ) then break; end
+				table.insert(list, { icon = texture, stacks = tonumber(stacks) or 0, index = i });
+			end
+		end
+	end
+	local n = math.min(16, table.getn(list));
+	for i = 1, n do
+		local e, b = list[i], TargetDebuffIcon(i);
+		b.icon:SetTexture(e.icon);
+		b.count:SetText(e.stacks > 1 and tostring(e.stacks) or "");
+		b.time:SetText(e.left and e.left > 0 and (e.left >= 10 and tostring(math.floor(e.left + 0.5)) or string.format("%.1f", e.left)) or "");
+		b.index, b.name, b.stacks = e.index, e.name, e.stacks;
+		b:ClearAllPoints();
+		-- where the 1.12 target frame puts its own: under the name and bars, eight to a row
+		b:SetPoint("TOPLEFT", TargetFrame, "BOTTOMLEFT", 5 + math.mod(i - 1, 8) * 19, 32 - math.floor((i - 1) / 8) * 22);
+		b:Show();
+	end
+	for i = n + 1, table.getn(targetDebuffs.icons) do targetDebuffs.icons[i]:Hide(); end
+end
+
 -- ---------------------------------------------------------------- staying above the level-up and new-item cards
 local ON_TOP = { "SlimSuiteWorldMarkers", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteClockFrame",
 	"SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame",
@@ -1197,6 +1271,7 @@ ticker:SetScript("OnUpdate", function()
 	if ( this.elapsed < 0.1 ) then return; end
 	this.elapsed = 0;
 	pcall(TrackKills);
+	pcall(UpdateTargetDebuffs);
 	pcall(UpdateRevive);
 	pcall(UpdateProc);
 	pcall(UpdateLocalClock);

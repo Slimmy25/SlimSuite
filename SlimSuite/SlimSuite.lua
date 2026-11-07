@@ -97,6 +97,9 @@ local function DB()
 	if ( d.deathSound == nil ) then d.deathSound = false; end
 	if ( d.hideTarget == nil ) then d.hideTarget = false; end
 	if ( d.mirrorTarget == nil ) then d.mirrorTarget = false; end
+	if ( d.buffsOnTarget == nil ) then d.buffsOnTarget = false; end
+	if ( d.buffsOnTargetSide ~= "above" ) then d.buffsOnTargetSide = "below"; end
+	if ( d.targetDebuffs == nil ) then d.targetDebuffs = true; end
 	if ( d.moveLevelButton == nil ) then d.moveLevelButton = false; end
 	if ( d.moveMeter == nil ) then d.moveMeter = false; end
 	if ( d.showRacialAbility == nil ) then d.showRacialAbility = false; end
@@ -2561,6 +2564,7 @@ PlaceAll = function()
 		if ( frame ) then pcall(ClampToClient, name, frame); end
 	end
 	if ( DB().mirrorTarget ) then pcall(SlimSuite_MirrorTarget); end
+	if ( DB().buffsOnTarget ) then pcall(SlimSuite_AttachBuffs); end
 end
 
 -- "Mirror target": the target frame stands where the player frame would be if the screen were folded at its center
@@ -2597,6 +2601,49 @@ function SlimSuite_MirrorPlayer()
 	if ( type(p) ~= "table" ) then p = {}; DB().places.PlayerFrame = p; end
 	p.x, p.y, p.coordinateSpace = x, y, "uiParent";
 	p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
+end
+
+-- "Buffs on the target frame": the buff frame joins the target frame, above or below it, at the target's scale, and
+-- loses its own handle while joined. It is shown in both frames' right-click menus and in the setup's steps.
+function SlimSuite_AttachBuffs()
+	if ( not DB().buffsOnTarget or not BuffFrame or not TargetFrame ) then return; end
+	BuffFrame:ClearAllPoints();
+	if ( DB().buffsOnTargetSide == "above" ) then BuffFrame:SetPoint("BOTTOMLEFT", TargetFrame, "TOPLEFT", 6, 2);
+	else BuffFrame:SetPoint("TOPLEFT", TargetFrame, "BOTTOMLEFT", 6, -2); end
+	if ( BuffFrame.SetScale ) then BuffFrame:SetScale(TargetFrame:GetScale() or 1); end
+end
+
+local function RefreshBuffControls()
+	if ( sizeMenu and sizeMenu.buffsOn ) then
+		sizeMenu.buffsOn:SetChecked(DB().buffsOnTarget and 1 or nil);
+		sizeMenu.buffsSide:SetText(DB().buffsOnTargetSide == "above" and "Buffs: above the target" or "Buffs: below the target");
+		if ( DB().buffsOnTarget ) then sizeMenu.buffsSide:Enable(); else sizeMenu.buffsSide:Disable(); end
+	end
+	if ( DB().unlocked ) then SlimSuite_SetUnlocked(true, true); end        -- shows or hides the buff frame's own handle
+end
+
+function SlimSuite_SetBuffsOnTarget(on)
+	DB().buffsOnTarget = on and true or false;
+	if ( on ) then
+		SlimSuite_AttachBuffs();
+	elseif ( BuffFrame ) then
+		-- back on its own: its own scale, and its own place (or the game's, if it never had one)
+		local scale = DB().scales.BuffFrame;
+		BuffFrame:SetScale(type(scale) == "number" and scale or 1);
+		local points = basePoints.BuffFrame;
+		if ( type(DB().places.BuffFrame) ~= "table" and points ) then
+			BuffFrame:ClearAllPoints();
+			for i = 1, table.getn(points) do local p = points[i]; BuffFrame:SetPoint(p[1], p[2], p[3], p[4], p[5]); end
+		end
+		PlaceAll();
+	end
+	RefreshBuffControls();
+end
+
+function SlimSuite_SetBuffsSide(side)
+	DB().buffsOnTargetSide = side == "above" and "above" or "below";
+	SlimSuite_AttachBuffs();
+	RefreshBuffControls();
 end
 
 function SlimSuite_SetMirrorTarget(on)
@@ -2985,6 +3032,16 @@ local function OpenSizeMenu(name, label)
 		sizeMenu.mirror.label:SetPoint("LEFT", sizeMenu.mirror, "RIGHT", 2, 1); sizeMenu.mirror.label:SetText("Mirror target");
 		sizeMenu.mirror:SetScript("OnClick", function() SlimSuite_SetMirrorTarget(this:GetChecked() and true or false); end);
 		sizeMenu.mirror:Hide();
+		-- the target frame's and the buff frame's shared option
+		sizeMenu.buffsOn = CreateFrame("CheckButton", nil, sizeMenu, "UICheckButtonTemplate");
+		sizeMenu.buffsOn:SetWidth(22); sizeMenu.buffsOn:SetHeight(22);
+		sizeMenu.buffsOn.label = sizeMenu.buffsOn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+		sizeMenu.buffsOn.label:SetPoint("LEFT", sizeMenu.buffsOn, "RIGHT", 2, 1); sizeMenu.buffsOn.label:SetText("Buffs on the target frame");
+		sizeMenu.buffsOn:SetScript("OnClick", function() SlimSuite_SetBuffsOnTarget(this:GetChecked() and true or false); end);
+		sizeMenu.buffsSide = K.Button(sizeMenu, "Buffs: below the target", 184, function()
+			SlimSuite_SetBuffsSide(DB().buffsOnTargetSide == "above" and "below" or "above");
+		end);
+		sizeMenu.buffsOn:Hide(); sizeMenu.buffsSide:Hide();
 		local reset = K.Button(sizeMenu, "Reset", 62, function()
 			if ( not SlimSuite_ResetElement(sizeTarget) ) then
 				K.Print(NAME, "the original size is not available yet; try again after the frame appears.");
@@ -3036,13 +3093,23 @@ local function OpenSizeMenu(name, label)
 	end
 	if ( sizeMenu.clockBox ) then
 		if ( sizeMenu.mirror ) then
-			if ( name == "PlayerFrame" ) then sizeMenu.mirror:SetChecked(DB().mirrorTarget and 1 or nil); sizeMenu.mirror:Show();
+			if ( name == "PlayerFrame" or name == "TargetFrame" ) then
+				sizeMenu.mirror:SetChecked(DB().mirrorTarget and 1 or nil); sizeMenu.mirror:Show();
 			else sizeMenu.mirror:Hide(); end
+		end
+		if ( sizeMenu.buffsOn ) then
+			local buffs = name == "TargetFrame" or name == "BuffFrame";
+			sizeMenu.buffsOn:ClearAllPoints(); sizeMenu.buffsSide:ClearAllPoints();
+			-- under Mirror target on the target frame's menu; first on the buff frame's
+			local top = name == "TargetFrame" and -231 or -207;
+			sizeMenu.buffsOn:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 8, top);
+			sizeMenu.buffsSide:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, top - 26);
+			if ( buffs ) then sizeMenu.buffsOn:Show(); sizeMenu.buffsSide:Show(); RefreshBuffControls(); else sizeMenu.buffsOn:Hide(); sizeMenu.buffsSide:Hide(); end
 		end
 		local isClock = name == "SlimSuiteLocalClockFrame";
 		for _, b in ipairs({ sizeMenu.clockBox, sizeMenu.clock24, sizeMenu.clockDst }) do if ( isClock ) then b:Show(); else b:Hide(); end end
 		if ( isClock ) then sizeMenu.ClockLabels(); end
-		sizeMenu:SetHeight(isClock and 326 or 270);
+		sizeMenu:SetHeight(isClock and 326 or (name == "TargetFrame" and 326) or (name == "BuffFrame" and 300) or 270);
 	end
 	sizeMenu:ClearAllPoints();
 	local saved = DB().sizeMenuPosition;
@@ -3429,7 +3496,7 @@ function SlimSuite_SetUnlocked(on, quiet)
 	if ( on ) then ShowEditGrid(); else HideEditGrid(); end
 	for i = 1, table.getn(MOVABLE) do
 		local name = MOVABLE[i][1];
-		if ( on and (not editOnly or editOnly == name) ) then
+		if ( on and (not editOnly or editOnly == name) and not (name == "BuffFrame" and DB().buffsOnTarget) ) then
 			local ok, h = pcall(Handle, name, MOVABLE[i][2]);
 			if ( ok and h ) then h:Show(); end
 		elseif ( handles[name] ) then
@@ -3736,17 +3803,17 @@ local SU = {};                                           -- the setup's panel, o
 function SU.Steps()
 	local d = DB();
 	local steps = {
-		{ frame = "PlayerFrame", title = "Unit frame", mirror = true,
+		{ frame = "PlayerFrame", title = "Unit frame",
 		  text = "Your hero's frame: health, power and level. Drag the green handle to place it. Right-click the handle for size and scale." },
 		{ frame = "PartyMemberFrame1", title = "Party frames",
 		  text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Right-click to stack them across or down." },
-		{ frame = "MainMenuBar", title = "Action bar", actionBar = true,
-		  text = "Your spells. Drag to place it, right-click for size or to turn it upright. Two choices for how it looks:" },
+		{ frame = "MainMenuBar", title = "Action bar",
+		  text = "Your spells. Drag to place it, right-click for size or to turn it upright." },
 	};
 	local rest = {
 		{ "TargetFrame", "Target frame", "The enemy the game has picked for you.", function() return not d.hideTarget; end },
 		{ "MainMenuExpBar", "XP bar", "Your experience bar. It can stand upright too (right-click)." },
-		{ "BuffFrame", "Buffs", "Your buffs. Right-click to stack them in a column and choose which way they grow." },
+		{ "BuffFrame", "Buffs", "Your buffs. Right-click to stack them in a column and choose which way they grow. Attached to the target frame, they move and scale with it instead." },
 		{ "MinimapCluster", "Minimap", "The minimap, with its pins." },
 		{ "ChatFrame1", "Chat", "The chat window, its tab and the box you type in move together." },
 		{ "GameTooltip", "Tooltip", "Where tooltips appear while the UI is unlocked, and their size." },
@@ -3769,15 +3836,45 @@ function SU.Steps()
 	return steps;
 end
 
-function SU.Check(parent, label, y, get, set)
+function SU.Check(parent)
 	local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate");
-	cb:SetWidth(22); cb:SetHeight(22); cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, y);
-	local fs = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	fs:SetPoint("LEFT", cb, "RIGHT", 2, 0); fs:SetJustifyH("LEFT"); fs:SetText(label);
-	cb.Refresh = function() cb:SetChecked(get() and 1 or nil); end;
-	cb:SetScript("OnClick", function() set(this:GetChecked() and true or false); end);
+	cb:SetWidth(22); cb:SetHeight(22);
+	cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	cb.label:SetPoint("LEFT", cb, "RIGHT", 2, 0); cb.label:SetJustifyH("LEFT");
+	cb.Refresh = function() if ( cb.get ) then cb:SetChecked(cb.get() and 1 or nil); end end;
+	cb:SetScript("OnClick", function()
+		if ( this.set ) then this.set(this:GetChecked() and true or false); end
+		if ( SU.panel and SU.panel:IsShown() ) then for i = 1, table.getn(SU.checks) do SU.checks[i].Refresh(); end end
+	end);
 	cb:Hide();
 	return cb;
+end
+
+-- the tick boxes each step offers: that element's own settings, the same ones as in the settings window
+function SU.ChecksFor(frame)
+	local d = DB();
+	local function Mirror() return { "Mirror target", function() return DB().mirrorTarget; end, function(v) SlimSuite_SetMirrorTarget(v); end }; end
+	local function BuffsOn() return { "Buffs on the target frame", function() return DB().buffsOnTarget; end, function(v) SlimSuite_SetBuffsOnTarget(v); end }; end
+	local function BuffsAbove() return { "...above the target (off: below it)", function() return DB().buffsOnTargetSide == "above"; end,
+		function(v) SlimSuite_SetBuffsSide(v and "above" or "below"); end }; end
+	local list = {
+		PlayerFrame = { Mirror() },
+		MainMenuBar = {
+			{ "Hide the bar's artwork (only the spell squares stay)", function() return DB().plainBar; end, function(v) DB().plainBar = v; pcall(PlainBar, v); end },
+			{ "Show all six buttons at all times, even empty ones", function() return DB().showEmptyActionSlots; end, function(v) DB().showEmptyActionSlots = v; pcall(ApplyActionSlotGrid); end },
+			{ "Add your racial as a 7th button", function() return DB().showRacialAbility; end, function(v) pcall(SlimSuite_SetRacialAbility, v); end } },
+		TargetFrame = { Mirror(), { "Show debuffs and DoTs on the target", function() return DB().targetDebuffs; end, function(v) DB().targetDebuffs = v; end }, BuffsOn(), BuffsAbove() },
+		BuffFrame = { BuffsOn(), BuffsAbove() },
+		SlimSuiteClockFrame = { { "Show the zone and Heroic affixes under it", function() return DB().zoneLine; end, function(v) DB().zoneLine = v; end } },
+		SlimSuiteBossFrames = { { "Show debuffs on the bars", function() return DB().encounterDebuffs; end, function(v) DB().encounterDebuffs = v; end } },
+		SlimSuiteTallyFrame = {
+			{ "Show boss and Guardian kills", function() return DB().tallyBossKills; end, function(v) DB().tallyBossKills = v; end },
+			{ "Dark band behind it", function() return DB().tallyBackground; end, function(v) DB().tallyBackground = v; end } },
+		SlimSuiteLocalClockFrame = {
+			{ "Dark background", function() return DB().localClockBackground ~= false; end, function(v) DB().localClockBackground = v; end },
+			{ "24-hour time", function() return SlimSuiteWorld and SlimSuiteWorld.ClockIs24 and SlimSuiteWorld.ClockIs24(); end, function(v) DB().localClock24 = v; end } },
+	};
+	return frame and list[frame] or {};
 end
 
 function SU.Build()
@@ -3828,13 +3925,9 @@ function SU.Build()
 		function(v) DB().gridCenterVertical, DB().gridCenterHorizontal = v, v; Regrid(); end);
 	SU.snap = Tick(-74, -30, "Snap frames", function() return DB().anchorSnap; end,
 		function(v) if ( SetAnchorSnap ) then SetAnchorSnap(v); end end);
-	-- the action bar's two questions
-	SU.panel.art = SU.Check(SU.panel, "Hide the bar's artwork (only the spell squares stay)", -92,
-		function() return DB().plainBar; end, function(v) DB().plainBar = v; pcall(PlainBar, v); end);
-	SU.panel.slots = SU.Check(SU.panel, "Show all six buttons at all times, even empty ones", -116,
-		function() return DB().showEmptyActionSlots; end, function(v) DB().showEmptyActionSlots = v; pcall(ApplyActionSlotGrid); end);
-	SU.panel.mirror = SU.Check(SU.panel, "Mirror target", -92,
-		function() return DB().mirrorTarget; end, function(v) SlimSuite_SetMirrorTarget(v); end);
+	-- each step's own tick boxes (up to four)
+	SU.checks = {};
+	for i = 1, 4 do SU.checks[i] = SU.Check(SU.panel); end
 	SU.panel.back = K.Button(SU.panel, "Back", 70, function() SlimSuite_SetupGo(DB().setupStep - 1); end);
 	SU.panel.back:SetPoint("BOTTOMLEFT", SU.panel, "BOTTOMLEFT", 10, 8);
 	SU.panel.skip = K.Button(SU.panel, "Skip setup", 90, function() SlimSuite_SetupEnd(false); end);
@@ -3873,21 +3966,19 @@ function SlimSuite_SetupGo(n)
 	SU.panel.title:SetText(step.title);
 	SU.panel.text:SetText(step.text);
 	local h = 58 + (SU.panel.text:GetHeight() or 28) + 40;
-	if ( step.actionBar ) then
-		SU.panel.art:ClearAllPoints(); SU.panel.art:SetPoint("TOPLEFT", SU.panel.text, "BOTTOMLEFT", -2, -4);
-		SU.panel.slots:ClearAllPoints(); SU.panel.slots:SetPoint("TOPLEFT", SU.panel.art, "BOTTOMLEFT", 0, 0);
-		SU.panel.art.Refresh(); SU.panel.slots.Refresh();
-		SU.panel.art:Show(); SU.panel.slots:Show();
-		h = h + 48;
-	else
-		SU.panel.art:Hide(); SU.panel.slots:Hide();
-	end
-	if ( step.mirror ) then
-		SU.panel.mirror:ClearAllPoints(); SU.panel.mirror:SetPoint("TOPLEFT", SU.panel.text, "BOTTOMLEFT", -2, -4);
-		SU.panel.mirror.Refresh(); SU.panel.mirror:Show();
-		h = h + 26;
-	else
-		SU.panel.mirror:Hide();
+	local checks = SU.ChecksFor(step.frame);
+	for i = 1, 4 do
+		local cb, c = SU.checks[i], checks[i];
+		if ( c ) then
+			cb.label:SetText(c[1]); cb.get, cb.set = c[2], c[3];
+			cb:ClearAllPoints();
+			if ( i == 1 ) then cb:SetPoint("TOPLEFT", SU.panel.text, "BOTTOMLEFT", -2, -4);
+			else cb:SetPoint("TOPLEFT", SU.checks[i - 1], "BOTTOMLEFT", 0, 0); end
+			cb.Refresh(); cb:Show();
+			h = h + 24;
+		else
+			cb.get, cb.set = nil, nil; cb:Hide();
+		end
 	end
 	SU.panel:SetHeight(h);
 	SU.grid.Refresh(); SU.centre.Refresh(); SU.snap.Refresh();
@@ -3997,6 +4088,8 @@ local function WinBuild()
 		AddRows(uiChild, {
 			{"Toggle UI Settings (drag, resize and scale)", function() return DB().unlocked; end, function(v) SlimSuite_SetUnlocked(v); end},
 			{"Hide the target frame", function() return DB().hideTarget; end, function(v) DB().hideTarget = v; TargetFrameHidden(v); end},
+			{"Show debuffs and DoTs on the target", function() return DB().targetDebuffs; end, function(v) DB().targetDebuffs = v; end},
+			{"Buffs on the target frame", function() return DB().buffsOnTarget; end, function(v) SlimSuite_SetBuffsOnTarget(v); end},
 			{"Replace Default Level Up with Movable Version?", function() return DB().moveLevelButton; end, function(v) DB().moveLevelButton = v; pcall(UpdateLevelButton); end},
 			{"Replace Default Build Rows with Movable Versions?", function() return DB().replaceBuildRows; end, function(v) DB().replaceBuildRows = v; ApplyBuildRowReplacement(); end},
 			{"Replace Default Damage Meter with Movable Version?", function() return DB().moveMeter; end, function(v) SetMeterReplacement(v); end},
@@ -4018,7 +4111,7 @@ local function WinBuild()
 			{"Replace Default Local Clock with Movable Version?", function() return DB().replaceLocalClock; end, function(v) DB().replaceLocalClock = v; end},
 			{"Show Slim Suite above the level-up and new-item cards", function() return DB().onTopOfScreens; end, function(v) DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -72);
-		uiChild:SetHeight(762);
+		uiChild:SetHeight(818);
 	end
 	local function BuildOther()
 		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
@@ -4074,7 +4167,7 @@ local function WinBuild()
 	end
 	CheckboxRows(); BuildOther(); BuildAddonManager();
 	local tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -676);
+	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -732);
 	tooltipTitle:SetText("Tooltip size");
 	local function AdjustTooltipSize(delta)
 		local size = DB().sizes.GameTooltip;
@@ -4086,14 +4179,14 @@ local function WinBuild()
 		PlaceAll();
 	end
 	local tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
-	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -694);
+	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -750);
 	local tooltipLarger = K.Button(uiChild, "Larger", 82, function() AdjustTooltipSize(20); end);
 	tooltipLarger:SetPoint("LEFT", tooltipSmaller, "RIGHT", 6, 0);
 	local reset = K.Button(uiChild, "Reset positions", 140, function() SlimSuite_ResetPlaces(); end);
-	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -728);
+	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -784);
 	local resetAll = K.Button(uiChild, "Reset all UI", 126, function() SlimSuite_ResetUI(); end);
 	resetAll:SetPoint("LEFT", reset, "RIGHT", 8, 0);
-	uiChild:SetHeight(762);
+	uiChild:SetHeight(818);
 	local function SelectPage(which)
 		uiScroll:Hide(); otherScroll:Hide(); addonsScroll:Hide();
 		if ( win.reloadButton ) then win.reloadButton:Hide(); end
