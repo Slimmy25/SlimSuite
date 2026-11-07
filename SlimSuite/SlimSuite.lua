@@ -381,6 +381,7 @@ local MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "P
 local handles = {};
 local editOnly;
 local setupActive;                                       -- the first-time setup is walking through the UI
+local win;                                               -- the settings window (made the first time it opens)
 local function IsEditing(name)
  return DB().unlocked and (not editOnly or editOnly == name);
 end
@@ -3832,7 +3833,6 @@ function SlimSuite_SetupEnd(finished)
 end
 
 -- ---------------------------------------------------------------- the settings window
-local win;
 
 local function Check(parent, label, y, get, set)
 	local cb, ok = K.Templated("CheckButton", nil, parent, "UICheckButtonTemplate");
