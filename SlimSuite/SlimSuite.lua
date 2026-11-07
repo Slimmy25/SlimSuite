@@ -3111,20 +3111,26 @@ local function OpenSizeMenu(name, label)
 		if ( isClock ) then sizeMenu.ClockLabels(); end
 		sizeMenu:SetHeight(isClock and 326 or (name == "TargetFrame" and 326) or (name == "BuffFrame" and 300) or 270);
 	end
+	-- The menu opens smaller, right beside the element it is for (on its right, or its left when there is no room),
+	-- top edges level. It can still be dragged anywhere while it is open.
+	local MENU_SCALE = 0.82;
+	sizeMenu:SetScale(MENU_SCALE);
 	sizeMenu:ClearAllPoints();
-	local saved = DB().sizeMenuPosition;
 	local sw, sh = UIParent:GetWidth(), UIParent:GetHeight();
+	local mw, mh = 206 * MENU_SCALE, (sizeMenu:GetHeight() or 270) * MENU_SCALE;
+	local l, r, b, t = RootBounds(f);
 	local x, y;
-	if ( type(saved) == "table" and type(saved.x) == "number" and type(saved.y) == "number" ) then
-		x, y = saved.x, saved.y;
+	if ( l and r and t ) then
+		x = r + 8;
+		if ( x + mw > sw ) then x = l - 8 - mw; end
+		y = t - mh;
 	else
 		local scale = UIParent:GetEffectiveScale() or 1;
-		x, y = GetCursorPosition(); x, y = x / scale, y / scale; x, y = x + 8, y + 8;
+		x, y = GetCursorPosition(); x, y = x / scale + 8, y / scale + 8;
 	end
-	x = math.max(0, math.min(sw - 206, x));
-	y = math.max(0, math.min(sh - (sizeMenu:GetHeight() or 270), y));
-	sizeMenu:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y);
-	if ( type(saved) ~= "table" ) then DB().sizeMenuPosition = { x = x, y = y }; end
+	x = math.max(0, math.min(sw - mw, x));
+	y = math.max(0, math.min(sh - mh, y));
+	sizeMenu:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x / MENU_SCALE, y / MENU_SCALE);
 	sizeMenu:Show();
 end
 
@@ -3962,6 +3968,7 @@ function SlimSuite_SetupGo(n)
 	editOnly = step.frame or "SlimSuiteSetupNothing";       -- the last step shows no handle
 	if ( sizeMenu ) then sizeMenu:Hide(); end
 	SlimSuite_SetUnlocked(true, true);
+	SU.Reveal(n);
 	SU.panel.step:SetText("Setup  -  step " .. n .. " of " .. count);
 	SU.panel.title:SetText(step.title);
 	SU.panel.text:SetText(step.text);
@@ -4009,8 +4016,44 @@ function SlimSuite_StartSetup(fromStart)
 end
 
 -- hide the setup panel (the UI is being locked, or the setup ended); its step is kept unless it ended
+-- What each step reveals besides its own frame: the frames that move with it.
+SU.COMPANIONS = {
+	PartyMemberFrame1 = { "PartyMemberFrame2", "PartyMemberFrame3", "PartyMemberFrame4" },
+	ChatFrame1 = { "ChatFrame1Tab", "ChatFrame1EditBox" },
+	SlimSuiteSpellRowFrame = { "SlimSuiteItemRowFrame" },
+	MainMenuBar = { "SlimSuiteProcMeter" },
+};
+-- Steps are seen in order: everything from the steps so far shows, everything from later steps waits (see-through)
+-- until its step comes. Ending the setup gives every frame back its own look.
+function SU.Reveal(n)
+	SU.saved = SU.saved or {};
+	for i = 1, table.getn(SU.steps) do
+		local name = SU.steps[i].frame;
+		if ( name ) then
+			local names = { name };
+			for _, c in ipairs(SU.COMPANIONS[name] or {}) do table.insert(names, c); end
+			if ( name == "TargetFrame" and DB().buffsOnTarget ) then table.insert(names, "BuffFrame"); end
+			for _, fname in ipairs(names) do
+				local f = getglobal(fname);
+				if ( f and f.SetAlpha ) then
+					if ( SU.saved[fname] == nil ) then SU.saved[fname] = f:GetAlpha() or 1; end
+					f:SetAlpha(i <= n and SU.saved[fname] or 0);
+				end
+			end
+		end
+	end
+end
+function SU.Unreveal()
+	for fname, alpha in pairs(SU.saved or {}) do
+		local f = getglobal(fname);
+		if ( f and f.SetAlpha ) then f:SetAlpha(alpha); end
+	end
+	SU.saved = nil;
+end
+
 function SlimSuite_SetupHide()
 	setupActive = false;
+	SU.Unreveal();
 	if ( SU.panel ) then SU.panel:Hide(); end
 	if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
 end
