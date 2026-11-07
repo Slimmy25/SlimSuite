@@ -380,6 +380,7 @@ local MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "P
                   { "SlimSuiteLocalClockFrame", "Local clock" } };
 local handles = {};
 local editOnly;
+local setupActive;                                       -- the first-time setup is walking through the UI
 local function IsEditing(name)
  return DB().unlocked and (not editOnly or editOnly == name);
 end
@@ -448,18 +449,18 @@ end
 
 -- The game's own build cluster (measured from its default UI): 28-pixel icons with a 1-pixel silver border,
 -- spells in one row and the worn jewelry 8 pixels below it, both starting at the same left edge.
-local BUILD_ICON, BUILD_GAP, BUILD_ROW_GAP = 28, 4, 8;
+local BUILD = { ICON = 28, GAP = 4, ROW_GAP = 8 };
 
 local function LayoutItemRow()
 	if ( not itemRow ) then return; end
-	local gap = BUILD_GAP;
+	local gap = BUILD.GAP;
 	if ( not DB().sizes.SlimSuiteItemRowFrame ) then
 		if ( DB().orientations.SlimSuiteItemRowFrame == "vertical" ) then
-			itemRow:SetWidth(BUILD_ICON); itemRow:SetHeight(5 * BUILD_ICON + 4 * gap);
-		else itemRow:SetWidth(5 * BUILD_ICON + 4 * gap); itemRow:SetHeight(BUILD_ICON); end
+			itemRow:SetWidth(BUILD.ICON); itemRow:SetHeight(5 * BUILD.ICON + 4 * gap);
+		else itemRow:SetWidth(5 * BUILD.ICON + 4 * gap); itemRow:SetHeight(BUILD.ICON); end
 	end
 	local vertical = DB().orientations.SlimSuiteItemRowFrame == "vertical";
-	local width, height = itemRow:GetWidth() or BUILD_ICON, itemRow:GetHeight() or BUILD_ICON;
+	local width, height = itemRow:GetWidth() or BUILD.ICON, itemRow:GetHeight() or BUILD.ICON;
 	local iconSize = vertical and math.max(12, math.min(width, (height - gap * 4) / 5))
 		or math.max(12, math.min(height, (width - gap * 4) / 5));
 	for i = 1, table.getn(itemRowButtons) do
@@ -473,14 +474,14 @@ end
 
 local function LayoutSpellRow()
 	if ( not spellRow ) then return; end
-	local gap = BUILD_GAP;
+	local gap = BUILD.GAP;
 	if ( not DB().sizes.SlimSuiteSpellRowFrame ) then
 		if ( DB().orientations.SlimSuiteSpellRowFrame == "vertical" ) then
-			spellRow:SetWidth(BUILD_ICON); spellRow:SetHeight(6 * BUILD_ICON + 5 * gap);
-		else spellRow:SetWidth(6 * BUILD_ICON + 5 * gap); spellRow:SetHeight(BUILD_ICON); end
+			spellRow:SetWidth(BUILD.ICON); spellRow:SetHeight(6 * BUILD.ICON + 5 * gap);
+		else spellRow:SetWidth(6 * BUILD.ICON + 5 * gap); spellRow:SetHeight(BUILD.ICON); end
 	end
 	local vertical = DB().orientations.SlimSuiteSpellRowFrame == "vertical";
-	local width, height = spellRow:GetWidth() or BUILD_ICON, spellRow:GetHeight() or BUILD_ICON;
+	local width, height = spellRow:GetWidth() or BUILD.ICON, spellRow:GetHeight() or BUILD.ICON;
 	local iconSize = vertical and math.max(12, math.min(width, (height - gap * 5) / 6))
 		or math.max(12, math.min(height, (width - gap * 5) / 6));
 	for i = 1, 6 do
@@ -518,7 +519,7 @@ function SlimSuite_BuildRowDefaultPlace(name)
 	local x, y = UIParent:GetWidth() * 0.275, UIParent:GetHeight() * 0.35;
 	if ( name == "SlimSuiteItemRowFrame" ) then
 		if ( DB().buildRowsAttached ) then
-			return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -BUILD_ROW_GAP };
+			return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -BUILD.ROW_GAP };
 		end
 		return { x = x, y = y - 40, coordinateSpace = "uiParent" };
 	end
@@ -596,7 +597,7 @@ local function CreateItemRow()
 	itemRow:SetFrameStrata("MEDIUM");
 	for i = 1, table.getn(ITEM_EQUIP_SLOTS) do
 		local button = CreateFrame("Button", "SlimSuiteItemButton" .. i, itemRow);
-		button:SetWidth(BUILD_ICON); button:SetHeight(BUILD_ICON);
+		button:SetWidth(BUILD.ICON); button:SetHeight(BUILD.ICON);
 		BuildIconLook(button);
 		button:EnableMouse(true);
 		button:SetScript("OnEnter", function()
@@ -722,7 +723,7 @@ local function CreateSpellRow()
 	for i = 1, 6 do
 		local button = CreateFrame("Button", "SlimSuiteSpellButton" .. i, spellRow);
 		button:SetID(i);
-		button:SetWidth(BUILD_ICON); button:SetHeight(BUILD_ICON);
+		button:SetWidth(BUILD.ICON); button:SetHeight(BUILD.ICON);
 		BuildIconLook(button);
 		button:EnableMouse(true);
 		button:SetScript("OnEnter", function()
@@ -841,8 +842,7 @@ end
 -- Kills / Gold / Cache in the game's own style (measured from its HUD): muted tan labels, gold numbers, a lowercase
 -- gold "cache" for the next cache's cost, and a soft dark band behind that fades out at both ends. The band can be
 -- turned off completely. Boss and Guardian kills sit next to Kills by default.
-local TALLY_LABEL, TALLY_VALUE = { 0.69, 0.63, 0.47 }, { 0.97, 0.82, 0.41 };
-local TALLY_FONT_SIZE, TALLY_WORD_GAP, TALLY_PART_GAP, TALLY_LINE = 15, 6, 16, 19;
+local TALLY = { LABEL = { 0.69, 0.63, 0.47 }, VALUE = { 0.97, 0.82, 0.41 }, FONT_SIZE = 15, WORD_GAP = 6, PART_GAP = 16, LINE = 19 };
 
 local function TallyValue(value)
 	if ( type(value) ~= "number" ) then return "-"; end
@@ -866,7 +866,7 @@ local function TallyString(list, i, justify)
 	local fs = list[i];
 	if ( not fs ) then
 		fs = tallyFrame:CreateFontString(nil, "OVERLAY");
-		fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", TALLY_FONT_SIZE);
+		fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", TALLY.FONT_SIZE);
 		fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1);
 		list[i] = fs;
 	end
@@ -881,19 +881,19 @@ local function DrawTally(parts)
 	for i = 1, n do
 		local label, value = TallyString(tallyFrame.labels, i), TallyString(tallyFrame.values, i, vertical and "RIGHT" or "LEFT");
 		label:SetText(parts[i][1]); value:SetText(parts[i][2]);
-		local c = parts[i][3] and TALLY_VALUE or TALLY_LABEL;
-		label:SetTextColor(c[1], c[2], c[3]); value:SetTextColor(TALLY_VALUE[1], TALLY_VALUE[2], TALLY_VALUE[3]);
-		widest = math.max(widest, (label:GetStringWidth() or 0) + TALLY_WORD_GAP + (value:GetStringWidth() or 0));
+		local c = parts[i][3] and TALLY.VALUE or TALLY.LABEL;
+		label:SetTextColor(c[1], c[2], c[3]); value:SetTextColor(TALLY.VALUE[1], TALLY.VALUE[2], TALLY.VALUE[3]);
+		widest = math.max(widest, (label:GetStringWidth() or 0) + TALLY.WORD_GAP + (value:GetStringWidth() or 0));
 		label:Show(); value:Show();
 	end
 	for i = n + 1, table.getn(tallyFrame.labels) do tallyFrame.labels[i]:Hide(); tallyFrame.values[i]:Hide(); end
 	local custom = DB().sizes.SlimSuiteTallyFrame;
 	local width, height;
 	if ( vertical ) then
-		width, height = widest + pad * 2, n * TALLY_LINE + 12;
+		width, height = widest + pad * 2, n * TALLY.LINE + 12;
 	else
-		for i = 1, n do x = x + (tallyFrame.labels[i]:GetStringWidth() or 0) + TALLY_WORD_GAP + (tallyFrame.values[i]:GetStringWidth() or 0) + TALLY_PART_GAP; end
-		width, height = x - TALLY_PART_GAP + pad, 30;
+		for i = 1, n do x = x + (tallyFrame.labels[i]:GetStringWidth() or 0) + TALLY.WORD_GAP + (tallyFrame.values[i]:GetStringWidth() or 0) + TALLY.PART_GAP; end
+		width, height = x - TALLY.PART_GAP + pad, 30;
 	end
 	-- a size set in the resize menu is kept as a minimum; the band always fits its text
 	if ( type(custom) == "table" ) then width, height = math.max(width, custom.w or 0), math.max(height, custom.h or 0); end
@@ -903,14 +903,14 @@ local function DrawTally(parts)
 		local label, value = tallyFrame.labels[i], tallyFrame.values[i];
 		label:ClearAllPoints(); value:ClearAllPoints();
 		if ( vertical ) then
-			local y = -6 - (i - 1) * TALLY_LINE;
+			local y = -6 - (i - 1) * TALLY.LINE;
 			label:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", pad, y);
 			value:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", -pad, y);
 		else
 			label:SetPoint("LEFT", tallyFrame, "LEFT", x, 0);
-			x = x + (label:GetStringWidth() or 0) + TALLY_WORD_GAP;
+			x = x + (label:GetStringWidth() or 0) + TALLY.WORD_GAP;
 			value:SetPoint("LEFT", tallyFrame, "LEFT", x, 0);
-			x = x + (value:GetStringWidth() or 0) + TALLY_PART_GAP;
+			x = x + (value:GetStringWidth() or 0) + TALLY.PART_GAP;
 		end
 	end
 	-- the band: flat in the middle, fading out over its last 14 pixels on each side; nothing at all when turned off
@@ -3073,6 +3073,10 @@ local function ShowLockPanel()
 		local button = K.Button(lockPanel, "Done", 76, function() SlimSuite_SetUnlocked(false); end);
 		button:SetPoint("BOTTOMRIGHT", lockPanel, "BOTTOMRIGHT", -8, 7);
 		lockPanel.doneButton = button;
+		local again = K.Button(lockPanel, "Run setup again", 130, function()
+			editOnly = nil; lockPanel:Hide(); SlimSuite_StartSetup(true);
+		end);
+		again:SetPoint("BOTTOMLEFT", lockPanel, "BOTTOMLEFT", 8, 7);
 		local choose = K.Button(lockPanel, "Choose element", 210, nil);
 		choose:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", 10, -141);
 		local all;
@@ -3325,6 +3329,15 @@ end
 
 -- unlocked: the handles show (the frames are shown too, so even an empty party frame can be placed)
 function SlimSuite_SetUnlocked(on, quiet)
+	-- The first time the mover is opened, the setup walks through the UI one element at a time instead.
+	if ( on and not quiet and not setupActive and not DB().setupDone and SlimSuite_StartSetup ) then
+		SlimSuite_StartSetup();
+		return;
+	end
+	if ( not on ) then
+		if ( setupActive and SlimSuite_SetupHide ) then SlimSuite_SetupHide(); end   -- its step is kept for next time
+		editOnly = nil;
+	end
 	DB().unlocked = on and true or false;
 	if ( on and GameTooltip ) then
 		local size = DB().sizes.GameTooltip;
@@ -3347,7 +3360,8 @@ function SlimSuite_SetUnlocked(on, quiet)
 	if ( on ) then
 		-- Leave the settings/menu window before presenting the in-world mover and its Done control.
 		if ( win ) then win:Hide(); end
-		ShowLockPanel();
+		if ( setupActive ) then if ( lockPanel ) then lockPanel:Hide(); end
+		else ShowLockPanel(); end
 	elseif ( lockPanel ) then
 		lockPanel:Hide();
 	end
@@ -3648,6 +3662,174 @@ cdFrame:SetScript("OnUpdate", function()
 		end
 	end
 end);
+
+-- ---------------------------------------------------------------- first-time setup of the movable UI
+-- The first time "Toggle UI Settings" is turned on, Slim Suite walks the player through the interface one element
+-- at a time: only that element's green handle shows, outlined in pulsing gold, with a short note and Back / Next.
+-- It starts with the unit frame, then the party frames, then the action bar (with its two questions), then the
+-- rest of the game's frames and every Slim Suite replacement that is turned on. Locking the UI part way through
+-- picks the setup up at the same step next time; "Skip setup" or finishing it ends it for good, and the move
+-- panel's "Run setup again" starts it over.
+local SU = {};                                           -- the setup's panel, outline and steps
+
+function SU.Steps()
+	local d = DB();
+	local steps = {
+		{ frame = "PlayerFrame", title = "Unit frame",
+		  text = "Your hero's frame: health, power and level. Drag the green handle to place it. Right-click the handle for size and scale." },
+		{ frame = "PartyMemberFrame1", title = "Party frames",
+		  text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Right-click to stack them across or down." },
+		{ frame = "MainMenuBar", title = "Action bar", actionBar = true,
+		  text = "Your spells. Drag to place it, right-click for size or to turn it upright. Two choices for how it looks:" },
+	};
+	local rest = {
+		{ "TargetFrame", "Target frame", "The enemy the game has picked for you.", function() return not d.hideTarget; end },
+		{ "MainMenuExpBar", "XP bar", "Your experience bar. It can stand upright too (right-click)." },
+		{ "BuffFrame", "Buffs", "Your buffs. Right-click to stack them in a column and choose which way they grow." },
+		{ "MinimapCluster", "Minimap", "The minimap, with its pins." },
+		{ "ChatFrame1", "Chat", "The chat window, its tab and the box you type in move together." },
+		{ "GameTooltip", "Tooltip", "Where tooltips appear while the UI is unlocked, and their size." },
+		{ "SlimSuiteStoredLevelsButton", "Level Up", "The movable Level Up button and its store toggle.", function() return d.moveLevelButton; end },
+		{ "SlimSuiteSpellRowFrame", "Build rows", "Your build spells, with your worn jewelry joined under them.", function() return d.replaceBuildRows; end },
+		{ "SlimSuiteMeterFrame", "Damage meter", "The meter. Its corner grip resizes it any time.", function() return d.moveMeter; end },
+		{ "SlimSuiteClockFrame", "Run clock", "Run time and the next boss.", function() return d.replaceClock; end },
+		{ "SlimSuiteBossFrames", "Encounter bars", "Boss, Guardian and elite health bars.", function() return d.replaceEncounters; end },
+		{ "SlimSuiteTallyFrame", "Kills / Gold / Cache", "Your run's tally.", function() return d.replaceTally; end },
+		{ "SlimSuiteAnnouncementFrame", "Announcements", "Where event announcements appear.", function() return d.replaceBanners; end },
+		{ "SlimSuiteReviveFrame", "Revive bar", "The bar shown while you bring a friend back.", function() return d.replaceRevive; end },
+		{ "SlimSuiteLocalClockFrame", "Local clock", "Your real-world clock. Right-click for 12/24-hour and its background.", function() return d.replaceLocalClock; end },
+		{ "SlimSuiteCombatTextFrame", "Combat text", "The combat text test box.", function() return d.combatTextBox; end },
+	};
+	for i = 1, table.getn(rest) do
+		local r = rest[i];
+		if ( getglobal(r[1]) and (not r[4] or r[4]()) ) then table.insert(steps, { frame = r[1], title = r[2], text = r[3] }); end
+	end
+	table.insert(steps, { title = "All set", text = "That's everything. Press Finish to lock the UI. You can move anything again with Toggle UI Settings, and run this setup again from the move panel." });
+	return steps;
+end
+
+function SU.Check(parent, label, y, get, set)
+	local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate");
+	cb:SetWidth(22); cb:SetHeight(22); cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, y);
+	local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	fs:SetPoint("LEFT", cb, "RIGHT", 2, 0); fs:SetWidth(300); fs:SetJustifyH("LEFT"); fs:SetText(label);
+	cb.Refresh = function() cb:SetChecked(get() and 1 or nil); end;
+	cb:SetScript("OnClick", function() set(this:GetChecked() and true or false); end);
+	return cb;
+end
+
+function SU.Build()
+	SU.panel = CreateFrame("Frame", "SlimSuiteSetupPanel", UIParent);
+	SU.panel:SetWidth(360); SU.panel:SetHeight(150);
+	SU.panel:SetFrameStrata("DIALOG");
+	SU.panel:SetMovable(true); SU.panel:EnableMouse(true);
+	if ( SU.panel.SetClampedToScreen ) then SU.panel:SetClampedToScreen(true); end
+	SU.panel:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	                         tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+	SU.panel:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
+	SU.panel:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+	SU.panel:RegisterForDrag("LeftButton");
+	SU.panel:SetScript("OnDragStart", function() this:StartMoving(); end);
+	SU.panel:SetScript("OnDragStop", function() this:StopMovingOrSizing(); end);
+	SU.panel.step = SU.panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall");
+	SU.panel.step:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 12, -10);
+	SU.panel.title = SU.panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
+	SU.panel.title:SetPoint("TOPLEFT", SU.panel.step, "BOTTOMLEFT", 0, -3);
+	SU.panel.text = SU.panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	SU.panel.text:SetPoint("TOPLEFT", SU.panel.title, "BOTTOMLEFT", 0, -6);
+	SU.panel.text:SetWidth(336); SU.panel.text:SetJustifyH("LEFT"); SU.panel.text:SetJustifyV("TOP");
+	-- the action bar's two questions
+	SU.panel.art = SU.Check(SU.panel, "Hide the bar's artwork (only the spell squares stay)", -92,
+		function() return DB().plainBar; end, function(v) DB().plainBar = v; pcall(PlainBar, v); end);
+	SU.panel.slots = SU.Check(SU.panel, "Show all six buttons at all times, even empty ones", -116,
+		function() return DB().showEmptyActionSlots; end, function(v) DB().showEmptyActionSlots = v; pcall(ApplyActionSlotGrid); end);
+	SU.panel.back = K.Button(SU.panel, "Back", 70, function() SlimSuite_SetupGo(DB().setupStep - 1); end);
+	SU.panel.back:SetPoint("BOTTOMLEFT", SU.panel, "BOTTOMLEFT", 10, 8);
+	SU.panel.skip = K.Button(SU.panel, "Skip setup", 90, function() SlimSuite_SetupEnd(false); end);
+	SU.panel.skip:SetPoint("LEFT", SU.panel.back, "RIGHT", 6, 0);
+	SU.panel.next = K.Button(SU.panel, "Next", 80, function()
+		if ( DB().setupStep >= table.getn(SU.steps) ) then SlimSuite_SetupEnd(true); else SlimSuite_SetupGo(DB().setupStep + 1); end
+	end);
+	SU.panel.next:SetPoint("BOTTOMRIGHT", SU.panel, "BOTTOMRIGHT", -10, 8);
+	SU.panel:SetPoint("TOP", UIParent, "TOP", 0, -110);
+	SU.panel:Hide();
+	-- the gold outline around the one handle being placed
+	SU.glow = CreateFrame("Frame", "SlimSuiteSetupGlow", UIParent);
+	SU.glow:SetFrameStrata("DIALOG");
+	SU.glow:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16 });
+	SU.glow:SetBackdropBorderColor(1, 0.82, 0.2, 1);
+	SU.glow:EnableMouse(false);
+	SU.glow:SetScript("OnUpdate", function()
+		local h = this.handle;
+		if ( not h or not h:IsShown() ) then this:SetAlpha(0); return; end
+		this:SetAlpha(0.45 + 0.55 * math.abs(math.sin(GetTime() * 3)));
+	end);
+	SU.glow:Hide();
+end
+
+-- show step n: only its element's handle, outlined; the panel says what it is
+function SlimSuite_SetupGo(n)
+	if ( not SU.panel ) then SU.Build(); end
+	local count = table.getn(SU.steps);
+	n = math.max(1, math.min(count, n or 1));
+	DB().setupStep = n;
+	local step = SU.steps[n];
+	editOnly = step.frame or "SlimSuiteSetupNothing";       -- the last step shows no handle
+	if ( sizeMenu ) then sizeMenu:Hide(); end
+	SlimSuite_SetUnlocked(true, true);
+	SU.panel.step:SetText("Setup  -  step " .. n .. " of " .. count);
+	SU.panel.title:SetText(step.title);
+	SU.panel.text:SetText(step.text);
+	local h = 62 + (SU.panel.text:GetHeight() or 28) + 38;
+	if ( step.actionBar ) then
+		SU.panel.art:ClearAllPoints(); SU.panel.art:SetPoint("TOPLEFT", SU.panel.text, "BOTTOMLEFT", -2, -4);
+		SU.panel.slots:ClearAllPoints(); SU.panel.slots:SetPoint("TOPLEFT", SU.panel.art, "BOTTOMLEFT", 0, 0);
+		SU.panel.art.Refresh(); SU.panel.slots.Refresh();
+		SU.panel.art:Show(); SU.panel.slots:Show();
+		h = h + 48;
+	else
+		SU.panel.art:Hide(); SU.panel.slots:Hide();
+	end
+	SU.panel:SetHeight(h);
+	if ( n > 1 ) then SU.panel.back:Enable(); else SU.panel.back:Disable(); end
+	SU.panel.next:SetText(n >= count and "Finish" or "Next");
+	if ( n >= count ) then SU.panel.skip:Hide(); else SU.panel.skip:Show(); end
+	SU.panel:Show();
+	local handle = step.frame and handles[step.frame];
+	SU.glow.handle = handle;
+	if ( handle ) then
+		SU.glow:ClearAllPoints();
+		SU.glow:SetPoint("TOPLEFT", handle, "TOPLEFT", -6, 6);
+		SU.glow:SetPoint("BOTTOMRIGHT", handle, "BOTTOMRIGHT", 6, -6);
+		SU.glow:Show();
+	else
+		SU.glow:Hide();
+	end
+end
+
+function SlimSuite_StartSetup(fromStart)
+	SU.steps = SU.Steps();
+	setupActive = true;
+	if ( fromStart or type(DB().setupStep) ~= "number" ) then DB().setupStep = 1; end
+	SlimSuite_SetupGo(DB().setupStep);
+end
+
+-- hide the setup panel (the UI is being locked, or the setup ended); its step is kept unless it ended
+function SlimSuite_SetupHide()
+	setupActive = false;
+	if ( SU.panel ) then SU.panel:Hide(); end
+	if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
+end
+
+-- finished: lock the UI. Skipped: carry on with every handle and the normal move panel.
+function SlimSuite_SetupEnd(finished)
+	DB().setupDone = true;
+	DB().setupStep = nil;
+	SlimSuite_SetupHide();
+	editOnly = nil;
+	if ( finished ) then SlimSuite_SetUnlocked(false, true);
+	else SlimSuite_SetUnlocked(true, true); end
+end
 
 -- ---------------------------------------------------------------- the settings window
 local win;
