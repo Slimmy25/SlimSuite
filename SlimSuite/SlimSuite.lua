@@ -2583,6 +2583,22 @@ function SlimSuite_MirrorTarget()
 	p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
 end
 
+-- the other direction: the player frame placed as the target frame's mirror image (while the target is dragged)
+function SlimSuite_MirrorPlayer()
+	if ( not DB().mirrorTarget or not PlayerFrame or not TargetFrame ) then return; end
+	local l, r, b, t = RootBounds(TargetFrame);
+	if ( not l or not t ) then return; end
+	local factor = RootFactor(PlayerFrame);
+	local pw, ph = (PlayerFrame:GetWidth() or 0) * factor, (PlayerFrame:GetHeight() or 0) * factor;
+	local x, y = UIParent:GetWidth() - l - pw, t - ph;
+	if ( PlayerFrame.SetUserPlaced ) then PlayerFrame:SetUserPlaced(true); end
+	SetRootPosition(PlayerFrame, x, y);
+	local p = DB().places.PlayerFrame;
+	if ( type(p) ~= "table" ) then p = {}; DB().places.PlayerFrame = p; end
+	p.x, p.y, p.coordinateSpace = x, y, "uiParent";
+	p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
+end
+
 function SlimSuite_SetMirrorTarget(on)
 	DB().mirrorTarget = on and true or false;
 	if ( on ) then pcall(SlimSuite_MirrorTarget); end
@@ -3309,11 +3325,6 @@ local function Handle(name, label)
 			end
 			-- The joined jewelry row moves with the spell row: dragging either handle moves the pair.
 			this.mover = (name == "SlimSuiteItemRowFrame" and DB().buildRowsAttached) and "SlimSuiteSpellRowFrame" or name;
-			if ( name == "TargetFrame" and DB().mirrorTarget ) then
-				DB().mirrorTarget = false;
-				if ( sizeMenu and sizeMenu.mirror ) then sizeMenu.mirror:SetChecked(nil); end
-				K.Print(NAME, "Mirror target is off: the target frame now stays where you put it.");
-			end
 			local t = getglobal(this.mover);
 			if ( not t ) then return; end
 			t:SetMovable(true);
@@ -3354,7 +3365,11 @@ local function Handle(name, label)
 				nextY = math.max(-minY, math.min(maxY, nextY));
 				SetRootPosition(moved, nextX, nextY);
 				SavePosition(this.mover or name, moved);          -- keep the newest location even if /reload happens mid-session
-				if ( (this.mover or name) == "PlayerFrame" and DB().mirrorTarget ) then pcall(SlimSuite_MirrorTarget); end
+				-- mirrored frames move together: drag either one and the other moves the opposite way
+				if ( DB().mirrorTarget ) then
+					if ( (this.mover or name) == "PlayerFrame" ) then pcall(SlimSuite_MirrorTarget);
+					elseif ( name == "TargetFrame" ) then pcall(SlimSuite_MirrorPlayer); end
+				end
 			end
 			if ( name == "GameTooltip" and t:IsShown() ) then
 				this:SetFrameStrata("TOOLTIP");
