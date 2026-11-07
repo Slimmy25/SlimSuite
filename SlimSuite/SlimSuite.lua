@@ -2198,6 +2198,58 @@ function SlimSuite_RestoreRacialActionButtonLayout()
 	end
 end
 
+-- A clean look for the XP bar when it stands upright. The stock bar's segment art and its rested-XP marker
+-- (ExhaustionTick, the diamond "end point") are drawn for a horizontal bar and look broken when rotated, so they are
+-- hidden and the bar gets a dark background, a thin gold border and a smooth fill. Laid flat again, everything
+-- the game drew comes back exactly as it was.
+local xpStyle = { shows = {} };
+local function StyleExpBar(on)
+	local xp = MainMenuExpBar;
+	if ( not xp ) then return; end
+	for i = 0, 3 do
+		local t = getglobal("MainMenuXPBarTexture" .. i);
+		if ( t and t.SetAlpha ) then t:SetAlpha(on and 0 or 1); end
+	end
+	for _, n in ipairs({ "ExhaustionTick", "ExhaustionLevelFillBar" }) do
+		local f = getglobal(n);
+		if ( f and f.Hide ) then
+			if ( not xpStyle.shows[n] ) then xpStyle.shows[n] = f.Show; end
+			if ( on ) then f.Show = function() end; f:Hide();
+			elseif ( f.Show ~= xpStyle.shows[n] ) then f.Show = xpStyle.shows[n]; f:Show(); end
+		end
+	end
+	local fill = xp.GetStatusBarTexture and xp:GetStatusBarTexture();
+	if ( fill and xpStyle.texture == nil and fill.GetTexture ) then xpStyle.texture = fill:GetTexture() or false; end
+	if ( on ) then
+		if ( not xpStyle.bg ) then
+			xpStyle.bg = xp:CreateTexture(nil, "BACKGROUND");
+			xpStyle.bg:SetAllPoints(xp);
+			xpStyle.bg:SetTexture(0.04, 0.035, 0.05, 0.85);
+			xpStyle.border = CreateFrame("Frame", nil, xp);
+			xpStyle.border:SetPoint("TOPLEFT", xp, "TOPLEFT", -3, 3);
+			xpStyle.border:SetPoint("BOTTOMRIGHT", xp, "BOTTOMRIGHT", 3, -3);
+			xpStyle.border:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10 });
+			xpStyle.border:SetBackdropBorderColor(0.75, 0.58, 0.25, 0.9);
+			xpStyle.border:EnableMouse(false);
+		end
+		xpStyle.bg:Show(); xpStyle.border:Show();
+		xpStyle.border:SetFrameLevel((xp:GetFrameLevel() or 1) + 2);
+		if ( xp.SetStatusBarTexture ) then xp:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar"); end
+		-- keep the game's own XP text readable on the narrow bar
+		for _, n in ipairs({ "MainMenuBarExpText", "MainMenuExpBarText" }) do
+			local t = getglobal(n);
+			if ( t and t.SetFont ) then
+				local font, _, flags = t:GetFont();
+				if ( font ) then t:SetFont(font, 10, "OUTLINE"); end
+			end
+		end
+	elseif ( xpStyle.bg ) then
+		xpStyle.bg:Hide(); xpStyle.border:Hide();
+		if ( xpStyle.texture and xp.SetStatusBarTexture ) then xp:SetStatusBarTexture(xpStyle.texture); end
+	end
+	xpStyle.on = on;
+end
+
 ApplyMovableOrientation = function(name)
 	local orientation = CurrentOrientation(name);
 	if ( name == "MainMenuBar" ) then
@@ -2254,6 +2306,7 @@ ApplyMovableOrientation = function(name)
 		-- so the movable handle and the rendered XP indicator share the same visible bounds.
 		if ( xp and xp.SetClipsChildren ) then pcall(xp.SetClipsChildren, xp, true); end
 		if ( xp and xp.SetOrientation ) then pcall(xp.SetOrientation, xp, string.upper(orientation)); end
+		pcall(StyleExpBar, orientation == "vertical");
 		local base = baseSizes.MainMenuExpBar;
 		local saved = DB().sizes.MainMenuExpBar;
 		if ( xp and base and type(saved) ~= "table" ) then
