@@ -3712,8 +3712,8 @@ end
 function SU.Check(parent, label, y, get, set)
 	local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate");
 	cb:SetWidth(22); cb:SetHeight(22); cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, y);
-	local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	fs:SetPoint("LEFT", cb, "RIGHT", 2, 0); fs:SetWidth(300); fs:SetJustifyH("LEFT"); fs:SetText(label);
+	local fs = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	fs:SetPoint("LEFT", cb, "RIGHT", 2, 0); fs:SetJustifyH("LEFT"); fs:SetText(label);
 	cb.Refresh = function() cb:SetChecked(get() and 1 or nil); end;
 	cb:SetScript("OnClick", function() set(this:GetChecked() and true or false); end);
 	return cb;
@@ -3721,7 +3721,7 @@ end
 
 function SU.Build()
 	SU.panel = CreateFrame("Frame", "SlimSuiteSetupPanel", UIParent);
-	SU.panel:SetWidth(360); SU.panel:SetHeight(150);
+	SU.panel:SetWidth(420); SU.panel:SetHeight(150);
 	SU.panel:SetFrameStrata("DIALOG");
 	SU.panel:SetMovable(true); SU.panel:EnableMouse(true);
 	if ( SU.panel.SetClampedToScreen ) then SU.panel:SetClampedToScreen(true); end
@@ -3737,8 +3737,36 @@ function SU.Build()
 	SU.panel.title = SU.panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
 	SU.panel.title:SetPoint("TOPLEFT", SU.panel.step, "BOTTOMLEFT", 0, -3);
 	SU.panel.text = SU.panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	SU.panel.text:SetPoint("TOPLEFT", SU.panel.title, "BOTTOMLEFT", 0, -6);
-	SU.panel.text:SetWidth(336); SU.panel.text:SetJustifyH("LEFT"); SU.panel.text:SetJustifyV("TOP");
+	SU.panel.text:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 12, -58);
+	SU.panel.text:SetWidth(396); SU.panel.text:SetJustifyH("LEFT"); SU.panel.text:SetJustifyV("TOP");
+	-- the grid settings, top right: grid on/off and its size; the red centre lines; frames snapping together
+	local function Tick(x, y, label, get, set)
+		local cb = CreateFrame("CheckButton", nil, SU.panel, "UICheckButtonTemplate");
+		cb:SetWidth(20); cb:SetHeight(20); cb:SetPoint("TOPRIGHT", SU.panel, "TOPRIGHT", x, y);
+		cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+		cb.label:SetPoint("LEFT", cb, "RIGHT", 0, 1); cb.label:SetText(label);
+		cb.Refresh = function() cb:SetChecked(get() and 1 or nil); end;
+		cb:SetScript("OnClick", function() set(this:GetChecked() and true or false); end);
+		return cb;
+	end
+	local function Regrid() if ( DB().unlocked and ShowEditGrid ) then ShowEditGrid(); end end
+	SU.grid = Tick(-176, -7, "Grid", function() return DB().showEditGrid; end, function(v) DB().showEditGrid = v; Regrid(); end);
+	SU.sizes = {};
+	local sizes = { 32, 64, 128, 256 };
+	for i = 1, 4 do
+		local pixels = sizes[i];
+		local b = K.Button(SU.panel, tostring(pixels), 34, function()
+			DB().gridDivisions = pixels; Regrid();
+			for j = 1, 4 do if ( sizes[j] == pixels ) then SU.sizes[j]:LockHighlight(); else SU.sizes[j]:UnlockHighlight(); end end
+		end);
+		b:SetHeight(18); b:SetPoint("TOPRIGHT", SU.panel, "TOPRIGHT", -8 - (4 - i) * 36, -8);
+		SU.sizes[i] = b;
+	end
+	SU.centre = Tick(-176, -30, "Center lines",
+		function() return DB().gridCenterVertical or DB().gridCenterHorizontal; end,
+		function(v) DB().gridCenterVertical, DB().gridCenterHorizontal = v, v; Regrid(); end);
+	SU.snap = Tick(-74, -30, "Snap frames", function() return DB().anchorSnap; end,
+		function(v) if ( SetAnchorSnap ) then SetAnchorSnap(v); end end);
 	-- the action bar's two questions
 	SU.panel.art = SU.Check(SU.panel, "Hide the bar's artwork (only the spell squares stay)", -92,
 		function() return DB().plainBar; end, function(v) DB().plainBar = v; pcall(PlainBar, v); end);
@@ -3781,7 +3809,7 @@ function SlimSuite_SetupGo(n)
 	SU.panel.step:SetText("Setup  -  step " .. n .. " of " .. count);
 	SU.panel.title:SetText(step.title);
 	SU.panel.text:SetText(step.text);
-	local h = 62 + (SU.panel.text:GetHeight() or 28) + 38;
+	local h = 58 + (SU.panel.text:GetHeight() or 28) + 40;
 	if ( step.actionBar ) then
 		SU.panel.art:ClearAllPoints(); SU.panel.art:SetPoint("TOPLEFT", SU.panel.text, "BOTTOMLEFT", -2, -4);
 		SU.panel.slots:ClearAllPoints(); SU.panel.slots:SetPoint("TOPLEFT", SU.panel.art, "BOTTOMLEFT", 0, 0);
@@ -3792,6 +3820,10 @@ function SlimSuite_SetupGo(n)
 		SU.panel.art:Hide(); SU.panel.slots:Hide();
 	end
 	SU.panel:SetHeight(h);
+	SU.grid.Refresh(); SU.centre.Refresh(); SU.snap.Refresh();
+	for i = 1, 4 do
+		if ( tonumber(DB().gridDivisions) == ({ 32, 64, 128, 256 })[i] ) then SU.sizes[i]:LockHighlight(); else SU.sizes[i]:UnlockHighlight(); end
+	end
 	if ( n > 1 ) then SU.panel.back:Enable(); else SU.panel.back:Disable(); end
 	SU.panel.next:SetText(n >= count and "Finish" or "Next");
 	if ( n >= count ) then SU.panel.skip:Hide(); else SU.panel.skip:Show(); end
