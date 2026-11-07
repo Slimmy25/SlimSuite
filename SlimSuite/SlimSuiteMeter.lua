@@ -160,7 +160,7 @@ end
 -- ("dps · now 0"), a Reset button and an "x", and a grip in the bottom-right corner to resize it.
 local VIEWS = { { 'damage', 'Damage Done' }, { 'healing', 'Healing Done' }, { 'boss', 'Boss Damage' }, { 'group', 'Party DPS' } };
 local GOLD, MUTED, CREAM, BORDER = { 0.97, 0.82, 0.41 }, { 0.56, 0.5, 0.38 }, { 0.85, 0.81, 0.7 }, { 0.43, 0.33, 0.145 };
-local HEADER, ROW_H = 22, 18;
+local HEADER, ROW_H = 20, 16;
 local FONT = STANDARD_TEXT_FONT or 'Fonts\\FRIZQT__.TTF';
 local function ViewName(view) for _, v in ipairs(VIEWS) do if v[1] == view then return v[2]; end end return 'Damage Done'; end
 local function Short(v)
@@ -197,37 +197,60 @@ local function SmallButton(parent, text, width, onClick)
  return b;
 end
 
-local function OpenViewList(frame)
- local list = M.viewList;
- if not list then
-  list = CreateFrame('Frame', 'SlimSuiteMeterViewList', UIParent);
-  list:SetFrameStrata('DIALOG'); list:SetWidth(104); list:SetHeight(4 + table.getn(VIEWS) * 20);
-  local bg = Tex(list, 'BACKGROUND', 0.024, 0.02, 0.05, 0.97); bg:SetAllPoints(list);
-  Border(list, BORDER);
-  list.items = {};
-  for i, v in ipairs(VIEWS) do
-   local item = CreateFrame('Button', nil, list);
-   item:SetHeight(20); item:SetPoint('TOPLEFT', list, 'TOPLEFT', 2, -2 - (i - 1) * 20); item:SetPoint('TOPRIGHT', list, 'TOPRIGHT', -2, -2 - (i - 1) * 20);
-   item.selected = Tex(item, 'BACKGROUND', 0.12, 0.105, 0.086, 1); item.selected:SetAllPoints(item);
-   local hi = Tex(item, 'HIGHLIGHT', 0.12, 0.105, 0.086, 1); hi:SetAllPoints(item);
-   item.text = Label(item, 13, CREAM); item.text:SetPoint('LEFT', item, 'LEFT', 7, 0); item.text:SetText(v[2]);
-   item.view = v[1];
-   item:SetScript('OnClick', function() M.view = this.view; M.owner = nil; M.offset = 0; M.message = nil; M.nextRead = 0; list:Hide(); end);
-   list.items[i] = item;
+local function BuildViewList(frame)
+ local list = CreateFrame('Frame', 'SlimSuiteMeterViewList', frame);
+ list:SetFrameStrata('DIALOG');
+ list:SetFrameLevel((frame:GetFrameLevel() or 1) + 20);
+ list:SetWidth(112); list:SetHeight(4 + table.getn(VIEWS) * 18);
+ list:EnableMouse(true);
+ local bg = Tex(list, 'BACKGROUND', 0.024, 0.02, 0.05, 0.97); bg:SetAllPoints(list);
+ Border(list, BORDER);
+ list.items = {};
+ for i = 1, table.getn(VIEWS) do
+  local item = CreateFrame('Button', nil, list);
+  item:SetWidth(108); item:SetHeight(18);
+  item:SetPoint('TOPLEFT', list, 'TOPLEFT', 2, -2 - (i - 1) * 18);
+  item:EnableMouse(true);
+  if item.RegisterForClicks then item:RegisterForClicks('LeftButtonUp'); end
+  item.selected = Tex(item, 'BACKGROUND', 0.12, 0.105, 0.086, 1); item.selected:SetAllPoints(item);
+  item.hover = Tex(item, 'BACKGROUND', 0.16, 0.14, 0.11, 1); item.hover:SetAllPoints(item); item.hover:Hide();
+  item.label = item:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall');
+  item.label:SetFont(FONT, 12); item.label:SetTextColor(CREAM[1], CREAM[2], CREAM[3]);
+  item.label:SetPoint('LEFT', item, 'LEFT', 6, 0); item.label:SetText(VIEWS[i][2]);
+  item.view = VIEWS[i][1];
+  item:SetScript('OnEnter', function() this.hover:Show(); end);
+  item:SetScript('OnLeave', function() this.hover:Hide(); end);
+  item:SetScript('OnClick', function()
+   M.view = this.view; M.owner = nil; M.offset = 0; M.message = nil; M.nextRead = 0; M.nextNow = 0;
+   this:GetParent():Hide();
+  end);
+  list.items[i] = item;
+ end
+ list:SetPoint('TOPLEFT', frame, 'TOPLEFT', 3, -(HEADER + 2));
+ list:Hide();
+ return list;
+end
+
+local function ToggleViewList(frame)
+ if not M.viewList then
+  local ok, list = pcall(BuildViewList, frame);
+  if not ok then
+   if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage('|cffffd100Slim Suite|r the meter\'s view list could not be made: ' .. tostring(list)); end
+   return;
   end
   M.viewList = list;
  end
+ local list = M.viewList;
  if list:IsShown() then list:Hide(); return; end
  for _, item in ipairs(list.items) do if item.view == M.view then item.selected:Show(); else item.selected:Hide(); end end
- list:ClearAllPoints(); list:SetPoint('TOPLEFT', frame, 'TOPLEFT', 4, -(HEADER + 3));
  list:Show();
 end
 
 function M.Attach(frame)
- M.frame = frame; frame:SetWidth(250); frame:SetHeight(240);
+ M.frame = frame; frame:SetWidth(230); frame:SetHeight(170);
  frame:EnableMouse(true); frame:EnableMouseWheel(true);
  if frame.SetResizable then frame:SetResizable(true); end
- if frame.SetMinResize then frame:SetMinResize(190, 100); end
+ if frame.SetMinResize then frame:SetMinResize(180, 90); end
  -- panel and header
  local body = Tex(frame, 'BACKGROUND', 1, 1, 1, 1); body:SetAllPoints(frame);
  if body.SetGradient then body:SetGradient('VERTICAL', 0.039, 0.031, 0.016, 0.082, 0.063, 0.031); else body:SetVertexColor(0.063, 0.051, 0.024); end
@@ -238,11 +261,12 @@ function M.Attach(frame)
  line:SetPoint('TOPLEFT', head, 'BOTTOMLEFT', 0, 0); line:SetPoint('TOPRIGHT', head, 'BOTTOMRIGHT', 0, 0); line:SetHeight(1);
  Border(frame, BORDER);
  -- header contents
- frame.title = Label(frame, 14, GOLD); frame.title:SetPoint('LEFT', frame, 'TOPLEFT', 9, -(HEADER / 2 + 1));
- frame.pick = SmallButton(frame, '^', 15, function() OpenViewList(frame); end);
+ frame.title = Label(frame, 13, GOLD); frame.title:SetPoint('LEFT', frame, 'TOPLEFT', 9, -(HEADER / 2 + 1));
+ frame.pick = SmallButton(frame, '^', 14, function() ToggleViewList(frame); end);
  frame.pick.text:SetTextColor(GOLD[1], GOLD[2], GOLD[3]);
  frame.pick:SetPoint('LEFT', frame.title, 'RIGHT', 6, 0);
- frame.rate = Label(frame, 12, MUTED); frame.rate:SetPoint('LEFT', frame.pick, 'RIGHT', 7, 0);
+ frame.rate = Label(frame, 11, MUTED); frame.rate:SetPoint('LEFT', frame.pick, 'RIGHT', 6, 0);
+ frame.rate:SetHeight(14);   -- one line only: never wraps under itself
  frame.close = CreateFrame('Button', nil, frame);
  frame.close:SetWidth(14); frame.close:SetHeight(14); frame.close:SetPoint('RIGHT', frame, 'TOPRIGHT', -5, -(HEADER / 2 + 1));
  frame.close.text = Label(frame.close, 13, { 0.66, 0.6, 0.47 }, 'CENTER'); frame.close.text:SetPoint('CENTER', frame.close, 'CENTER', 0, 1); frame.close.text:SetText('x');
@@ -254,7 +278,7 @@ function M.Attach(frame)
  frame.back = SmallButton(frame, 'Back', 40, function() M.owner = nil; M.offset = 0; M.nextRead = 0; end);
  frame.back:SetPoint('RIGHT', frame.close, 'LEFT', -6, 0); frame.back:Hide();
  -- the message shown when there is nothing to list
- frame.empty = Label(frame, 13, { 0.6, 0.53, 0.41 }); frame.empty:SetPoint('TOPLEFT', frame, 'TOPLEFT', 9, -(HEADER + 9));
+ frame.empty = Label(frame, 12, { 0.6, 0.53, 0.41 }); frame.empty:SetPoint('TOPLEFT', frame, 'TOPLEFT', 9, -(HEADER + 9));
  frame.empty:SetJustifyV('TOP');
  -- rows
  frame:SetScript('OnMouseWheel', function() M.offset = math.max(0, math.min(math.max(0, Count(M.rows) - M.visible), M.offset - (arg1 or 0) * 3)); end);
@@ -264,10 +288,10 @@ function M.Attach(frame)
   row:SetPoint('TOPLEFT', frame, 'TOPLEFT', 5, -(HEADER + 5) - (i - 1) * ROW_H); row:SetHeight(ROW_H - 1);
   row.bar = Tex(row, 'BACKGROUND', GOLD[1], GOLD[2], GOLD[3], 0.13); row.bar:SetPoint('TOPLEFT', row, 'TOPLEFT', 0, 0); row.bar:SetPoint('BOTTOMLEFT', row, 'BOTTOMLEFT', 0, 0);
   local hi = Tex(row, 'HIGHLIGHT', 1, 0.85, 0.5, 0.08); hi:SetAllPoints(row);
-  row.icon = row:CreateTexture(nil, 'ARTWORK'); row.icon:SetPoint('LEFT', row, 'LEFT', 2, 0); row.icon:SetWidth(14); row.icon:SetHeight(14);
+  row.icon = row:CreateTexture(nil, 'ARTWORK'); row.icon:SetPoint('LEFT', row, 'LEFT', 2, 0); row.icon:SetWidth(13); row.icon:SetHeight(13);
   row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
-  row.name = Label(row, 12, CREAM); row.name:SetPoint('LEFT', row, 'LEFT', 20, 0);
-  row.value = Label(row, 12, GOLD, 'RIGHT'); row.value:SetPoint('RIGHT', row, 'RIGHT', -3, 0);
+  row.name = Label(row, 11, CREAM); row.name:SetPoint('LEFT', row, 'LEFT', 20, 0);
+  row.value = Label(row, 11, GOLD, 'RIGHT'); row.value:SetPoint('RIGHT', row, 'RIGHT', -3, 0);
   row:SetScript('OnEnter', function() Tooltip(this); end); row:SetScript('OnLeave', function() if GameTooltip then GameTooltip:Hide(); end end);
   row:SetScript('OnClick', function() if M.view == 'group' and not M.owner and this.entry then M.owner = this.entry.ownerId; M.offset = 0; M.nextRead = 0; if GameTooltip then GameTooltip:Hide(); end end end);
   row:EnableMouseWheel(true); row:SetScript('OnMouseWheel', frame:GetScript('OnMouseWheel')); frame.rows[i] = row;
@@ -288,6 +312,9 @@ function M.Attach(frame)
   if SlimSuite_SavePosition then SlimSuite_SavePosition('SlimSuiteMeterFrame', frame); end
  end);
  frame:SetScript('OnHide', function() if M.viewList then M.viewList:Hide(); end end);
+ -- the view list is made now, with the meter, so it is ready the first time "^" is pressed
+ local ok, list = pcall(BuildViewList, frame);
+ if ok then M.viewList = list; end
 end
 
 -- "x": the meter stays hidden for the rest of this run and comes back with the next one
@@ -352,8 +379,10 @@ function M.Draw(active, editing)
  local rateText = unit .. ' · now ' .. rateValue;
  if healing and M.absorbed and M.absorbed > 0 then rateText = rateText .. ' · absorbed ' .. Short(M.absorbed); end
  -- keep the rate between the "^" button and Reset / x
- local rightEdge = (f.reset:IsShown() or f.back:IsShown()) and 70 or 26;
- FitString(f.rate, rateText, math.max(20, width - 9 - (f.title:GetStringWidth() or 80) - 6 - 15 - 7 - rightEdge), 8);
+ local rightEdge = (f.reset:IsShown() or f.back:IsShown()) and 68 or 24;
+ local room = math.max(16, width - 9 - (f.title:GetStringWidth() or 80) - 6 - 14 - 6 - rightEdge);
+ FitString(f.rate, rateText, room, 9);
+ if (f.rate:GetStringWidth() or 0) > room then FitString(f.rate, rateValue .. ' ' .. unit, room, 9); end
  M.rows = rows; M.visible = math.max(1, math.min(64, math.floor((f:GetHeight() - HEADER - 12) / ROW_H)));
  M.offset = math.max(0, math.min(M.offset, math.max(0, Count(rows) - M.visible)));
  if Count(rows) == 0 then
@@ -379,11 +408,11 @@ function M.Draw(active, editing)
    local value = Short(row.displayAmount) .. (r and ('  (' .. r .. ')') or '');
    local valueWidth = math.max(60, math.floor(rowWidth * 0.45));
    FitString(button.value, value, valueWidth, 8);
-   FitString(button.name, button.label, math.max(24, rowWidth - 22 - valueWidth - 4), 8);
+   FitString(button.name, button.label, math.max(24, rowWidth - 20 - valueWidth - 4), 8);
    local color = M.view == 'group' and not M.owner and CLASS_COLORS[ClassOf(actor) or ''];
    if color then button.name:SetTextColor(tonumber(string.sub(color, 1, 2), 16) / 255, tonumber(string.sub(color, 3, 4), 16) / 255, tonumber(string.sub(color, 5, 6), 16) / 255);
    else button.name:SetTextColor(CREAM[1], CREAM[2], CREAM[3]); end
-   if source and source.icon and source.icon.status == 'ready' then button.icon:SetTexture(source.icon.path); button.icon:Show(); button.name:SetPoint('LEFT', button, 'LEFT', 20, 0);
+   if source and source.icon and source.icon.status == 'ready' then button.icon:SetTexture(source.icon.path); button.icon:Show(); button.name:SetPoint('LEFT', button, 'LEFT', 18, 0);
    else button.icon:Hide(); button.name:SetPoint('LEFT', button, 'LEFT', 4, 0); end
    button:Show();
   else button.entry = nil; button:Hide(); end
