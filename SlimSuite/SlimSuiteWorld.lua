@@ -681,19 +681,16 @@ local function Clock(sec) sec = math.floor(sec + 0.5); return string.format("%d:
 W.Clock = Clock;
 
 -- ---------------------------------------------------------------- minimap pins: caches, bosses and lairs (separate settings)
--- Positions are in the game's yards (AZS_RUN px/py and the caches' x/y share them, per the 0.97 patch notes).
--- ASSUMPTION to check against the docs: +x is north and +y is west, as in WoW's own world coordinates. If pins
--- come out mirrored or turned, change NORTH_SIGN / WEST_SIGN / SWAP_AXES here.
-local NORTH_SIGN, WEST_SIGN, SWAP_AXES = 1, 1, false;
+-- Positions are in the game's yards (AZS_RUN px/py and the caches' and lairs' x/y share them, per patch 0.97).
+-- Pins are fixed to their spot in the world: they are placed every frame from your hero's position, so they glide
+-- with the minimap instead of stepping. A lair out of the minimap's range is simply not shown; caches and bosses out
+-- of range wait on the rim, pointing the way.
+-- Which world axis is north: WoW's own convention (+x north, +y west) is used until Slim Suite has checked it against
+-- the game's map position while you walk (GetPlayerMapPosition); what it finds is saved and used from then on.
 -- the 1.12 minimap's diameter in yards at each zoom level, outdoors and indoors
 local OUTDOOR = { [0] = 466.67, 400, 333.33, 266.67, 200, 133.33 };
 local INDOOR = { [0] = 300, 240, 180, 120, 80, 50 };
 
-function A.PlayerPos()
-	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
-	if ( run and type(run.px) == "number" and type(run.py) == "number" ) then return run.px, run.py; end
-	return nil;
-end
 function A.Pos(t)
 	if ( type(t) ~= "table" ) then return nil; end
 	local x, y = A.Field(t, "x", "wx", "worldX"), A.Field(t, "y", "wy", "worldY");
@@ -711,6 +708,93 @@ function A.Caches()
 	return list;
 end
 
+-- your hero's position, smoothed between the game's updates: when AZS_RUN moves in steps, the position is carried
+-- forward at the speed of the last step for a moment, so pins do not jump each time it updates
+local hero = { at = 0, vx = 0, vy = 0 };
+function A.PlayerPos()
+	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
+	if ( not run or type(run.px) ~= "number" or type(run.py) ~= "number" ) then return nil; end
+	local now = GetTime();
+	if ( run.px ~= hero.x or run.py ~= hero.y ) then
+		if ( hero.x and now - hero.at > 0.02 and now - hero.at < 1 ) then
+			hero.vx, hero.vy = (run.px - hero.x) / (now - hero.at), (run.py - hero.y) / (now - hero.at);
+		else hero.vx, hero.vy = 0, 0; end
+		hero.x, hero.y, hero.at = run.px, run.py, now;
+	end
+	local t = math.min(now - hero.at, 0.25);
+	if ( now - hero.at > 0.4 ) then hero.vx, hero.vy = 0, 0; end
+	return hero.x + hero.vx * t, hero.y + hero.vy * t;
+end
+
+-- north / west in yards from a world offset, using the saved axis check if there is one
+local function Bearing(dx, dy)
+	local axes = DB().minimapAxes;
+	if ( type(axes) == "table" and axes.east ) then
+		local east = (axes.east == "x" and dx or dy) * axes.eastSign;
+		local north = (axes.east == "x" and dy or dx) * axes.northSign;
+		return north, -east;
+	end
+	return dx, dy;                                         -- WoW: +x north, +y west
+end
+
+-- Learn the axes: compare how the hero's yards change with how the game's own map position changes (map x grows to the
+-- east, map y to the south). After 80 yards of clear movement the answer is saved.
+local learn = { at = 0, xe = 0, ye = 0, xs = 0, ys = 0, moved = 0 };
+local function LearnAxes(now)
+	if ( type(DB().minimapAxes) == "table" or now < learn.at ) then return; end
+	learn.at = now + 0.5;
+	if ( not GetPlayerMapPosition or (WorldMapFrame and WorldMapFrame:IsShown()) ) then return; end
+	if ( SetMapToCurrentZone ) then pcall(SetMapToCurrentZone); end
+	local ok, mx, my = pcall(GetPlayerMapPosition, "player");
+	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
+	if ( not ok or not mx or (mx == 0 and my == 0) or not run or type(run.px) ~= "number" ) then learn.last = nil; return; end
+	local last = learn.last;
+	learn.last = { mx = mx, my = my, x = run.px, y = run.py };
+	if ( not last ) then return; end
+	local dx, dy, dme, dms = run.px - last.x, run.py - last.y, mx - last.mx, my - last.my;
+	local step = math.sqrt(dx * dx + dy * dy);
+	if ( step < 2 or step > 60 or (dme == 0 and dms == 0) ) then return; end
+	learn.xe, learn.ye = learn.xe + dx * dme, learn.ye + dy * dme;
+	learn.xs, learn.ys = learn.xs + dx * dms, learn.ys + dy * dms;
+	learn.moved = learn.moved + step;
+	if ( learn.moved < 80 ) then return; end
+	local straight = math.abs(learn.xe) + math.abs(learn.ys);   -- x runs east-west, y north-south
+	local crossed = math.abs(learn.ye) + math.abs(learn.xs);    -- y runs east-west, x north-south
+	if ( straight > crossed * 4 ) then
+		DB().minimapAxes = { east = "x", eastSign = learn.xe > 0 and 1 or -1, northSign = learn.ys > 0 and -1 or 1 };
+	elseif ( crossed > straight * 4 ) then
+		DB().minimapAxes = { east = "y", eastSign = learn.ye > 0 and 1 or -1, northSign = learn.xs > 0 and -1 or 1 };
+	else
+		learn.xe, learn.ye, learn.xs, learn.ys, learn.moved = 0, 0, 0, 0, 0;   -- unclear: start over
+	end
+end
+
+-- Indoors or out: the 1.12 minimap keeps a zoom for each (the minimapZoom and minimapInsideZoom settings). When both
+-- are the same, a quick zoom nudge shows which one follows. Checked when the zoom or the zone changes, not each frame.
+local indoors = false;
+local nudgedAt = 0;
+local function CheckIndoors(mayNudge)
+	if ( not Minimap or not GetCVar ) then return; end
+	local zoom = Minimap:GetZoom() or 0;
+	local out, ins = tonumber(GetCVar("minimapZoom")), tonumber(GetCVar("minimapInsideZoom"));
+	if ( out and ins and out ~= ins ) then indoors = ins == zoom; return; end
+	-- only on a zone change, never in answer to a zoom event (the nudge itself is one)
+	if ( not mayNudge or GetTime() - nudgedAt < 2 ) then return; end
+	nudgedAt = GetTime();
+	local test = zoom < 5 and zoom + 1 or zoom - 1;
+	Minimap:SetZoom(test);
+	indoors = tonumber(GetCVar("minimapInsideZoom")) == test;
+	Minimap:SetZoom(zoom);
+end
+local zoomWatch = CreateFrame("Frame");
+for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA", "MINIMAP_UPDATE_ZOOM" }) do
+	pcall(zoomWatch.RegisterEvent, zoomWatch, e);
+end
+zoomWatch:SetScript("OnEvent", function()
+	if ( GetTime() - nudgedAt < 2 and event == "MINIMAP_UPDATE_ZOOM" ) then return; end
+	pcall(CheckIndoors, event ~= "MINIMAP_UPDATE_ZOOM");
+end);
+
 local pins, pinUsed = {}, 0;
 local function Pin()
 	pinUsed = pinUsed + 1;
@@ -720,10 +804,11 @@ local function Pin()
 		p:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 5);
 		p:EnableMouse(true);
 		p.icon = p:CreateTexture(nil, "OVERLAY"); p.icon:SetAllPoints(p);
-		p.label = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		p.label:SetPoint("TOP", p, "BOTTOM", 0, 1);
-		local font, _, flags = p.label:GetFont();
-		if ( font ) then p.label:SetFont(font, 9, "OUTLINE"); end
+		p.label = p:CreateFontString(nil, "OVERLAY");
+		p.label:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 9);
+		p.label:SetShadowColor(0, 0, 0, 1); p.label:SetShadowOffset(1, -1);
+		p.label:SetTextColor(0.88, 0.82, 0.72);
+		p.label:SetPoint("LEFT", p, "RIGHT", 1, 0);
 		p:SetScript("OnEnter", function()
 			if ( not GameTooltip or not this.tip ) then return; end
 			GameTooltip:SetOwner(this, "ANCHOR_LEFT");
@@ -738,99 +823,111 @@ local function Pin()
 	return p;
 end
 
-local function PlacePin(px, py, x, y, size, tip)
-	local north, west = (x - px) * NORTH_SIGN, (y - py) * WEST_SIGN;
-	if ( SWAP_AXES ) then north, west = west, north; end
+-- Place one pin. Returns nil when the spot is out of range and the pin should not show there.
+local function PlacePin(px, py, t)
+	local north, west = Bearing(t.x - px, t.y - py);
 	local zoom = Minimap:GetZoom() or 0;
-	local inside = GetCVar and tonumber(GetCVar("minimapInsideZoom")) == zoom and IsIndoors and IsIndoors();
-	local yards = ((inside and INDOOR[zoom]) or OUTDOOR[zoom] or 466.67) / 2;
+	local yards = ((indoors and INDOOR[zoom]) or OUTDOOR[zoom] or 466.67) / 2;
 	local radius = (Minimap:GetWidth() or 140) / 2;
 	local dist = math.sqrt(north * north + west * west);
 	local dx, dy = -west / yards * radius, north / yards * radius;
+	local outside = dist > yards * 0.94;
+	if ( outside and not t.rim ) then return nil; end
 	local p = Pin();
-	local onEdge = dist > yards * 0.92;
-	if ( onEdge and dist > 0 ) then
-		-- out of the minimap's range: keep it on the rim, pointing the way, however far it is
+	if ( outside and dist > 0 ) then
 		local k = (radius - 6) / math.sqrt(dx * dx + dy * dy);
 		dx, dy = dx * k, dy * k;
 	end
-	p:SetWidth(onEdge and size * 0.8 or size); p:SetHeight(onEdge and size * 0.8 or size);
-	p:SetAlpha(onEdge and 0.7 or 1);
+	local size = outside and t.size * 0.8 or t.size;
+	p:SetWidth(size); p:SetHeight(size);
+	p:SetAlpha((t.alpha or 1) * (outside and 0.7 or 1));
 	p:ClearAllPoints();
 	p:SetPoint("CENTER", Minimap, "CENTER", dx, dy);
-	p.tip, p.dist, p.sub = tip, dist, nil;
-	p.label:SetText("");
-	p.icon:SetVertexColor(1, 1, 1);
-	if ( p.icon.SetDesaturated ) then p.icon:SetDesaturated(nil); end
+	p.icon:SetTexture(t.texture);
+	if ( t.raid ) then SetRaidIcon(p.icon, t.raid); elseif ( t.crop ) then p.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93); else p.icon:SetTexCoord(0, 1, 0, 1); end
+	p.icon:SetVertexColor(t.r or 1, t.g or 1, t.b or 1);
+	if ( p.icon.SetDesaturated ) then p.icon:SetDesaturated(t.grey and 1 or nil); end
+	p.label:SetText(outside and "" or (t.label or ""));
+	p.tip, p.sub, p.dist = t.tip, t.sub, dist;
 	p:Show();
 	return p;
 end
 
-local function UpdateMinimapPins()
-	pinUsed = 0;
+-- What to pin is gathered ten times a second; pins are placed every frame.
+local targets = {};
+local function GatherPins()
+	targets = {};
 	local d = DB();
-	local px, py = A.PlayerPos();
 	local phase = A.Call("AZS_GetPhase");
 	local inRun = phase == nil or phase == "playing" or phase == "choosing" or phase == "paused";
-	if ( Minimap and px and inRun ) then
-		if ( d.minimapCaches ) then
-			local caches = A.Caches();
-			for i = 1, table.getn(caches) do
-				local c = caches[i];
-				local x, y = A.Pos(c);
-				local opened = A.Field(c, "opened", "looted", "taken");
-				if ( x and not opened ) then
-					local p = PlacePin(px, py, x, y, 14, A.Field(c, "name", "label") or "Cache");
-					p.icon:SetTexture("Interface\\Icons\\INV_Box_02"); p.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
-				end
+	if ( not Minimap or not inRun ) then return; end
+	if ( d.minimapCaches ) then
+		local caches = A.Caches();
+		for i = 1, table.getn(caches) do
+			local c = caches[i];
+			local x, y = A.Pos(c);
+			if ( x and not A.Field(c, "opened", "looted", "taken") ) then
+				table.insert(targets, { x = x, y = y, size = 13, rim = true, crop = true, texture = "Interface\\Icons\\INV_Box_02",
+					tip = A.Field(c, "name", "label") or "Cache" });
 			end
 		end
-		if ( d.minimapLairs ) then
-			local now = GetTime();
-			local lairs = W.LairInfo(now);
-			for i = 1, table.getn(lairs) do
-				local l = lairs[i];
-				local x, y = A.Pos(l.entry);
-				if ( x ) then
-					local p = PlacePin(px, py, x, y, l.flagged and 15 or 12, l.name);
-					p.icon:SetTexture(PRE_PULL_ICON); p.icon:SetTexCoord(0, 1, 0, 1);
-					if ( l.state == "awake" ) then
-						p.icon:SetVertexColor(1, 0.25, 0.2); p.sub = "Awake: its Guardian is fighting";
-					elseif ( l.state == "empty" ) then
-						if ( p.icon.SetDesaturated ) then p.icon:SetDesaturated(1); end
-						p.icon:SetVertexColor(0.6, 0.6, 0.6);
-						if ( l.refill ) then p.label:SetText(Clock(l.refill)); p.sub = "Empty: fills again in " .. Clock(l.refill);
-						else p.sub = "Empty: fills again within 3:00"; end
-					else
-						p.sub = "Asleep: its Guardian waits";
-					end
-					if ( l.flagged ) then p.sub = (p.sub or "") .. "\n(the game's red flag points here)"; end
+	end
+	if ( d.minimapLairs ) then
+		local lairs = W.LairInfo(GetTime());
+		for i = 1, table.getn(lairs) do
+			local l = lairs[i];
+			local x, y = A.Pos(l.entry);
+			if ( x ) then
+				local t = { x = x, y = y, size = l.flagged and 13 or 11, texture = PRE_PULL_ICON, tip = l.name };
+				if ( l.state == "awake" ) then
+					t.r, t.g, t.b, t.sub = 1, 0.3, 0.25, "Awake: its Guardian is fighting";
+				elseif ( l.state == "empty" ) then
+					t.grey, t.alpha = true, 0.75;
+					if ( l.refill ) then t.label = Clock(l.refill); t.sub = "Empty: fills again in " .. Clock(l.refill);
+					else t.sub = "Empty: fills again within 3:00"; end
+				else
+					t.sub = "Asleep: its Guardian waits";
 				end
+				if ( l.flagged ) then t.sub = t.sub .. "\n(the game's red flag points here)"; end
+				table.insert(targets, t);
 			end
 		end
-		if ( d.minimapBosses ) then
-			local bosses = A.Call("AZS_GetBosses");
+	end
+	if ( d.minimapBosses ) then
+		local bosses = A.Call("AZS_GetBosses");
+		if ( type(bosses) == "table" ) then
 			local byId = {};
-			if ( type(bosses) == "table" ) then
-				local anchors = A.Anchors();
-				for i = 1, table.getn(anchors) do local id = A.Id(anchors[i]); if ( id ~= nil ) then byId[id] = anchors[i]; end end
-				for i = 1, table.getn(bosses) do
-					local b = bosses[i];
-					if ( type(b) == "table" ) then
-						local x, y = A.Pos(b);
-						if ( not x and b.id ~= nil ) then x, y = A.Pos(byId[b.id]); end
-						if ( x ) then
-							local p = PlacePin(px, py, x, y, 16, b.name or "Boss");
-							-- the boss's own marker icon when it has one, else a skull
-							SetRaidIcon(p.icon, (b.id ~= nil and assigned[b.id]) or 8);
-						end
+			local anchors = A.Anchors();
+			for i = 1, table.getn(anchors) do local id = A.Id(anchors[i]); if ( id ~= nil ) then byId[id] = anchors[i]; end end
+			for i = 1, table.getn(bosses) do
+				local b = bosses[i];
+				if ( type(b) == "table" ) then
+					local x, y = A.Pos(b);
+					if ( not x and b.id ~= nil ) then x, y = A.Pos(byId[b.id]); end
+					if ( x ) then
+						-- the boss's own marker icon when it has one, else a skull
+						table.insert(targets, { x = x, y = y, size = 15, rim = true, texture = RAID_ICONS,
+							raid = (b.id ~= nil and assigned[b.id]) or 8, tip = b.name or "Boss" });
 					end
 				end
 			end
 		end
 	end
+end
+
+local pinGather = 0;
+local function UpdateMinimapPins()
+	local now = GetTime();
+	if ( now >= pinGather ) then pinGather = now + 0.1; GatherPins(); pcall(LearnAxes, now); end
+	pinUsed = 0;
+	local px, py = A.PlayerPos();
+	if ( px and Minimap and Minimap:IsVisible() ) then
+		for i = 1, table.getn(targets) do PlacePin(px, py, targets[i]); end
+	end
 	for i = pinUsed + 1, table.getn(pins) do pins[i]:Hide(); end
 end
+local pinDriver = CreateFrame("Frame");
+pinDriver:SetScript("OnUpdate", function() pcall(UpdateMinimapPins); end);
 
 -- ---------------------------------------------------------------- movable local clock (0.136)
 -- AZS_GetLocalTime() gives the clock's text, hour, minute and format, even with the clock or minimap hidden and out of
@@ -1102,7 +1199,6 @@ ticker:SetScript("OnUpdate", function()
 	pcall(TrackKills);
 	pcall(UpdateRevive);
 	pcall(UpdateProc);
-	pcall(UpdateMinimapPins);
 	pcall(UpdateLocalClock);
 end);
 ticker:RegisterEvent("PLAYER_ENTERING_WORLD");
