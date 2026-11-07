@@ -154,92 +154,242 @@ local function Tooltip(button)
  if (M.dropped or 0)>0 then GameTooltip:AddLine('Some damage samples were missed.',1,0.5,0);end
  GameTooltip:Show();
 end
+-- ---------------------------------------------------------------- the meter's look
+-- Drawn like the game's own damage meter (measured from its HUD): a near-black warm panel with a thin gold-brown
+-- border, a header with the view's name in gold, a small "^" button that opens the view list, the current rate
+-- ("dps · now 0"), a Reset button and an "x", and a grip in the bottom-right corner to resize it.
+local VIEWS = { { 'damage', 'Damage Done' }, { 'healing', 'Healing Done' }, { 'boss', 'Boss Damage' }, { 'group', 'Party DPS' } };
+local GOLD, MUTED, CREAM, BORDER = { 0.97, 0.82, 0.41 }, { 0.56, 0.5, 0.38 }, { 0.85, 0.81, 0.7 }, { 0.43, 0.33, 0.145 };
+local HEADER, ROW_H = 22, 18;
+local FONT = STANDARD_TEXT_FONT or 'Fonts\\FRIZQT__.TTF';
+local function ViewName(view) for _, v in ipairs(VIEWS) do if v[1] == view then return v[2]; end end return 'Damage Done'; end
+local function Short(v)
+ v = Num(v);
+ if v >= 1000000 then return string.format('%.1fm', v / 1000000); end
+ if v >= 10000 then return string.format('%.1fk', v / 1000); end
+ return Text(v);
+end
+local function Tex(parent, layer, r, g, b, a)
+ local t = parent:CreateTexture(nil, layer); t:SetTexture(1, 1, 1, 1); t:SetVertexColor(r, g, b, a or 1); return t;
+end
+local function Label(parent, size, color, justify)
+ local fs = parent:CreateFontString(nil, 'OVERLAY');
+ fs:SetFont(FONT, size); fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1);
+ fs:SetTextColor(color[1], color[2], color[3]); fs:SetJustifyH(justify or 'LEFT');
+ return fs;
+end
+-- a 1-pixel border made of four textures
+local function Border(f, c)
+ local t = Tex(f, 'BORDER', c[1], c[2], c[3]); t:SetPoint('TOPLEFT', f, 'TOPLEFT', 0, 0); t:SetPoint('TOPRIGHT', f, 'TOPRIGHT', 0, 0); t:SetHeight(1);
+ local b = Tex(f, 'BORDER', c[1], c[2], c[3]); b:SetPoint('BOTTOMLEFT', f, 'BOTTOMLEFT', 0, 0); b:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 0); b:SetHeight(1);
+ local l = Tex(f, 'BORDER', c[1], c[2], c[3]); l:SetPoint('TOPLEFT', f, 'TOPLEFT', 0, 0); l:SetPoint('BOTTOMLEFT', f, 'BOTTOMLEFT', 0, 0); l:SetWidth(1);
+ local r = Tex(f, 'BORDER', c[1], c[2], c[3]); r:SetPoint('TOPRIGHT', f, 'TOPRIGHT', 0, 0); r:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 0); r:SetWidth(1);
+end
+-- the header's small square buttons and text buttons
+local function SmallButton(parent, text, width, onClick)
+ local b = CreateFrame('Button', nil, parent);
+ b:SetWidth(width); b:SetHeight(15);
+ local fill = Tex(b, 'BACKGROUND', 0.08, 0.055, 0.027, 1); fill:SetAllPoints(b);
+ Border(b, { 0.32, 0.25, 0.105 });
+ b.text = Label(b, 11, { 0.59, 0.54, 0.4 }, 'CENTER'); b.text:SetPoint('CENTER', b, 'CENTER', 0, 0); b.text:SetText(text);
+ local hi = Tex(b, 'HIGHLIGHT', 1, 0.85, 0.5, 0.12); hi:SetAllPoints(b);
+ b:SetScript('OnClick', onClick);
+ return b;
+end
+
+local function OpenViewList(frame)
+ local list = M.viewList;
+ if not list then
+  list = CreateFrame('Frame', 'SlimSuiteMeterViewList', UIParent);
+  list:SetFrameStrata('DIALOG'); list:SetWidth(104); list:SetHeight(4 + table.getn(VIEWS) * 20);
+  local bg = Tex(list, 'BACKGROUND', 0.024, 0.02, 0.05, 0.97); bg:SetAllPoints(list);
+  Border(list, BORDER);
+  list.items = {};
+  for i, v in ipairs(VIEWS) do
+   local item = CreateFrame('Button', nil, list);
+   item:SetHeight(20); item:SetPoint('TOPLEFT', list, 'TOPLEFT', 2, -2 - (i - 1) * 20); item:SetPoint('TOPRIGHT', list, 'TOPRIGHT', -2, -2 - (i - 1) * 20);
+   item.selected = Tex(item, 'BACKGROUND', 0.12, 0.105, 0.086, 1); item.selected:SetAllPoints(item);
+   local hi = Tex(item, 'HIGHLIGHT', 0.12, 0.105, 0.086, 1); hi:SetAllPoints(item);
+   item.text = Label(item, 13, CREAM); item.text:SetPoint('LEFT', item, 'LEFT', 7, 0); item.text:SetText(v[2]);
+   item.view = v[1];
+   item:SetScript('OnClick', function() M.view = this.view; M.owner = nil; M.offset = 0; M.message = nil; M.nextRead = 0; list:Hide(); end);
+   list.items[i] = item;
+  end
+  M.viewList = list;
+ end
+ if list:IsShown() then list:Hide(); return; end
+ for _, item in ipairs(list.items) do if item.view == M.view then item.selected:Show(); else item.selected:Hide(); end end
+ list:ClearAllPoints(); list:SetPoint('TOPLEFT', frame, 'TOPLEFT', 4, -(HEADER + 3));
+ list:Show();
+end
+
 function M.Attach(frame)
- M.frame=frame;frame:SetWidth(340);frame:SetHeight(220);frame:EnableMouse(true);frame:EnableMouseWheel(true);
- frame.rows={};frame.tabs={};
- local views={{'damage','Damage'},{'healing','Healing'},{'boss','Boss'},{'group','Party'}};
- for i=1,4 do
-  local view,label=views[i][1],views[i][2];
-  local tab=K.Button(frame,label,78,function() M.view=view;M.owner=nil;M.offset=0;M.message=nil;M.nextRead=0;end);
-  tab:SetPoint('TOPLEFT',frame,'TOPLEFT',8+(i-1)*81,-6);frame.tabs[view]=tab;
+ M.frame = frame; frame:SetWidth(250); frame:SetHeight(240);
+ frame:EnableMouse(true); frame:EnableMouseWheel(true);
+ if frame.SetResizable then frame:SetResizable(true); end
+ if frame.SetMinResize then frame:SetMinResize(190, 100); end
+ -- panel and header
+ local body = Tex(frame, 'BACKGROUND', 1, 1, 1, 1); body:SetAllPoints(frame);
+ if body.SetGradient then body:SetGradient('VERTICAL', 0.039, 0.031, 0.016, 0.082, 0.063, 0.031); else body:SetVertexColor(0.063, 0.051, 0.024); end
+ local head = Tex(frame, 'ARTWORK', 1, 1, 1, 1);
+ head:SetPoint('TOPLEFT', frame, 'TOPLEFT', 1, -1); head:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -1, -1); head:SetHeight(HEADER);
+ if head.SetGradient then head:SetGradient('VERTICAL', 0.125, 0.094, 0.043, 0.22, 0.165, 0.078); else head:SetVertexColor(0.17, 0.13, 0.06); end
+ local line = Tex(frame, 'ARTWORK', 0.32, 0.25, 0.11, 1);
+ line:SetPoint('TOPLEFT', head, 'BOTTOMLEFT', 0, 0); line:SetPoint('TOPRIGHT', head, 'BOTTOMRIGHT', 0, 0); line:SetHeight(1);
+ Border(frame, BORDER);
+ -- header contents
+ frame.title = Label(frame, 14, GOLD); frame.title:SetPoint('LEFT', frame, 'TOPLEFT', 9, -(HEADER / 2 + 1));
+ frame.pick = SmallButton(frame, '^', 15, function() OpenViewList(frame); end);
+ frame.pick.text:SetTextColor(GOLD[1], GOLD[2], GOLD[3]);
+ frame.pick:SetPoint('LEFT', frame.title, 'RIGHT', 6, 0);
+ frame.rate = Label(frame, 12, MUTED); frame.rate:SetPoint('LEFT', frame.pick, 'RIGHT', 7, 0);
+ frame.close = CreateFrame('Button', nil, frame);
+ frame.close:SetWidth(14); frame.close:SetHeight(14); frame.close:SetPoint('RIGHT', frame, 'TOPRIGHT', -5, -(HEADER / 2 + 1));
+ frame.close.text = Label(frame.close, 13, { 0.66, 0.6, 0.47 }, 'CENTER'); frame.close.text:SetPoint('CENTER', frame.close, 'CENTER', 0, 1); frame.close.text:SetText('x');
+ frame.close:SetScript('OnClick', function() M.Close(); end);
+ frame.close:SetScript('OnEnter', function() this.text:SetTextColor(1, 0.85, 0.5); end);
+ frame.close:SetScript('OnLeave', function() this.text:SetTextColor(0.66, 0.6, 0.47); end);
+ frame.reset = SmallButton(frame, 'Reset', 40, function() M.Reset(); M.nextRead = 0; end);
+ frame.reset:SetPoint('RIGHT', frame.close, 'LEFT', -6, 0);
+ frame.back = SmallButton(frame, 'Back', 40, function() M.owner = nil; M.offset = 0; M.nextRead = 0; end);
+ frame.back:SetPoint('RIGHT', frame.close, 'LEFT', -6, 0); frame.back:Hide();
+ -- the message shown when there is nothing to list
+ frame.empty = Label(frame, 13, { 0.6, 0.53, 0.41 }); frame.empty:SetPoint('TOPLEFT', frame, 'TOPLEFT', 9, -(HEADER + 9));
+ frame.empty:SetJustifyV('TOP');
+ -- rows
+ frame:SetScript('OnMouseWheel', function() M.offset = math.max(0, math.min(math.max(0, Count(M.rows) - M.visible), M.offset - (arg1 or 0) * 3)); end);
+ frame.rows = {};
+ for i = 1, 64 do
+  local row = CreateFrame('Button', nil, frame);
+  row:SetPoint('TOPLEFT', frame, 'TOPLEFT', 5, -(HEADER + 5) - (i - 1) * ROW_H); row:SetHeight(ROW_H - 1);
+  row.bar = Tex(row, 'BACKGROUND', GOLD[1], GOLD[2], GOLD[3], 0.13); row.bar:SetPoint('TOPLEFT', row, 'TOPLEFT', 0, 0); row.bar:SetPoint('BOTTOMLEFT', row, 'BOTTOMLEFT', 0, 0);
+  local hi = Tex(row, 'HIGHLIGHT', 1, 0.85, 0.5, 0.08); hi:SetAllPoints(row);
+  row.icon = row:CreateTexture(nil, 'ARTWORK'); row.icon:SetPoint('LEFT', row, 'LEFT', 2, 0); row.icon:SetWidth(14); row.icon:SetHeight(14);
+  row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
+  row.name = Label(row, 12, CREAM); row.name:SetPoint('LEFT', row, 'LEFT', 20, 0);
+  row.value = Label(row, 12, GOLD, 'RIGHT'); row.value:SetPoint('RIGHT', row, 'RIGHT', -3, 0);
+  row:SetScript('OnEnter', function() Tooltip(this); end); row:SetScript('OnLeave', function() if GameTooltip then GameTooltip:Hide(); end end);
+  row:SetScript('OnClick', function() if M.view == 'group' and not M.owner and this.entry then M.owner = this.entry.ownerId; M.offset = 0; M.nextRead = 0; if GameTooltip then GameTooltip:Hide(); end end end);
+  row:EnableMouseWheel(true); row:SetScript('OnMouseWheel', frame:GetScript('OnMouseWheel')); frame.rows[i] = row;
  end
- frame.amount=K.Button(frame,'Damage Done',118,function() M.sort='amount';M.offset=0;end);
- frame.amount:SetPoint('TOPLEFT',frame,'TOPLEFT',8,-34);
- frame.rate=K.Button(frame,'DPS',64,function() M.sort='rate';M.offset=0;end);frame.rate:SetPoint('LEFT',frame.amount,'RIGHT',4,0);
- frame.reset=K.Button(frame,'Reset',58,function() M.Reset();M.nextRead=0;end);frame.reset:SetPoint('TOPRIGHT',frame,'TOPRIGHT',-8,-34);
- frame.back=K.Button(frame,'Back',58,function() M.owner=nil;M.offset=0;M.nextRead=0;end);frame.back:SetPoint('TOPRIGHT',frame,'TOPRIGHT',-8,-34);frame.back:Hide();
- frame.total=frame:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall');frame.total:SetPoint('TOPLEFT',frame,'TOPLEFT',8,-64);
- frame.status=frame:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall');frame.status:SetPoint('BOTTOMLEFT',frame,'BOTTOMLEFT',8,5);
- frame:SetScript('OnMouseWheel',function() M.offset=math.max(0,math.min(math.max(0,Count(M.rows)-M.visible),M.offset-(arg1 or 0)*3));end);
- for i=1,64 do
-  local row=CreateFrame('Button',nil,frame);row:SetPoint('TOPLEFT',frame,'TOPLEFT',8,-84-(i-1)*20);row:SetHeight(19);
-  row:SetHighlightTexture('Interface\\Buttons\\ButtonHilight-Square');
-  row.icon=row:CreateTexture(nil,'ARTWORK');row.icon:SetPoint('LEFT',row,'LEFT',0,0);row.icon:SetWidth(16);row.icon:SetHeight(16);
-  row.name=row:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall');row.name:SetPoint('LEFT',row,'LEFT',20,0);row.name:SetJustifyH('LEFT');
-  row.value=row:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall');row.value:SetPoint('RIGHT',row,'RIGHT',-2,0);row.value:SetJustifyH('RIGHT');
-  row:SetScript('OnEnter',function() Tooltip(this);end);row:SetScript('OnLeave',function() if GameTooltip then GameTooltip:Hide();end end);
-  row:SetScript('OnClick',function() if M.view=='group' and not M.owner and this.entry then M.owner=this.entry.ownerId;M.offset=0;M.nextRead=0;if GameTooltip then GameTooltip:Hide();end end end);
-  row:EnableMouseWheel(true);row:SetScript('OnMouseWheel',frame:GetScript('OnMouseWheel'));frame.rows[i]=row;
+ -- the resize grip: a small gold stepped triangle in the bottom-right corner
+ local grip = CreateFrame('Button', nil, frame);
+ grip:SetWidth(12); grip:SetHeight(12); grip:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -2, 2);
+ for i = 1, 4 do
+  local step = Tex(grip, 'OVERLAY', 0.56, 0.44, 0.19, 1);
+  step:SetWidth(i * 2); step:SetHeight(2); step:SetPoint('BOTTOMRIGHT', grip, 'BOTTOMRIGHT', 0, (4 - i) * 2);
  end
-end
-function M.Draw(active,editing)
- local f=M.frame;if not f then return;end
- local healing=M.view=='healing';local unit=healing and 'HPS' or 'DPS';
- local width=f:GetWidth();local tabW=math.max(24,(width-16-9)/4);
- for i,view in ipairs({'damage','healing','boss','group'}) do
-  local tab=f.tabs[view];tab:SetWidth(tabW);tab:ClearAllPoints();tab:SetPoint('TOPLEFT',f,'TOPLEFT',8+(i-1)*(tabW+3),-6);
-  if view==M.view then tab:LockHighlight();else tab:UnlockHighlight();end
- end
- f.amount:SetText(healing and 'Healing Done' or 'Damage Done');f.rate:SetText(unit);
- f.amount:SetWidth(math.max(50,math.min(118,(width-88)*0.62)));f.rate:SetWidth(math.max(30,math.min(64,(width-88)*0.32)));
- if M.sort=='amount' then f.amount:LockHighlight();f.rate:UnlockHighlight();else f.rate:LockHighlight();f.amount:UnlockHighlight();end
- f.reset:Hide();f.back:Hide();
- if M.view=='damage' or M.view=='healing' then f.reset:Show();elseif M.view=='group' and M.owner then f.back:Show();end
- local now=GetTime();
- if now>=(M.nextRead or 0) then
-  M.nextRead=now+0.35;
-  local snapshot,err=Query();M.snapshot=snapshot;M.error=err;M.nextRead=now+math.max(0.35,type(err)=='table' and Num(err.retryAfterSeconds) or 0);
- end
- local snapshot=M.snapshot;local rows={};
- if snapshot then for _,row in ipairs(snapshot.rows or {}) do table.insert(rows,row);end end
- table.sort(rows,function(a,b)
-  local av=M.sort=='rate' and Num(a.displayRate and a.displayRate.value) or Num(a.displayAmount);
-  local bv=M.sort=='rate' and Num(b.displayRate and b.displayRate.value) or Num(b.displayAmount);
-  if av~=bv then return av>bv;end
-  return tostring(a.rowId)<tostring(b.rowId);
+ grip:SetScript('OnMouseDown', function() if arg1 == 'LeftButton' and frame.StartSizing then frame:StartSizing('BOTTOMRIGHT'); end end);
+ grip:SetScript('OnMouseUp', function()
+  frame:StopMovingOrSizing();
+  if type(SlimSuiteDB) == 'table' and type(SlimSuiteDB.sizes) == 'table' then
+   SlimSuiteDB.sizes.SlimSuiteMeterFrame = { w = frame:GetWidth(), h = frame:GetHeight() };
+  end
+  if SlimSuite_SavePosition then SlimSuite_SavePosition('SlimSuiteMeterFrame', frame); end
  end);
- M.rows=rows;M.visible=math.max(1,math.min(64,math.floor((f:GetHeight()-108)/20)));
- M.offset=math.max(0,math.min(M.offset,math.max(0,Count(rows)-M.visible)));
- local totals=snapshot and snapshot.totals;
- local totalText=totals and (Text(totals.displayAmount)..' | '..(totals.displayRate and totals.displayRate.status=='ready' and Text(totals.displayRate.value) or '--')..' '..unit)
-  or (type(M.error)=='table' and (M.error.code=='NO_PARTY' and 'Join a party to see party damage' or M.error.code=='NO_ENCOUNTER' and 'No boss fight yet' or 'Waiting: '..tostring(M.error.code)) or M.error or 'Waiting for meter data');
- if healing then
-  if M.absorbed and M.absorbed>0 then totalText=totalText..' | Absorbed: '..Text(M.absorbed);end
-  if type(AZS_RUN)=='table' and type(AZS_RUN.sh)=='number' then totalText=totalText..' | Current shield: '..Text(AZS_RUN.sh);end
+ frame:SetScript('OnHide', function() if M.viewList then M.viewList:Hide(); end end);
+end
+
+-- "x": the meter stays hidden for the rest of this run and comes back with the next one
+function M.Close()
+ M.closedRun = (M.context and M.context.runId) or true;
+ if M.viewList then M.viewList:Hide(); end
+ if M.frame then M.frame:Hide(); end
+end
+function M.IsClosed()
+ if not M.closedRun then return false; end
+ local ctx = AZS_GetMeterContext and AZS_GetMeterContext();
+ if M.closedRun ~= true and type(ctx) == 'table' and ctx.runId and ctx.runId ~= M.closedRun then M.closedRun = nil; return false; end
+ return true;
+end
+
+-- the rate right now: a short recent window when the game offers one, else the whole run
+local function NowRate(snapshot)
+ if not (AZS_GetMeterContext and AZS_GetMeterSnapshot) or M.view == 'group' then
+  return snapshot and snapshot.totals and snapshot.totals.displayRate;
  end
- FitString(f.total,totalText,math.max(30,width-16),7);
- local statusText=M.message or (Count(rows)>0 and (tostring(M.offset+1)..'-'..tostring(math.min(Count(rows),M.offset+M.visible))..' / '..Count(rows)..' | Scroll for more') or (editing and 'Meter preview' or 'No data yet'));
- FitString(f.status,statusText,math.max(30,width-16),7);
- for i,button in ipairs(f.rows) do
-  local row=i<=M.visible and rows[M.offset+i] or nil;
+ local now = GetTime();
+ if now >= (M.nextNow or 0) then
+  M.nextNow = now + 1;
+  local ctx = AZS_GetMeterContext();
+  local result;
+  if type(ctx) == 'table' and ctx.runId then
+   local q = { apiVersion = 1, runId = ctx.runId, metric = M.view == 'healing' and 'healing' or 'damage', scope = 'self',
+    period = M.view == 'boss' and 'encounter' or 'run', groupBy = 'source', windowSeconds = 5 };
+   if M.view == 'healing' then q.healingPerspective = 'performed'; end
+   local ok, r = pcall(AZS_GetMeterSnapshot, q);
+   if ok and type(r) == 'table' then result = r.totals and r.totals.displayRate; end
+  end
+  M.nowRate = result;
+ end
+ if type(M.nowRate) == 'table' and M.nowRate.status == 'ready' then return M.nowRate; end
+ return snapshot and snapshot.totals and snapshot.totals.displayRate;
+end
+
+function M.Draw(active, editing)
+ local f = M.frame; if not f then return; end
+ local healing = M.view == 'healing';
+ local unit = healing and 'hps' or 'dps';
+ local width = f:GetWidth();
+ f.title:SetText(ViewName(M.view));
+ f.reset:Hide(); f.back:Hide();
+ if M.view == 'damage' or M.view == 'healing' then f.reset:Show(); elseif M.view == 'group' and M.owner then f.back:Show(); end
+ local now = GetTime();
+ if now >= (M.nextRead or 0) then
+  M.nextRead = now + 0.35;
+  local snapshot, err = Query(); M.snapshot = snapshot; M.error = err;
+  M.nextRead = now + math.max(0.35, type(err) == 'table' and Num(err.retryAfterSeconds) or 0);
+ end
+ local snapshot = M.snapshot; local rows = {};
+ if snapshot then for _, row in ipairs(snapshot.rows or {}) do table.insert(rows, row); end end
+ table.sort(rows, function(a, b)
+  local av, bv = Num(a.displayAmount), Num(b.displayAmount);
+  if av ~= bv then return av > bv; end
+  return tostring(a.rowId) < tostring(b.rowId);
+ end);
+ local rate = NowRate(snapshot);
+ local rateValue = type(rate) == 'table' and rate.status == 'ready' and Short(rate.value) or '0';
+ local rateText = unit .. ' · now ' .. rateValue;
+ if healing and M.absorbed and M.absorbed > 0 then rateText = rateText .. ' · absorbed ' .. Short(M.absorbed); end
+ -- keep the rate between the "^" button and Reset / x
+ local rightEdge = (f.reset:IsShown() or f.back:IsShown()) and 70 or 26;
+ FitString(f.rate, rateText, math.max(20, width - 9 - (f.title:GetStringWidth() or 80) - 6 - 15 - 7 - rightEdge), 8);
+ M.rows = rows; M.visible = math.max(1, math.min(64, math.floor((f:GetHeight() - HEADER - 12) / ROW_H)));
+ M.offset = math.max(0, math.min(M.offset, math.max(0, Count(rows) - M.visible)));
+ if Count(rows) == 0 then
+  local msg = M.message;
+  if not msg and type(M.error) == 'table' then
+   msg = M.error.code == 'NO_PARTY' and 'Join a party to see party DPS.' or M.error.code == 'NO_ENCOUNTER' and 'No boss fight yet.' or nil;
+  elseif not msg and type(M.error) == 'string' and not editing then msg = M.error; end
+  if not msg then msg = healing and 'No healing yet.' or M.view == 'boss' and 'No boss damage yet.' or M.view == 'group' and 'No party damage yet.' or 'No damage yet.'; end
+  f.empty:SetWidth(math.max(40, width - 18)); f.empty:SetText(msg); f.empty:Show();
+ else
+  f.empty:Hide();
+ end
+ local top = rows[1] and Num(rows[1].displayAmount) or 0;
+ for i, button in ipairs(f.rows) do
+  local row = i <= M.visible and rows[M.offset + i] or nil;
   if row then
-   local source=snapshot.sources and snapshot.sources[row.sourceKey];local actor=snapshot.actors and snapshot.actors[row.ownerId];
-   button.entry=row;button.source=source;button.label=source and source.name or actor and actor.name or 'Unknown source';
-   local color=M.view=='group' and not M.owner and CLASS_COLORS[ClassOf(actor) or ''];
-   local rowWidth=math.max(20,width-16);button:SetWidth(rowWidth);
-   local rateText=row.displayRate and row.displayRate.status=='ready' and Text(row.displayRate.value) or '--';
-   local amountText=Text(row.displayAmount)..(healing and ' heal' or ' dmg');
-   local primary=M.sort=='rate' and (rateText..' '..unit) or amountText;
-   local valueWidth=math.max(72,math.floor(rowWidth*0.47));
-   local nameWidth=math.max(24,rowWidth-20-valueWidth-4);
-   FitString(button.name,button.label,nameWidth,7);
-   if color then button.name:SetTextColor(tonumber(string.sub(color,1,2),16)/255,tonumber(string.sub(color,3,4),16)/255,tonumber(string.sub(color,5,6),16)/255);else button.name:SetTextColor(1,1,1);end
-   FitString(button.value,primary..' | '..string.format('%.1f%%',Num(row.share)*100),valueWidth,7);
-   if source and source.icon and source.icon.status=='ready' then button.icon:SetTexture(source.icon.path);button.icon:Show();else button.icon:Hide();end
+   local source = snapshot.sources and snapshot.sources[row.sourceKey]; local actor = snapshot.actors and snapshot.actors[row.ownerId];
+   button.entry = row; button.source = source; button.label = source and source.name or actor and actor.name or 'Unknown source';
+   local rowWidth = math.max(20, width - 10); button:SetWidth(rowWidth);
+   local share = top > 0 and Num(row.displayAmount) / top or 0;
+   button.bar:SetWidth(math.max(1, rowWidth * math.max(0, math.min(1, share))));
+   local r = row.displayRate and row.displayRate.status == 'ready' and Short(row.displayRate.value) or nil;
+   local value = Short(row.displayAmount) .. (r and ('  (' .. r .. ')') or '');
+   local valueWidth = math.max(60, math.floor(rowWidth * 0.45));
+   FitString(button.value, value, valueWidth, 8);
+   FitString(button.name, button.label, math.max(24, rowWidth - 22 - valueWidth - 4), 8);
+   local color = M.view == 'group' and not M.owner and CLASS_COLORS[ClassOf(actor) or ''];
+   if color then button.name:SetTextColor(tonumber(string.sub(color, 1, 2), 16) / 255, tonumber(string.sub(color, 3, 4), 16) / 255, tonumber(string.sub(color, 5, 6), 16) / 255);
+   else button.name:SetTextColor(CREAM[1], CREAM[2], CREAM[3]); end
+   if source and source.icon and source.icon.status == 'ready' then button.icon:SetTexture(source.icon.path); button.icon:Show(); button.name:SetPoint('LEFT', button, 'LEFT', 20, 0);
+   else button.icon:Hide(); button.name:SetPoint('LEFT', button, 'LEFT', 4, 0); end
    button:Show();
-  else button.entry=nil;button:Hide();end
+  else button.entry = nil; button:Hide(); end
  end
 end
+
 -- The stream belongs to this addon alone; polling never consumes another addon's events.
 local stream=CreateFrame('Frame');
 function M.Drain()

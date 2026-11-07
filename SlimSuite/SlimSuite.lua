@@ -1010,10 +1010,6 @@ local function CreateMeterFrame()
 	meterFrame:SetWidth(250); meterFrame:SetHeight(180);
 	meterFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -8, 44);
 	meterFrame:SetFrameStrata("HIGH");
-	meterFrame:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	                         tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
-	meterFrame:SetBackdropColor(0.025, 0.02, 0.035, 0.88);
-	meterFrame:SetBackdropBorderColor(0.7, 0.52, 0.2, 0.9);
 	meterFrame:EnableMouse(false);
 	SlimSuiteMeter.Attach(meterFrame);
 	local savedOriginal = DB().meterNativeOriginal;
@@ -1046,6 +1042,10 @@ UpdateMeter = function()
 	end
 	if ( not active and not editing ) then
 		meterFrame:Hide(); SetNativeMeterHidden(false); return;
+	end
+	-- closed with its "x": hidden for the rest of this run (the game's meter stays hidden too)
+	if ( not editing and SlimSuiteMeter.IsClosed and SlimSuiteMeter.IsClosed() ) then
+		meterFrame:Hide(); SetNativeMeterHidden(true); return;
 	end
 	SetNativeMeterHidden(true);
 	meterFrame:Show();
@@ -1932,6 +1932,11 @@ local function SavePosition(name, f)
 	if ( type(p) ~= "table" ) then p = {}; DB().places[name] = p; end
 	local left, right, bottom = RootBounds(f);
 	p.x, p.y, p.coordinateSpace = left, bottom, "uiParent";
+end
+SlimSuite_SavePosition = function(name, f)
+	SavePosition(name, f);
+	local p = DB().places[name];
+	if ( p ) then p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil; end
 end
 
 -- Resize, scale and snapped anchors can all push visible child controls past a screen edge.
