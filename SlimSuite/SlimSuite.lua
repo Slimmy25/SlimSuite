@@ -5378,6 +5378,40 @@ function SS.Toggle()
 	if ( win:IsShown() ) then win:Hide(); else win:Show(); end
 end
 
+-- "/slimsuite mouse": a small label by the cursor names the frame under it (and the frame that frame belongs to), so a
+-- click that does nothing can be traced to whatever is catching it. Type it again to turn the label off.
+function SS.ToggleMouseProbe()
+	local probe = getglobal("SlimSuiteMouseProbe");
+	if ( not probe ) then
+		probe = CreateFrame("Frame", "SlimSuiteMouseProbe", UIParent);
+		probe:SetFrameStrata("TOOLTIP");
+		probe:SetWidth(10); probe:SetHeight(10);
+		probe.text = probe:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+		probe.text:SetPoint("BOTTOMLEFT", probe, "TOPRIGHT", 4, 4);
+		probe.text:SetJustifyH("LEFT");
+		probe:Hide();
+	end
+	if ( probe:IsShown() ) then
+		probe:Hide(); SS.Stop("mouseProbe");
+		K.Print(NAME, "the frame label is off.");
+		return;
+	end
+	probe:Show();
+	SS.Every("mouseProbe", 0.1, function()
+		local f = GetMouseFocus and GetMouseFocus();
+		local x, y = GetCursorPosition();
+		local scale = UIParent:GetEffectiveScale() or 1;
+		probe:ClearAllPoints();
+		probe:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale);
+		if ( not f ) then probe.text:SetText("|cffaaaaaa(the game world)|r"); return; end
+		local name = (f.GetName and f:GetName()) or "(no name)";
+		local parent = f.GetParent and f:GetParent();
+		local pname = parent and parent.GetName and parent:GetName() or "(no name)";
+		probe.text:SetText("|cffffd100" .. name .. "|r\n|cffaaaaaain " .. pname .. "|r");
+	end);
+	K.Print(NAME, "the frame under your cursor is named next to it. /slimsuite mouse turns it off.");
+end
+
 SLASH_SLIMSUITE1 = "/slimsuite";
 SLASH_SLIMSUITE2 = "/slim";
 SlashCmdList["SLIMSUITE"] = function(msg)
@@ -5394,6 +5428,8 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		K.Print(NAME, "chat lines with \"" .. rest .. "\" are shown again.");
 	elseif ( cmd == "errors" ) then
 		SS.ShowErrors();
+	elseif ( cmd == "mouse" ) then
+		SS.ToggleMouseProbe();
 	elseif ( cmd == "minimap" ) then
 		local shown = SS.Mini and SS.Mini.Toggle();
 		K.Print(NAME, shown and "the minimap button is back." or "the minimap button is hidden. /slimsuite minimap brings it back.");
