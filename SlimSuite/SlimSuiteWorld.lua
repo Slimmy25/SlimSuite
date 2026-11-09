@@ -506,6 +506,12 @@ end
 function W.SetNativeOriginal(part, original) if ( natives[part] ) then natives[part].was = original; end end
 local function SetNativeHidden(n, on)
 	if ( not A.Has("AZS_SetHudShown") ) then return; end
+	-- already hidden: ask the game again only when its phase changes, and hide its part again if it came back
+	local rearm = SS.PhaseChanged("hud:" .. n.part);
+	if ( on and n.overridden ) then
+		if ( rearm and A.Call("AZS_IsHudShown", n.part) ) then SS.Safe(AZS_SetHudShown, n.part, false); end
+		return;
+	end
 	if ( on and not n.overridden ) then
 		local shown = A.Call("AZS_IsHudShown", n.part);
 		if ( shown == nil ) then shown = true; end

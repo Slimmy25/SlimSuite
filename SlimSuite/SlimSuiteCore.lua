@@ -1,6 +1,6 @@
 -- Slim Suite's shared core, loaded before the other Slim Suite files:
 --   SS                 the one namespace for Slim Suite's functions and shared tables (replaces the SlimSuite_* globals)
---   SS.Safe(fn, ...)   calls fn with up to four arguments and logs any error to the error log (returns pcall's results)
+--   SS.Safe(fn, ...)   calls fn with the given arguments and logs any error to the error log (returns pcall's results)
 --   SS.Every(name, s, fn, watch)  runs fn every s seconds (0 = every frame) from one shared ticker;
 --                      skipped while the optional watch frame is hidden, as WoW never sends OnUpdate to a hidden frame
 --   SS.Stop(name)      stops a timed task
@@ -34,10 +34,24 @@ function SS.LogError(msg)
 	while ( table.getn(log) > MAX_ENTRIES ) do table.remove(log, 1); end
 end
 
--- Calls fn with up to four arguments, like pcall. A real error is logged; a missing function (an optional
+-- Calls fn with the given arguments, like pcall. A real error is logged; a missing function (an optional
 -- addon call that is not there) is skipped quietly, since that is expected rather than a fault.
 -- each distinct error is shown in the game's error popup once, so it is seen even when chat is unusable;
 -- repeats only go to the log. The popup goes through _ERRORMESSAGE, which the error log also records.
+-- True once each time the game's phase (waiting, in a run, ...) has changed since this key was last asked. Used to
+-- check again whether the game has shown one of its own HUD parts that Slim Suite replaces.
+local lastPhase = {};
+function SS.PhaseChanged(key)
+	local phase = "none";
+	if ( type(AZS_GetPhase) == "function" ) then
+		local ok, p = pcall(AZS_GetPhase);
+		if ( ok ) then phase = tostring(p); end
+	end
+	local changed = lastPhase[key] ~= nil and lastPhase[key] ~= phase;
+	lastPhase[key] = phase;
+	return changed;
+end
+
 -- lets a frame keep the position the user placed it at; a frame the game will not move is skipped, not an error
 function SS.UserPlace(f)
 	if ( not f or not f.SetUserPlaced ) then return; end
@@ -46,11 +60,16 @@ function SS.UserPlace(f)
 end
 
 local shownErrors = {};
-function SS.Safe(fn, a, b, c, d)
+function SS.Safe(fn, ...)
 	if ( type(fn) ~= "function" ) then return false; end
-	local ok, r1, r2 = pcall(fn, a, b, c, d);
+	-- exactly the arguments given, as pcall passed them: some game functions reject extra nil arguments
+	local ok, r1, r2, r3, r4 = pcall(fn, unpack(arg));
 	if ( not ok ) then
+		-- one popup per place in the code ("File.lua:123"), not per message: a message carrying a changing number or
+		-- name would otherwise count as new every time
 		local key = tostring(r1);
+		local _, _, where = string.find(key, "^(.-:%d+):");
+		key = where or (string.gsub(key, "%d+", "#"));
 		if ( not shownErrors[key] and type(_ERRORMESSAGE) == "function" ) then
 			shownErrors[key] = true;
 			pcall(_ERRORMESSAGE, r1);
@@ -58,7 +77,7 @@ function SS.Safe(fn, a, b, c, d)
 			pcall(SS.LogError, r1);   -- logging must never raise an error of its own
 		end
 	end
-	return ok, r1, r2;
+	return ok, r1, r2, r3, r4;
 end
 
 local tasks = {};

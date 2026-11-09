@@ -135,6 +135,11 @@ function SS.DB()
 	if ( d.gridCenterHorizontal == nil ) then d.gridCenterHorizontal = true; end
 	d.startUnlocked = nil;                                  -- the retired "Open UI modifier at startup": the UI always starts locked
 	if ( d.tallyVertical == nil ) then d.tallyVertical = false; end
+	-- earlier versions let the classic player and target frames take a width and height that only changed their click area
+	if ( not d.classicSizesCleared ) then
+		if ( type(d.sizes) == "table" ) then d.sizes.PlayerFrame = nil; d.sizes.TargetFrame = nil; end
+		d.classicSizesCleared = true;
+	end
 	if ( d.tallyBossKills == nil ) then d.tallyBossKills = true; end
 	if ( d.tallyBackground == nil ) then d.tallyBackground = true; end
 	if ( d.showEmptyActionSlots == nil ) then d.showEmptyActionSlots = false; end
@@ -396,7 +401,8 @@ local MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "P
                   { "SlimSuiteReviveFrame", "Revive bar" },
                   { "SlimSuiteCombatTextFrame", "Combat text (test)" },
                   { "SlimSuiteLocalClockFrame", "Local clock" },
-                  { "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" } };
+                  { "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
+                  { "SlimSuiteMinimapBar", "Minimap buttons" } };
 local handles = {};
 local handleList = {};
 local editOnly;
@@ -768,6 +774,14 @@ SS.CreateSpellRow();
 
 function SS.SetNativeBuildHidden(on)
 	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
+	local rearm = SS.PhaseChanged("hud:build");
+	if ( on and buildNativeOverridden ) then   -- asked once, and again only if the game shows it after a phase change
+		if ( rearm and type(AZS_IsHudShown) == "function" ) then
+			local ok, shown = SS.Safe(AZS_IsHudShown, "build");
+			if ( ok and shown and shown ~= 0 and shown ~= "0" ) then SS.Safe(AZS_SetHudShown, "build", false); end
+		end
+		return;
+	end
 	if ( on ) then
 		local shown = true;
 		if ( type(AZS_IsHudShown) == "function" ) then
@@ -824,6 +838,14 @@ end);
 
 function SS.SetNativeTallyHidden(on)
 	if ( type(AZS_SetHudShown) ~= "function" or tallyNativeWasShown ~= true ) then return; end
+	local rearm = SS.PhaseChanged("hud:tally");
+	if ( on and tallyNativeOverridden ) then   -- asked once, and again only if the game shows it after a phase change
+		if ( rearm and type(AZS_IsHudShown) == "function" ) then
+			local ok, shown = SS.Safe(AZS_IsHudShown, "tally");
+			if ( ok and shown ) then SS.Safe(AZS_SetHudShown, "tally", false); end
+		end
+		return;
+	end
 	if ( on ) then
 		local shown = true;
 		if ( type(AZS_IsHudShown) == "function" ) then
@@ -999,6 +1021,16 @@ SS.CreateTallyFrame();
 
 function SS.SetNativeMeterHidden(on)
 	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
+	-- the meter update runs several times a second: ask the game to hide its meter once, and again only if the game
+	-- shows it after its phase changes (a new run, say)
+	local rearm = SS.PhaseChanged("hud:meter");
+	if ( on and meterNativeOverridden ) then
+		if ( rearm and type(AZS_IsHudShown) == "function" ) then
+			local ok, shown = SS.Safe(AZS_IsHudShown, "meter");
+			if ( ok and shown ) then SS.Safe(AZS_SetHudShown, "meter", false); end
+		end
+		return;
+	end
 	if ( on ) then
 		local shown = true;
 		if ( type(AZS_IsHudShown) == "function" ) then
@@ -1058,7 +1090,9 @@ UpdateMeter = function()
 	local active = phase and phase ~= "ready";
 	local editing = SS.IsEditing("SlimSuiteMeterFrame") and SS.DB().moveMeter;
 	if ( not SS.DB().moveMeter ) then
-		meterFrame:Hide(); SS.SetNativeMeterHidden(false); return;
+		meterFrame:Hide();
+		if ( not setupActive ) then SS.SetNativeMeterHidden(false); end   -- the setup keeps the game's meter hidden
+		return;
 	end
 	-- Shown before a run too, like the game's own meter (it reads "No damage yet." until the run starts).
 	-- closed with its "x": hidden for the rest of this run (the game's meter stays hidden too)
@@ -2615,42 +2649,48 @@ function SS.Pair()
 	return getglobal("PlayerFrame"), getglobal("TargetFrame");
 end
 
-function SS.MirrorTarget()
-	local P, T = SS.Pair();
-	if ( not SS.DB().mirrorTarget or not P or not T ) then return; end
+-- Places "to" as the mirror image of "from" across the screen's vertical centre line: to's right edge sits where
+-- from's left edge would be reflected, and the two share a vertical centre. With "Same size scaling" on (the
+-- default), "to" also takes from's width, height and scale, so the pair stays identical.
+function SS.MirrorFrames(from, to)
+	if ( not from or not to ) then return; end
+	local fromName, toName = from:GetName(), to:GetName();
 	if ( SS.DB().mirrorSameScale ~= false ) then
-		local scale = SS.DB().scales[P:GetName()];
-		SS.DB().scales[T:GetName()] = scale;
-		if ( T.SetScale ) then T:SetScale(type(scale) == "number" and scale or 1); end
+		local scale = SS.DB().scales[fromName];
+		SS.DB().scales[toName] = scale;
+		if ( to.SetScale ) then to:SetScale(type(scale) == "number" and scale or 1); end
+		local w, h = from:GetWidth(), from:GetHeight();
+		if ( w and h and w > 0 and h > 0 and toName ~= "PlayerFrame" and toName ~= "TargetFrame" ) then   -- classic art: scale only
+			to:SetWidth(w); to:SetHeight(h);
+			SS.DB().sizes[toName] = { w = w, h = h };
+		end
 	end
-	local l, r, b, t = RootBounds(P);
+	local l, r, b, t = RootBounds(from);
 	if ( not l or not t ) then return; end
-	local factor = RootFactor(T);
-	local tw, th = (T:GetWidth() or 0) * factor, (T:GetHeight() or 0) * factor;
-	local x, y = UIParent:GetWidth() - l - tw, t - th;
-	if ( T.SetUserPlaced ) then SS.UserPlace(T); end
-	SetRootPosition(T, x, y);
-	local p = SS.DB().places[T:GetName()];
-	if ( type(p) ~= "table" ) then p = {}; SS.DB().places[T:GetName()] = p; end
+	local factor = RootFactor(to);
+	local tw, th = (to:GetWidth() or 0) * factor, (to:GetHeight() or 0) * factor;
+	local x = UIParent:GetWidth() - l - tw;
+	local y = (b + t) / 2 - th / 2;
+	if ( to.SetUserPlaced ) then SS.UserPlace(to); end
+	SetRootPosition(to, x, y);
+	local p = SS.DB().places[toName];
+	if ( type(p) ~= "table" ) then p = {}; SS.DB().places[toName] = p; end
 	p.x, p.y, p.coordinateSpace = x, y, "uiParent";
 	p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
 end
 
--- the other direction: the player frame placed as the target frame's mirror image (while the target is dragged)
-function SS.MirrorPlayer()
+-- the target placed as the player's mirror image (the player leads)
+function SS.MirrorTarget()
+	if ( not SS.DB().mirrorTarget ) then return; end
 	local P, T = SS.Pair();
-	if ( not SS.DB().mirrorTarget or not P or not T ) then return; end
-	local l, r, b, t = RootBounds(T);
-	if ( not l or not t ) then return; end
-	local factor = RootFactor(P);
-	local pw, ph = (P:GetWidth() or 0) * factor, (P:GetHeight() or 0) * factor;
-	local x, y = UIParent:GetWidth() - l - pw, t - ph;
-	if ( P.SetUserPlaced ) then SS.UserPlace(P); end
-	SetRootPosition(P, x, y);
-	local p = SS.DB().places[P:GetName()];
-	if ( type(p) ~= "table" ) then p = {}; SS.DB().places[P:GetName()] = p; end
-	p.x, p.y, p.coordinateSpace = x, y, "uiParent";
-	p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
+	SS.MirrorFrames(P, T);
+end
+
+-- the player placed as the target's mirror image (while the target is being dragged or resized)
+function SS.MirrorPlayer()
+	if ( not SS.DB().mirrorTarget ) then return; end
+	local P, T = SS.Pair();
+	SS.MirrorFrames(T, P);
 end
 
 -- "Buffs on the target frame": the buff frame joins the target frame, above or below it, at the target's scale, and
@@ -2731,13 +2771,67 @@ end
 
 -- "Square minimap": the minimap's mask is swapped between the round and the square texture. Some clients
 -- have no mask API at all, so this is checked and reported rather than assumed.
-SlimSuiteMinimapMask = { round = "Textures\\MinimapMask", square = "Interface\\BUTTONS\\WHITE8X8" };
+-- the square mask is Slim Suite's own full-size white square: the game's tiny 8x8 white texture cuts the whole map out
+SlimSuiteMinimapMask = { round = "Textures\\MinimapMask", square = "Interface\\AddOns\\SlimSuite\\textures\\MinimapSquare" };
 function SS.ApplyMinimapShape()
 	if ( not Minimap or not Minimap.SetMaskTexture ) then return false; end
 	local square = SS.DB().minimapSquare and true or false;
 	local ok = SS.Safe(Minimap.SetMaskTexture, Minimap, square and SlimSuiteMinimapMask.square or SlimSuiteMinimapMask.round);
+	SS.Safe(SS.ArrangeEdgeButtons, square and ok);   -- the buttons follow the shape the map really has
 	if ( MinimapBorder ) then if ( square ) then MinimapBorder:Hide(); else MinimapBorder:Show(); end end
+	-- the map is only redrawn with its new shape when it changes zoom: step the zoom and back to force that
+	if ( ok and Minimap.GetZoom and Minimap.SetZoom and Minimap.GetZoomLevels ) then
+		local zoom, levels = Minimap:GetZoom(), Minimap:GetZoomLevels();
+		local other = (zoom < levels - 1) and zoom + 1 or zoom - 1;
+		if ( other >= 0 ) then SS.Safe(Minimap.SetZoom, Minimap, other); SS.Safe(Minimap.SetZoom, Minimap, zoom); end
+	end
 	return ok;
+end
+
+-- With the square minimap, the small buttons around its edge (the game's own and other addons') move from the old
+-- circle to the same direction on the square's edge; switching back to round puts each one back where it was.
+-- Gathered buttons are left to the gather layout, and the map's pins are never touched (they have no name).
+function SS.ArrangeEdgeButtons(square)
+	if ( not Minimap or not Minimap.GetCenter ) then return; end
+	local mx, my = Minimap:GetCenter();
+	if ( not mx ) then return; end
+	local ms = Minimap:GetEffectiveScale() or 1;
+	mx, my = mx * ms, my * ms;
+	local half = (Minimap:GetWidth() or 140) * ms / 2;
+	for _, root in ipairs({ Minimap, MinimapCluster }) do
+		local kids = { root:GetChildren() };
+		for i = 1, table.getn(kids) do
+			local f = kids[i];
+			local name = f and f.GetName and f:GetName();
+			if ( name and f ~= SS.Mini and f ~= Minimap and not f.slimOrig and not f.slimBarOrig and name ~= "MinimapPing"
+				and string.sub(name, 1, 9) ~= "SlimSuite" ) then
+				local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
+				if ( w > 0 and w <= 40 and h > 0 and h <= 40 ) then
+					if ( square and not f.slimSquareOrig ) then
+						local fx, fy = f:GetCenter();
+						if ( fx ) then
+							local fs = f:GetEffectiveScale() or 1;
+							local dx, dy = fx * fs - mx, fy * fs - my;
+							local r = math.sqrt(dx * dx + dy * dy);
+							local most = math.max(math.abs(dx), math.abs(dy));
+							if ( r >= half * 0.75 and most > 0 ) then   -- only buttons sitting around the edge
+								local p, rel, rp, x, y = f:GetPoint(1);
+								f.slimSquareOrig = { p, rel, rp, x or 0, y or 0 };
+								f:ClearAllPoints();
+								f:SetPoint("CENTER", Minimap, "CENTER", dx * r / most / fs, dy * r / most / fs);
+							end
+						end
+					elseif ( not square and f.slimSquareOrig ) then
+						local o = f.slimSquareOrig;
+						f.slimSquareOrig = nil;
+						f:ClearAllPoints();
+						if ( o[2] ) then f:SetPoint(o[1], o[2], o[3], o[4], o[5]); end
+					end
+				end
+			end
+		end
+	end
+	if ( SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); end
 end
 
 function SS.SetMinimapSquare(on)
@@ -2983,6 +3077,7 @@ function SS.OpenSizeMenu(name, label)
 			if ( sizeTarget == "GameTooltip" ) then SS.DB().tooltipCustom = true; end
 			if ( sizeTarget == "BuffFrame" ) then SS.Safe(SS.ApplyBuffOrientation); end
 			if ( sizeTarget == "SlimSuiteClockFrame" ) then SS.ApplyClockLayout(); end
+			if ( SS.Element(sizeTarget) == "TargetFrame" ) then SS.Safe(SS.MirrorPlayer); end
 			PlaceAll();
 			sizeMenuWidth:SetText("Width: " .. math.floor(w + 0.5));
 			sizeMenuHeight:SetText("Height: " .. math.floor(h + 0.5));
@@ -2995,10 +3090,12 @@ function SS.OpenSizeMenu(name, label)
 		shorter:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -72, -55);
 		local taller = K.Button(sizeMenu, "+", 30, function() ResizeBy("h", 20); end);
 		taller:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -32, -55);
+		sizeMenu.sizeRows = { sizeMenuWidth, sizeMenuHeight, narrower, wider, shorter, taller };
 		local function SetScalePercent(percent)
 			if ( not sizeTarget ) then return; end
 			percent = math.max(1, math.min(200, math.floor(tonumber(percent) or 100)))
 			SS.DB().scales[sizeTarget] = percent / 100;
+			if ( SS.Element(sizeTarget) == "TargetFrame" ) then SS.Safe(SS.MirrorPlayer); end
 			PlaceAll();
 			sizeMenuScaleInput:SetText(tostring(percent));
 		end
@@ -3143,7 +3240,9 @@ function SS.OpenSizeMenu(name, label)
 			cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 			cb.label:SetPoint("LEFT", cb, "RIGHT", 2, 1); cb.label:SetWidth(160); cb.label:SetJustifyH("LEFT");
 			cb:SetScript("OnClick", function()
-				if ( this.entry and this.entry.set ) then this.entry.set(this:GetChecked() and true or false); end
+				-- an entry is { label, get, set, condition }: the setter is its third item
+				local set = this.entry and this.entry[3];
+				if ( set ) then set(this:GetChecked() and true or false); end
 				SS.RefreshCrossRefs(SlimSuiteSizeMenuName);
 			end);
 			cb:Hide();
@@ -3184,6 +3283,10 @@ function SS.OpenSizeMenu(name, label)
 	sizeMenuText:SetText("Resize " .. (label or name));
 	sizeMenuWidth:SetText("Width: " .. math.floor(w + 0.5));
 	sizeMenuHeight:SetText("Height: " .. math.floor(h + 0.5));
+	-- the classic player and target frames' artwork has a fixed size: width and height would only change the area you
+	-- can click, so they are resized with Scale alone (the new-school cards keep all three)
+	local fixedArt = sizeTarget == "PlayerFrame" or sizeTarget == "TargetFrame";
+	for _, c in ipairs(sizeMenu.sizeRows or {}) do if ( fixedArt ) then c:Hide(); else c:Show(); end end
 	local scale = SS.DB().scales[sizeTarget] or 1;
 	sizeMenuScaleInput:SetText(tostring(math.max(1, math.min(200, math.floor(scale * 100 + 0.5)))));
 	if ( sizeMenu.layoutButton ) then
@@ -3534,8 +3637,9 @@ function SS.DragStep(h, name)
 	SS.SavePlace(h.mover or name, moved);          -- keep the newest location even if /reload happens mid-session
 	-- mirrored frames move together: drag either one and the other moves the opposite way
 	if ( SS.DB().mirrorTarget ) then
-		if ( (h.mover or name) == "PlayerFrame" ) then SS.MirrorTarget();
-		elseif ( name == "TargetFrame" ) then SS.MirrorPlayer(); end
+		local element = SS.Element(h.mover or name);
+		if ( element == "PlayerFrame" ) then SS.MirrorTarget();
+		elseif ( element == "TargetFrame" ) then SS.MirrorPlayer(); end
 	end
 	SS.FollowHandle(h, name);
 end
@@ -3616,6 +3720,23 @@ SS.Every("handleFollow", 0, function()
 end);
 
 -- unlocked: the handles show (the frames are shown too, so even an empty party frame can be placed)
+-- Which movable frames are switched off right now (false): a feature turned off, or the design not in use (the
+-- classic player/target frames while the new-school cards are on, and the other way round). Anything not listed is on.
+function SS.AvailableElements()
+	local d = SS.DB();
+	local off = {
+		SlimSuiteStoredLevelsButton = d.moveLevelButton, SlimSuiteSpellRowFrame = d.replaceBuildRows, SlimSuiteItemRowFrame = d.replaceBuildRows,
+		SlimSuiteMeterFrame = d.moveMeter, SlimSuiteClockFrame = d.replaceClock, SlimSuiteBossFrames = d.replaceEncounters,
+		SlimSuiteTallyFrame = d.replaceTally, SlimSuiteAnnouncementFrame = d.replaceBanners, SlimSuiteReviveFrame = d.replaceRevive,
+		SlimSuiteLocalClockFrame = d.replaceLocalClock and d.clockDetached, SlimSuiteCombatTextFrame = d.combatTextBox, SlimSuiteMinimapBar = d.minimapBar,
+		TargetFrame = not d.hideTarget and not d.newFrames, PlayerFrame = not d.newFrames,
+		SlimSuitePlayerCard = d.newFrames, SlimSuiteTargetCard = d.newFrames and not d.hideTarget,
+	};
+	local out = {};
+	for name, isOn in pairs(off) do out[name] = isOn and true or false; end
+	return out;
+end
+
 function SS.SetUnlocked(on, quiet)
 	-- The first time the mover is opened, the setup walks through the UI one element at a time instead.
 	if ( on and not quiet and not setupActive and SS.StartSetup ) then
@@ -3654,10 +3775,11 @@ function SS.SetUnlocked(on, quiet)
 		lockPanel:Hide();
 	end
 	if ( on ) then ShowEditGrid(); else SS.HideEditGrid(); end
+	local available = SS.AvailableElements();
 	for i = 1, table.getn(MOVABLE) do
 		local name = MOVABLE[i][1];
 		local isDefault = SS.DB().frameDefault and SS.DB().frameDefault[name];
-		if ( on and not isDefault and (not editOnly or editOnly == name) and not (name == "BuffFrame" and (SS.DB().buffsOnTarget or SS.DB().buffsOnPlayer)) ) then
+		if ( on and not isDefault and available[name] ~= false and (not editOnly or editOnly == name) and not (name == "BuffFrame" and (SS.DB().buffsOnTarget or SS.DB().buffsOnPlayer)) ) then
 			local ok, h = SS.Safe(SS.Handle, name, MOVABLE[i][2]);
 			if ( ok and h ) then h:Show(); end
 		elseif ( handles[name] ) then
@@ -3983,6 +4105,7 @@ function SU.Steps()
 		{ "SlimSuiteReviveFrame", "Revive bar", "The bar shown while you bring a friend back.", function() return d.replaceRevive; end },
 		{ "SlimSuiteLocalClockFrame", "Local clock", "Your real-world clock. Right-click for 12/24-hour and its background.", function() return d.replaceLocalClock and d.clockDetached; end },
 		{ "SlimSuiteCombatTextFrame", "Combat text", "The combat text test box.", function() return d.combatTextBox; end },
+		{ "SlimSuiteMinimapBar", "Minimap buttons", "Every minimap button and the day/night moon in one row. Drag it anywhere.", function() return d.minimapBar; end },
 	};
 	for i = 1, table.getn(rest) do
 		local r = rest[i];
@@ -4060,6 +4183,8 @@ function SU.ChecksFor(frame)
 		function(v) SS.SetLocalClockOn(v); end, short = "Show the local clock", xref = true }; end
 	local function DetachClock() return { "Detach the clock from the minimap (its own button up top)", function() return SS.DB().clockDetached; end,
 		function(v) SS.SetClockDetached(v); end, function() return SS.DB().replaceLocalClock; end, short = "Detach from minimap", xref = true }; end
+	local function MinimapBar() return { "Put the minimap buttons and the moon in their own movable row", function() return SS.DB().minimapBar; end,
+		function(v) SS.SetMinimapBar(v); end, short = "Buttons in their own row", xref = true }; end
 	local function JoinRows() return { "Join the worn-jewelry row under the build spells", function() return SS.DB().buildRowsAttached; end,
 		function(v) if ( (v and true or false) ~= (SS.DB().buildRowsAttached and true or false) ) then SS.ToggleBuildRowsAttached(); end end, short = "Join the jewelry row", xref = true }; end
 	local list = {
@@ -4078,7 +4203,11 @@ function SU.ChecksFor(frame)
 			{ "...above the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "above"; end, function(v) if ( v ) then SS.SetGather(true, "above"); end end },
 			{ "...below the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "below"; end, function(v) if ( v ) then SS.SetGather(true, "below"); end end },
 			{ "...left of the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "left"; end, function(v) if ( v ) then SS.SetGather(true, "left"); end end },
-			{ "...right of the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "right"; end, function(v) if ( v ) then SS.SetGather(true, "right"); end end } },
+			{ "...right of the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "right"; end, function(v) if ( v ) then SS.SetGather(true, "right"); end end },
+			MinimapBar() },
+		SlimSuiteMinimapBar = { MinimapBar(),
+			{ "Vertical", function() return SS.DB().orientations.SlimSuiteMinimapBar == "vertical"; end,
+			function(v) SS.DB().orientations.SlimSuiteMinimapBar = v and "vertical" or "horizontal"; SS.Safe(SS.LayoutMinimapBar); end } },
 		SlimSuiteClockFrame = { { "Show the zone and Heroic affixes under it", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
 		MainMenuExpBar = { { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
 			function(v) SU.SetVertical("MainMenuExpBar", v); end } },
@@ -4174,6 +4303,8 @@ function SU.SetOn(frame, on, title)
 	if ( frame == "TargetFrame" and not on and SS.DB().combineTarget and not SU.restoring and not SU.cascading ) then
 		SS.DB().combineTarget = false; SS.Safe(SS.RebuildSetup);
 	end
+	-- the damage meter element is the same switch as "Replace Default Damage Meter with Movable Version?"
+	if ( frame == "SlimSuiteMeterFrame" and not SU.restoring ) then SS.DB().moveMeter = on and true or false; end
 	SU.on = SU.on or {};
 	SU.on[frame] = on and true or nil;
 	SS.DB().enabledElements = SS.DB().enabledElements or {};
@@ -4187,7 +4318,29 @@ function SU.SetOn(frame, on, title)
 	for _, c in ipairs(SU.COMPANIONS[frame] or {}) do table.insert(names, c); end
 	if ( frame == "TargetFrame" and SS.DB().buffsOnTarget ) then table.insert(names, "BuffFrame"); end
 	if ( frame == "PlayerFrame" and SS.DB().buffsOnPlayer ) then table.insert(names, "BuffFrame"); end
-	if ( frame == "MinimapCluster" ) then table.insert(names, "Minimap"); table.insert(names, "GameTimeFrame"); end
+	if ( frame == "SlimSuiteMinimapBar" ) then
+		for i = 1, table.getn(SlimSuiteMinimapBarList) do
+			local n = SlimSuiteMinimapBarList[i].GetName and SlimSuiteMinimapBarList[i]:GetName();
+			if ( n ) then table.insert(names, n); end
+		end
+	end
+	if ( frame == "MinimapCluster" ) then
+		table.insert(names, "Minimap");
+		if ( GameTimeFrame and not GameTimeFrame.slimBarOrig ) then table.insert(names, "GameTimeFrame"); end   -- unless the moon is in the row
+		-- the game's own minimap parts (its round border, zoom buttons, zone text), so the chosen shape can be seen;
+		-- other addons' minimap buttons stay hidden
+		for _, root in ipairs({ Minimap, MinimapCluster }) do
+			if ( root and root.GetChildren ) then
+				local kids = { root:GetChildren() };
+				for i = 1, table.getn(kids) do
+					local n = kids[i] and kids[i].GetName and kids[i]:GetName();
+					if ( n and n ~= "Minimap" and not kids[i].slimBarOrig and (string.find(n, "^Minimap") or string.find(n, "^MiniMap")) ) then table.insert(names, n); end
+				end
+			end
+		end
+		-- the local clock hangs under the minimap unless it has been detached (then it is its own element)
+		if ( SS.DB().replaceLocalClock and not SS.DB().clockDetached ) then table.insert(names, "SlimSuiteLocalClockFrame"); end
+	end
 	for i = 1, table.getn(names) do
 		if ( SS.DB().newFrames and names[i] == "PlayerFrame" ) then names[i] = "SlimSuitePlayerCard";
 		elseif ( SS.DB().newFrames and names[i] == "TargetFrame" ) then names[i] = "SlimSuiteTargetCard"; end
@@ -4198,8 +4351,12 @@ function SU.SetOn(frame, on, title)
 			SU.Save(f);
 			if ( on ) then
 				if ( SU.shownBefore and SU.shownBefore[f] and f.Show ) then f:Show(); end
-				if ( (fname == "SlimSuitePlayerCard" or fname == "SlimSuiteTargetCard") and f.Show ) then f:Show(); end
-				f:SetAlpha(SU.saved[f]);
+				if ( (fname == "SlimSuitePlayerCard" or fname == "SlimSuiteTargetCard" or fname == "SlimSuiteMinimapBar") and f.Show ) then f:Show(); end
+				-- an element turned on is shown, even if it was invisible when the setup opened (e.g. the classic frames
+				-- sat at alpha 0 under the new-school cards); a hidden feature is faded out again by its own setting
+				local a = SU.saved[f];
+				if ( type(a) ~= "number" or a <= 0 ) then a = 1; end
+				f:SetAlpha(a);
 				if ( fname == "TargetFrame" and not SS.DB().hideTarget and f.Show ) then f:Show(); end
 				local p = f:GetParent();                     -- a hidden parent would hide the element too
 				while ( p and p ~= UIParent and p.SetAlpha ) do SU.Save(p); p:SetAlpha(SU.saved[p]); p = p:GetParent(); end
@@ -4208,11 +4365,13 @@ function SU.SetOn(frame, on, title)
 			end
 		end
 	end
-	if ( frame == "TargetFrame" and not on and SS.DB().mirrorTarget ) then SS.SetMirrorTarget(false); end
+	-- turning the target frame off ends the mirror, but reopening the setup only restores what is shown; it changes no settings
+	if ( frame == "TargetFrame" and not on and SS.DB().mirrorTarget and not SU.restoring ) then SS.SetMirrorTarget(false); end
 	local hname = SS.Shown(frame);
 	if ( hname ~= frame and handles[frame] ) then handles[frame]:Hide(); end    -- the hidden frame's handle never shows
 	if ( on and not handles[hname] and title ) then SS.Safe(SS.Handle, hname, title); end
 	if ( handles[hname] ) then if ( on ) then handles[hname]:Show(); else handles[hname]:Hide(); end end
+	if ( frame == "MinimapCluster" and on ) then SS.Safe(SS.ApplyMinimapShape); end   -- round border or square edge
 	if ( not SU.batching ) then SU.RefreshBar(); SU.UpdateDemo(); end
 end
 
@@ -4393,6 +4552,20 @@ function SS.GuardTargetTooltips()
 	end
 end
 
+-- where the cards start (TOPLEFT offsets from the screen's top-left), roughly over the game's own player and target frames
+SS.CARD_START = {
+	SlimSuitePlayerCard = { 24, -30 },
+	SlimSuiteTargetCard = { 250, -30 },
+	SlimSuitePartySelfCard = { 24, -140 },
+};
+
+-- the same right-click menu the game's own player and target frames open
+function SS.CardMenu(f)
+	if ( not ToggleDropDownMenu ) then return; end
+	if ( f.unit == "target" and TargetFrameDropDown ) then ToggleDropDownMenu(1, nil, TargetFrameDropDown, f:GetName(), 120, 10);
+	elseif ( f.unit == "player" and PlayerFrameDropDown ) then ToggleDropDownMenu(1, nil, PlayerFrameDropDown, f:GetName(), 106, 27); end
+end
+
 function SS.MakeCards()
 	if ( getglobal("SlimSuitePlayerCard") ) then return; end
 	local function Make(name, unit)
@@ -4402,6 +4575,15 @@ function SS.MakeCards()
 		f:SetBackdropColor(0.05, 0.05, 0.05, 0.9);
 		f:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
 		f.unit = unit;
+		f:EnableMouse(true);
+		f:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+		f:SetScript("OnClick", function()
+			if ( arg1 == "RightButton" ) then SS.Safe(SS.CardMenu, this);
+			else SS.Safe(TargetUnit, this.unit); end
+		end);
+		-- a starting place near the game's own frame (a frame with no anchor is never drawn); a saved place replaces it
+		local start = SS.CARD_START[name];
+		if ( start ) then f:SetPoint("TOPLEFT", UIParent, "TOPLEFT", start[1], start[2]); end
 		f.name = f:CreateFontString(nil, "OVERLAY", "GameFontNormal");
 		f.name:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -4);
 		f.hp = CreateFrame("StatusBar", nil, f);
@@ -4414,11 +4596,9 @@ function SS.MakeCards()
 		f.power:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 5, 5); f.power:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -5, 5); f.power:SetHeight(4);
 		SS.cardFrames = SS.cardFrames or {};
 		table.insert(SS.cardFrames, f);
+		-- every card is checked, hidden ones too: the target card has to appear when a target is picked
 		SS.Every("cards", 0.2, function()
-			for i = 1, table.getn(SS.cardFrames) do
-				local c = SS.cardFrames[i];
-				if ( c:IsShown() ) then SS.RefreshCard(c); end
-			end
+			for i = 1, table.getn(SS.cardFrames) do SS.RefreshCard(SS.cardFrames[i]); end
 		end);
 		f:Hide();
 		return f;
@@ -4427,6 +4607,10 @@ function SS.MakeCards()
 	Make("SlimSuiteTargetCard", "target");
 	local self = Make("SlimSuitePartySelfCard", "player");
 	self.slimParty = true;
+	SS.Safe(SS.Place, "SlimSuitePlayerCard");
+	SS.Safe(SS.Place, "SlimSuiteTargetCard");
+	-- the cards are made after the saved places were applied at load, so the mirror has to be applied to them now
+	if ( SS.DB().mirrorTarget ) then SS.Safe(SS.MirrorTarget); end
 end
 
 -- the game's frames fade out and the cards show while the design is on (only outside the setup, which owns visibility)
@@ -4627,7 +4811,7 @@ function SU.Focus(frame)
 		SU.panel.text:SetText("Click an element on the bar above to turn it on, then set its options here. Click it again to turn it off.");
 	end
 	local h = 58 + (SU.panel.text:GetHeight() or 28) + 40;
-	for i = 1, 10 do
+	for i = 1, 12 do
 		local cb, c = SU.checks[i], checks[i];
 		if ( c ) then
 			cb.label:SetText(c[1]); cb.get, cb.set = c[2], c[3];
@@ -4678,7 +4862,33 @@ function SS.RebuildSetup()
 	if ( SU.Rebuild ) then SU.Rebuild(); end
 end
 
+-- Switching between the classic frames and the new-school cards is one element changing its look: the frame now
+-- shown takes the old one's place (centred on it) and its hidden/shown state, so nothing set before is lost.
+function SS.CarryDesign(on)
+	for _, el in ipairs({ "PlayerFrame", "TargetFrame" }) do
+		local card = el == "PlayerFrame" and "SlimSuitePlayerCard" or "SlimSuiteTargetCard";
+		local fromName, toName = on and el or card, on and card or el;
+		local from, to = getglobal(fromName), getglobal(toName);
+		if ( from and to ) then
+			local l, r, b, t = RootBounds(from);
+			if ( l and r and b and t ) then
+				local factor = RootFactor(to);
+				local w, h = (to:GetWidth() or 0) * factor, (to:GetHeight() or 0) * factor;
+				SS.UserPlace(to);
+				SetRootPosition(to, (l + r) / 2 - w / 2, (b + t) / 2 - h / 2);
+				SS.Safe(SS.SavePosition, toName, to);
+			end
+			local muted = SS.DB().muted[fromName] and true or false;
+			if ( (SS.DB().muted[toName] and true or false) ~= muted ) then
+				SS.DB().muted[toName] = muted;
+				SS.Safe(ApplyFeatureMute, toName);
+			end
+		end
+	end
+end
+
 function SS.SetNewFrames(on)
+	if ( (SS.DB().newFrames and true or false) ~= (on and true or false) ) then SS.Safe(SS.CarryDesign, on); end
 	SS.DB().newFrames = on and true or false;
 	SS.Safe(SS.ApplyNewFrames);
 	if ( setupActive and SU.on ) then
@@ -4773,8 +4983,15 @@ function SU.Begin()
 	local saved = SS.DB().enabledElements or {};
 	SU.restoring = true;
 	SU.batching = true;      -- one bar and demo refresh at the end, not one per element
+	-- hiding everything also hid the grid: show it again if it is on, so the Grid tick always matches the screen
+	SS.Safe(SU.SetGridSetting, SS.DB().showEditGrid and true or false);
 	-- one element failing to come back must not stop the rest of the setup from opening (the error is still shown)
-	for i = 1, table.getn(SU.elements) do local f = SU.elements[i].frame; SS.Safe(SU.SetOn, f, saved[f] and true or false, SU.titles[f]); end
+	for i = 1, table.getn(SU.elements) do
+		local f = SU.elements[i].frame;
+		local want = saved[f] and true or false;
+		if ( f == "SlimSuiteMeterFrame" ) then want = SS.DB().moveMeter and true or false; end   -- follows the setting
+		SS.Safe(SU.SetOn, f, want, SU.titles[f]);
+	end
 	SU.batching = false;
 	SU.restoring = false;
 	-- the bar: one button per element
@@ -4858,7 +5075,7 @@ function SU.Build()
 	end
 	-- the element's own questions (up to five tick boxes)
 	SU.checks = {};
-	for i = 1, 10 do SU.checks[i] = SU.Check(SU.panel); end
+	for i = 1, 12 do SU.checks[i] = SU.Check(SU.panel); end
 	SU.panel.exit = K.Button(SU.panel, "Exit", 90, function() SS.SetupEnd(false); end);
 	SU.panel.exit:SetPoint("BOTTOMLEFT", SU.panel, "BOTTOMLEFT", 10, 8);
 	SU.panel.complete = K.Button(SU.panel, "Complete", 100, function() SS.SetupEnd(true); end);
@@ -5190,7 +5407,7 @@ loader:SetScript("OnEvent", function()
 	SS.Safe(SS.HookTooltipOwner);
 	SS.Safe(PlaceAll);
 	SS.Safe(UpdateMeter);
-	if ( event == "PLAYER_ENTERING_WORLD" ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
+	if ( event == "PLAYER_ENTERING_WORLD" ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
 end);
 local buffLayoutUpdater = CreateFrame("Frame");
 buffLayoutUpdater:RegisterEvent("UNIT_AURA");
@@ -5259,13 +5476,124 @@ end
 function SS.SetGather(on, side)
 	SS.DB().gatherButtons = on and true or false;
 	if ( side ) then SS.DB().gatherButtons = true; SS.DB().gatherSide = side; end
+	if ( SS.DB().gatherButtons and SS.DB().minimapBar ) then   -- the newest choice wins: the row lets its buttons go
+		SS.DB().minimapBar = false; SS.Safe(SS.LayoutMinimapBar); SU.Rebuild();
+	end
 	SS.Safe(SS.LayoutGather);
+end
+
+-- "Minimap buttons in their own row": the small buttons around the minimap (other addons', Slim Suite's gear, the
+-- game's tracking, mail, battleground and meeting-stone icons) and the day/night moon line up in one movable row.
+-- The zoom buttons stay on the map. Turning it off puts every button back where it was (round or square).
+SS.BAR_BLIZZARD = { "GameTimeFrame", "MiniMapTrackingFrame", "MiniMapMailFrame", "MiniMapBattlefieldFrame", "MiniMapMeetingStoneFrame" };
+SlimSuiteMinimapBarList = {};
+do
+	local bar = CreateFrame("Frame", "SlimSuiteMinimapBar", UIParent);
+	bar:SetWidth(44); bar:SetHeight(44);
+	bar:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -210);   -- under the minimap until it is moved
+	bar:SetFrameStrata("BACKGROUND");
+	bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	                  tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+	bar:SetBackdropColor(0, 0, 0, 0.55);
+	bar:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8);
+	bar:Hide();
+end
+
+-- a button leaving the row goes back to the frame it belonged to (the minimap) and its old place
+function SS.ReleaseFromBar(f)
+	if ( not f or not f.slimBarOrig ) then return; end
+	local o = f.slimBarOrig;
+	f.slimBarOrig = nil;
+	if ( f.slimBarParent and f.SetParent ) then f:SetParent(f.slimBarParent); end
+	if ( f.slimBarStrata and f.SetFrameStrata ) then f:SetFrameStrata(f.slimBarStrata); end
+	f.slimBarParent, f.slimBarStrata = nil, nil;
+	if ( f == SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); return; end
+	f:ClearAllPoints();
+	if ( o[2] ) then f:SetPoint(o[1], o[2], o[3], o[4], o[5]); end
+end
+
+function SS.LayoutMinimapBar()
+	local bar = getglobal("SlimSuiteMinimapBar");
+	if ( not bar or not Minimap ) then return; end
+	local d = SS.DB();
+	local list = SlimSuiteMinimapBarList;
+	if ( not d.minimapBar ) then
+		for i = 1, table.getn(list) do SS.ReleaseFromBar(list[i]); end
+		SlimSuiteMinimapBarList = {};
+		bar:Hide();
+		return;
+	end
+	-- who belongs: the ones already in the row, Slim Suite's gear, the game's icons, and other addons' buttons found
+	-- around the minimap's edge (small, named, and out at the rim, so the map's own pins are never taken)
+	local inBar = {};
+	for i = 1, table.getn(list) do inBar[list[i]] = true; end
+	local function Add(f) if ( f and not inBar[f] ) then table.insert(list, f); inBar[f] = true; end end
+	if ( SS.Mini ) then Add(SS.Mini); end
+	for _, n in ipairs(SS.BAR_BLIZZARD) do Add(getglobal(n)); end
+	local mx, my = Minimap:GetCenter();
+	local ms = Minimap:GetEffectiveScale() or 1;
+	local half = (Minimap:GetWidth() or 140) * ms / 2;
+	local kids = { Minimap:GetChildren() };
+	for i = 1, table.getn(kids) do
+		local f = kids[i];
+		local name = f and f.GetName and f:GetName();
+		if ( name and mx and string.sub(name, 1, 7) ~= "Minimap" and string.sub(name, 1, 7) ~= "MiniMap" and string.sub(name, 1, 9) ~= "SlimSuite" ) then
+			local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
+			local fx, fy = f:GetCenter();
+			if ( w >= 18 and w <= 40 and h >= 18 and h <= 40 and fx ) then
+				local fs = f:GetEffectiveScale() or 1;
+				local dx, dy = fx * fs - mx * ms, fy * fs - my * ms;
+				if ( math.sqrt(dx * dx + dy * dy) >= half * 0.9 ) then Add(f); end
+			end
+		end
+	end
+	SlimSuiteMinimapBarList = list;
+	-- the row takes each button over (so hiding or scaling the minimap no longer touches them, and they scale with the
+	-- row) and lines them up; a hidden one (mail with no mail) takes no place until it shows
+	local vertical = d.orientations and d.orientations.SlimSuiteMinimapBar == "vertical";
+	local slot, pad, n = 34, 5, 0;
+	for i = 1, table.getn(list) do
+		local f = list[i];
+		if ( not f.slimBarOrig ) then
+			local p, rel, rp, x, y = f:GetPoint(1);
+			f.slimBarOrig = { p, rel, rp, x or 0, y or 0 };
+			f.slimBarParent = f.GetParent and f:GetParent();
+			f.slimBarStrata = f.GetFrameStrata and f:GetFrameStrata();
+			if ( f.SetParent ) then f:SetParent(bar); end
+			if ( f.SetFrameStrata ) then f:SetFrameStrata("MEDIUM"); end   -- above the row's dark background
+		end
+		local wanted = f:IsShown();
+		if ( f == SS.Mini ) then wanted = not (d.minimap and d.minimap.hide); end
+		if ( wanted ) then
+			local own = (f.GetScale and f:GetScale()) or 1;
+			local along = pad + slot / 2 + n * slot;
+			f:ClearAllPoints();
+			if ( vertical ) then f:SetPoint("CENTER", bar, "TOP", 0, -along / own);
+			else f:SetPoint("CENTER", bar, "LEFT", along / own, 0); end
+			n = n + 1;
+		end
+	end
+	local length = math.max(1, n) * slot + pad * 2;
+	if ( vertical ) then bar:SetWidth(slot + pad * 2); bar:SetHeight(length);
+	else bar:SetWidth(length); bar:SetHeight(slot + pad * 2); end
+	if ( not setupActive ) then bar:Show(); end
+end
+SS.Every("minimapBar", 1, function() if ( SS.DB().minimapBar ) then SS.LayoutMinimapBar(); end end);   -- late buttons, new mail
+
+function SS.SetMinimapBar(on)
+	SS.DB().minimapBar = on and true or false;
+	if ( on and SS.DB().gatherButtons ) then SS.DB().gatherButtons = false; SS.Safe(SS.LayoutGather); end   -- the newest choice wins
+	SS.Safe(SS.LayoutMinimapBar);
+	if ( not on ) then SS.Safe(SS.ApplyMinimapShape); end   -- the returned buttons follow the round or square edge
+	SU.Rebuild();                                            -- the row gets (or loses) its own button up top
 end
 
 -- the minimap button: a gear, at the left of the minimap (AZS Stats' is at the bottom, AZS Handbook's at the top
 -- left)
 local okMini, errMini = SS.Safe(function()
 	SS.Mini = K.Minimap({ name = "SlimSuiteMinimapButton", icon = "INV_Misc_Gear_02", angle = 190, db = SS.DB,
+		square = function() return SS.DB().minimapSquare; end,
+		docked = function() return SS.DB().minimapBar; end,
 		click = function() SS.Toggle(); end,
 		tooltip = function(tt)
 			tt:AddLine(NAME);

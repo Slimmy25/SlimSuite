@@ -215,12 +215,22 @@ function K.Minimap(o)
 
 	function mini.Place()
 		local m = M();
+		if ( o.docked and o.docked() ) then   -- placed by the row it sits in: only shown or hidden here
+			if ( m.hide ) then mini:Hide(); else mini:Show(); end
+			return;
+		end
 		mini:ClearAllPoints();
 		if ( m.detached and m.x and m.y ) then
 			mini:SetPoint("CENTER", UIParent, "BOTTOMLEFT", K.Num(m.x), K.Num(m.y));
 		elseif ( Minimap ) then
 			local a = math.rad(K.Num(m.angle or o.angle));
-			mini:SetPoint("CENTER", Minimap, "CENTER", RING * math.cos(a), RING * math.sin(a));
+			local x, y = math.cos(a), math.sin(a);
+			-- a square minimap: the same direction, but on the square's edge instead of the circle
+			if ( o.square and o.square() ) then
+				local most = math.max(math.abs(x), math.abs(y));
+				if ( most > 0 ) then x, y = x / most, y / most; end
+			end
+			mini:SetPoint("CENTER", Minimap, "CENTER", RING * x, RING * y);
 		else
 			mini:SetPoint("CENTER", UIParent, "TOPRIGHT", -60, -60);
 		end
@@ -235,6 +245,7 @@ function K.Minimap(o)
 	end
 
 	local function Drag()
+		if ( o.docked and o.docked() ) then return; end   -- the row is moved by its own handle instead
 		local x, y = GetCursorPosition();
 		local s = UIParent:GetEffectiveScale();
 		x, y = x / s, y / s;
