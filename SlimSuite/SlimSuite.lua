@@ -4953,6 +4953,7 @@ function SS.RefreshCard(f)
 	if ( f.slimParty and not SS.DB().partyIncludesSelf ) then f:Hide(); return; end
 	if ( not f.slimParty and not SS.DB().newFrames ) then f:Hide(); return; end
 	if ( not f.slimParty and f.unit == "player" and SS.DB().partyIncludesSelf ) then f:Hide(); return; end   -- you are in the party
+	local unit = f.unit;
 	if ( not UnitExists(unit) ) then
 		if ( setupActive and unit == "target" ) then
 			local t = SU.SAMPLE_TARGET;
