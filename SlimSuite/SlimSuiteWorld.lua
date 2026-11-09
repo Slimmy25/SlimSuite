@@ -640,6 +640,9 @@ end
 -- A fixed, movable box (not floating in the world): your newest hits on top, each with its spell icon. Crits stick
 -- out of the group: indented further, bigger, and they stay on screen twice as long.
 local NORMAL_LIFE, CRIT_LIFE, FADE, MAX_LINES = 3, 6, 0.6, 14;
+-- each option is on unless turned off in its setting (ctHeals, ctCrits, ctIcons, ctLong)
+local function CTOn(key) return DB()[key] ~= false; end
+local function CTLife(e) return (e.crit and CRIT_LIFE or NORMAL_LIFE) * (CTOn("ctLong") and 2 or 1); end
 local box = CreateFrame("Frame", "SlimSuiteCombatTextFrame", UIParent);
 box:SetWidth(260); box:SetHeight(220);
 box:SetPoint("RIGHT", UIParent, "RIGHT", -260, 40);
@@ -683,17 +686,25 @@ local function OnCombatEvent(event)
 	if ( not DB().combatTextBox or type(event) ~= "table" or type(event.amount) ~= "number" ) then return; end
 	local kind = event.kind;
 	if ( kind ~= "damage" and kind ~= "heal" and kind ~= "healing" ) then return; end
+	if ( kind ~= "damage" and not CTOn("ctHeals") ) then return; end
 	local name = event.meterSource or event.abilityName or event.spell or event.damageType or "";
-	table.insert(box.entries, 1, { born = GetTime(), crit = event.critical == true, heal = kind ~= "damage",
-		amount = math.floor(event.amount + 0.5), name = tostring(name), icon = IconFor(event) });
+	table.insert(box.entries, 1, { born = GetTime(), crit = event.critical == true and CTOn("ctCrits"), heal = kind ~= "damage",
+		amount = math.floor(event.amount + 0.5), name = tostring(name), icon = CTOn("ctIcons") and IconFor(event) or nil });
 	while ( table.getn(box.entries) > 40 ) do table.remove(box.entries); end
 end
 if ( SlimSuiteMeter and SlimSuiteMeter.listeners ) then table.insert(SlimSuiteMeter.listeners, OnCombatEvent); end
+-- Demo Mode: a sample hit or heal goes into the real box (its own options still apply to what is drawn)
+function SlimSuiteWorld.DemoHit(amount, name, icon, crit, heal)
+	table.insert(box.entries, 1, { born = GetTime(), crit = crit and CTOn("ctCrits"), heal = heal and true or false,
+		amount = amount, name = name, icon = CTOn("ctIcons") and icon or nil });
+	while ( table.getn(box.entries) > 40 ) do table.remove(box.entries); end
+end
 
 local function DrawBox()
 	local d = DB();
 	local editing = Editing("SlimSuiteCombatTextFrame");
-	if ( not d.combatTextBox and not editing ) then box:Hide(); return; end
+	local demo = SS.demoRunning and true or false;   -- Demo Mode shows the box with sample hits
+	if ( not d.combatTextBox and not editing and not demo ) then box:Hide(); return; end
 	box:Show();
 	local now = GetTime();
 	local list = box.entries;
@@ -703,7 +714,7 @@ local function DrawBox()
 	end
 	for i = table.getn(box.entries), 1, -1 do
 		local e = box.entries[i];
-		if ( now - e.born > (e.crit and CRIT_LIFE or NORMAL_LIFE) ) then table.remove(box.entries, i); end
+		if ( now - e.born > CTLife(e) ) then table.remove(box.entries, i); end
 	end
 	local y, n = -6, 0;
 	local bottom = -(box:GetHeight() or 220) + 6;
@@ -713,14 +724,14 @@ local function DrawBox()
 		if ( n >= MAX_LINES or y - h < bottom ) then break; end
 		n = n + 1;
 		local l = BoxLine(n);
-		local life = e.crit and CRIT_LIFE or NORMAL_LIFE;
+		local life = CTLife(e);
 		local age = now - e.born;
 		local alpha = 1;
 		if ( age > life - FADE ) then alpha = math.max(0, (life - age) / FADE); end
 		l:ClearAllPoints();
 		l:SetPoint("TOPLEFT", box, "TOPLEFT", e.crit and 26 or 8, y);
 		l:SetWidth((box:GetWidth() or 260) - (e.crit and 30 or 12)); l:SetHeight(h);
-		l.icon:SetWidth(h - 2); l.icon:SetHeight(h - 2); l.icon:SetTexture(e.icon);
+		l.icon:SetWidth(e.icon and (h - 2) or 0); l.icon:SetHeight(h - 2); l.icon:SetTexture(e.icon or nil);
 		l.text:SetFontObject(e.crit and NumberFontNormalLarge or GameFontHighlightSmall);
 		l.text:SetText((e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name);
 		if ( e.heal ) then l.text:SetTextColor(0.3, 1, 0.4);

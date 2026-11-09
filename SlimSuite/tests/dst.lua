@@ -1,0 +1,5 @@
+print("auto offset:", SlimSuiteWorld.DaylightOffset(), "isdst today:", os.date("*t").isdst)
+SS.DB().localClockDST = 1; print("forced on:", SlimSuiteWorld.DaylightOffset())
+SS.DB().localClockDST = 0; print("forced off:", SlimSuiteWorld.DaylightOffset())
+SS.DB().localClockDST = nil; print("back to auto:", SlimSuiteWorld.DaylightOffset())
+print(table.concat(ERRORS, "\n"))

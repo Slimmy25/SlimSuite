@@ -156,6 +156,7 @@ function SS.DB()
 	if ( d.partyLockAbove == nil ) then d.partyLockAbove = false; end   -- locked party frames hang below the player by default
 	if ( d.partyCompact == nil ) then d.partyCompact = false; end
 	if ( d.partyFaces == nil ) then d.partyFaces = true; end
+	if ( d.cardPortraits == nil ) then d.cardPortraits = true; end   -- the 3D character model on the new-school frames
 	if ( d.targetDebuffs == nil ) then d.targetDebuffs = true; end
 	if ( d.moveLevelButton == nil ) then d.moveLevelButton = false; end
 	if ( d.moveMeter == nil ) then d.moveMeter = false; end
@@ -444,7 +445,6 @@ local MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "P
                   { "SlimSuiteItemRowFrame", "Worn rings / trinkets" },
                   { "SlimSuiteTallyFrame", "Kills / Gold / Cache" }, { "GameTooltip", "Tooltip" },
                   { "SlimSuiteReviveFrame", "Revive bar" },
-                  { "SlimSuiteCombatTextFrame", "Combat text (test)" },
                   { "SlimSuiteLocalClockFrame", "Local clock" },
                   { "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
                   { "SlimSuiteMinimapBar", "Minimap buttons" } };
@@ -801,6 +801,11 @@ function SS.CreateSpellRow()
 		button:SetScript("OnEnter", function()
 			if ( not this.spell or not GameTooltip ) then return; end
 			GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+			-- a loadout icon has no spell-book slot of its own: look the spell up, so the tooltip is the same as the action bar's
+			if ( not this.spellBookSlot and this.spell.spell ) then
+				local _, slot = SS.SpellTextureById(tonumber(this.spell.spell));
+				this.spellBookSlot = slot;
+			end
 			if ( this.spellBookSlot and GameTooltip.SetSpellBookItem ) then GameTooltip:SetSpellBookItem(this.spellBookSlot, BOOKTYPE_SPELL or "spell");
 			elseif ( this.spell.key or this.sourceName ) then
 				GameTooltip:AddLine(tostring(this.sourceName or this.spell.key));
@@ -1237,10 +1242,17 @@ function SS.UpdateLevelButton()
 	local canReplace = type(AZS_OpenStoredLevels) == "function";
 	local replacing = SS.DB().moveLevelButton and canReplace;
 	SS.SetNativeLevelButtonHidden(replacing);
+	local storedCount = 0;
+	if ( type(AZS_GetStoredLevels) == "function" ) then
+		local okCount, value = SS.Safe(AZS_GetStoredLevels);
+		if ( okCount and type(value) == "number" ) then storedCount = math.max(0, math.floor(value)); end
+	end
 	if ( levelButton.store ) then
 		local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 		local inRun = phase == "playing" or phase == "choosing" or phase == "paused";
-		if ( replacing and type(AZS_SetStoringLevels) == "function" and (inRun or SS.IsEditing("SlimSuiteStoredLevelsButton")) ) then
+		-- points to spend: a level-up choice is open, or levels are already stored; otherwise the toggle is off the screen
+		local hasPoints = phase == "choosing" or storedCount > 0;
+		if ( replacing and type(AZS_SetStoringLevels) == "function" and inRun and (hasPoints or SS.IsEditing("SlimSuiteStoredLevelsButton")) ) then
 			local ok, storing = false, nil;
 			if ( type(AZS_IsStoringLevels) == "function" ) then ok, storing = SS.Safe(AZS_IsStoringLevels); end
 			levelButton.store:SetChecked((ok and storing) and 1 or nil);
@@ -2414,6 +2426,7 @@ function SS.LayoutXpSegments()
 	if ( not seg ) then
 		seg = CreateFrame("Frame", "SlimSuiteXpSegments", xp);
 		seg:SetAllPoints(xp);
+		seg:SetFrameStrata("HIGH");
 		seg:EnableMouse(false);
 		seg.ticks = {};
 		for i = 1, 19 do
@@ -2423,6 +2436,7 @@ function SS.LayoutXpSegments()
 		end
 		seg:SetScript("OnSizeChanged", function() SS.Safe(SS.LayoutXpSegments); end);
 	end
+	seg:SetAllPoints(xp);
 	seg:SetFrameLevel((xp:GetFrameLevel() or 1) + 3);      -- over the fill and the upright bar's border
 	if ( SS.DB().xpSegments == false ) then seg:Hide(); return; end
 	seg:Show();
@@ -4423,7 +4437,6 @@ function SU.Steps()
 		{ "SlimSuiteAnnouncementFrame", "Announcements", "Where event announcements appear.", function() return d.replaceBanners; end },
 		{ "SlimSuiteReviveFrame", "Revive bar", "The bar shown while you bring a friend back.", function() return d.replaceRevive; end },
 		{ "SlimSuiteLocalClockFrame", "Local clock", "Your real-world clock. Right-click for 12/24-hour and its background.", function() return d.replaceLocalClock and d.clockDetached; end },
-		{ "SlimSuiteCombatTextFrame", "Combat text", "The combat text test box.", function() return d.combatTextBox; end },
 		{ "SlimSuiteMinimapBar", "Minimap buttons", "Every minimap button and the day/night moon in one row. Drag it anywhere.", function() return d.minimapBar; end },
 	};
 	for i = 1, table.getn(rest) do
@@ -4850,8 +4863,12 @@ SS.QUIET_HANDLES = { PlayerFrame = true, TargetFrame = true, SlimSuitePlayerCard
 -- The target preview in the setup: with no target, the target frame itself (classic or new-school) shows a sample
 -- elite, so you see exactly what you are placing. A real target always shows as itself.
 SU.SAMPLE_TARGET = { name = "Hogger", level = "??", hp = 70 };
+-- the setup and Demo Mode both show the sample previews
+SS.demoRunning = false;
+function SS.PreviewAllowed() return (setupActive or SS.demoRunning) and true or false; end
+
 function SU.PreviewTarget()
-	if ( not setupActive or not (SU.on and SU.on.TargetFrame) or SS.DB().hideTarget ) then return; end
+	if ( not SS.PreviewAllowed() or not (SU.on and SU.on.TargetFrame) or SS.DB().hideTarget ) then return; end
 	if ( UnitExists("target") ) then return; end
 	local t = SU.SAMPLE_TARGET;
 	if ( TargetFrame and not SS.DB().newFrames ) then
@@ -4881,7 +4898,7 @@ end
 -- laid out as the party really is (a column or a row, thin lines, faces on or off). Real teammates show as themselves.
 SU.MANA_COLOUR = { Warrior = { 1, 0, 0 } };                -- rage; everyone else here uses mana
 function SU.PreviewParty()
-	if ( not setupActive or not (SU.on and SU.on.PartyMemberFrame1) ) then return; end
+	if ( not SS.PreviewAllowed() or not (SU.on and SU.on.PartyMemberFrame1) ) then return; end
 	for i = 1, 4 do
 		local f = getglobal("PartyMemberFrame" .. i);
 		local sample = SU.PARTY_SAMPLE[i];
@@ -5021,20 +5038,34 @@ SU.BOSS_SAMPLE = { { "Hogger", 60 }, { "Mr. Smite", 40 }, { "Edwin VanCleef", 85
 
 -- The new-school player and target frames: cards in the party frames' look, showing name, health and power.
 -- They are only shown while the design is on; the game's own frames are made transparent (not removed) meanwhile.
+-- the 3D model of the unit on a new-school card; it is re-read only when the unit changes
+function SS.UpdateCardModel(f, unit)
+	local m = f.model;
+	if ( not m or not m.SetUnit ) then return; end
+	if ( SS.DB().cardPortraits == false or not unit or not UnitExists(unit) ) then
+		m:Hide(); f.modelFor = nil; return;
+	end
+	local who = UnitName(unit);
+	if ( f.modelFor ~= who or not m:IsShown() ) then
+		m:Show(); m:ClearModel(); m:SetUnit(unit); m:SetCamera(0); f.modelFor = who;
+	end
+end
+
 function SS.RefreshCard(f)
 	if ( not f ) then return; end
 	if ( f.slimParty and not SS.DB().partyIncludesSelf ) then f:Hide(); return; end
 	if ( not f.slimParty and not SS.DB().newFrames ) then f:Hide(); return; end
 	if ( not f.slimParty and f.unit == "player" and SS.DB().partyIncludesSelf ) then f:Hide(); return; end   -- you are in the party
 	local unit = f.unit;
+	SS.Safe(SS.UpdateCardModel, f, unit);
 	if ( not UnitExists(unit) ) then
-		if ( setupActive and unit == "target" ) then
+		if ( SS.PreviewAllowed() and unit == "target" ) then
 			local t = SU.SAMPLE_TARGET;
 			f.name:SetText(t.name); f.name:SetTextColor(0.9, 0.25, 0.25);
 			f.hp:SetMinMaxValues(0, 100); f.hp:SetValue(t.hp); f.hpText:SetText("Elite");
 			f.power:SetMinMaxValues(0, 1); f.power:SetValue(0);
 			f:Show();
-		elseif ( setupActive and unit == "player" ) then
+		elseif ( SS.PreviewAllowed() and unit == "player" ) then
 			f.name:SetText(UnitName("player") or "You"); f.name:SetTextColor(1, 1, 1);
 			f.hp:SetMinMaxValues(0, 1); f.hp:SetValue(1); f.hpText:SetText("");
 			f.power:SetMinMaxValues(0, 1); f.power:SetValue(0);
@@ -5134,6 +5165,13 @@ function SS.MakeCards()
 		f.power = CreateFrame("StatusBar", nil, f);
 		f.power:SetStatusBarTexture(SU.BAR_TEXTURE);
 		f.power:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 5, 5); f.power:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -5, 5); f.power:SetHeight(4);
+		-- the 3D model on the left; the name and bars start to its right
+		f.model = CreateFrame("PlayerModel", nil, f);
+		f.model:SetWidth(34); f.model:SetHeight(34);
+		f.model:SetPoint("TOPLEFT", f, "TOPLEFT", 5, -5);
+		f.name:SetPoint("TOPLEFT", f, "TOPLEFT", 42, -4);
+		f.hp:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 42, 11);
+		f.power:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 42, 5);
 		SS.cardFrames = SS.cardFrames or {};
 		table.insert(SS.cardFrames, f);
 		-- every card is checked, hidden ones too: the target card has to appear when a target is picked
@@ -5706,6 +5744,12 @@ SU.COMPANIONS = {
 
 -- restore every frame's alpha as it was before the setup
 function SU.Unreveal()
+	-- the minimap is faded while the setup runs; a faded value saved by mistake must never be put back
+	if ( SU.saved ) then
+		for _, m in ipairs({ Minimap, MinimapCluster }) do
+			if ( m and SU.saved[m] ~= nil and (type(SU.saved[m]) ~= "number" or SU.saved[m] <= 0) ) then SU.saved[m] = 1; end
+		end
+	end
 	for f, a in pairs(SU.saved or {}) do if ( f and f.SetAlpha ) then f:SetAlpha(a); end end
 	for f in pairs(SU.shownBefore or {}) do if ( f and f.Show ) then f:Show(); end end
 	SU.saved = nil; SU.shownBefore = nil;
@@ -5761,7 +5805,11 @@ function SS.LayoutPage(page)
 			r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y);
 			if ( any ) then r.fs:Show(); y = y - 24; else r.fs:Hide(); end
 		elseif ( show[i] ) then
-			if ( r.kind == "choice" ) then
+			if ( r.kind == "button" ) then
+				r.b:ClearAllPoints(); r.b:SetPoint("TOPLEFT", parent, "TOPLEFT", 26, y + 2);
+				r.b:Show();
+				y = y - 30;
+			elseif ( r.kind == "choice" ) then
 				r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 30 + r.lead, y - 6);
 				r.fs:Show(); r.b:Show();
 			else
@@ -5770,7 +5818,8 @@ function SS.LayoutPage(page)
 			end
 			y = y - 28;
 		else
-			if ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); end
+			if ( r.kind == "button" ) then r.b:Hide();
+			elseif ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); end
 		end
 	end
 	parent:SetHeight(math.max(20, -y + 12));
@@ -5841,6 +5890,10 @@ function SS.WinBuild()
 				fs:SetText(row.head); fs:SetTextColor(1, 0.82, 0);
 				table.insert(page.rows, { kind = "head", fs = fs });
 				up = nil;
+			elseif ( row.button ) then
+				local b = K.Button(parent, row.button, 150, row.onClick);
+				table.insert(page.rows, { kind = "button", b = b });
+				up = nil;
 			else
 				local label, lead = row[1], 0;
 				if ( string.find(label, "^%s") ) then lead = 22; label = string.gsub(label, "^%s+", ""); end
@@ -5891,6 +5944,7 @@ function SS.WinBuild()
 		AddRows(uiChild, {
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
+			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
 			{head="Frames"},
 			{"Hide the target frame", function() return SS.DB().hideTarget; end, function(v) SS.DB().hideTarget = v; SS.TargetFrameHidden(v); end},
 			{"Show debuffs and DoTs on the target", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end},
@@ -5915,7 +5969,12 @@ function SS.WinBuild()
 			{"Replace Default Local Clock with Movable Version?", function() return SS.DB().replaceLocalClock; end, function(v) SS.DB().replaceLocalClock = v; end},
 			{head="Extras"},
 			{"Class proc meter under the player frame", function() return SS.DB().procMeter; end, function(v) SS.DB().procMeter = v; end},
-			{"Combat text test box (movable)", function() return SS.DB().combatTextBox; end, function(v) SS.DB().combatTextBox = v; end},
+			{"Combat text box (movable)", function() return SS.DB().combatTextBox; end, function(v) SS.DB().combatTextBox = v; end},
+			{"Show heals in combat text", function() return SS.DB().ctHeals ~= false; end, function(v) SS.DB().ctHeals = v and true or false; end},
+			{"Crits: bigger and longer", function() return SS.DB().ctCrits ~= false; end, function(v) SS.DB().ctCrits = v and true or false; end},
+			{"Spell icons in combat text", function() return SS.DB().ctIcons ~= false; end, function(v) SS.DB().ctIcons = v and true or false; end},
+			{"Longer combat text lines (twice as long)", function() return SS.DB().ctLong ~= false; end, function(v) SS.DB().ctLong = v and true or false; end},
+			{button = "Combat Text", onClick = function() SS.DB().combatTextBox = not SS.DB().combatTextBox; end},
 			{"Floating combat text over enemies (Slim Suite's own)", function() return SS.DB().floatingText; end, function(v) SS.DB().floatingText = v; end},
 			{"Show Slim Suite above the level-up and new-item cards", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -72, function(y) uiLastY = y; PlaceTail(); end);
@@ -6348,3 +6407,133 @@ local okMini, errMini = SS.Safe(function()
 		end });
 end);
 if ( not okMini ) then K.Print(NAME, "|cffff4040the minimap button could not be made:|r " .. tostring(errMini)); end
+
+-- Demo Mode: shows Slim Suite's own elements with sample data, moving and changing in real time. Your settings are
+-- not changed: the elements on the screen are the ones you have set, and the sample values come and go on top.
+-- Shows: the target and party previews (health rises and falls), the buff bar (buffs come and go), and the combat
+-- text box (hits and heals arrive).
+local demoT = 0;
+local demoPrevOn = nil;
+local DEMO_HITS = { { 412, "Fireball", "Spell_Fire_Fireball02", true }, { 96, "Frostbolt", "Spell_Frost_FrostBolt02", false },
+	{ 180, "Smite", "Spell_Holy_Smite", false }, { 55, "Mend", "Spell_Holy_Heal", false, true }, { 233, "Arcane Missiles", "Spell_Nature_StarFall", false },
+	{ 310, "Shadow Bolt", "Spell_Shadow_ShadowBolt", true } };
+local demoHitIndex = 1;
+local demoHitClock = 0;
+
+local function DemoTick(dt)
+	demoT = demoT + dt;
+	demoHitClock = demoHitClock + dt;
+	-- target and party health rise and fall (the sample values the previews read)
+	SU.SAMPLE_TARGET.hp = 40 + math.floor(35 * (1 + math.sin(demoT * 0.9)) / 2);
+	for i = 1, table.getn(SU.PARTY_SAMPLE) do
+		local s = SU.PARTY_SAMPLE[i];
+		s[3] = 35 + math.floor(60 * (1 + math.sin(demoT * (0.6 + i * 0.25) + i)) / 2);
+	end
+	SS.Safe(SU.PreviewTarget);
+	SS.Safe(SU.PreviewParty);
+	-- boss frames: the three sample bosses' health moves
+	if ( SU.bossDemo and SU.bossDemo.cards and SU.bossDemo:IsShown() ) then
+		for i = 1, table.getn(SU.bossDemo.cards) do
+			local card = SU.bossDemo.cards[i];
+			local pct = 25 + math.floor(70 * (1 + math.sin(demoT * (0.35 + i * 0.12) + i)) / 2);
+			if ( card.hp ) then card.hp:SetValue(pct); end
+		end
+	end
+	-- damage meter: the sample numbers climb
+	if ( SlimSuiteMeter and SlimSuiteMeter.demoSnapshot ) then SlimSuiteMeter.demoSnapshot = DemoMeterSnapshot(demoT); end
+	-- minimap pins circle the map inside its edge
+	local mm = Minimap and Minimap.GetWidth and (Minimap:GetWidth() or 140) / 2 - 10 or 60;
+	for i = 1, table.getn(demoPins) do
+		local a = demoT * (0.5 + i * 0.2) + i * 1.6;
+		demoPins[i]:ClearAllPoints();
+		demoPins[i]:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * mm * (0.4 + 0.15 * i), math.sin(a) * mm * (0.4 + 0.15 * i));
+	end
+	-- XP bar: a glint sweeps across it
+	if ( demoGlint and MainMenuExpBar ) then
+		local w = MainMenuExpBar:GetWidth() or 100;
+		demoGlint:ClearAllPoints();
+		demoGlint:SetPoint("LEFT", MainMenuExpBar, "LEFT", math.mod(demoT * 70, math.max(1, w)), 0);
+	end
+	-- buffs: each one comes and goes on its own rhythm
+	if ( SU.buffDemo and SU.buffDemo.icons ) then
+		for i = 1, table.getn(SU.buffDemo.icons) do
+			local icon = SU.buffDemo.icons[i];
+			if ( icon ) then
+				if ( math.mod(math.floor(demoT / (1.5 + i * 0.4)) + i, 2) == 0 ) then icon:Show(); else icon:Hide(); end
+			end
+		end
+	end
+	-- combat text: a hit or heal arrives every 0.9 seconds
+	if ( demoHitClock >= 0.9 and SlimSuiteWorld and SlimSuiteWorld.DemoHit ) then
+		demoHitClock = 0;
+		local h = DEMO_HITS[demoHitIndex];
+		SS.Safe(SlimSuiteWorld.DemoHit, h[1], h[2], "Interface\\Icons\\" .. h[3], h[4], h[5]);
+		demoHitIndex = math.mod(demoHitIndex, table.getn(DEMO_HITS)) + 1;
+	end
+end
+
+-- sample meter rows: the party's names and WoW spells, with damage that grows over time
+local DEMO_METER = {
+	{ "Slimjim", "Fireball", "Spell_Fire_Fireball02", 9200, 2 },
+	{ "Brann", "Smite", "Spell_Holy_Smite", 6100, 1 },
+	{ "Lyra", "Frostbolt", "Spell_Frost_FrostBolt02", 5400, 1.4 },
+	{ "Tomkin", "Shadow Bolt", "Spell_Shadow_ShadowBolt", 3900, 1.7 },
+};
+local function DemoMeterSnapshot(t)
+	local snap = { actors = {}, sources = {}, rows = {} };
+	for i = 1, table.getn(DEMO_METER) do
+		local d = DEMO_METER[i];
+		local amount = math.floor(d[4] + t * 210 * d[5]);
+		snap.actors["a" .. i] = { name = d[1] };
+		snap.sources["s" .. i] = { name = d[2], icon = { status = "ready", path = "Interface\\Icons\\" .. d[3] } };
+		snap.rows[i] = { rowId = "r" .. i, sourceKey = "s" .. i, ownerId = "a" .. i, displayAmount = amount,
+			displayRate = { status = "ready", value = math.floor(d[5] * 210) } };
+	end
+	return snap;
+end
+
+-- sample minimap pins and an XP-bar glint, drawn on the real frames and removed when the demo stops
+local demoPins, demoGlint = {}, nil;
+
+function SS.StartDemoMode()
+	if ( SS.demoRunning ) then return; end
+	SS.demoRunning = true;
+	demoT = 0; demoHitClock = 0;
+	if ( SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = DemoMeterSnapshot(0); end
+	local mf = getglobal("SlimSuiteMeterFrame"); if ( mf ) then mf:Show(); end
+	if ( Minimap and Minimap.CreateTexture and table.getn(demoPins) == 0 ) then
+		for i = 1, 4 do
+			local p = Minimap:CreateTexture(nil, "OVERLAY");
+			p:SetWidth(6); p:SetHeight(6); p:SetTexture(i == 1 and 1 or 0.9, i == 2 and 0.8 or 0.4, 0.2, 1);
+			demoPins[i] = p;
+		end
+	end
+	for i = 1, table.getn(demoPins) do demoPins[i]:Show(); end
+	if ( MainMenuExpBar and MainMenuExpBar.CreateTexture ) then
+		if ( not demoGlint ) then demoGlint = MainMenuExpBar:CreateTexture(nil, "OVERLAY"); demoGlint:SetWidth(16); demoGlint:SetTexture(1, 1, 1, 0.35); end
+		demoGlint:SetHeight(MainMenuExpBar:GetHeight() or 12); demoGlint:Show();
+	end
+	-- show the elements in the demo (the previous choices are put back when it stops)
+	demoPrevOn = SU.on;
+	SU.on = { PartyMemberFrame1 = true, TargetFrame = true, BuffFrame = true, SlimSuiteBossFrames = true };
+	SS.Safe(SU.UpdateDemo);
+	SS.Every("demoMode", 0.25, function() SS.Safe(DemoTick, 0.25); end);
+	SS.DB().demoMode = true;
+end
+
+function SS.StopDemoMode()
+	if ( not SS.demoRunning ) then return; end
+	SS.demoRunning = false;
+	SS.Stop("demoMode");
+	if ( SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = nil; end
+	for i = 1, table.getn(demoPins) do demoPins[i]:Hide(); end
+	if ( demoGlint ) then demoGlint:Hide(); end
+	SU.on = demoPrevOn; demoPrevOn = nil;
+	SS.Safe(SU.UpdateDemo);
+	SS.Safe(SS.ApplyNewFrames);
+	SS.DB().demoMode = false;
+end
+
+function SS.ToggleDemoMode()
+	if ( SS.demoRunning ) then SS.StopDemoMode(); else SS.StartDemoMode(); end
+end

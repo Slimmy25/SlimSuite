@@ -375,6 +375,7 @@ function M.Draw(active, editing)
   local snapshot, err = Query(); M.snapshot = snapshot; M.error = err;
   M.nextRead = now + math.max(0.35, type(err) == 'table' and Num(err.retryAfterSeconds) or 0);
  end
+ if SS.demoRunning and M.demoSnapshot then M.snapshot = M.demoSnapshot; M.error = nil; end   -- Demo Mode: sample rows
  local snapshot = M.snapshot; local rows = {};
  if snapshot then for _, row in ipairs(snapshot.rows or {}) do table.insert(rows, row); end end
  table.sort(rows, function(a, b)
