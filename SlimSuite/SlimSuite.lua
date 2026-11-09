@@ -3010,9 +3010,9 @@ function SS.ArrangeEdgeButtons(square)
 			local k = ms / (f:GetEffectiveScale() or 1);
 			return (f:GetWidth() or 32) / k, (f:GetHeight() or 32) / k;
 		end
-		-- + over -, centred on the right edge
-		if ( zoomIn ) then local w, h = Size(zoomIn); Put(zoomIn, half + w / 2 + 2, h / 2 + 1); end
-		if ( zoomOut ) then local w, h = Size(zoomOut); Put(zoomOut, half + w / 2 + 2, -(h / 2 + 1)); end
+		-- + over -, sitting on the map just inside its right edge
+		if ( zoomIn ) then local w, h = Size(zoomIn); Put(zoomIn, half - w / 2 - 2, h / 2 + 1); end
+		if ( zoomOut ) then local w, h = Size(zoomOut); Put(zoomOut, half - w / 2 - 2, -(h / 2 + 1)); end
 		-- the moon first, then the others by name, Slim Suite's gear last; hidden ones (no mail, say) leave no gap
 		table.sort(left, function(a, b)
 			local an, bn = a:GetName() or "", b:GetName() or "";
@@ -3028,7 +3028,7 @@ function SS.ArrangeEdgeButtons(square)
 			if ( f == SS.Mini or (f.IsShown and f:IsShown()) ) then
 				local w, h = Size(f);
 				if ( y - h < -halfH and y < halfH ) then x = x + widest + 2; y = halfH; widest = 0; end   -- a full column: one more beside it
-				Put(f, -(half + 2 + x + w / 2), y - h / 2);
+				Put(f, -(half - 2 - x - w / 2), y - h / 2);   -- inside the left edge, on the map
 				y = y - h - 2;
 				if ( w > widest ) then widest = w; end
 			end
