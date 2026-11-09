@@ -2340,7 +2340,11 @@ function SS.RestoreRacialActionButtonLayout()
 	for p = 1, table.getn(original.racial.points) do
 		local a = original.racial.points[p]; ActionButton12:SetPoint(a[1], a[2], a[3], a[4], a[5]);
 	end
-	if ( original.racial.shown ) then ActionButton12:Show(); else ActionButton12:Hide(); end
+	local id = (ActionButton_GetPagedID and ActionButton_GetPagedID(ActionButton12)) or 12;
+	local ok, has = SS.Safe(HasAction, id);
+	if ( original.racial.shown or (ok and has) ) then ActionButton12:Show();
+	elseif ( ActionButton12.slimShownByUs ) then ActionButton12:Hide(); end
+	ActionButton12.slimShownByUs = nil;
 	if ( ActionButton12.slimRacialBorder ) then ActionButton12.slimRacialBorder:Hide(); end
 	if ( AZS_RacialRim and original.rim ) then
 		AZS_RacialRim:ClearAllPoints();
@@ -2432,7 +2436,10 @@ ApplyMovableOrientation = function(name)
                     rim:SetBackdropBorderColor(1, 0.78, 0.18, 1); rim:EnableMouse(false);
                     button.slimRacialBorder = rim;
                 end
-                if ( showRacial and i == 7 ) then button:Show(); end
+                if ( showRacial and i == 7 ) then
+                    if ( not button:IsShown() ) then button.slimShownByUs = true; end   -- so it can be hidden again later
+                    button:Show();
+                end
             end
         end
 		if ( not showRacial ) then SS.RestoreRacialActionButtonLayout(); end
@@ -2957,6 +2964,12 @@ function SS.DetachExperienceBar()
 	end
 	if ( width and width > 0 ) then MainMenuExpBar:SetWidth(width); end
 	if ( height and height > 0 ) then MainMenuExpBar:SetHeight(height); end
+	-- a new parent puts it at the bottom of the drawing order, under the bar's frame and gryphons: lift it above them
+	local art = MainMenuBarArtFrame or MainMenuBar;
+	if ( art and MainMenuExpBar.SetFrameStrata ) then
+		MainMenuExpBar:SetFrameStrata(art:GetFrameStrata() or "MEDIUM");
+		MainMenuExpBar:SetFrameLevel((art:GetFrameLevel() or 1) + 5);
+	end
 	xpBarDetached = true;
 end
 
@@ -3789,6 +3802,13 @@ function SS.SetUnlocked(on, quiet)
 	end
 	SS.Safe(SS.UpdateLevelButton);
 	SS.Safe(UpdateMeter);
+	-- while unlocked the action bar uses the movable layout; locked again with no custom layout, the game's own returns
+	if ( not on ) then
+		local d = SS.DB();
+		if ( not d.showRacialAbility and not d.plainBar and d.orientations.MainMenuBar ~= "vertical" and type(d.sizes.MainMenuBar) ~= "table" ) then
+			SS.Safe(SS.RestoreNativeActionBarLayout);
+		end
+	end
 	if ( not quiet ) then K.Print(NAME, on and "drag a handle to move it; right-click for size, scale, layout or hide. Shift-left-click hides/shows a feature. Use Lock UI when done." or "the UI is locked."); end
 end
 
