@@ -3011,6 +3011,7 @@ function SS.OpenSizeMenu(name, label)
 	name = SS.Element(name);
 	local f = getglobal(SS.Shown(name));
 	if ( not f ) then return; end
+	if ( sizeMenu and sizeMenu.SetAlpha ) then sizeMenu:SetAlpha(1); end
 	if ( not sizeMenu ) then
 		sizeMenu = CreateFrame("Frame", nil, UIParent);
 		sizeMenu:SetWidth(206);
@@ -4302,8 +4303,12 @@ SU.FORCE_HIDE = { "SlimSuiteMeterFrame", "SlimSuiteTallyFrame", "SlimSuiteClockF
 	"SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteProcMeter", "SlimSuiteStoredLevelsButton",
 	"SlimSuiteStoreLevelsToggle", "SlimSuiteWorldMarkers", "SlimSuiteFloatingText", "SlimSuiteMovePanel", "GameTimeFrame" };
 
--- the chat windows, their tabs and their input boxes stay visible and usable during setup, so you can always type
-SU.KEEP_VISIBLE = {};
+-- the chat windows, their tabs and their input boxes stay visible and usable during setup, so you can always type;
+-- so do the game's error popup, menus and confirmation dialogs, and Slim Suite's own tools. Hidden, these came back
+-- invisible but still catching clicks, which stopped any further changes.
+SU.KEEP_VISIBLE = { ScriptErrors = true, SlimSuiteErrorFrame = true, SlimSuiteMouseProbe = true, ItemRefTooltip = true };
+for i = 1, 3 do SU.KEEP_VISIBLE["DropDownList" .. i] = true; end
+for i = 1, 4 do SU.KEEP_VISIBLE["StaticPopup" .. i] = true; end
 for i = 1, 7 do
 	SU.KEEP_VISIBLE["ChatFrame" .. i] = true; SU.KEEP_VISIBLE["ChatFrame" .. i .. "Tab"] = true; SU.KEEP_VISIBLE["ChatFrame" .. i .. "EditBox"] = true;
 end
@@ -4313,6 +4318,7 @@ function SU.HideAll()
 	local keep = { [SU.panel] = true, [SU.bar] = true, [SU.glow] = true };
 	for name in pairs(SU.KEEP_VISIBLE) do local c = getglobal(name); if ( c ) then keep[c] = true; end end
 	for _, h in pairs(handles) do keep[h] = true; end
+	if ( sizeMenu ) then keep[sizeMenu] = true; end   -- the right-click menu stays usable while the setup redraws
 	local kids = { UIParent:GetChildren() };
 	for i = 1, table.getn(kids) do
 		local f = kids[i];
@@ -4343,7 +4349,7 @@ function SU.SetOn(frame, on, title)
 	SS.DB().enabledElements[frame] = on and true or nil;
 	if ( frame == "PlayerFrame" and SS.DB().combineTarget and getglobal("TargetFrame") ) then
 		SU.cascading = true;
-		SU.SetOn("TargetFrame", on, SU.titles and SU.titles.TargetFrame or "Target frame");
+		SS.Safe(SU.SetOn, "TargetFrame", on, SU.titles and SU.titles.TargetFrame or "Target frame");
 		SU.cascading = false;
 	end
 	local names = { frame };
@@ -4885,8 +4891,9 @@ end
 function SU.Rebuild()
 	if ( not setupActive ) then return; end
 	local f = SU.focus;
-	SU.Begin();
-	for i = 1, table.getn(SU.elements or {}) do if ( f and SU.elements[i].frame == f ) then SU.Focus(f); end end
+	SS.Safe(SU.Begin);
+	SU.batching, SU.restoring, SU.cascading = false, false, false;   -- never left stuck by a failure part-way
+	for i = 1, table.getn(SU.elements or {}) do if ( f and SU.elements[i].frame == f ) then SS.Safe(SU.Focus, f); end end
 end
 
 -- the new-school design for the player and target frames (the same switch as the sub-option under Mirror target)
@@ -4999,6 +5006,10 @@ end
 -- the setup: everything hidden, one bar of elements, all off
 function SU.Begin()
 	if ( not SU.panel ) then SU.Build(); end
+	for name in pairs(SU.KEEP_VISIBLE) do                        -- undo an earlier sweep of these, if any
+		local c = getglobal(name);
+		if ( c and c.SetAlpha and c.GetAlpha and c:GetAlpha() == 0 ) then c:SetAlpha(1); end
+	end
 	editOnly = "SlimSuiteSetupNothing";                  -- no handles until an element is turned on
 	SS.SetUnlocked(true, true);
 	SU.on = {};
