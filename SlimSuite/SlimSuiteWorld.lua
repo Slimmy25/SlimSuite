@@ -8,9 +8,9 @@
 --     new-item cards (0.126).
 -- Lua 5.0 / 1.12 interface: scripts read `this`, `arg1`; no # operator, no `...` in expressions; only the 1.12 API.
 --
--- THE ADAPTER (A, below) is the only place that knows the shape of the new API calls. The patch notes name these
--- functions but not their exact arguments or fields, so A reads several likely field names and every call is
--- guarded: if a guess is wrong, that feature stays hidden instead of raising errors. Check A against the addon docs.
+-- THE ADAPTER (A, below) is the only place that knows the shape of the game's addon API. It follows the game's addon
+-- docs ("Azeroth Survivors: Addon API"): exact arguments (extra ones are errors there), the documented field names,
+-- and every call guarded, so a game build without a function simply leaves that feature hidden.
 
 local W = {};
 SlimSuiteWorld = W;
@@ -19,15 +19,16 @@ local function Editing(name) return SS.IsEditing and SS.IsEditing(name); end
 
 -- ---------------------------------------------------------------- the adapter
 local A = {};
-function A.Call(name, a, b)
+-- Call a game function with exactly the arguments given. Returns its two results (result, err); nil if it is missing.
+function A.Call(name, ...)
 	local fn = getglobal(name);
 	if ( type(fn) ~= "function" ) then return nil; end
-	local ok, result = SS.Safe(fn, a, b);
-	if ( ok ) then return result; end
+	local ok, result, err = SS.Safe(fn, unpack(arg));
+	if ( ok ) then return result, err; end
 	return nil;
 end
 function A.Has(name) return type(getglobal(name)) == "function"; end
--- the first of several possible field names that is set
+-- the first of several possible field names that is set (only for old game builds; the docs' names come first)
 function A.Field(t, k1, k2, k3, k4)
 	if ( type(t) ~= "table" ) then return nil; end
 	if ( t[k1] ~= nil ) then return t[k1]; end
@@ -36,34 +37,60 @@ function A.Field(t, k1, k2, k3, k4)
 	if ( k4 and t[k4] ~= nil ) then return t[k4]; end
 	return nil;
 end
-function A.Id(t) return A.Field(t, "id", "unitId", "anchorId", "spawnId"); end
--- AZS_GetWorldAnchors(): every anchor the game offers (enemies, bosses, guardians, caches, lairs, fallen spots).
-function A.Anchors()
-	local list = A.Call("AZS_GetWorldAnchors");
-	if ( type(list) ~= "table" ) then return {}; end
-	return list;
-end
--- AZS_ProjectWorldAnchors(anchors, liftYards): screen positions. Returns a map: anchor id -> { x, y, on, dist }
--- in UIParent units. Accepts results in the same order as the request, or keyed by anchor id.
-function A.Project(anchors, lift)
-	local out = {};
-	if ( table.getn(anchors) == 0 ) then return out; end
-	local result = A.Call("AZS_ProjectWorldAnchors", anchors, lift);
-	if ( type(result) ~= "table" ) then return out; end
-	local scale = UIParent:GetEffectiveScale() or 1;
-	local function Read(anchor, p)
-		if ( type(p) ~= "table" ) then return; end
-		local x, y = A.Field(p, "x", "screenX", "sx"), A.Field(p, "y", "screenY", "sy");
-		if ( type(x) ~= "number" or type(y) ~= "number" ) then return; end
-		local on = A.Field(p, "onScreen", "visible", "inView");
-		local id = A.Id(anchor) or A.Id(p);
-		if ( id == nil ) then return; end
-		out[id] = { x = x / scale, y = y / scale, on = on ~= false, dist = A.Field(p, "distance", "dist", "yards") };
+function A.Id(t) return A.Field(t, "id", "unitId", "anchorId"); end
+
+-- The world-anchor catalog (AZS_GetWorldAnchors): every page of one catalog, read in one go, as the docs require (a
+-- later frame may have another catalog). Only the kinds Slim Suite draws are asked for. Read at most ten times a
+-- second and shared by the markers and the minimap pins. Gives { list, byUnit (AZS_UNITS id), byLair (lair index) }.
+local CATALOG_QUERY = { kinds = { "boss", "finalBoss", "guardian", "elite", "guardianLair" } };
+local catalog = { at = -1, list = {}, byUnit = {}, byLair = {} };
+function A.Catalog(now)
+	if ( now - catalog.at < 0.1 ) then return catalog; end
+	if ( not A.Has("AZS_GetWorldAnchors") ) then return catalog; end
+	local list, cursor = {}, nil;
+	for pages = 1, 32 do
+		local page = A.Call("AZS_GetWorldAnchors", CATALOG_QUERY, cursor);
+		if ( type(page) ~= "table" or type(page.entries) ~= "table" ) then return catalog; end   -- not ready: keep the last
+		for i = 1, table.getn(page.entries) do table.insert(list, page.entries[i]); end
+		if ( not page.hasMore ) then break; end
+		cursor = page.nextCursor;
 	end
-	for i = 1, table.getn(anchors) do Read(anchors[i], result[i] or result[A.Id(anchors[i]) or 0]); end
+	local byUnit, byLair = {}, {};
+	for i = 1, table.getn(list) do
+		local e = list[i];
+		if ( e.unitId ~= nil and e.state ~= "dead" ) then byUnit[e.unitId] = e; end
+		if ( e.lairIndex ~= nil ) then byLair[e.lairIndex] = e; end
+	end
+	catalog.at, catalog.list, catalog.byUnit, catalog.byLair = now, list, byUnit, byLair;
+	return catalog;
+end
+
+-- AZS_ProjectWorldAnchors: requests are { anchorId, attachment ("position" or "overhead"), offset = { z = yards } }.
+-- Gives a map: anchor id -> { x, y, on, dist } in UIParent units, for the anchors on screen only (the game gives no
+-- screen place for one that is off screen or behind the camera). Asks in groups of 256, the most per call.
+function A.Project(requests)
+	local out = {};
+	local n = table.getn(requests);
+	if ( n == 0 or not A.Has("AZS_ProjectWorldAnchors") ) then return out; end
+	local scale = UIParent:GetEffectiveScale() or 1;
+	local first = 1;
+	while ( first <= n ) do
+		local batch = {};
+		for i = first, math.min(n, first + 255) do table.insert(batch, requests[i]); end
+		first = first + 256;
+		local result = A.Call("AZS_ProjectWorldAnchors", batch);
+		if ( type(result) == "table" and type(result.entries) == "table" ) then
+			for i = 1, table.getn(result.entries) do
+				local e = result.entries[i];
+				if ( e.state == "onScreen" and type(e.x) == "number" and type(e.y) == "number" ) then
+					out[e.anchorId] = { x = e.x / scale, y = e.y / scale, on = true, dist = e.playerDistance };
+				end
+			end
+		end
+	end
 	return out;
 end
-function A.Kind(anchor) return string.lower(tostring(A.Field(anchor, "kind", "type", "category") or "")); end
+function A.Kind(anchor) return string.lower(tostring(A.Field(anchor, "kind") or "")); end
 W.API = A;
 
 -- ---------------------------------------------------------------- marker drawing
@@ -201,6 +228,7 @@ end
 local function DownedFriends(now)
 	local list = A.Call("AZS_GetDownedPartyMembers");
 	local current = {};
+	if ( type(list) ~= "table" and A.Has("AZS_GetDownedPartyMembers") ) then return {}; end   -- not ready yet: next time
 	if ( type(list) ~= "table" ) then
 		-- Older game builds: still play the sound when a teammate falls, from party health.
 		for i = 1, 4 do
@@ -236,60 +264,60 @@ end
 -- What to mark is gathered ten times a second; where it is on screen is worked out every frame so markers stay put
 -- as the camera turns.
 local gathered = { at = 0, want = {}, kinds = {} };
+local LIFT = { z = 3 };                                   -- a lair's or a fallen friend's marker floats 3 yards up
 local function Gather(now)
 	local d = DB();
 	local phase = A.Call("AZS_GetPhase");
 	local inRun = phase == nil or phase == "playing" or phase == "choosing" or phase == "paused";
-	local anchors = (inRun and (d.bossMarks or d.prePullMarks)) and A.Anchors() or {};
-	local byId = {};
-	for i = 1, table.getn(anchors) do
-		local id = A.Id(anchors[i]);
-		if ( id ~= nil ) then byId[id] = anchors[i]; end
-	end
+	local cat = (inRun and (d.bossMarks or d.prePullMarks)) and A.Catalog(now) or { byUnit = {}, byLair = {} };
 	local want, kinds = {}, {};
-	-- pulled bosses and Guardians
+	local function Want(anchorId, attachment, offset, kind)
+		if ( anchorId == nil or kinds[anchorId] ) then return; end
+		table.insert(want, { anchorId = anchorId, attachment = attachment, offset = offset });
+		kinds[anchorId] = kind;
+	end
+	-- pulled bosses and Guardians: over their heads
 	if ( inRun and d.bossMarks ) then
 		local enemies = PulledEnemies();
 		AssignIcons(enemies);
 		for i = 1, table.getn(enemies) do
 			local e = enemies[i];
-			if ( assigned[e.id] and byId[e.id] ) then table.insert(want, byId[e.id]); kinds[e.id] = { icon = assigned[e.id] }; end
+			local a = cat.byUnit[e.id];
+			if ( assigned[e.id] and a ) then Want(a.anchorId, "overhead", nil, { icon = assigned[e.id] }); end
 		end
 	else
 		for id in pairs(assigned) do assigned[id] = nil; end
 	end
-	-- Guardians and lairs before they are pulled
+	-- Guardians before they are pulled (over their heads), and their lairs (on the spot)
 	if ( inRun and d.prePullMarks ) then
 		local sleeping = SleepingGuardians();
 		for i = 1, table.getn(sleeping) do
 			local s = sleeping[i];
-			if ( byId[s.id] and not kinds[s.id] ) then table.insert(want, byId[s.id]); kinds[s.id] = { prePull = true, name = s.name }; end
+			local a = cat.byUnit[s.id];
+			if ( a ) then Want(a.anchorId, "overhead", nil, { prePull = true, name = s.name }); end
 		end
-		for i = 1, table.getn(anchors) do
-			local a = anchors[i];
-			local id = A.Id(a);
-			if ( id ~= nil and A.Kind(a) == "lair" and not kinds[id] ) then
-				table.insert(want, a); kinds[id] = { prePull = true, name = A.Field(a, "name", "label") or "Lair" };
-			end
-		end
-		-- an empty lair is labelled with its refill countdown, so you know when to go back
 		local lairs = W.LairInfo(now);
 		for i = 1, table.getn(lairs) do
 			local l = lairs[i];
-			if ( l.state == "empty" and kinds[l.id] ) then
-				kinds[l.id].name = l.refill and ("Refills in " .. W.Clock(l.refill)) or "Empty lair";
-				kinds[l.id].empty = true;
+			local a = cat.byLair[l.index];
+			if ( a and l.state ~= "awake" ) then
+				local kind = { prePull = true, name = l.name };
+				-- an empty lair is labelled with its refill countdown, so you know when to go back
+				if ( l.state == "empty" ) then
+					kind.name = l.refill and ("Refills in " .. W.Clock(l.refill)) or "Empty lair";
+					kind.empty = true;
+				end
+				Want(a.anchorId, "position", LIFT, kind);
 			end
 		end
 	end
-	-- downed friends
+	-- downed friends: each fall comes with its own anchor
 	local friends = (d.deathMarks or d.deathSound) and DownedFriends(now) or {};
 	if ( d.deathMarks ) then
 		for i = 1, table.getn(friends) do
 			local f = friends[i];
-			local id = A.Id(f.entry) or f.key;
-			if ( type(f.entry) == "table" and A.Id(f.entry) == nil ) then f.entry.id = id; end
-			table.insert(want, f.entry); kinds[id] = { friend = f };
+			local e = f.entry;
+			if ( type(e) == "table" and e.anchorStatus == "ready" and e.anchorId ) then Want(e.anchorId, "position", LIFT, { friend = f }); end
 		end
 	end
 	gathered.at, gathered.want, gathered.kinds = now, want, kinds;
@@ -297,36 +325,41 @@ end
 
 local function UpdateMarkers()
 	used = 0;
-	local now = GetTime();
-	if ( now - gathered.at >= 0.1 ) then Gather(now); end
-	local want, kinds = gathered.want, gathered.kinds;
-	local spots = A.Project(want, 3);
-	for i = 1, table.getn(want) do
-		local id = A.Id(want[i]);
-		local p = id ~= nil and spots[id] or nil;
-		local k = id ~= nil and kinds[id] or nil;
-		if ( p and k ) then
-			local m = Marker();
-			if ( k.icon ) then
-				SetRaidIcon(m.icon, k.icon);
-				Show(p, SizeFor(p.dist, true), 1, nil);
-			elseif ( k.prePull ) then
-				m.icon:SetTexture(PRE_PULL_ICON); m.icon:SetTexCoord(0, 1, 0, 1);
-				Show(p, SizeFor(p.dist, false), k.empty and 0.5 or 0.85, k.name);
-			elseif ( k.friend ) then
-				local st = k.friend.state;
-				SetRaidIcon(m.icon, st.icon or DEATH_ICONS[1]);
-				-- blink 16 times when they fall, then stay lit until they are back up
-				local t = now - st.first;
-				local lit = t >= DEATH_BLINKS * 0.8 or math.mod(math.floor(t / 0.4), 2) == 0;
-				Show(p, SizeFor(p.dist, true), lit and 1 or 0.15, k.friend.name);
+	if ( overlay:IsShown() ) then
+		local now = GetTime();
+		if ( now - gathered.at >= 0.1 ) then Gather(now); end
+		local want, kinds = gathered.want, gathered.kinds;
+		local spots = A.Project(want);
+		for i = 1, table.getn(want) do
+			local id = want[i].anchorId;
+			local p, k = spots[id], kinds[id];
+			if ( p and k ) then
+				local m = Marker();
+				if ( k.icon ) then
+					SetRaidIcon(m.icon, k.icon);
+					Show(p, SizeFor(p.dist, true), 1, nil);
+				elseif ( k.prePull ) then
+					m.icon:SetTexture(PRE_PULL_ICON); m.icon:SetTexCoord(0, 1, 0, 1);
+					Show(p, SizeFor(p.dist, false), k.empty and 0.5 or 0.85, k.name);
+				elseif ( k.friend ) then
+					local st = k.friend.state;
+					SetRaidIcon(m.icon, st.icon or DEATH_ICONS[1]);
+					-- blink 16 times when they fall, then stay lit until they are back up
+					local t = now - st.first;
+					local lit = t >= DEATH_BLINKS * 0.8 or math.mod(math.floor(t / 0.4), 2) == 0;
+					Show(p, SizeFor(p.dist, true), lit and 1 or 0.15, k.friend.name);
+				end
 			end
 		end
 	end
 	for i = used + 1, table.getn(pool) do pool[i]:Hide(); end
 end
 
-SS.Every("markers", 0, function() SS.Safe(UpdateMarkers); end, overlay);
+-- Markers move in the game's world-anchor frame handler, which runs after the camera has moved each frame (OnUpdate
+-- runs before, so markers would trail a frame when you turn). Older game builds: once a frame from the shared ticker.
+if ( not (A.Has("AZS_RegisterWorldAnchorFrameHandler") and SS.Safe(AZS_RegisterWorldAnchorFrameHandler, function() SS.Safe(UpdateMarkers); end)) ) then
+	SS.Every("markers", 0, function() SS.Safe(UpdateMarkers); end, overlay);
+end
 
 -- ---------------------------------------------------------------- debuffs on the encounter bars
 local function DebuffIcon(row, i)
@@ -369,7 +402,7 @@ function W.DrawDebuffs(row, unit, vertical, enabled)
 				if ( not string.find(icon, "\\", 1, true) ) then icon = "Interface\\Icons\\" .. icon; end
 				b.icon:SetTexture(icon);
 				local stacks = tonumber(A.Field(db, "stacks", "count", "applications")) or 0;
-				local left = tonumber(A.Field(db, "left", "timeLeft", "remaining", "duration"));
+				local left = not db.permanent and tonumber(db.remaining) or nil;
 				b.count:SetText(stacks > 1 and tostring(stacks) or "");
 				b.time:SetText(left and left > 0 and (left >= 10 and tostring(math.floor(left + 0.5)) or string.format("%.1f", left)) or "");
 				b.data = { name = A.Field(db, "name", "spell"), dispel = A.Field(db, "dispel", "dispelType", "type"), stacks = stacks };
@@ -506,6 +539,7 @@ end
 function W.SetNativeOriginal(part, original) if ( natives[part] ) then natives[part].was = original; end end
 local function SetNativeHidden(n, on)
 	if ( not A.Has("AZS_SetHudShown") ) then return; end
+	if ( type(n.part) ~= "string" or n.part == "" ) then return; end   -- a missing name would hide the whole HUD
 	-- already hidden: ask the game again only when its phase changes, and hide its part again if it came back
 	local rearm = SS.PhaseChanged("hud:" .. n.part);
 	if ( on and n.overridden ) then
@@ -533,15 +567,13 @@ local function UpdateRevive()
 	local r = A.Call("AZS_GetRevive");
 	local progress, label;
 	if ( type(r) == "table" ) then
-		progress = tonumber(A.Field(r, "progress", "fraction", "pct"));
-		local value, max = tonumber(A.Field(r, "value", "current", "elapsed")), tonumber(A.Field(r, "max", "total", "duration"));
-		if ( not progress and value and max and max > 0 ) then progress = value / max; end
-		if ( progress and progress > 1 ) then progress = progress / 100; end
-		local active = A.Field(r, "active", "reviving");
-		if ( active == false ) then progress = nil; end
-		local who = A.Field(r, "name", "target", "who");
-		local left = tonumber(A.Field(r, "left", "timeLeft", "remaining"));
-		label = "Reviving" .. (who and (" " .. tostring(who)) or "") .. (left and string.format("  %.1fs", left) or "");
+		if ( tonumber(r.down) == 1 ) then                  -- you are down and a friend is bringing you back
+			progress = tonumber(r.share);
+			label = "Revived by " .. ((r.by and r.by ~= "") and tostring(r.by) or "a friend");
+		elseif ( r.reviving and r.reviving ~= "" ) then     -- you stand over a downed friend
+			progress = tonumber(r.rshare);
+			label = "Reviving " .. tostring(r.reviving);
+		end
 	end
 	if ( progress and progress > 0 ) then
 		revive.bar:SetValue(math.max(0, math.min(1, progress))); revive.text:SetText(label); revive:Show();
@@ -714,24 +746,15 @@ function A.Lairs()
 end
 -- "asleep", "awake" or "empty"
 function A.LairState(l)
-	local st = A.Field(l, "state", "status", "phase");
-	if ( type(st) == "string" ) then
-		st = string.lower(st);
-		if ( st == "empty" or st == "dead" or st == "cleared" or st == "slain" ) then return "empty"; end
-		if ( st == "awake" or st == "fighting" or st == "active" ) then return "awake"; end
-		return "asleep";
-	end
-	if ( A.Field(l, "empty", "cleared") == true ) then return "empty"; end
-	if ( st == 1 or A.Field(l, "awake") == true ) then return "awake"; end
+	local st = type(l.state) == "string" and string.lower(l.state) or "";
+	if ( st == "empty" or st == "awake" ) then return st; end
 	return "asleep";
 end
--- seconds until an empty lair fills again, or nil if not known
-function A.LairRefill(l, id, now)
-	local left = tonumber(A.Field(l, "refill", "refillIn", "fillsIn", "left"));
-	if ( left ) then return math.max(0, left); end
-	local at = tonumber(A.Field(l, "refillAt", "fillAt", "respawnAt"));
-	if ( at ) then return math.max(0, at - now); end
-	local since = id ~= nil and lairEmptySince[id];
+-- seconds until an empty lair fills again ("left"), else Slim Suite's own 3:00 count, else nil
+function A.LairRefill(l, key, now)
+	local left = tonumber(l.left);
+	if ( left and left >= 0 ) then return left; end
+	local since = lairEmptySince[key];
 	if ( since ) then return math.max(0, LAIR_REFILL - (now - since)); end
 	return nil;
 end
@@ -741,20 +764,20 @@ function W.LairInfo(now)
 	for i = 1, table.getn(lairs) do
 		local l = lairs[i];
 		if ( type(l) == "table" ) then
-			local id = A.Id(l) or i;
+			local key = l.index or i;                      -- the lair's own number (its guardian id is 0 while empty)
 			local state = A.LairState(l);
-			seen[id] = true;
+			seen[key] = true;
 			if ( state == "empty" ) then
-				if ( not lairEmptySince[id] ) then lairEmptySince[id] = now; end
+				if ( not lairEmptySince[key] ) then lairEmptySince[key] = now; end
 			else
-				lairEmptySince[id] = nil;
+				lairEmptySince[key] = nil;
 			end
-			table.insert(list, { id = id, entry = l, state = state, flagged = A.Field(l, "flag", "flagged") and true or false,
-				name = A.Field(l, "guardian", "guardianName", "name") or "Lair",
-				refill = state == "empty" and A.LairRefill(l, id, now) or nil });
+			table.insert(list, { index = key, id = l.id, entry = l, state = state, flagged = tonumber(l.flag) == 1,
+				name = (l.name and l.name ~= "") and l.name or "Lair",
+				refill = state == "empty" and A.LairRefill(l, key, now) or nil });
 		end
 	end
-	for id in pairs(lairEmptySince) do if ( not seen[id] ) then lairEmptySince[id] = nil; end end
+	for key in pairs(lairEmptySince) do if ( not seen[key] ) then lairEmptySince[key] = nil; end end
 	return list;
 end
 local function Clock(sec) sec = math.floor(sec + 0.5); return string.format("%d:%02d", math.floor(sec / 60), math.mod(sec, 60)); end
@@ -781,17 +804,19 @@ function A.Pos(t)
 	if ( type(x) == "number" and type(y) == "number" ) then return x, y; end
 	return nil;
 end
--- the caches on the field (0.92): a getter if the game has one, else its table
+-- the caches on the field: AZS_CHESTS
 function A.Caches()
-	local list = A.Call("AZS_GetCaches");
-	if ( type(list) ~= "table" ) then list = type(AZS_CACHES) == "table" and AZS_CACHES or {}; end
-	return list;
+	return type(AZS_CHESTS) == "table" and AZS_CHESTS or {};
 end
 
--- your hero's position, smoothed between the game's updates: when AZS_RUN moves in steps, the position is carried
--- forward at the speed of the last step for a moment, so pins do not jump each time it updates
+-- Your hero's position this frame (AZS_GetPlayerPosition, every map), with its coordinate space: a cache's or a lair's
+-- x, y is used only when its spaceId is yours. Older game builds: AZS_RUN's position, carried forward between its
+-- twice-a-second updates so pins do not jump.
 local hero = { at = 0, vx = 0, vy = 0 };
 function A.PlayerPos()
+	local p = A.Call("AZS_GetPlayerPosition");
+	if ( type(p) == "table" and type(p.x) == "number" and type(p.y) == "number" ) then return p.x, p.y, p.spaceId; end
+	if ( A.Has("AZS_GetPlayerPosition") ) then return nil; end   -- not ready (a loading screen): no pins this frame
 	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
 	if ( not run or type(run.px) ~= "number" or type(run.py) ~= "number" ) then return nil; end
 	local now = GetTime();
@@ -805,49 +830,14 @@ function A.PlayerPos()
 	if ( now - hero.at > 0.4 ) then hero.vx, hero.vy = 0, 0; end
 	return hero.x + hero.vx * t, hero.y + hero.vy * t;
 end
-
--- north / west in yards from a world offset, using the saved axis check if there is one
-local function Bearing(dx, dy)
-	local axes = DB().minimapAxes;
-	if ( type(axes) == "table" and axes.east ) then
-		local east = (axes.east == "x" and dx or dy) * axes.eastSign;
-		local north = (axes.east == "x" and dy or dx) * axes.northSign;
-		return north, -east;
-	end
-	return dx, dy;                                         -- WoW: +x north, +y west
+-- the same coordinate space as yours (an entry without one, from an old build, is taken as yours)
+local function SameSpace(entry, space)
+	return space == nil or type(entry) ~= "table" or entry.spaceId == nil or entry.spaceId == space;
 end
 
--- Learn the axes: compare how the hero's yards change with how the game's own map position changes (map x grows to the
--- east, map y to the south). After 80 yards of clear movement the answer is saved.
-local learn = { at = 0, xe = 0, ye = 0, xs = 0, ys = 0, moved = 0 };
-local function LearnAxes(now)
-	if ( type(DB().minimapAxes) == "table" or now < learn.at ) then return; end
-	learn.at = now + 0.5;
-	if ( not GetPlayerMapPosition or (WorldMapFrame and WorldMapFrame:IsShown()) ) then return; end
-	if ( SetMapToCurrentZone ) then SS.Safe(SetMapToCurrentZone); end
-	local ok, mx, my = SS.Safe(GetPlayerMapPosition, "player");
-	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
-	if ( not ok or not mx or (mx == 0 and my == 0) or not run or type(run.px) ~= "number" ) then learn.last = nil; return; end
-	local last = learn.last;
-	learn.last = { mx = mx, my = my, x = run.px, y = run.py };
-	if ( not last ) then return; end
-	local dx, dy, dme, dms = run.px - last.x, run.py - last.y, mx - last.mx, my - last.my;
-	local step = math.sqrt(dx * dx + dy * dy);
-	if ( step < 2 or step > 60 or (dme == 0 and dms == 0) ) then return; end
-	learn.xe, learn.ye = learn.xe + dx * dme, learn.ye + dy * dme;
-	learn.xs, learn.ys = learn.xs + dx * dms, learn.ys + dy * dms;
-	learn.moved = learn.moved + step;
-	if ( learn.moved < 80 ) then return; end
-	local straight = math.abs(learn.xe) + math.abs(learn.ys);   -- x runs east-west, y north-south
-	local crossed = math.abs(learn.ye) + math.abs(learn.xs);    -- y runs east-west, x north-south
-	if ( straight > crossed * 4 ) then
-		DB().minimapAxes = { east = "x", eastSign = learn.xe > 0 and 1 or -1, northSign = learn.ys > 0 and -1 or 1 };
-	elseif ( crossed > straight * 4 ) then
-		DB().minimapAxes = { east = "y", eastSign = learn.ye > 0 and 1 or -1, northSign = learn.xs > 0 and -1 or 1 };
-	else
-		learn.xe, learn.ye, learn.xs, learn.ys, learn.moved = 0, 0, 0, 0, 0;   -- unclear: start over
-	end
-end
+-- north and west in yards from a world offset: the docs fix the axes (+x north, +y west), and the 1.12 minimap keeps
+-- north up
+local function Bearing(dx, dy) return dx, dy; end
 
 -- Indoors or out: the 1.12 minimap keeps a zoom for each (the minimapZoom and minimapInsideZoom settings). When both
 -- are the same, a quick zoom nudge shows which one follows. Checked when the zoom or the zone changes, not each frame.
@@ -935,7 +925,7 @@ end
 
 -- What to pin is gathered ten times a second; pins are placed every frame.
 local targets = {};
-local function GatherPins()
+local function GatherPins(space)
 	targets = {};
 	local d = DB();
 	local phase = A.Call("AZS_GetPhase");
@@ -946,9 +936,8 @@ local function GatherPins()
 		for i = 1, table.getn(caches) do
 			local c = caches[i];
 			local x, y = A.Pos(c);
-			if ( x and not A.Field(c, "opened", "looted", "taken") ) then
-				table.insert(targets, { x = x, y = y, size = 13, rim = true, crop = true, texture = "Interface\\Icons\\INV_Box_02",
-					tip = A.Field(c, "name", "label") or "Cache" });
+			if ( x and SameSpace(c, space) ) then
+				table.insert(targets, { x = x, y = y, size = 13, rim = true, crop = true, texture = "Interface\\Icons\\INV_Box_02", tip = "Cache" });
 			end
 		end
 	end
@@ -957,7 +946,7 @@ local function GatherPins()
 		for i = 1, table.getn(lairs) do
 			local l = lairs[i];
 			local x, y = A.Pos(l.entry);
-			if ( x ) then
+			if ( x and SameSpace(l.entry, space) ) then
 				local t = { x = x, y = y, size = l.flagged and 13 or 11, texture = PRE_PULL_ICON, tip = l.name };
 				if ( l.state == "awake" ) then
 					t.r, t.g, t.b, t.sub = 1, 0.3, 0.25, "Awake: its Guardian is fighting";
@@ -974,21 +963,17 @@ local function GatherPins()
 		end
 	end
 	if ( d.minimapBosses ) then
+		-- a boss's place comes from the world-anchor catalog (AZS_GetBosses carries no position)
 		local bosses = A.Call("AZS_GetBosses");
+		local cat = A.Catalog(GetTime());
 		if ( type(bosses) == "table" ) then
-			local byId = {};
-			local anchors = A.Anchors();
-			for i = 1, table.getn(anchors) do local id = A.Id(anchors[i]); if ( id ~= nil ) then byId[id] = anchors[i]; end end
 			for i = 1, table.getn(bosses) do
 				local b = bosses[i];
-				if ( type(b) == "table" ) then
-					local x, y = A.Pos(b);
-					if ( not x and b.id ~= nil ) then x, y = A.Pos(byId[b.id]); end
-					if ( x ) then
-						-- the boss's own marker icon when it has one, else a skull
-						table.insert(targets, { x = x, y = y, size = 15, rim = true, texture = RAID_ICONS,
-							raid = (b.id ~= nil and assigned[b.id]) or 8, tip = b.name or "Boss" });
-					end
+				local a = type(b) == "table" and b.id ~= nil and cat.byUnit[b.id] or nil;
+				if ( a and a.positionAvailable and SameSpace(a, space) ) then
+					-- the boss's own marker icon when it has one, else a skull
+					table.insert(targets, { x = a.x, y = a.y, size = 15, rim = true, texture = RAID_ICONS,
+						raid = assigned[b.id] or 8, tip = b.name or "Boss" });
 				end
 			end
 		end
@@ -998,9 +983,9 @@ end
 local pinGather = 0;
 local function UpdateMinimapPins()
 	local now = GetTime();
-	if ( now >= pinGather ) then pinGather = now + 0.1; GatherPins(); SS.Safe(LearnAxes, now); end
 	pinUsed = 0;
-	local px, py = A.PlayerPos();
+	local px, py, space = A.PlayerPos();
+	if ( now >= pinGather ) then pinGather = now + 0.1; GatherPins(space); end
 	if ( px and Minimap and Minimap:IsVisible() ) then
 		for i = 1, table.getn(targets) do PlacePin(px, py, targets[i]); end
 	end
@@ -1048,10 +1033,10 @@ local function GameTime()
 	elseif ( type(t) == "table" ) then
 		text = A.Field(t, "text", "label");
 		h, m = tonumber(A.Field(t, "hour", "h")), tonumber(A.Field(t, "minute", "min", "m"));
-		fmt = A.Field(t, "format", "fmt");
+		fmt = t.is24Hour;
 	end
 	local is24;
-	if ( fmt ~= nil ) then is24 = not string.find(tostring(fmt), "12", 1, true); end
+	if ( type(fmt) == "boolean" ) then is24 = fmt; end
 	if ( (not h or not m) and type(text) == "string" ) then
 		local _, _, hh, mm, ampm = string.find(text, "(%d+):(%d+)%s*([AaPp]?[Mm]?)");
 		h, m = tonumber(hh), tonumber(mm);
@@ -1132,25 +1117,24 @@ floatLayer:SetFrameStrata("LOW");
 floatLayer:EnableMouse(false);
 local floats, floatPool = {}, {};
 
+-- an event's anchor: a handle the game says is ready, else none (never a place the game does not know)
 local function FloatAnchor(event)
-	local a = A.Field(event, "anchor", "anchorId", "targetAnchor", "worldAnchor");
-	if ( a == nil ) then return nil; end
-	if ( type(a) ~= "table" ) then a = { id = a }; end
-	if ( A.Id(a) == nil ) then a.id = tostring(event); end
-	return a;
+	if ( event.anchorStatus ~= nil and event.anchorStatus ~= "ready" ) then return nil; end
+	return event.anchorId;
 end
 
 local function OnFloatEvent(event)
-	if ( not DB().floatingText or type(event) ~= "table" or type(event.amount) ~= "number" ) then return; end
-	local kind = event.kind;
-	if ( kind ~= "damage" and kind ~= "heal" and kind ~= "healing" ) then return; end
+	if ( not DB().floatingText or type(event) ~= "table" or event.kind ~= "damage" or type(event.amount) ~= "number" ) then return; end
 	local anchor = FloatAnchor(event);
 	if ( not anchor ) then return; end
+	local now = GetTime();
+	local born = tonumber(event.presentedAt) or now;
+	if ( now - born > FLOAT_LIFE ) then return; end      -- a delayed batch's old hit: not shown
 	if ( table.getn(floats) >= 60 ) then table.remove(floats, 1); end
-	table.insert(floats, { anchor = anchor, born = GetTime(), crit = event.critical == true, heal = kind ~= "damage",
+	table.insert(floats, { anchor = anchor, born = born, crit = event.critical == true,
 		text = tostring(math.floor(event.amount + 0.5)), icon = IconFor(event),
 		drift = math.mod(table.getn(floats), 5) * 9 - 18,
-		kind = SS.UnitKind(A.Field(event, "target", "targetId", "unitId")) });
+		kind = event.targetUnitId ~= nil and SS.UnitKind(event.targetUnitId) or nil });
 end
 if ( SlimSuiteMeter and SlimSuiteMeter.listeners ) then table.insert(SlimSuiteMeter.listeners, OnFloatEvent); end
 
@@ -1168,6 +1152,7 @@ local function FloatText(i)
 end
 
 local function DrawFloats()
+	if ( DB().floatingText and SlimSuiteMeter and SlimSuiteMeter.Drain ) then SS.Safe(SlimSuiteMeter.Drain); end
 	local now = GetTime();
 	for i = table.getn(floats), 1, -1 do
 		local e = floats[i];
@@ -1178,23 +1163,24 @@ local function DrawFloats()
 		for i = 1, table.getn(floatPool) do floatPool[i]:Hide(); end
 		return;
 	end
-	local anchors = {};
-	for i = 1, n do anchors[i] = floats[i].anchor; end
-	local result = A.Call("AZS_ProjectCombatTextAnchors", anchors);
+	-- AZS_ProjectCombatTextAnchors(ids, "follow"): over the living enemy, then where it fell
+	local ids = {};
+	for i = 1, n do ids[i] = floats[i].anchor; end
+	local result = A.Call("AZS_ProjectCombatTextAnchors", ids, "follow");
+	local entries = type(result) == "table" and type(result.entries) == "table" and result.entries or {};
 	local scale = UIParent:GetEffectiveScale() or 1;
 	local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
 	local shown = 0;
 	for i = 1, n do
 		local e = floats[i];
-		local p = type(result) == "table" and (result[i] or result[A.Id(e.anchor)]) or nil;
-		local x, y = A.Field(p, "x", "screenX", "sx"), A.Field(p, "y", "screenY", "sy");
-		local on = A.Field(p, "onScreen", "visible", "inView");
-		if ( type(x) == "number" and type(y) == "number" and on ~= false ) then
+		local p = entries[i];
+		local x, y = p and p.x, p and p.y;
+		if ( p and p.state == "onScreen" and type(x) == "number" and type(y) == "number" ) then
 			shown = shown + 1;
 			local f = FloatText(shown);
 			local life = e.crit and FLOAT_CRIT_LIFE or FLOAT_LIFE;
 			local t = (now - e.born) / life;
-			local dist = tonumber(A.Field(p, "distance", "dist", "yards"));
+			local dist = tonumber(p.playerDistance);
 			local near = dist and math.max(0.6, math.min(1.25, 1.35 - dist / 90)) or 1;
 			local pop = (e.crit and t < 0.12) and (1.3 - t * 2.5) or 1;
 			local size = math.floor((e.crit and 22 or 14) * near * pop + 0.5);

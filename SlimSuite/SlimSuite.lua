@@ -38,18 +38,29 @@ local NAME = "Slim Suite";
 -- the game itself writes "You have gained {damage}% damage, {health} maximum health and {regen} health per second."
 -- SS.UnitKind(unit): what an enemy is, as one lowercase word ("final", "boss", "guardian", "elite", ...).
 -- Pass a unit token ("target"), an id, or an entry from AZS_UNITS / AZS_GetBosses / AZS_GetGuardians. The game's
--- AZS_UnitKind (0.87) answers first; an entry's own kind field is the fallback. Use this everywhere instead of
--- reading .kind directly, so every feature classifies enemies the same way.
+-- AZS_UnitKind answers for unit names (it takes only those, per the addon docs); an id or an entry is classed by its
+-- own kind field, else by AZS_UNITS. Use this everywhere instead of reading .kind directly.
 function SS.UnitKind(unit)
-	local key = unit;
-	if ( type(unit) == "table" ) then key = unit.id; end
-	if ( key ~= nil and type(AZS_UnitKind) == "function" ) then
-		local ok, kind = SS.Safe(AZS_UnitKind, key);
-		if ( ok and type(kind) == "string" and kind ~= "" ) then return string.lower(kind); end
+	-- a unit name ("target", "mouseover"): the game's AZS_UnitKind, which takes only those
+	if ( type(unit) == "string" ) then
+		if ( type(AZS_UnitKind) == "function" ) then
+			local ok, kind = SS.Safe(AZS_UnitKind, unit);
+			if ( ok and type(kind) == "string" and kind ~= "" ) then return string.lower(kind); end
+		end
+		return nil;
 	end
+	-- an AZS_UNITS id, or an entry from AZS_UNITS / AZS_GetBosses / AZS_GetGuardians: its own kind, else AZS_UNITS'
+	local id = unit;
 	if ( type(unit) == "table" ) then
 		if ( unit.final ) then return "final"; end
-		if ( type(unit.kind) == "string" ) then return string.lower(unit.kind); end
+		if ( type(unit.kind) == "string" and unit.kind ~= "" ) then return string.lower(unit.kind); end
+		id = unit.id;
+	end
+	if ( id ~= nil and type(AZS_UNITS) == "table" ) then
+		for i = 1, table.getn(AZS_UNITS) do
+			local u = AZS_UNITS[i];
+			if ( type(u) == "table" and u.id == id and type(u.kind) == "string" ) then return string.lower(u.kind); end
+		end
 	end
 	return nil;
 end
@@ -824,7 +835,8 @@ itemRowEvents:SetScript("OnEvent", function()
 end);
 -- Some game gear changes are applied by the run rather than a bag click. Poll the five jewelry
 -- equipment slots as a fallback so the item deck updates even if that transition omits the event.
-SS.Every("itemRowPoll", 0.5, function() SS.Safe(SS.RefreshSpellRow); SS.Safe(SS.ApplyBuildRowReplacement); end);
+-- the AZSSPELLS addon message refreshes the rows as the spells change; this slow check only catches anything missed
+SS.Every("itemRowPoll", 2, function() SS.Safe(SS.RefreshSpellRow); SS.Safe(SS.ApplyBuildRowReplacement); end);
 
 local spellRowEvents = CreateFrame("Frame");
 spellRowEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
