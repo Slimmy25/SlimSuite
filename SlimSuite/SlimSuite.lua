@@ -2925,6 +2925,7 @@ function SS.ApplyMinimapShape()
 	if ( not Minimap or not Minimap.SetMaskTexture ) then return false; end
 	local square = SS.DB().minimapSquare and true or false;
 	local ok = SS.Safe(Minimap.SetMaskTexture, Minimap, square and SlimSuiteMinimapMask.square or SlimSuiteMinimapMask.round);
+	SS.squareActive = square and ok and true or false;
 	SS.Safe(SS.ArrangeEdgeButtons, square and ok);   -- the buttons follow the shape the map really has
 	if ( MinimapBorder ) then if ( square ) then MinimapBorder:Hide(); else MinimapBorder:Show(); end end
 	-- the map is only redrawn with its new shape when it changes zoom: step the zoom and back to force that
@@ -2936,40 +2937,57 @@ function SS.ApplyMinimapShape()
 	return ok;
 end
 
--- With the square minimap, the small buttons around its edge (the game's own and other addons') move from the old
--- circle to the same direction on the square's edge; switching back to round puts each one back where it was.
--- Gathered buttons are left to the gather layout, and the map's pins are never touched (they have no name).
+-- With the square minimap, the buttons around it follow the square: the zoom buttons stand one above the other at
+-- its right edge, and every other minimap button (the game's own, the day/night moon, other addons' and Slim Suite's
+-- gear) lines up in a column down its left edge. Switching back to round puts each one back where it was.
+-- Gathered buttons and the buttons in their own row are left to those layouts; the map's pins are never touched (they
+-- have no name), and neither is the minimap's close button.
+SS.SQUARE_KNOWN = { MinimapZoomIn = true, MinimapZoomOut = true, GameTimeFrame = true, MiniMapTrackingFrame = true,
+	MiniMapMailFrame = true, MiniMapBattlefieldFrame = true, MiniMapMeetingStoneFrame = true };
+SS.SQUARE_SKIP = { MinimapPing = true, MinimapToggleButton = true };
+-- true while the square layout places the buttons (the minimap buttons' "Around the minimap" choice)
+function SS.SquareColumn()
+	return SS.squareActive and SS.MinimapButtonPlace() == "ring";
+end
 function SS.ArrangeEdgeButtons(square)
 	if ( not Minimap or not Minimap.GetCenter ) then return; end
 	local mx, my = Minimap:GetCenter();
 	if ( not mx ) then return; end
 	local ms = Minimap:GetEffectiveScale() or 1;
-	mx, my = mx * ms, my * ms;
-	local half = (Minimap:GetWidth() or 140) * ms / 2;
+	local half = (Minimap:GetWidth() or 140) / 2;
+	local halfH = (Minimap:GetHeight() or 140) / 2;
+	local column = square and SS.MinimapButtonPlace() == "ring";
+	local left, zoomIn, zoomOut = {}, nil, nil;
 	for _, root in ipairs({ Minimap, MinimapCluster }) do
 		local kids = { root:GetChildren() };
 		for i = 1, table.getn(kids) do
 			local f = kids[i];
 			local name = f and f.GetName and f:GetName();
-			if ( name and f ~= SS.Mini and f ~= Minimap and not f.slimOrig and not f.slimBarOrig and name ~= "MinimapPing"
+			if ( name and f ~= SS.Mini and f ~= Minimap and not f.slimOrig and not f.slimBarOrig and not SS.SQUARE_SKIP[name]
 				and string.sub(name, 1, 9) ~= "SlimSuite" ) then
 				local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
 				if ( w > 0 and w <= 40 and h > 0 and h <= 40 ) then
-					if ( square and not f.slimSquareOrig ) then
-						local fx, fy = f:GetCenter();
-						if ( fx ) then
-							local fs = f:GetEffectiveScale() or 1;
-							local dx, dy = fx * fs - mx, fy * fs - my;
-							local r = math.sqrt(dx * dx + dy * dy);
-							local most = math.max(math.abs(dx), math.abs(dy));
-							if ( r >= half * 0.75 and most > 0 ) then   -- only buttons sitting around the edge
-								local p, rel, rp, x, y = f:GetPoint(1);
-								f.slimSquareOrig = { p, rel, rp, x or 0, y or 0 };
-								f:ClearAllPoints();
-								f:SetPoint("CENTER", Minimap, "CENTER", dx * r / most / fs, dy * r / most / fs);
+					if ( column ) then
+						-- a button joins the layout once: the game's own by name, another addon's if it sits around the edge
+						local member = f.slimSquareOrig ~= nil or SS.SQUARE_KNOWN[name];
+						if ( not member ) then
+							local fx, fy = f:GetCenter();
+							if ( fx ) then
+								local fs = f:GetEffectiveScale() or 1;
+								local dx, dy = fx * fs / ms - mx, fy * fs / ms - my;
+								member = math.sqrt(dx * dx + dy * dy) >= half * 0.75;
 							end
 						end
-					elseif ( not square and f.slimSquareOrig ) then
+						if ( member ) then
+							if ( not f.slimSquareOrig ) then
+								local p, rel, rp, x, y = f:GetPoint(1);
+								f.slimSquareOrig = { p, rel, rp, x or 0, y or 0 };
+							end
+							if ( name == "MinimapZoomIn" ) then zoomIn = f;
+							elseif ( name == "MinimapZoomOut" ) then zoomOut = f;
+							else table.insert(left, f); end
+						end
+					elseif ( f.slimSquareOrig ) then
 						local o = f.slimSquareOrig;
 						f.slimSquareOrig = nil;
 						f:ClearAllPoints();
@@ -2979,7 +2997,61 @@ function SS.ArrangeEdgeButtons(square)
 			end
 		end
 	end
+	if ( column ) then
+		-- a button's offsets are in its own scale; sizes and places here are in the minimap's
+		local function Put(f, x, y)
+			local k = ms / (f:GetEffectiveScale() or 1);
+			f:ClearAllPoints();
+			f:SetPoint("CENTER", Minimap, "CENTER", x * k, y * k);
+		end
+		local function Size(f)
+			local k = ms / (f:GetEffectiveScale() or 1);
+			return (f:GetWidth() or 32) / k, (f:GetHeight() or 32) / k;
+		end
+		-- + over -, centred on the right edge
+		if ( zoomIn ) then local w, h = Size(zoomIn); Put(zoomIn, half + w / 2 + 2, h / 2 + 1); end
+		if ( zoomOut ) then local w, h = Size(zoomOut); Put(zoomOut, half + w / 2 + 2, -(h / 2 + 1)); end
+		-- the moon first, then the others by name, Slim Suite's gear last; hidden ones (no mail, say) leave no gap
+		table.sort(left, function(a, b)
+			local an, bn = a:GetName() or "", b:GetName() or "";
+			if ( an == "GameTimeFrame" ) then return bn ~= "GameTimeFrame"; end
+			if ( bn == "GameTimeFrame" ) then return false; end
+			return an < bn;
+		end);
+		local d = SS.DB();
+		if ( SS.Mini and not (d.minimap and (d.minimap.hide or d.minimap.detached)) ) then table.insert(left, SS.Mini); end   -- one dragged off the map stays put
+		local y, x, widest = halfH, 0, 0;
+		for i = 1, table.getn(left) do
+			local f = left[i];
+			if ( f == SS.Mini or (f.IsShown and f:IsShown()) ) then
+				local w, h = Size(f);
+				if ( y - h < -halfH and y < halfH ) then x = x + widest + 2; y = halfH; widest = 0; end   -- a full column: one more beside it
+				Put(f, -(half + 2 + x + w / 2), y - h / 2);
+				y = y - h - 2;
+				if ( w > widest ) then widest = w; end
+			end
+		end
+	end
 	if ( SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); end
+end
+
+-- buttons that appear later (new mail, a queue, another addon's button) join the square's column
+SS.Every("squareEdge", 1, function() if ( SS.SquareColumn() ) then SS.ArrangeEdgeButtons(true); end end);
+
+-- The mouse wheel over the minimap zooms it, as the + and - buttons do.
+function SS.MinimapWheel(delta)
+	if ( not Minimap or not Minimap.GetZoom or not Minimap.SetZoom ) then return; end
+	local zoom = Minimap:GetZoom() or 0;
+	local levels = Minimap.GetZoomLevels and Minimap:GetZoomLevels() or 6;
+	if ( delta > 0 and zoom < levels - 1 ) then
+		if ( type(Minimap_ZoomInClick) == "function" ) then Minimap_ZoomInClick(); else Minimap:SetZoom(zoom + 1); end
+	elseif ( delta < 0 and zoom > 0 ) then
+		if ( type(Minimap_ZoomOutClick) == "function" ) then Minimap_ZoomOutClick(); else Minimap:SetZoom(zoom - 1); end
+	end
+end
+if ( Minimap and Minimap.EnableMouseWheel and not Minimap:GetScript("OnMouseWheel") ) then
+	Minimap:EnableMouseWheel(true);
+	Minimap:SetScript("OnMouseWheel", function() SS.Safe(SS.MinimapWheel, arg1 or 0); end);
 end
 
 function SS.SetMinimapSquare(on)
@@ -6101,7 +6173,7 @@ end
 local okMini, errMini = SS.Safe(function()
 	SS.Mini = K.Minimap({ name = "SlimSuiteMinimapButton", icon = "INV_Misc_Gear_02", angle = 190, db = SS.DB,
 		square = function() return SS.DB().minimapSquare; end,
-		docked = function() return SS.DB().minimapBar; end,
+		docked = function() local m = SS.DB().minimap; return SS.DB().minimapBar or (SS.SquareColumn() and not (m and m.detached)); end,   -- placed by the row or the square's column
 		click = function() SS.Toggle(); end,
 		tooltip = function(tt)
 			tt:AddLine(NAME);
