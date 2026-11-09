@@ -2817,13 +2817,15 @@ function SS.RefreshCrossRefs(name)
 	local y = -312;
 	for i = 1, table.getn(sizeMenu.xref) do
 		local cb, e = sizeMenu.xref[i], rows[i];
+		if ( not e ) then SS.RowKind(cb, nil); end
 		if ( e ) then
 			cb.entry = e;
 			cb:ClearAllPoints();
 			cb:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", e[4] and 26 or 8, y);
 			cb.warn:SetText(e.warn or "");
 			if ( e.warn ) then cb.warn:Show(); else cb.warn:Hide(); end
-			y = y - 26 - (e.warn and math.max(10, cb.warn:GetHeight() or 10) or 0);
+			SS.RowKind(cb, e, "below");
+			y = y - 26 - (e.warn and math.max(10, cb.warn:GetHeight() or 10) or 0) - (e.choice and 24 or 0);
 			cb.label:SetText(e.short or e[1]);
 			cb:SetChecked(e[2]() and 1 or nil);
 			if ( e[4] and not e[4]() ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
@@ -4284,10 +4286,80 @@ SU.WARN = {
 	buffsTarget = "Turns off: Buffs/Debuffs on the player frame.",
 	buffsPlayer = "Turns off: Buffs on the target frame.",
 	lockParty = "Makes the party frames movable.",
-	gather = "Turns off: the buttons' own row.",
-	minimapBar = "Turns off: Gather the minimap buttons.",
 };
-SS.WARN = SU.WARN;                                       -- the same, for code above SU's declaration
+SS.WARN = SU.WARN;
+
+-- A setting with several choices ({ label, get, set, choice = { { text, value }, ... } }) shows as one button with the
+-- current choice; clicking it opens a small menu of all of them, the game's own dropdown menu at the cursor.
+SS.choiceButtons = {};
+function SS.ChoiceText(e)
+	local v = e[2] and e[2]();
+	for i = 1, table.getn(e.choice or {}) do if ( e.choice[i][2] == v ) then return e.choice[i][1]; end end
+	return "";
+end
+function SS.RefreshChoices()
+	for i = 1, table.getn(SS.choiceButtons) do
+		local b = SS.choiceButtons[i];
+		if ( b.entry ) then b:SetText(SS.ChoiceText(b.entry) .. "  v"); end
+	end
+end
+function SS.ChoiceButton(parent, width)
+	local b = K.Button(parent, "", width, function() SS.OpenChoice(this.entry); end);
+	table.insert(SS.choiceButtons, b);
+	return b;
+end
+function SS.FillChoiceMenu()
+	local menu = getglobal("SlimSuiteChoiceMenu");
+	local e = menu and menu.entry;
+	if ( not e ) then return; end
+	local current = e[2]();
+	for i = 1, table.getn(e.choice) do
+		local opt = e.choice[i];
+		local info = {};
+		info.text = opt[1];
+		info.checked = current == opt[2];
+		info.func = function() e[3](opt[2]); SS.AfterChoice(); end;
+		UIDropDownMenu_AddButton(info);
+	end
+end
+function SS.OpenChoice(e)
+	if ( not e or not ToggleDropDownMenu or not UIDropDownMenu_Initialize ) then return; end
+	local menu = getglobal("SlimSuiteChoiceMenu");
+	if ( not menu ) then
+		menu = CreateFrame("Frame", "SlimSuiteChoiceMenu", UIParent, "UIDropDownMenuTemplate");
+		menu:Hide();
+		UIDropDownMenu_Initialize(menu, function() SS.Safe(SS.FillChoiceMenu); end, "MENU");
+	end
+	menu.entry = e;
+	ToggleDropDownMenu(1, nil, menu, "cursor", 0, 0);
+end
+-- after a choice: every place that shows it is brought up to date
+function SS.AfterChoice()
+	SS.RefreshChoices();
+	if ( setupActive and SU.focus ) then SU.Focus(SU.focus); end
+	if ( sizeMenu and sizeMenu:IsShown() and SlimSuiteSizeMenuName ) then SS.RefreshCrossRefs(SlimSuiteSizeMenuName); end
+end
+-- a tick-box row turned into a choice row (or back): the box itself is hidden and the choice button stands beside its
+-- label ("right", the setup) or under it ("below", the narrow right-click menu)
+function SS.RowKind(cb, e, where)
+	local choice = e and e.choice ~= nil;
+	for _, get in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetHighlightTexture", "GetCheckedTexture", "GetDisabledCheckedTexture" }) do
+		local t = cb[get] and cb[get](cb);
+		if ( t and t.SetAlpha ) then t:SetAlpha(choice and 0 or 1); end
+	end
+	cb:EnableMouse(not choice);
+	if ( choice ) then
+		if ( not cb.choiceBtn ) then cb.choiceBtn = SS.ChoiceButton(cb, where == "below" and 176 or 200); end
+		cb.choiceBtn.entry = e;
+		cb.choiceBtn:ClearAllPoints();
+		if ( where == "below" ) then cb.choiceBtn:SetPoint("TOPLEFT", cb.label, "BOTTOMLEFT", -2, -3);
+		else cb.choiceBtn:SetPoint("LEFT", cb.label, "RIGHT", 8, 0); end
+		cb.choiceBtn:SetText(SS.ChoiceText(e) .. "  v");
+		cb.choiceBtn:Show();
+	elseif ( cb.choiceBtn ) then
+		cb.choiceBtn:Hide(); cb.choiceBtn.entry = nil;
+	end
+end                                       -- the same, for code above SU's declaration
 SU.WARN_UNMOVABLE = {
 	PlayerFrame = "Unticking turns off: Mirror target.",
 	TargetFrame = "Unticking turns off: Mirror target.",
@@ -4358,10 +4430,7 @@ function SU.ChecksFor(frame)
 		function(v) SS.SetLocalClockOn(v); end, short = "Show the local clock", xref = true }; end
 	local function DetachClock() return { "Detach the clock from the minimap (its own button up top)", function() return SS.DB().clockDetached; end,
 		function(v) SS.SetClockDetached(v); end, function() return SS.DB().replaceLocalClock; end, short = "Detach from minimap", xref = true }; end
-	local function MinimapBar() return { "Put the minimap buttons and the moon in their own movable row", function() return SS.DB().minimapBar; end,
-		function(v) SS.SetMinimapBar(v); end, short = "Buttons in their own row", xref = true, warn = W.minimapBar }; end
-	local function Gather() return { "Gather the minimap buttons together", function() return SS.DB().gatherButtons; end,
-		function(v) SS.SetGather(v); end, short = "Gather the buttons", xref = true, warn = W.gather }; end
+	local function ButtonPlace() return SS.MinimapButtonsEntry(); end
 	local function JoinRows() return { "Join the worn-jewelry row under the build spells", function() return SS.DB().buildRowsAttached; end,
 		function(v) if ( (v and true or false) ~= (SS.DB().buildRowsAttached and true or false) ) then SS.ToggleBuildRowsAttached(); end end, short = "Join the jewelry row", xref = true }; end
 	local list = {
@@ -4376,13 +4445,8 @@ function SU.ChecksFor(frame)
 		BuffFrame = { BuffsOn(), BuffsAbove(), PlayerBuffs(), PlayerBuffsBelow() },
 		MinimapCluster = { { "Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end },
 			ShowClock(), DetachClock(),
-			Gather(),
-			{ "...above the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "above"; end, function(v) if ( v ) then SS.SetGather(true, "above"); end end },
-			{ "...below the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "below"; end, function(v) if ( v ) then SS.SetGather(true, "below"); end end },
-			{ "...left of the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "left"; end, function(v) if ( v ) then SS.SetGather(true, "left"); end end },
-			{ "...right of the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "right"; end, function(v) if ( v ) then SS.SetGather(true, "right"); end end },
-			MinimapBar() },
-		SlimSuiteMinimapBar = { MinimapBar(), Gather(),
+			ButtonPlace() },
+		SlimSuiteMinimapBar = { ButtonPlace(),
 			{ "Vertical", function() return SS.DB().orientations.SlimSuiteMinimapBar == "vertical"; end,
 			function(v) SS.DB().orientations.SlimSuiteMinimapBar = v and "vertical" or "horizontal"; SS.Safe(SS.LayoutMinimapBar); end } },
 		SlimSuiteClockFrame = { { "Show the zone and Heroic affixes under it", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
@@ -5101,6 +5165,7 @@ function SU.Focus(frame)
 		local cb, c = SU.checks[i], checks[i];
 		if ( c ) then
 			cb.label:SetText(c[1]); cb.get, cb.set = c[2], c[3];
+			SS.RowKind(cb, c, "right");
 			cb:ClearAllPoints();
 			-- a setting that only works with another one is indented under it
 			local dx = c[4] and 20 or 0;
@@ -5500,7 +5565,17 @@ function SS.WinBuild()
 			local row = entries[i];
 			local label, lead = row[1], 0;
 			if ( string.find(label, "^%s") ) then lead = 22; label = string.gsub(label, "^%s+", ""); end
-			SS.Check(parent, label, y, row[2], row[3], lead); y = y - 28;
+			if ( row.choice ) then
+				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
+				fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 30 + lead, y - 6); fs:SetText(label);
+				local b = SS.ChoiceButton(parent, 200);
+				b.entry = row; b:SetPoint("LEFT", fs, "RIGHT", 10, 0);
+				b:SetText(SS.ChoiceText(row) .. "  v");
+				b:SetScript("OnShow", function() if ( this.entry ) then this:SetText(SS.ChoiceText(this.entry) .. "  v"); end end);
+			else
+				SS.Check(parent, label, y, row[2], row[3], lead);
+			end
+			y = y - 28;
 		end
 		parent:SetHeight(math.max(20, -y + 12));
 	end
@@ -5561,11 +5636,7 @@ function SS.WinBuild()
 			{"Play a sound when you or a teammate dies", function() return SS.DB().deathSound; end, function(v) SS.DB().deathSound = v; end},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
 			{"Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end},
-			{"Gather the minimap buttons together", function() return SS.DB().gatherButtons; end, function(v) SS.SetGather(v); end},
-			{"   ...above the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "above"; end, function(v) if ( v ) then SS.SetGather(true, "above"); end end},
-			{"   ...below the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "below"; end, function(v) if ( v ) then SS.SetGather(true, "below"); end end},
-			{"   ...left of the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "left"; end, function(v) if ( v ) then SS.SetGather(true, "left"); end end},
-			{"   ...right of the minimap", function() return SS.DB().gatherButtons and SS.DB().gatherSide == "right"; end, function(v) if ( v ) then SS.SetGather(true, "right"); end end},
+			SS.MinimapButtonsEntry(),
 			{"Minimap button", function() local m = SS.DB().minimap; return not (m and m.hide); end, function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (m and m.hide and true or false) == v ) then SS.Mini.Toggle(); end end end}
 		}, -68);
 	end
@@ -5806,11 +5877,38 @@ function SS.LayoutGather()
 	SlimSuiteGatheredList = want;
 end
 
-function SS.SetGather(on, side)
+-- "Minimap buttons": one choice for where the buttons around the minimap go
+SS.MINIMAP_BUTTON_PLACES = { { "Around the minimap", "ring" }, { "Gathered above it", "above" }, { "Gathered below it", "below" },
+	{ "Gathered to its left", "left" }, { "Gathered to its right", "right" }, { "In their own movable row", "row" } };
+function SS.MinimapButtonPlace()
+	local d = SS.DB();
+	if ( d.minimapBar ) then return "row"; end
+	if ( d.gatherButtons ) then return d.gatherSide or "left"; end
+	return "ring";
+end
+function SS.SetMinimapButtonPlace(v)
+	local d = SS.DB();
+	if ( v == "row" ) then
+		if ( not d.minimapBar ) then SS.SetMinimapBar(true, true); end
+	elseif ( v == "ring" ) then
+		if ( d.minimapBar ) then SS.SetMinimapBar(false, true); end
+		if ( d.gatherButtons ) then SS.SetGather(false, nil, true); end
+	else
+		if ( d.minimapBar ) then SS.SetMinimapBar(false, true); end
+		SS.SetGather(true, v, true);
+	end
+end
+-- the setting as a menu row, in the setup, the right-click menus and the settings window
+function SS.MinimapButtonsEntry()
+	return { "Minimap buttons", function() return SS.MinimapButtonPlace(); end, function(v) SS.SetMinimapButtonPlace(v); end,
+		choice = SS.MINIMAP_BUTTON_PLACES, xref = true, short = "Minimap buttons" };
+end
+
+function SS.SetGather(on, side, quiet)
 	SS.DB().gatherButtons = on and true or false;
 	if ( side ) then SS.DB().gatherButtons = true; SS.DB().gatherSide = side; end
 	if ( SS.DB().gatherButtons and SS.DB().minimapBar ) then   -- the newest choice wins: the row lets its buttons go
-		SS.Notice("The minimap buttons' own row turned off: they are gathered by the minimap now.");
+		if ( not quiet ) then SS.Notice("The minimap buttons' own row turned off: they are gathered by the minimap now."); end
 		SS.DB().minimapBar = false; SS.Safe(SS.LayoutMinimapBar); SU.Rebuild();
 	end
 	SS.Safe(SS.LayoutGather);
@@ -5914,10 +6012,10 @@ function SS.LayoutMinimapBar()
 end
 SS.Every("minimapBar", 1, function() if ( SS.DB().minimapBar ) then SS.LayoutMinimapBar(); end end);   -- late buttons, new mail
 
-function SS.SetMinimapBar(on)
+function SS.SetMinimapBar(on, quiet)
 	SS.DB().minimapBar = on and true or false;
 	if ( on and SS.DB().gatherButtons ) then   -- the newest choice wins
-		SS.Notice("Gather the minimap buttons turned off: they are in their own row now.");
+		if ( not quiet ) then SS.Notice("Gather the minimap buttons turned off: they are in their own row now."); end
 		SS.DB().gatherButtons = false; SS.Safe(SS.LayoutGather);
 	end
 	SS.Safe(SS.LayoutMinimapBar);
