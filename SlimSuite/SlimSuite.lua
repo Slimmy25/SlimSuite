@@ -109,6 +109,7 @@ function SS.DB()
 	if ( d.buffsOnPlayer == nil ) then d.buffsOnPlayer = false; end
 	if ( not d.buffsPlayerAboveDefault ) then d.buffsOnPlayerSide = "above"; d.buffsPlayerAboveDefault = true; end   -- buffs sit above by default
 	if ( d.partyLocked == nil ) then d.partyLocked = false; end
+	if ( d.partyLockAbove == nil ) then d.partyLockAbove = false; end   -- locked party frames hang below the player by default
 	if ( d.partyCompact == nil ) then d.partyCompact = false; end
 	if ( d.partyFaces == nil ) then d.partyFaces = true; end
 	if ( d.targetDebuffs == nil ) then d.targetDebuffs = true; end
@@ -2582,7 +2583,16 @@ function SS.Place(name, ignoreAnchor)
 		end
 		local lockTo = (SS.DB().newFrames and getglobal("SlimSuitePlayerCard")) or PlayerFrame;
 		if ( SS.DB().partyLocked and lockTo ) then
-			f:ClearAllPoints(); f:SetPoint("TOPLEFT", lockTo, "BOTTOMLEFT", 0, -6);
+			f:ClearAllPoints();
+			if ( SS.DB().partyLockAbove ) then
+				-- the whole party block (all its shown frames, stacked or in a row) sits just above the player frame
+				local _, minY = VisualInsets(f);
+				local factor = RootFactor(f);
+				if ( not factor or factor <= 0 ) then factor = 1; end
+				f:SetPoint("BOTTOMLEFT", lockTo, "TOPLEFT", 0, (6 - (minY or 0)) / factor);
+			else
+				f:SetPoint("TOPLEFT", lockTo, "BOTTOMLEFT", 0, -6);
+			end
 			return;
 		end
 	end
@@ -4197,6 +4207,8 @@ function SU.ChecksFor(frame)
 		function() return SS.DB().buffsOnPlayer; end, short = "Below the player frame", xref = true }; end
 	local function LockParty() return { "Lock party frames to the player frame", function() return SS.DB().partyLocked; end,
 		function(v) SU.SetPartyOption("partyLocked", v); end, short = "Lock to player frame", xref = true }; end
+	local function LockPartyAbove() return { "...above the player frame (off: below)", function() return SS.DB().partyLockAbove; end,
+		function(v) SU.SetPartyOption("partyLockAbove", v); end, function() return SS.DB().partyLocked; end, short = "Above the player frame", xref = true }; end
 	local function SelfParty() return { "Add yourself to the party frames (turns the target frame off)", function() return SS.DB().partyIncludesSelf; end,
 		function(v) SS.SetPartySelf(v); end, short = "Add yourself to party", xref = true }; end
 	local function ShowClock() return { "Show the local clock", function() return SS.DB().replaceLocalClock; end,
@@ -4208,7 +4220,7 @@ function SU.ChecksFor(frame)
 	local function JoinRows() return { "Join the worn-jewelry row under the build spells", function() return SS.DB().buildRowsAttached; end,
 		function(v) if ( (v and true or false) ~= (SS.DB().buildRowsAttached and true or false) ) then SS.ToggleBuildRowsAttached(); end end, short = "Join the jewelry row", xref = true }; end
 	local list = {
-		PlayerFrame = { Combine(), NewSchool(), Mirror(), MirrorScale(), NewSchoolMirror(), PlayerBuffs(), PlayerBuffsBelow(), LockParty(), SelfParty() },
+		PlayerFrame = { Combine(), NewSchool(), Mirror(), MirrorScale(), NewSchoolMirror(), PlayerBuffs(), PlayerBuffsBelow(), LockParty(), LockPartyAbove(), SelfParty() },
 		MainMenuBar = {
 			{ "Hide the bar's artwork (only the spell squares stay)", function() return SS.DB().plainBar; end, function(v) SS.DB().plainBar = v; SS.Safe(SS.PlainBar, v); end },
 			{ "Show all six buttons at all times, even empty ones", function() return SS.DB().showEmptyActionSlots; end, function(v) SS.DB().showEmptyActionSlots = v; SS.Safe(ApplyActionSlotGrid); end },
@@ -4232,7 +4244,7 @@ function SU.ChecksFor(frame)
 		MainMenuExpBar = { { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
 			function(v) SU.SetVertical("MainMenuExpBar", v); end } },
 		PartyMemberFrame1 = {
-			LockParty(),
+			LockParty(), LockPartyAbove(),
 			{ "Show as thin lines, not face plates", function() return SS.DB().partyCompact; end, function(v) SU.SetPartyOption("partyCompact", v); end },
 			{ "Show character faces", function() return SS.DB().partyFaces ~= false; end, function(v) SU.SetPartyOption("partyFaces", v); end },
 			SelfParty(),
