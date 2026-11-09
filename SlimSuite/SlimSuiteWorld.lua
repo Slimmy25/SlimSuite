@@ -1058,10 +1058,22 @@ function W.ClockIs24()
 	return gameIs24 and true or false;
 end
 
+-- The hour that daylight saving adds to the clock. Automatic (the setting not set) follows the computer's own clock,
+-- which knows the zone's rules and whether daylight saving is in effect today; otherwise +1, -1 or off as chosen.
+function W.DaylightOffset()
+	local v = DB().localClockDST;
+	if ( v ~= nil ) then return tonumber(v) or 0; end
+	if ( type(date) == "function" ) then
+		local ok, t = pcall(date, "*t");
+		if ( ok and type(t) == "table" and t.isdst ) then return 1; end
+	end
+	return 0;
+end
+
 local function LocalTimeText()
 	local h, m, gameIs24, text = GameTime();
 	if ( not h ) then return text; end
-	h = math.mod(h + (tonumber(DB().localClockDST) or 0) + 24, 24);
+	h = math.mod(h + W.DaylightOffset() + 24, 24);
 	local use24 = DB().localClock24;
 	if ( use24 == nil ) then use24 = gameIs24; end
 	if ( use24 ) then return string.format("%02d:%02d", h, m); end

@@ -3489,8 +3489,14 @@ function SS.OpenSizeMenu(name, label)
 			sizeMenu.clockBox:SetText(d.localClockBackground == false and "Show background" or "Remove background");
 			local is24 = SlimSuiteWorld and SlimSuiteWorld.ClockIs24 and SlimSuiteWorld.ClockIs24();
 			sizeMenu.clock24:SetText(is24 and "Switch to 12-hour" or "Switch to 24-hour");
-			local dst = tonumber(d.localClockDST) or 0;
-			sizeMenu.clockDst:SetText("Daylight saving: " .. (dst > 0 and "+1 hour" or (dst < 0 and "-1 hour" or "off")));
+			-- automatic unless set by hand; the text says what the clock is doing now
+			local now = SlimSuiteWorld and SlimSuiteWorld.DaylightOffset and SlimSuiteWorld.DaylightOffset() or 0;
+			if ( d.localClockDST == nil ) then
+				sizeMenu.clockDst:SetText("Daylight saving: auto (" .. (now > 0 and "on" or "off") .. ")");
+			else
+				local dst = tonumber(d.localClockDST) or 0;
+				sizeMenu.clockDst:SetText("Daylight saving: " .. (dst > 0 and "+1 hour" or (dst < 0 and "-1 hour" or "off")));
+			end
 		end
 		local function ClockChanged()
 			if ( SlimSuiteWorld and SlimSuiteWorld.UpdateLocalClock ) then SlimSuiteWorld.UpdateLocalClock(); end
@@ -3505,10 +3511,13 @@ function SS.OpenSizeMenu(name, label)
 			SS.DB().localClock24 = not is24; ClockChanged();
 		end);
 		sizeMenu.clock24:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -236);
-		-- off -> +1 hour -> -1 hour -> off
-		sizeMenu.clockDst = K.Button(sizeMenu, "Daylight saving: off", 184, function()
-			local dst = tonumber(SS.DB().localClockDST) or 0;
-			SS.DB().localClockDST = dst == 0 and 1 or (dst > 0 and -1 or 0); ClockChanged();
+		-- automatic -> forced on (+1 hour) -> forced off -> automatic
+		sizeMenu.clockDst = K.Button(sizeMenu, "Daylight saving: auto", 184, function()
+			local dst = SS.DB().localClockDST;
+			if ( dst == nil ) then SS.DB().localClockDST = 1;
+			elseif ( dst == 1 ) then SS.DB().localClockDST = 0;
+			else SS.DB().localClockDST = nil; end
+			ClockChanged();
 		end);
 		sizeMenu.clockDst:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -264);
 		sizeMenu.ClockLabels = ClockLabels;
