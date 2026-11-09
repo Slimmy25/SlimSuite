@@ -2405,6 +2405,44 @@ end
 -- (ExhaustionTick, the diamond "end point") are drawn for a horizontal bar and look broken when rotated, so they are
 -- hidden and the bar gets a dark background, a thin gold border and a smooth fill. Laid flat again, everything
 -- the game drew comes back exactly as it was.
+-- "Split into 20 segments": 19 thin dividers over the XP bar, each 5% of a level apart. They sit on the bar, follow its
+-- size, and lie across it when the bar stands upright. On unless turned off.
+function SS.LayoutXpSegments()
+	local xp = MainMenuExpBar;
+	if ( not xp ) then return; end
+	local seg = getglobal("SlimSuiteXpSegments");
+	if ( not seg ) then
+		seg = CreateFrame("Frame", "SlimSuiteXpSegments", xp);
+		seg:SetAllPoints(xp);
+		seg:EnableMouse(false);
+		seg.ticks = {};
+		for i = 1, 19 do
+			local t = seg:CreateTexture(nil, "OVERLAY");
+			t:SetTexture(0, 0, 0, 0.65);
+			seg.ticks[i] = t;
+		end
+		seg:SetScript("OnSizeChanged", function() SS.Safe(SS.LayoutXpSegments); end);
+	end
+	seg:SetFrameLevel((xp:GetFrameLevel() or 1) + 3);      -- over the fill and the upright bar's border
+	if ( SS.DB().xpSegments == false ) then seg:Hide(); return; end
+	seg:Show();
+	local vertical = SS.DB().orientations.MainMenuExpBar == "vertical";
+	local w, h = xp:GetWidth() or 0, xp:GetHeight() or 0;
+	for i = 1, 19 do
+		local t = seg.ticks[i];
+		t:ClearAllPoints();
+		if ( vertical ) then
+			local y = h * i / 20;
+			t:SetPoint("BOTTOMLEFT", seg, "BOTTOMLEFT", 0, y); t:SetPoint("BOTTOMRIGHT", seg, "BOTTOMRIGHT", 0, y);
+			t:SetHeight(1);
+		else
+			local x = w * i / 20;
+			t:SetPoint("TOPLEFT", seg, "TOPLEFT", x, 0); t:SetPoint("BOTTOMLEFT", seg, "BOTTOMLEFT", x, 0);
+			t:SetWidth(1);
+		end
+	end
+end
+
 local xpStyle = { shows = {} };
 function SS.StyleExpBar(on)
 	local xp = MainMenuExpBar;
@@ -2513,6 +2551,7 @@ ApplyMovableOrientation = function(name)
 		if ( xp and xp.SetClipsChildren ) then SS.Safe(xp.SetClipsChildren, xp, true); end
 		if ( xp and xp.SetOrientation ) then SS.Safe(xp.SetOrientation, xp, string.upper(orientation)); end
 		SS.Safe(SS.StyleExpBar, orientation == "vertical");
+		SS.Safe(SS.LayoutXpSegments);                         -- the dividers turn with the bar
 		local base = baseSizes.MainMenuExpBar;
 		local saved = SS.DB().sizes.MainMenuExpBar;
 		if ( xp and base and type(saved) ~= "table" ) then
@@ -4348,7 +4387,9 @@ function SU.ChecksFor(frame)
 			function(v) SS.DB().orientations.SlimSuiteMinimapBar = v and "vertical" or "horizontal"; SS.Safe(SS.LayoutMinimapBar); end } },
 		SlimSuiteClockFrame = { { "Show the zone and Heroic affixes under it", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
 		MainMenuExpBar = { { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
-			function(v) SU.SetVertical("MainMenuExpBar", v); end } },
+			function(v) SU.SetVertical("MainMenuExpBar", v); SS.Safe(SS.LayoutXpSegments); end },
+			{ "Split into 20 segments", function() return SS.DB().xpSegments ~= false; end,
+			function(v) SS.DB().xpSegments = v and true or false; SS.Safe(SS.LayoutXpSegments); end, xref = true, short = "Split into 20 segments" } },
 		PartyMemberFrame1 = {
 			LockParty(), LockPartyAbove(),
 			{ "Show as thin lines, not face plates", function() return SS.DB().partyCompact; end, function(v) SU.SetPartyOption("partyCompact", v); end },
@@ -5699,7 +5740,7 @@ loader:SetScript("OnEvent", function()
 	SS.Safe(SS.HookTooltipOwner);
 	SS.Safe(PlaceAll);
 	SS.Safe(UpdateMeter);
-	if ( event == "PLAYER_ENTERING_WORLD" ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
+	if ( event == "PLAYER_ENTERING_WORLD" ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
 end);
 local buffLayoutUpdater = CreateFrame("Frame");
 buffLayoutUpdater:RegisterEvent("UNIT_AURA");
