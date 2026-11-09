@@ -1786,7 +1786,7 @@ function SS.UpdateClock()
 		local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
 		if ( type(left) ~= "number" and run and type(run.nb) == "number" and run.nb >= 0 ) then left = run.nb; end
 		if ( type(left) == "number" and left >= 0 ) then
-			clockFrame.next:SetText("next boss in " .. ClockText(math.ceil(left)));
+			clockFrame.next:SetText("next boss in " .. SS.ClockText(math.ceil(left)));
 		else
 			clockFrame.next:SetText("next boss in --:--");
 		end
@@ -2810,6 +2810,42 @@ function SS.AttachBuffs()
 	if ( BuffFrame.SetScale ) then BuffFrame:SetScale(anchor:GetScale() or 1); end
 end
 
+-- Every tick box that shows a setting, wherever it is: the setup, the right-click menu, the settings window, the move
+-- panel. A click always flips the setting itself (not whatever the box happened to show), and afterwards every visible
+-- box reads its setting again. One setting can be shown in two places, and turning one setting on can turn another off
+-- (the newest choice wins); a box left showing the old value only set the value it already had when clicked, which
+-- looked like the box did nothing.
+SS.toggleBoxes = {};
+function SS.TrackToggle(cb)
+	table.insert(SS.toggleBoxes, cb);
+	return cb;
+end
+function SS.FlipToggle(get, set)
+	if ( type(get) ~= "function" or type(set) ~= "function" ) then return; end
+	set(not (get() and true or false));
+end
+function SS.RefreshToggles()
+	for i = 1, table.getn(SS.toggleBoxes) do
+		local cb = SS.toggleBoxes[i];
+		if ( cb.get and cb:IsVisible() ) then
+			local ok, v = pcall(cb.get);
+			if ( ok ) then cb:SetChecked(v and 1 or nil); end
+			if ( cb.cond ) then
+				local okc, c = pcall(cb.cond);
+				if ( okc and not c ) then cb:Disable(); if ( cb.label ) then cb.label:SetTextColor(0.45, 0.45, 0.45); end
+				else cb:Enable(); if ( cb.label ) then cb.label:SetTextColor(1, 1, 1); end end
+			end
+		end
+	end
+	if ( SS.RefreshChoices ) then SS.RefreshChoices(); end
+	if ( sizeMenu and sizeMenu:IsShown() and sizeMenu.buffsSide ) then
+		sizeMenu.buffsSide:SetText(SS.DB().buffsOnTargetSide == "above" and "Buffs: above the target" or "Buffs: below the target");
+		if ( SS.DB().buffsOnTarget ) then sizeMenu.buffsSide:Enable(); else sizeMenu.buffsSide:Disable(); end
+	end
+end
+-- the boxes are read again twice a second as well, for settings changed by a slash command or by the game
+SS.Every("toggleRefresh", 0.5, function() SS.RefreshToggles(); end);
+
 -- fills the right-click menu's cross-reference rows for this element (the same settings the setup shows)
 function SS.RefreshCrossRefs(name)
 	if ( not sizeMenu or not sizeMenu.xref ) then return; end
@@ -2820,6 +2856,7 @@ function SS.RefreshCrossRefs(name)
 		if ( not e ) then SS.RowKind(cb, nil); end
 		if ( e ) then
 			cb.entry = e;
+			cb.get = (not e.choice) and e[2] or nil; cb.cond = e[4];
 			cb:ClearAllPoints();
 			cb:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", e[4] and 26 or 8, y);
 			cb.warn:SetText(e.warn or "");
@@ -2832,7 +2869,7 @@ function SS.RefreshCrossRefs(name)
 			else cb:Enable(); cb.label:SetTextColor(1, 1, 1); end
 			cb:Show();
 		else
-			cb.entry = nil; cb:Hide();
+			cb.entry = nil; cb.get = nil; cb.cond = nil; cb:Hide();
 		end
 	end
 	if ( table.getn(rows) > 0 ) then sizeMenu:SetHeight(math.max(sizeMenu:GetHeight() or 270, -y + 28)); end
@@ -3276,7 +3313,7 @@ function SS.OpenSizeMenu(name, label)
 			if ( sizeTarget ~= "BuffFrame" ) then return; end
 			SS.DB().buffCustomLayout = true;
 			SS.DB().buffGrowthDirection = SS.BuffGrowthDirection() == "up" and "down" or "up";
-			growth:SetText("Grow " .. BuffGrowthDirection());
+			growth:SetText("Grow " .. SS.BuffGrowthDirection());
 			SS.Safe(SS.ApplyBuffOrientation);
 			PlaceAll();
 		end);
@@ -3289,7 +3326,7 @@ function SS.OpenSizeMenu(name, label)
 			if ( not sizeTarget ) then return; end
 			SS.DB().padding[sizeTarget] = math.max(0, SS.FramePadding(sizeTarget) - 2);
 			SS.ApplyMovablePadding(sizeTarget);
-			sizeMenuPadding:SetText("Padding: " .. FramePadding(sizeTarget));
+			sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(sizeTarget));
 			local t = getglobal(sizeTarget);
 			if ( t ) then sizeMenuWidth:SetText("Width: " .. math.floor(t:GetWidth() + 0.5)); sizeMenuHeight:SetText("Height: " .. math.floor(t:GetHeight() + 0.5)); end
 		end);
@@ -3298,7 +3335,7 @@ function SS.OpenSizeMenu(name, label)
 			if ( not sizeTarget ) then return; end
 			SS.DB().padding[sizeTarget] = math.min(SS.FramePaddingLimit(sizeTarget), SS.FramePadding(sizeTarget) + 2);
 			SS.ApplyMovablePadding(sizeTarget);
-			sizeMenuPadding:SetText("Padding: " .. FramePadding(sizeTarget));
+			sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(sizeTarget));
 			local t = getglobal(sizeTarget);
 			if ( t ) then sizeMenuWidth:SetText("Width: " .. math.floor(t:GetWidth() + 0.5)); sizeMenuHeight:SetText("Height: " .. math.floor(t:GetHeight() + 0.5)); end
 		end);
@@ -3348,7 +3385,9 @@ function SS.OpenSizeMenu(name, label)
 		sizeMenu.mirror:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 8, -207);
 		sizeMenu.mirror.label = sizeMenu.mirror:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		sizeMenu.mirror.label:SetPoint("LEFT", sizeMenu.mirror, "RIGHT", 2, 1); sizeMenu.mirror.label:SetText("Mirror target |cffff9933(!)|r");
-		sizeMenu.mirror:SetScript("OnClick", function() SS.SetMirrorTarget(this:GetChecked() and true or false); end);
+		sizeMenu.mirror.get = function() return SS.DB().mirrorTarget; end;
+		SS.TrackToggle(sizeMenu.mirror);
+		sizeMenu.mirror:SetScript("OnClick", function() SS.SetMirrorTarget(not SS.DB().mirrorTarget); SS.RefreshToggles(); end);
 		sizeMenu.mirror:SetScript("OnEnter", function() SS.ShowWarnTip(this, SS.WARN.mirror); end);
 		sizeMenu.mirror:SetScript("OnLeave", function() SS.HideWarnTip(); end);
 		sizeMenu.mirror:Hide();
@@ -3363,12 +3402,14 @@ function SS.OpenSizeMenu(name, label)
 			cb.warn:SetPoint("TOPLEFT", cb.label, "BOTTOMLEFT", 0, -1); cb.warn:SetWidth(160); cb.warn:SetJustifyH("LEFT");
 			cb.warn:SetTextColor(1, 0.6, 0.2); cb.warn:Hide();
 			cb:SetScript("OnClick", function()
-				-- an entry is { label, get, set, condition }: the setter is its third item
-				local set = this.entry and this.entry[3];
-				if ( set ) then set(this:GetChecked() and true or false); end
+				-- an entry is { label, get, set, condition }: the setting is flipped, whatever the box showed
+				local e = this.entry;
+				if ( e ) then SS.FlipToggle(e[2], e[3]); end
 				SS.RefreshCrossRefs(SlimSuiteSizeMenuName);
+				SS.RefreshToggles();
 			end);
 			cb:Hide();
+			SS.TrackToggle(cb);
 			sizeMenu.xref[i] = cb;
 		end
 		-- indented under Mirror target; greyed out unless mirroring is on
@@ -3377,14 +3418,19 @@ function SS.OpenSizeMenu(name, label)
 		sizeMenu.mirrorScale:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 26, -229);
 		sizeMenu.mirrorScale.label = sizeMenu.mirrorScale:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		sizeMenu.mirrorScale.label:SetPoint("LEFT", sizeMenu.mirrorScale, "RIGHT", 2, 1); sizeMenu.mirrorScale.label:SetText("Same size scaling");
-		sizeMenu.mirrorScale:SetScript("OnClick", function() SS.SetMirrorSameScale(this:GetChecked() and true or false); end);
+		sizeMenu.mirrorScale.get = function() return SS.DB().mirrorSameScale ~= false; end;
+		sizeMenu.mirrorScale.cond = function() return SS.DB().mirrorTarget; end;
+		SS.TrackToggle(sizeMenu.mirrorScale);
+		sizeMenu.mirrorScale:SetScript("OnClick", function() SS.SetMirrorSameScale(not (SS.DB().mirrorSameScale ~= false)); SS.RefreshToggles(); end);
 		sizeMenu.mirrorScale:Hide();
 		-- the target frame's and the buff frame's shared option
 		sizeMenu.buffsOn = CreateFrame("CheckButton", nil, sizeMenu, "UICheckButtonTemplate");
 		sizeMenu.buffsOn:SetWidth(22); sizeMenu.buffsOn:SetHeight(22);
 		sizeMenu.buffsOn.label = sizeMenu.buffsOn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		sizeMenu.buffsOn.label:SetPoint("LEFT", sizeMenu.buffsOn, "RIGHT", 2, 1); sizeMenu.buffsOn.label:SetText("Buffs on the target frame |cffff9933(!)|r");
-		sizeMenu.buffsOn:SetScript("OnClick", function() SS.SetBuffsOnTarget(this:GetChecked() and true or false); end);
+		sizeMenu.buffsOn.get = function() return SS.DB().buffsOnTarget; end;
+		SS.TrackToggle(sizeMenu.buffsOn);
+		sizeMenu.buffsOn:SetScript("OnClick", function() SS.SetBuffsOnTarget(not SS.DB().buffsOnTarget); SS.RefreshToggles(); end);
 		sizeMenu.buffsOn:SetScript("OnEnter", function() SS.ShowWarnTip(this, SS.WARN.buffsTarget); end);
 		sizeMenu.buffsOn:SetScript("OnLeave", function() SS.HideWarnTip(); end);
 		sizeMenu.buffsSide = K.Button(sizeMenu, "Buffs: below the target", 184, function()
@@ -3427,7 +3473,7 @@ function SS.OpenSizeMenu(name, label)
 		if ( sizeMenu.growthButton ) then
 			if ( name == "BuffFrame" ) then
 				sizeMenu.growthButton:Show();
-				sizeMenu.growthButton:SetText("Grow " .. BuffGrowthDirection());
+				sizeMenu.growthButton:SetText("Grow " .. SS.BuffGrowthDirection());
 			else sizeMenu.growthButton:Hide(); end
 		end
 		if ( name == "SlimSuiteSpellRowFrame" ) then
@@ -3438,7 +3484,7 @@ function SS.OpenSizeMenu(name, label)
 		if ( canPad ) then
 			sizeMenu.paddingWheel:Show();
 			sizeMenuPadding:Show(); sizeMenu.padDown:Show(); sizeMenu.padUp:Show();
-			sizeMenuPadding:SetText("Padding: " .. FramePadding(name));
+			sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(name));
 		else
 			sizeMenuPadding:Hide(); sizeMenu.padDown:Hide(); sizeMenu.padUp:Hide();
 			sizeMenu.paddingWheel:Hide();
@@ -3529,7 +3575,9 @@ function SS.ShowLockPanel()
 		local gridCheck = CreateFrame("CheckButton", nil, lockPanel, "UICheckButtonTemplate");
 		gridCheck:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", 6, -52); gridCheck:SetWidth(22); gridCheck:SetHeight(22);
 		gridCheck:SetScript("OnShow", function() this:SetChecked(SS.DB().showEditGrid and 1 or nil); end);
-		gridCheck:SetScript("OnClick", function() SS.DB().showEditGrid = this:GetChecked() and true or false; if ( SS.DB().unlocked ) then ShowEditGrid(); end end);
+		gridCheck.get = function() return SS.DB().showEditGrid; end;
+		SS.TrackToggle(gridCheck);
+		gridCheck:SetScript("OnClick", function() SS.DB().showEditGrid = not SS.DB().showEditGrid; if ( SS.DB().unlocked ) then ShowEditGrid(); end SS.RefreshToggles(); end);
 		local gridLabel = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		gridLabel:SetPoint("LEFT", gridCheck, "RIGHT", 0, 0); gridLabel:SetText("Grid");
 		local gridSizes = {16, 32, 64, 128};
@@ -3549,7 +3597,9 @@ function SS.ShowLockPanel()
 			local cb = CreateFrame("CheckButton", nil, lockPanel, "UICheckButtonTemplate");
 			cb:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", x, -82); cb:SetWidth(22); cb:SetHeight(22);
 			cb:SetScript("OnShow", function() this:SetChecked(SS.DB()[key] and 1 or nil); end);
-			cb:SetScript("OnClick", function() SS.DB()[key] = this:GetChecked() and true or false; if ( SS.DB().unlocked ) then ShowEditGrid(); end end);
+			cb.get = function() return SS.DB()[key]; end;
+			SS.TrackToggle(cb);
+			cb:SetScript("OnClick", function() SS.DB()[key] = not SS.DB()[key]; if ( SS.DB().unlocked ) then ShowEditGrid(); end SS.RefreshToggles(); end);
 			local label = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 			label:SetPoint("LEFT", cb, "RIGHT", 0, 0); label:SetText(labelText);
 		end
@@ -3558,7 +3608,9 @@ function SS.ShowLockPanel()
 		local snap = CreateFrame("CheckButton", nil, lockPanel, "UICheckButtonTemplate");
 		snap:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", 6, -111); snap:SetWidth(22); snap:SetHeight(22);
 		snap:SetScript("OnShow", function() this:SetChecked(SS.DB().anchorSnap and 1 or nil); end);
-		snap:SetScript("OnClick", function() SetAnchorSnap(this:GetChecked() and true or false); end);
+		snap.get = function() return SS.DB().anchorSnap; end;
+		SS.TrackToggle(snap);
+		snap:SetScript("OnClick", function() SetAnchorSnap(not SS.DB().anchorSnap); SS.RefreshToggles(); end);
 		local snapLabel = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		snapLabel:SetPoint("LEFT", snap, "RIGHT", 0, 0); snapLabel:SetText("Snap nearby frames together");
 		local button = K.Button(lockPanel, "Done", 76, function() SS.SetUnlocked(false); end);
@@ -4271,10 +4323,11 @@ function SU.Check(parent)
 	cb.warn:SetTextColor(1, 0.6, 0.2); cb.warn:Hide();
 	cb.Refresh = function() if ( cb.get ) then cb:SetChecked(cb.get() and 1 or nil); end end;
 	cb:SetScript("OnClick", function()
-		if ( this.set ) then this.set(this:GetChecked() and true or false); end
-		if ( SU.panel and SU.panel:IsShown() ) then for i = 1, table.getn(SU.checks) do SU.checks[i].Refresh(); end end
+		SS.FlipToggle(this.get, this.set);
+		SS.RefreshToggles();
 	end);
 	cb:Hide();
+	SS.TrackToggle(cb);
 	return cb;
 end
 
@@ -4282,7 +4335,7 @@ end
 -- and the right-click menus. "Movable?" warns about what unticking it turns off.
 SU.WARN = {
 	mirror = "Turns off: Add yourself to party. Makes both frames movable.",
-	selfParty = "Turns off: the target frame, Mirror target, Combine.",
+	selfParty = "Turns off: the target frame (back when unticked), Mirror target, Combine.",
 	buffsTarget = "Turns off: Buffs/Debuffs on the player frame.",
 	buffsPlayer = "Turns off: Buffs on the target frame.",
 	lockParty = "Makes the party frames movable.",
@@ -4336,6 +4389,7 @@ end
 -- after a choice: every place that shows it is brought up to date
 function SS.AfterChoice()
 	SS.RefreshChoices();
+	SS.RefreshToggles();
 	if ( setupActive and SU.focus ) then SU.Focus(SU.focus); end
 	if ( sizeMenu and sizeMenu:IsShown() and SlimSuiteSizeMenuName ) then SS.RefreshCrossRefs(SlimSuiteSizeMenuName); end
 end
@@ -5164,7 +5218,7 @@ function SU.Focus(frame)
 	for i = 1, 12 do
 		local cb, c = SU.checks[i], checks[i];
 		if ( c ) then
-			cb.label:SetText(c[1]); cb.get, cb.set = c[2], c[3];
+			cb.label:SetText(c[1]); cb.get, cb.set, cb.cond = c[2], c[3], c[4];
 			SS.RowKind(cb, c, "right");
 			cb:ClearAllPoints();
 			-- a setting that only works with another one is indented under it
@@ -5179,7 +5233,7 @@ function SU.Focus(frame)
 			else cb:Enable(); cb.label:SetTextColor(1, 1, 1); end
 			h = h + 24 + cb.warnGap;
 		else
-			cb.get, cb.set = nil, nil; cb:Hide();
+			cb.get, cb.set, cb.cond = nil, nil, nil; cb:Hide();
 		end
 	end
 	SU.panel:SetHeight(h);
@@ -5266,7 +5320,10 @@ end
 --   "target" the target frame is turned on from its button: you leave the party frames
 function SS.ClaimTarget(by)
 	if ( by == "self" ) then
-		if ( not SS.DB().hideTarget ) then SS.Notice("The target frame turned off: you are in the party frames now."); end
+		if ( not SS.DB().hideTarget ) then
+			SS.Notice("The target frame turned off: you are in the party frames now.");
+			SS.DB().targetHiddenBySelf = true;          -- so leaving the party frames brings it back
+		end
 		SS.DB().hideTarget = true; SS.Safe(SS.TargetFrameHidden, true);
 		if ( SS.DB().mirrorTarget ) then SS.SetMirrorTarget(false); SS.Notice("Mirror target turned off: the target frame is off."); end
 		if ( SU.on and SU.on.TargetFrame ) then SU.SetOn("TargetFrame", false, SU.titles and SU.titles.TargetFrame or "Target frame"); end
@@ -5278,6 +5335,7 @@ function SS.ClaimTarget(by)
 		SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
 	end
 	if ( by ~= "self" and SS.DB().hideTarget ) then SS.DB().hideTarget = false; SS.Safe(SS.TargetFrameHidden, false); end
+	SS.DB().targetHiddenBySelf = nil;
 end
 
 -- You in the party frames: your own card joins the end of the party column or row. It takes the target frame's
@@ -5285,6 +5343,14 @@ end
 function SS.SetPartySelf(on)
 	SS.DB().partyIncludesSelf = on and true or false;
 	if ( on ) then SS.ClaimTarget("self"); end
+	-- unticked again: the target frame it turned off comes back (one you hid yourself stays hidden)
+	if ( not on and SS.DB().targetHiddenBySelf ) then
+		SS.DB().targetHiddenBySelf = nil;
+		if ( SS.DB().hideTarget ) then
+			SS.DB().hideTarget = false; SS.Safe(SS.TargetFrameHidden, false);
+			SS.Notice("The target frame is back: you left the party frames.");
+		end
+	end
 	SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
 	if ( SU.demo ) then SU.demo:Hide(); SU.demo = nil; end
 	SU.Rebuild();
@@ -5318,6 +5384,7 @@ function SU.Click(frame)
 	else
 		SU.Focus(frame);
 	end
+	SS.RefreshToggles();
 end
 
 -- the setup: everything hidden, one bar of elements, all off
@@ -5418,7 +5485,9 @@ function SU.Build()
 		cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		cb.label:SetPoint("LEFT", cb, "RIGHT", 0, 1); cb.label:SetText(label);
 		cb.Refresh = function() cb:SetChecked(get() and 1 or nil); end;
-		cb:SetScript("OnClick", function() set(this:GetChecked() and true or false); end);
+		cb.get = get;
+		SS.TrackToggle(cb);
+		cb:SetScript("OnClick", function() SS.FlipToggle(get, set); SS.RefreshToggles(); end);
 		return cb;
 	end
 	-- the grid, top right of every setup panel: on or off, and its size
@@ -5530,9 +5599,13 @@ function SS.Check(parent, label, y, get, set, indent)
 	fs:SetPoint("LEFT", cb, "RIGHT", 4, 1);
 	fs:SetWidth(350); fs:SetHeight(28); fs:SetJustifyH("LEFT"); fs:SetText(label);
 	cb:SetScript("OnShow", function() this:SetChecked(get() and 1 or nil); end);
+	cb.get = get;
+	SS.TrackToggle(cb);
 	cb:SetScript("OnClick", function()
-		set(this:GetChecked() and true or false);
-		K.Sound(this:GetChecked() and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff");
+		local v = not (get() and true or false);
+		set(v);
+		K.Sound(v and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff");
+		SS.RefreshToggles();
 	end);
 	return cb;
 end
@@ -5587,7 +5660,7 @@ function SS.WinBuild()
 		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetText("Most custom game UI is not available as reusable addon art or code. This section recreates it as faithfully as possible so it can be moved; a few implementation choices are unavoidable. <3");
 		AddRows(uiChild, {
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
-			{"Hide the target frame", function() return SS.DB().hideTarget; end, function(v) SS.DB().hideTarget = v; SS.TargetFrameHidden(v); end},
+			{"Hide the target frame", function() return SS.DB().hideTarget; end, function(v) SS.DB().hideTarget = v; SS.DB().targetHiddenBySelf = nil; SS.TargetFrameHidden(v); end},
 			{"Show debuffs and DoTs on the target", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end},
 			{"Buffs on the target frame", function() return SS.DB().buffsOnTarget; end, function(v) SS.SetBuffsOnTarget(v); end},
 			{"Replace Default Level Up with Movable Version?", function() return SS.DB().moveLevelButton; end, function(v) SS.DB().moveLevelButton = v; SS.Safe(SS.UpdateLevelButton); end},
