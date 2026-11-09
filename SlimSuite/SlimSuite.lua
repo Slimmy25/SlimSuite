@@ -2838,6 +2838,7 @@ function SS.RefreshToggles()
 		end
 	end
 	if ( SS.RefreshChoices ) then SS.RefreshChoices(); end
+	for i = 1, table.getn(SS.pages or {}) do SS.LayoutPage(SS.pages[i]); end
 	if ( sizeMenu and sizeMenu:IsShown() and sizeMenu.buffsSide ) then
 		sizeMenu.buffsSide:SetText(SS.DB().buffsOnTargetSide == "above" and "Buffs: above the target" or "Buffs: below the target");
 		if ( SS.DB().buffsOnTarget ) then sizeMenu.buffsSide:Enable(); else sizeMenu.buffsSide:Disable(); end
@@ -4440,6 +4441,8 @@ end
 
 function SU.Check(parent)
 	local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate");
+	cb:SetScript("OnEnter", function() if ( this.warnText ) then SS.ShowWarnTip(this, this.warnText); end end);
+	cb:SetScript("OnLeave", function() SS.HideWarnTip(); end);
 	cb:SetWidth(22); cb:SetHeight(22);
 	cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 	cb.label:SetPoint("LEFT", cb, "RIGHT", 2, 0); cb.label:SetJustifyH("LEFT");
@@ -5345,7 +5348,10 @@ function SU.Focus(frame)
 	if ( e ) then
 		SU.panel.title:SetText(e.title);
 		SU.panel.text:SetText(e.text);
-		checks = SU.ChecksFor(frame);
+		-- a sub-setting shows only while the setting it depends on is on
+		local all, shown = SU.ChecksFor(frame), {};
+		for i = 1, table.getn(all) do if ( not all[i][4] or all[i][4]() ) then table.insert(shown, all[i]); end end
+		checks = shown;
 	else
 		SU.panel.title:SetText("Setup");
 		SU.panel.text:SetText("Click an element on the bar above to turn it on, then set its options here. Click it again to turn it off.");
@@ -5354,7 +5360,8 @@ function SU.Focus(frame)
 	for i = 1, 12 do
 		local cb, c = SU.checks[i], checks[i];
 		if ( c ) then
-			cb.label:SetText(c[1]); cb.get, cb.set, cb.cond = c[2], c[3], c[4];
+			cb.label:SetText(c[1] .. (c.warn and " |cffff9933(!)|r" or "")); cb.get, cb.set, cb.cond = c[2], c[3], c[4];
+			cb.warnText = c.warn;
 			SS.RowKind(cb, c, "right");
 			cb:ClearAllPoints();
 			-- a setting that only works with another one is indented under it
@@ -5362,8 +5369,7 @@ function SU.Focus(frame)
 			cb.indentX = dx;
 			if ( i == 1 ) then cb:SetPoint("TOPLEFT", SU.panel.text, "BOTTOMLEFT", -2 + dx, -4);
 			else cb:SetPoint("TOPLEFT", SU.checks[i - 1], "BOTTOMLEFT", dx - (SU.checks[i - 1].indentX or 0), -(SU.checks[i - 1].warnGap or 0)); end
-			cb.warn:SetText(c.warn or "");
-			if ( c.warn ) then cb.warn:Show(); cb.warnGap = 12; else cb.warn:Hide(); cb.warnGap = 0; end
+			cb.warn:Hide(); cb.warnGap = 0;
 			cb.Refresh(); cb:Show();
 			if ( c[4] and not c[4]() ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
 			else cb:Enable(); cb.label:SetTextColor(1, 1, 1); end
@@ -5734,6 +5740,44 @@ end
 
 -- ---------------------------------------------------------------- the settings window
 
+-- Places a settings page's visible rows top to bottom. A sub-setting whose setting is off, and a heading with nothing
+-- under it, take no room. Runs again after every change, so sub-settings appear and disappear as they are turned on.
+function SS.LayoutPage(page)
+	local rows, parent = page.rows, page.parent;
+	local show = {};
+	for i = 1, table.getn(rows) do
+		local r = rows[i];
+		show[i] = not (r.up and not r.up());
+	end
+	local y = page.startY;
+	for i = 1, table.getn(rows) do
+		local r = rows[i];
+		if ( r.kind == "head" ) then
+			local any = false;
+			for j = i + 1, table.getn(rows) do
+				if ( rows[j].kind == "head" ) then break; end
+				if ( show[j] ) then any = true; break; end
+			end
+			r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y);
+			if ( any ) then r.fs:Show(); y = y - 24; else r.fs:Hide(); end
+		elseif ( show[i] ) then
+			if ( r.kind == "choice" ) then
+				r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 30 + r.lead, y - 6);
+				r.fs:Show(); r.b:Show();
+			else
+				r.cb:ClearAllPoints(); r.cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 26 + r.lead, y);
+				r.cb:Show(); r.cb.label:Show();
+			end
+			y = y - 28;
+		else
+			if ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); end
+		end
+	end
+	parent:SetHeight(math.max(20, -y + 12));
+	if ( page.after ) then page.after(y); end
+	return y;
+end
+
 function SS.Check(parent, label, y, get, set, indent)
 	local cb, ok = K.Templated("CheckButton", nil, parent, "UICheckButtonTemplate");
 	if ( not ok or not cb.SetChecked ) then
@@ -5749,6 +5793,7 @@ function SS.Check(parent, label, y, get, set, indent)
 	local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
 	fs:SetPoint("LEFT", cb, "RIGHT", 4, 1);
 	fs:SetWidth(350); fs:SetHeight(28); fs:SetJustifyH("LEFT"); fs:SetText(label);
+	cb.label = fs;
 	cb:SetScript("OnShow", function() this:SetChecked(get() and 1 or nil); end);
 	cb.get = get;
 	SS.TrackToggle(cb);
@@ -5783,25 +5828,59 @@ function SS.WinBuild()
 	local addonsScroll, addonsChild = K.Scroll("SlimSuiteAddonsScroll", win, 422);
 	addonsScroll:SetPoint("TOPLEFT", win, "TOPLEFT", 20, bodyTop);
 	addonsScroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 48);
-	local function AddRows(parent, entries, startY)
-		local y = startY;
+	-- A page is a list of groups: {head="Name"} starts one. A row whose label starts with spaces is a sub-setting: it
+	-- shows only while the setting above it (the one it belongs to) is on.
+	local function AddRows(parent, entries, startY, after)
+		SS.pages = SS.pages or {};
+		local page = { parent = parent, rows = {}, startY = startY, after = after };
+		local up = nil;
 		for i = 1, table.getn(entries) do
 			local row = entries[i];
-			local label, lead = row[1], 0;
-			if ( string.find(label, "^%s") ) then lead = 22; label = string.gsub(label, "^%s+", ""); end
-			if ( row.choice ) then
-				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
-				fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 30 + lead, y - 6); fs:SetText(label);
-				local b = SS.ChoiceButton(parent, 200);
-				b.entry = row; b:SetPoint("LEFT", fs, "RIGHT", 10, 0);
-				b:SetText(SS.ChoiceText(row) .. "  v");
-				b:SetScript("OnShow", function() if ( this.entry ) then this:SetText(SS.ChoiceText(this.entry) .. "  v"); end end);
+			if ( row.head ) then
+				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal");
+				fs:SetText(row.head); fs:SetTextColor(1, 0.82, 0);
+				table.insert(page.rows, { kind = "head", fs = fs });
+				up = nil;
 			else
-				SS.Check(parent, label, y, row[2], row[3], lead);
+				local label, lead = row[1], 0;
+				if ( string.find(label, "^%s") ) then lead = 22; label = string.gsub(label, "^%s+", ""); end
+				local r = { lead = lead, up = (lead > 0) and up or nil };
+				if ( row.choice ) then
+					r.kind = "choice";
+					r.fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
+					r.fs:SetText(label);
+					r.b = SS.ChoiceButton(parent, 200);
+					r.b.entry = row; r.b:SetPoint("LEFT", r.fs, "RIGHT", 10, 0);
+					r.b:SetText(SS.ChoiceText(row) .. "  v");
+					r.b:SetScript("OnShow", function() if ( this.entry ) then this:SetText(SS.ChoiceText(this.entry) .. "  v"); end end);
+					up = nil;
+				else
+					r.kind = "check";
+					r.cb = SS.Check(parent, label, startY, row[2], row[3], lead);
+					up = row[2];
+				end
+				table.insert(page.rows, r);
 			end
-			y = y - 28;
 		end
-		parent:SetHeight(math.max(20, -y + 12));
+		table.insert(SS.pages, page);
+		SS.LayoutPage(page);
+		return page;
+	end
+	local tooltipTitle, tooltipSmaller, tooltipLarger, reset, resetAll, addonsTab, uiLastY, otherLastY;
+	-- the tooltip-size and reset controls sit under the last row of the UI page
+	local function PlaceTail()
+		if ( not tooltipTitle or not uiLastY ) then return; end
+		local y0 = uiLastY - 14;
+		tooltipTitle:ClearAllPoints(); tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, y0);
+		tooltipSmaller:ClearAllPoints(); tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, y0 - 18);
+		reset:ClearAllPoints(); reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, y0 - 52);
+		uiChild:SetHeight(-(y0 - 52) + 44);
+	end
+	-- the Manage Addons button sits under the last row of the Other page
+	local function PlaceAddons()
+		if ( not addonsTab or not otherLastY ) then return; end
+		addonsTab:ClearAllPoints(); addonsTab:SetPoint("TOPLEFT", otherChild, "TOPLEFT", 10, otherLastY - 12);
+		otherChild:SetHeight(-(otherLastY - 12) + 44);
 	end
 	local function CheckboxRows()
 		local noteTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontNormal");
@@ -5810,59 +5889,66 @@ function SS.WinBuild()
 		note:SetPoint("TOPLEFT", noteTitle, "BOTTOMLEFT", 0, -3); note:SetWidth(390); note:SetHeight(38);
 		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetText("Most custom game UI is not available as reusable addon art or code. This section recreates it as faithfully as possible so it can be moved; a few implementation choices are unavoidable. <3");
 		AddRows(uiChild, {
+			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
+			{head="Frames"},
 			{"Hide the target frame", function() return SS.DB().hideTarget; end, function(v) SS.DB().hideTarget = v; SS.TargetFrameHidden(v); end},
 			{"Show debuffs and DoTs on the target", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end},
 			{"Buffs on the target frame", function() return SS.DB().buffsOnTarget; end, function(v) SS.SetBuffsOnTarget(v); end},
+			{head="Default UI replacements"},
 			{"Replace Default Level Up with Movable Version?", function() return SS.DB().moveLevelButton; end, function(v) SS.DB().moveLevelButton = v; SS.Safe(SS.UpdateLevelButton); end},
 			{"Replace Default Build Rows with Movable Versions?", function() return SS.DB().replaceBuildRows; end, function(v) SS.DB().replaceBuildRows = v; SS.ApplyBuildRowReplacement(); end},
 			{"Replace Default Damage Meter with Movable Version?", function() return SS.DB().moveMeter; end, function(v) SS.SetMeterReplacement(v); end},
 			{"Replace Default Run Clock with Movable Version?", function() return SS.DB().replaceClock;end,function(v) SS.DB().replaceClock=v;SS.UpdateClock();end},
 			{"   ...show the zone and Heroic affixes under it", function() return SS.DB().zoneLine;end,function(v) SS.DB().zoneLine=v;SS.UpdateClock();end},
 			{"Replace Default Encounter Bars with Movable Versions?", function() return SS.DB().replaceEncounters;end,function(v) SS.DB().replaceEncounters=v;SS.UpdateBossFrames();end},
+			{"   ...show debuffs on the encounter bars", function() return SS.DB().encounterDebuffs; end, function(v) SS.DB().encounterDebuffs = v; SS.Safe(SS.UpdateBossFrames); end},
 			{"Replace Default Kills / Gold / Cache with Movable Version?", function() return SS.DB().replaceTally;end,function(v) SS.DB().replaceTally=v;SS.UpdateTally();end},
 			{"   ...show boss and Guardian kills next to Kills", function() return SS.DB().tallyBossKills;end,function(v) SS.DB().tallyBossKills=v;SS.UpdateTally();end},
 			{"   ...dark band behind it", function() return SS.DB().tallyBackground;end,function(v) SS.DB().tallyBackground=v;SS.UpdateTally();end},
 			{"Replace Default Announcements with Movable Version?", function() return SS.DB().replaceBanners;end,function(v) SS.DB().replaceBanners=v;SS.UpdateAnnouncementFrame();end},
+			{"Replace Default Revive Bar with Movable Version?", function() return SS.DB().replaceRevive; end, function(v) SS.DB().replaceRevive = v; end},
+			{head="Action bar"},
 			{"Replace Default Action Bar Art with Plain Version?", function() return SS.DB().plainBar; end, function(v) SS.DB().plainBar = v; SS.PlainBar(v); end},
 			{"Add racial ability as a 7th Action Bar 1 button?", function() return SS.DB().showRacialAbility; end, function(v) SS.SetRacialAbility(v); end},
 			{"Show empty slots in Action Bar 1", function() return SS.DB().showEmptyActionSlots; end, function(v) SS.DB().showEmptyActionSlots = v; ApplyActionSlotGrid(); end},
-			{"Replace Default Revive Bar with Movable Version?", function() return SS.DB().replaceRevive; end, function(v) SS.DB().replaceRevive = v; end},
-			{"Show debuffs on the movable encounter bars", function() return SS.DB().encounterDebuffs; end, function(v) SS.DB().encounterDebuffs = v; SS.Safe(SS.UpdateBossFrames); end},
+			{"Replace Default Local Clock with Movable Version?", function() return SS.DB().replaceLocalClock; end, function(v) SS.DB().replaceLocalClock = v; end},
+			{head="Extras"},
 			{"Class proc meter under the player frame", function() return SS.DB().procMeter; end, function(v) SS.DB().procMeter = v; end},
 			{"Combat text test box (movable)", function() return SS.DB().combatTextBox; end, function(v) SS.DB().combatTextBox = v; end},
 			{"Floating combat text over enemies (Slim Suite's own)", function() return SS.DB().floatingText; end, function(v) SS.DB().floatingText = v; end},
-			{"Replace Default Local Clock with Movable Version?", function() return SS.DB().replaceLocalClock; end, function(v) SS.DB().replaceLocalClock = v; end},
 			{"Show Slim Suite above the level-up and new-item cards", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
-		}, -72);
-		uiChild:SetHeight(818);
+		}, -72, function(y) uiLastY = y; PlaceTail(); end);
 	end
 	local function BuildOther()
 		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
 		purpose:SetPoint("TOPLEFT",otherChild,"TOPLEFT",10,-8);purpose:SetWidth(390);purpose:SetHeight(32);
 		purpose:SetJustifyH("LEFT");purpose:SetJustifyV("TOP");purpose:SetText("The goal of clearing up chat is to see your friends' chat better in multiplayer.");
-		local title=otherChild:CreateFontString(nil,"OVERLAY","GameFontNormal");title:SetPoint("TOPLEFT",otherChild,"TOPLEFT",10,-43);title:SetText("Chat mods");
 		AddRows(otherChild, {
+			{head="Chat mods"},
 			{"No level-up stat bonuses in chat", function() return SS.DB().hideLevel;end,function(v) SS.DB().hideLevel=v;end},
 			{"No new spell lines in chat", function() return SS.DB().hideNewSpells;end,function(v) SS.DB().hideNewSpells=v;end},
 			{"Hide racial buff information in chat", function() return SS.DB().hideRacialInfo;end,function(v) SS.DB().hideRacialInfo=v;end},
 			{"Hide the Oogax Q opening line", function() return SS.DB().hideOpeningLine;end,function(v) SS.DB().hideOpeningLine=v;end},
 			{"Hide 'Who dares to enter my lair'", function() return SS.DB().hideLairLine;end,function(v) SS.DB().hideLairLine=v;end},
 			{"Hide in-game roleplay lines from chat", function() return SS.DB().hideRP;end,function(v) SS.DB().hideRP=v;end},
+			{head="Camera and marks"},
 			{"Camera as far out as it goes (50)", function() return SS.DB().camera; end, function(v) SS.DB().camera = v; SS.Camera(v); end},
 			{"Mark pulled bosses and Guardians (Skull, X, Circle, Star)", function() return SS.DB().bossMarks; end, function(v) SS.DB().bossMarks = v; end},
 			{"   ...and Guardians and lairs before they're pulled", function() return SS.DB().prePullMarks; end, function(v) SS.DB().prePullMarks = v; end},
+			{head="Minimap"},
 			{"Show caches on the minimap", function() return SS.DB().minimapCaches; end, function(v) SS.DB().minimapCaches = v; end},
 			{"Show bosses on the minimap", function() return SS.DB().minimapBosses; end, function(v) SS.DB().minimapBosses = v; end},
 			{"Show lairs on the minimap, with their 3:00 refill timer", function() return SS.DB().minimapLairs; end, function(v) SS.DB().minimapLairs = v; end},
 			{"Show the game's nearest Guardian lair flag on minimap", function() return SS.DB().showGuardianFlag; end, function(v) SS.DB().showGuardianFlag = v; SS.ApplyGuardianFlag(); end},
+			{"Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end},
+			SS.MinimapButtonsEntry(),
+			{"Minimap button", function() local m = SS.DB().minimap; return not (m and m.hide); end, function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (m and m.hide and true or false) == v ) then SS.Mini.Toggle(); end end end},
+			{head="Deaths and spells"},
 			{"Mark where a downed friend can be revived", function() return SS.DB().deathMarks; end, function(v) SS.DB().deathMarks = v; end},
 			{"Play a sound when you or a teammate dies", function() return SS.DB().deathSound; end, function(v) SS.DB().deathSound = v; end},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
-			{"Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end},
-			SS.MinimapButtonsEntry(),
-			{"Minimap button", function() local m = SS.DB().minimap; return not (m and m.hide); end, function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (m and m.hide and true or false) == v ) then SS.Mini.Toggle(); end end end}
-		}, -68);
+		}, -48, function(y) otherLastY = y; PlaceAddons(); end);
 	end
 	local function BuildAddonManager()
 		local title = addonsChild:CreateFontString(nil, "OVERLAY", "GameFontNormal");
@@ -5893,8 +5979,7 @@ function SS.WinBuild()
 		local errors = K.Button(win, "Error log", 120, function() SS.ShowErrors(); end);
 		errors:SetPoint("BOTTOMLEFT", win, "BOTTOMLEFT", 198, 17);
 	end
-	CheckboxRows(); BuildOther(); BuildAddonManager();
-	local tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -732);
 	tooltipTitle:SetText("Tooltip size");
 	local function AdjustTooltipSize(delta)
@@ -5906,15 +5991,16 @@ function SS.WinBuild()
 		if ( GameTooltip ) then GameTooltip:SetWidth(size.w); GameTooltip:SetHeight(size.h); end
 		PlaceAll();
 	end
-	local tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
+	tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
 	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -750);
-	local tooltipLarger = K.Button(uiChild, "Larger", 82, function() AdjustTooltipSize(20); end);
+	tooltipLarger = K.Button(uiChild, "Larger", 82, function() AdjustTooltipSize(20); end);
 	tooltipLarger:SetPoint("LEFT", tooltipSmaller, "RIGHT", 6, 0);
-	local reset = K.Button(uiChild, "Reset positions", 140, function() SS.ResetPlaces(); end);
+	reset = K.Button(uiChild, "Reset positions", 140, function() SS.ResetPlaces(); end);
 	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -784);
-	local resetAll = K.Button(uiChild, "Reset all UI", 126, function() SS.ResetUI(); end);
+	resetAll = K.Button(uiChild, "Reset all UI", 126, function() SS.ResetUI(); end);
 	resetAll:SetPoint("LEFT", reset, "RIGHT", 8, 0);
 	uiChild:SetHeight(818);
+	CheckboxRows(); BuildOther(); BuildAddonManager();
 	local function SelectPage(which)
 		uiScroll:Hide(); otherScroll:Hide(); addonsScroll:Hide();
 		if ( win.reloadButton ) then win.reloadButton:Hide(); end
@@ -5924,9 +6010,8 @@ function SS.WinBuild()
 	end
 	tabUi:SetScript("OnClick", function() SelectPage("ui"); end);
 	tabOther:SetScript("OnClick", function() SelectPage("other"); end);
-	local addonsTab = K.Button(otherChild, "Manage Addons", 132, function() SelectPage("addons"); end);
-	addonsTab:SetPoint("TOPLEFT", otherChild, "TOPLEFT", 10, -556);
-	otherChild:SetHeight(594);
+	addonsTab = K.Button(otherChild, "Manage Addons", 132, function() SelectPage("addons"); end);
+	PlaceTail(); PlaceAddons();
 	SelectPage("other");
 end
 
