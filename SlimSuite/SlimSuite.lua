@@ -2597,11 +2597,11 @@ function SS.Place(name, ignoreAnchor)
 		if ( SS.DB().partyLocked and lockTo ) then
 			f:ClearAllPoints();
 			if ( SS.DB().partyLockAbove ) then
-				-- the whole party block (all its shown frames, stacked or in a row) sits just above the player frame
-				local _, minY = VisualInsets(f);
+				-- the whole party block (all four places, filled or not, stacked or in a row) sits just above the player
+				-- frame, so it never grows down over it when someone joins
 				local factor = RootFactor(f);
 				if ( not factor or factor <= 0 ) then factor = 1; end
-				f:SetPoint("BOTTOMLEFT", lockTo, "TOPLEFT", 0, (6 - (minY or 0)) / factor);
+				f:SetPoint("TOPLEFT", lockTo, "TOPLEFT", 0, (6 + SS.PartyBlockDepth(f)) / factor);
 			else
 				f:SetPoint("TOPLEFT", lockTo, "BOTTOMLEFT", 0, -6);
 			end
@@ -4442,6 +4442,24 @@ function SU.SetVertical(name, on)
 	if ( SU.checks ) then for i = 1, table.getn(SU.checks) do SU.checks[i].Refresh(); end end
 end
 
+-- How far the party block reaches down from the first party frame's top, in UIParent units: all four party frames,
+-- shown or not (a hidden frame keeps its place), and the setup's sample cards while they are on screen.
+function SS.PartyBlockDepth(first)
+	local depth = 0;
+	local top = first and first:GetTop();
+	if ( top ) then
+		top = top * RootFactor(first);
+		for i = 1, 4 do
+			local p = getglobal("PartyMemberFrame" .. i);
+			local b = p and p:GetBottom();
+			if ( b ) then depth = math.max(depth, top - b * RootFactor(p)); end
+		end
+	end
+	if ( SU.demo and SU.demo:IsShown() ) then depth = math.max(depth, (SU.demo:GetHeight() or 0) * RootFactor(SU.demo)); end
+	if ( depth <= 0 and first ) then depth = (first:GetHeight() or 0) * RootFactor(first); end
+	return depth;
+end
+
 -- the party demo: five sample members where the party frames stand, while the party element is on
 SU.PARTY_SAMPLE = { { "Brann", "Priest", 82 }, { "Lyra", "Mage", 55 },
                        { "Tomas", "Hunter", 100 }, { "Velka", "Warrior", 30 } };
@@ -4778,6 +4796,8 @@ function SU.UpdateDemo()
 		SU.demo:ClearAllPoints();
 		SU.demo:SetPoint("TOPLEFT", PartyMemberFrame1 or UIParent, "TOPLEFT", 0, 0);
 		SU.demo:Show();
+		-- locked above the player frame: place the party again now the sample cards count towards its height
+		if ( SS.DB().partyLocked and SS.DB().partyLockAbove ) then SS.Safe(SS.Place, "PartyMemberFrame1"); end
 		for i = 1, 4 do local p = getglobal("PartyMemberFrame" .. i); if ( p and p.SetAlpha ) then SU.Save(p); p:SetAlpha(0); end end
 	elseif ( SU.demo ) then
 		SU.demo:Hide();
