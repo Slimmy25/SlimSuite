@@ -4558,7 +4558,8 @@ function SS.PartyBlockDepth(first)
 end
 
 -- handles that are invisible until the mouse is over them (the frame under them is its own preview)
-SS.QUIET_HANDLES = { PlayerFrame = true, TargetFrame = true, SlimSuitePlayerCard = true, SlimSuiteTargetCard = true };
+SS.QUIET_HANDLES = { PlayerFrame = true, TargetFrame = true, SlimSuitePlayerCard = true, SlimSuiteTargetCard = true,
+	PartyMemberFrame1 = true };
 
 -- The target preview in the setup: with no target, the target frame itself (classic or new-school) shows a sample
 -- elite, so you see exactly what you are placing. A real target always shows as itself.
@@ -4590,8 +4591,56 @@ function SU.EndTargetPreview()
 		TargetFrame:Hide();
 	end
 end
--- clicking the ground during the setup makes the game hide the empty target frame: show the sample again
-SS.Every("targetPreview", 0.5, function() SU.PreviewTarget(); end);
+-- The party preview in the setup: the game's own four party frames, each empty one filled with a sample teammate,
+-- laid out as the party really is (a column or a row, thin lines, faces on or off). Real teammates show as themselves.
+SU.MANA_COLOUR = { Warrior = { 1, 0, 0 } };                -- rage; everyone else here uses mana
+function SU.PreviewParty()
+	if ( not setupActive or not (SU.on and SU.on.PartyMemberFrame1) ) then return; end
+	for i = 1, 4 do
+		local f = getglobal("PartyMemberFrame" .. i);
+		local sample = SU.PARTY_SAMPLE[i];
+		if ( f and sample and not UnitExists("party" .. i) ) then
+			f.slimPreview = true;
+			f:Show();
+			local rgb = SU.CLASS_RGB[sample[2]] or { 1, 1, 1 };
+			local name = getglobal("PartyMemberFrame" .. i .. "Name");
+			if ( name and name.SetText ) then name:SetText(sample[1]); name:SetTextColor(rgb[1], rgb[2], rgb[3]); end
+			local hp = getglobal("PartyMemberFrame" .. i .. "HealthBar");
+			if ( hp and hp.SetMinMaxValues ) then hp:SetMinMaxValues(0, 100); hp:SetValue(sample[3]); hp:SetStatusBarColor(0, 1, 0); end
+			local mana = getglobal("PartyMemberFrame" .. i .. "ManaBar");
+			if ( mana and mana.SetMinMaxValues ) then
+				local c = SU.MANA_COLOUR[sample[2]] or { 0, 0, 1 };
+				mana:SetMinMaxValues(0, 100); mana:SetValue(60); mana:SetStatusBarColor(c[1], c[2], c[3]);
+			end
+			local face = getglobal("PartyMemberFrame" .. i .. "Portrait");
+			if ( face and face.SetTexture ) then
+				local coords = SU.CLASS_ICON[sample[2]] or { 0, 1, 0, 1 };
+				face:SetTexture("Interface\\WorldStateFrame\\ICONS-CLASSES");
+				face:SetTexCoord(coords[1], coords[2], coords[3], coords[4]);
+				if ( SS.DB().partyFaces == false ) then face:Hide(); else face:Show(); end
+			end
+		end
+	end
+end
+-- when the setup closes, a previewed frame with nobody in its place hides again, its face back to a plain portrait
+function SU.EndPartyPreview()
+	for i = 1, 4 do
+		local f = getglobal("PartyMemberFrame" .. i);
+		if ( f and f.slimPreview ) then
+			f.slimPreview = nil;
+			local face = getglobal("PartyMemberFrame" .. i .. "Portrait");
+			if ( face and face.SetTexCoord ) then face:SetTexCoord(0, 1, 0, 1); end
+			if ( UnitExists("party" .. i) ) then
+				if ( face and SetPortraitTexture ) then SS.Safe(SetPortraitTexture, face, "party" .. i); end
+			else
+				f:Hide();
+			end
+		end
+	end
+end
+
+-- clicking the ground or a party change during the setup makes the game hide the empty frames: show the samples again
+SS.Every("targetPreview", 0.5, function() SU.PreviewTarget(); SU.PreviewParty(); end);
 
 -- the party demo: five sample members where the party frames stand, while the party element is on
 SU.PARTY_SAMPLE = { { "Brann", "Priest", 82 }, { "Lyra", "Mage", 55 },
@@ -4926,16 +4975,12 @@ end
 -- the demos stand where their elements are, while those elements are on; the real frames are hidden behind them
 function SU.UpdateDemo()
 	local on = SU.on or {};
+	-- the party frames preview themselves (SU.PreviewParty); the old sample cards over them are retired
+	if ( SU.demo ) then SU.demo:Hide(); end
 	if ( on.PartyMemberFrame1 ) then
-		if ( not SU.demo ) then SU.demo = SU.BuildDemo(); end
-		SU.demo:ClearAllPoints();
-		SU.demo:SetPoint("TOPLEFT", PartyMemberFrame1 or UIParent, "TOPLEFT", 0, 0);
-		SU.demo:Show();
-		-- locked above the player frame: place the party again now the sample cards count towards its height
+		SU.PreviewParty();
+		-- locked above the player frame: place the party again now all four frames show
 		if ( SS.DB().partyLocked and SS.DB().partyLockAbove ) then SS.Safe(SS.Place, "PartyMemberFrame1"); end
-		for i = 1, 4 do local p = getglobal("PartyMemberFrame" .. i); if ( p and p.SetAlpha ) then SU.Save(p); p:SetAlpha(0); end end
-	elseif ( SU.demo ) then
-		SU.demo:Hide();
 	end
 	-- the target frame previews itself (SU.PreviewTarget); the old sample card over it is retired
 	if ( SU.targetDemo ) then SU.targetDemo:Hide(); end
@@ -5339,6 +5384,7 @@ function SS.SetupHide()
 	setupActive = false;
 	SU.Unreveal();
 	SS.Safe(SU.EndTargetPreview);
+	SS.Safe(SU.EndPartyPreview);
 	if ( SU.panel ) then SU.panel:Hide(); end
 	if ( SU.bar ) then SU.bar:Hide(); end
 	if ( SU.demo ) then SU.demo:Hide(); end
