@@ -1,14 +1,19 @@
-# Publishes a GitHub release whenever a version tag such as v1.03 is pushed.
-# The release carries SlimSuite-<version>.zip, which holds the SlimSuite folder ready to drop into Interface\AddOns.
+# Publishes a GitHub release for each new Slim Suite version.
+# It runs when main is pushed with a changed SlimSuite.toc (or a changed workflow). If the version in
+# "## Version:" has no release yet, it builds SlimSuite-<version>.zip and publishes release v<version>,
+# creating that tag itself. Pushing main without changing the version publishes nothing.
 name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+    paths:
+      - "SlimSuite/SlimSuite.toc"
+      - ".github/workflows/release.yml"
 
 permissions:
-  contents: write   # needed to create the release
+  contents: write   # needed to create the tag and the release
 
 jobs:
   release:
@@ -16,22 +21,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the tag matches the addon version
+      - name: Read the addon version
+        id: version
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          toc=$(grep -m1 '^## Version:' SlimSuite/SlimSuite.toc | sed 's/^## Version:[[:space:]]*//' | tr -d '\r')
-          if [ "$tag" != "$toc" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match '## Version: $toc' in SlimSuite.toc. Update one so they match."
-            exit 1
-          fi
+          version=$(grep -m1 '^## Version:' SlimSuite/SlimSuite.toc | sed 's/^## Version:[[:space:]]*//' | tr -d '\r')
+          if [ -z "$version" ]; then echo "No '## Version:' line in SlimSuite.toc"; exit 1; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Build the zip
-        run: zip -r "SlimSuite-${GITHUB_REF_NAME#v}.zip" SlimSuite -x "*.git*"
-
-      - name: Create the release
+      - name: Skip if this version is already released
+        id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "SlimSuite-${GITHUB_REF_NAME#v}.zip" \
-            --title "Slim Suite ${GITHUB_REF_NAME#v}" \
+          if gh release view "v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
+            echo "v${{ steps.version.outputs.version }} is already released; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the zip
+        if: steps.check.outputs.skip != 'true'
+        run: zip -r "SlimSuite-${{ steps.version.outputs.version }}.zip" SlimSuite -x "*.git*"
+
+      - name: Create the release
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" "SlimSuite-${{ steps.version.outputs.version }}.zip" \
+            --target "$GITHUB_SHA" \
+            --title "Slim Suite ${{ steps.version.outputs.version }}" \
             --generate-notes
