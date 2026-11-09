@@ -2850,7 +2850,9 @@ SS.Every("toggleRefresh", 0.5, function() SS.RefreshToggles(); end);
 function SS.RefreshCrossRefs(name)
 	if ( not sizeMenu or not sizeMenu.xref ) then return; end
 	local rows = name and SS.CrossRefs(name) or {};
-	local y = -312;
+	-- under the menu's own buttons: the build rows' attach button and the clock's daylight-saving button come first
+	local y = -208;
+	if ( name == "SlimSuiteSpellRowFrame" or name == "SlimSuiteLocalClockFrame" ) then y = -238; end
 	for i = 1, table.getn(sizeMenu.xref) do
 		local cb, e = sizeMenu.xref[i], rows[i];
 		if ( not e ) then SS.RowKind(cb, nil); end
@@ -2872,7 +2874,7 @@ function SS.RefreshCrossRefs(name)
 			cb.entry = nil; cb.get = nil; cb.cond = nil; cb:Hide();
 		end
 	end
-	if ( table.getn(rows) > 0 ) then sizeMenu:SetHeight(math.max(sizeMenu:GetHeight() or 270, -y + 28)); end
+	sizeMenu:SetHeight(-y + 40);   -- room for Reset and Done under the last setting
 end
 
 function SS.RefreshBuffControls()
@@ -3464,7 +3466,7 @@ function SS.OpenSizeMenu(name, label)
 		sizeMenu.mirror:SetScript("OnLeave", function() SS.HideWarnTip(); end);
 		sizeMenu.mirror:Hide();
 		sizeMenu.xref = {};
-		for i = 1, 10 do
+		for i = 1, 14 do
 			local cb = CreateFrame("CheckButton", nil, sizeMenu, "UICheckButtonTemplate");
 			cb:SetWidth(22); cb:SetHeight(22);
 			cb:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 8, -312 - (i - 1) * 26);
@@ -3564,30 +3566,12 @@ function SS.OpenSizeMenu(name, label)
 		sizeMenu.muteButton:SetText(SS.DB().muted[sizeTarget] and "Show feature" or "Hide feature");
 	end
 	if ( sizeMenu.clockBox ) then
-		if ( sizeMenu.mirror ) then
-			if ( name == "PlayerFrame" or name == "TargetFrame" ) then
-				sizeMenu.mirror:SetChecked(SS.DB().mirrorTarget and 1 or nil); sizeMenu.mirror:Show();
-				sizeMenu.mirrorScale:SetChecked(SS.DB().mirrorSameScale ~= false and 1 or nil); sizeMenu.mirrorScale:Show();
-				if ( SS.DB().mirrorTarget ) then
-					sizeMenu.mirrorScale:Enable(); sizeMenu.mirrorScale.label:SetTextColor(1, 1, 1);
-				else
-					sizeMenu.mirrorScale:Disable(); sizeMenu.mirrorScale.label:SetTextColor(0.45, 0.45, 0.45);
-				end
-			else sizeMenu.mirror:Hide(); sizeMenu.mirrorScale:Hide(); end
-		end
-		if ( sizeMenu.buffsOn ) then
-			local buffs = name == "TargetFrame" or name == "BuffFrame";
-			sizeMenu.buffsOn:ClearAllPoints(); sizeMenu.buffsSide:ClearAllPoints();
-			-- under Mirror target on the target frame's menu; first on the buff frame's
-			local top = name == "TargetFrame" and -257 or -207;
-			sizeMenu.buffsOn:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 8, top);
-			sizeMenu.buffsSide:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 26, top - 26);
-			if ( buffs ) then sizeMenu.buffsOn:Show(); sizeMenu.buffsSide:Show(); SS.RefreshBuffControls(); else sizeMenu.buffsOn:Hide(); sizeMenu.buffsSide:Hide(); end
-		end
+		-- Mirror target, the buffs and the clock's background and 12/24-hour are setting rows now, as in the setup;
+		-- only the clock's daylight-saving button stays a button
+		for _, c in ipairs({ sizeMenu.mirror, sizeMenu.mirrorScale, sizeMenu.buffsOn, sizeMenu.buffsSide, sizeMenu.clockBox, sizeMenu.clock24 }) do c:Hide(); end
 		local isClock = name == "SlimSuiteLocalClockFrame";
-		for _, b in ipairs({ sizeMenu.clockBox, sizeMenu.clock24, sizeMenu.clockDst }) do if ( isClock ) then b:Show(); else b:Hide(); end end
-		if ( isClock ) then sizeMenu.ClockLabels(); end
-		sizeMenu:SetHeight(isClock and 326 or (name == "TargetFrame" and 326) or (name == "BuffFrame" and 300) or 270);
+		sizeMenu.clockDst:ClearAllPoints(); sizeMenu.clockDst:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -208);
+		if ( isClock ) then sizeMenu.clockDst:Show(); sizeMenu.ClockLabels(); else sizeMenu.clockDst:Hide(); end
 	end
 	-- The menu opens smaller, right beside the element it is for (on its right, or its left when there is no room),
 	-- top edges level. It can still be dragged anywhere while it is open.
@@ -3986,8 +3970,8 @@ function SS.AvailableElements()
 		SlimSuiteMeterFrame = d.moveMeter, SlimSuiteClockFrame = d.replaceClock, SlimSuiteBossFrames = d.replaceEncounters,
 		SlimSuiteTallyFrame = d.replaceTally, SlimSuiteAnnouncementFrame = d.replaceBanners, SlimSuiteReviveFrame = d.replaceRevive,
 		SlimSuiteLocalClockFrame = d.replaceLocalClock and d.clockDetached, SlimSuiteCombatTextFrame = d.combatTextBox, SlimSuiteMinimapBar = d.minimapBar,
-		TargetFrame = not d.hideTarget and not d.newFrames, PlayerFrame = not d.newFrames,
-		SlimSuitePlayerCard = d.newFrames, SlimSuiteTargetCard = d.newFrames and not d.hideTarget,
+		TargetFrame = not d.hideTarget and not d.newFrames, PlayerFrame = not d.newFrames and not d.partyIncludesSelf,
+		SlimSuitePlayerCard = d.newFrames and not d.partyIncludesSelf, SlimSuiteTargetCard = d.newFrames and not d.hideTarget,
 	};
 	local out = {};
 	for name, isOn in pairs(off) do out[name] = isOn and true or false; end
@@ -4407,7 +4391,8 @@ end
 -- and the right-click menus. "Movable?" warns about what unticking it turns off.
 SU.WARN = {
 	mirror = "Turns off: Add yourself to party. Makes both frames movable.",
-	selfParty = "Turns off: the target frame (back when unticked), Mirror target, Combine.",
+	selfParty = "Turns off: your player frame (back when unticked), Mirror target, Combine.",
+	combine = "Turns off: Add yourself to party.",
 	buffsTarget = "Turns off: Buffs/Debuffs on the player frame.",
 	buffsPlayer = "Turns off: Buffs on the target frame.",
 	lockParty = "Makes the party frames movable.",
@@ -4532,15 +4517,15 @@ function SU.ChecksFor(frame)
 	-- Entries tagged xref = true refer to another element, so they also appear in that element's right-click menu.
 	local W = SU.WARN;
 	local function Mirror() return { "Mirror target", warn = W.mirror, function() return SS.DB().mirrorTarget; end, function(v) SS.SetMirrorTarget(v); if ( v and not SS.DB().hideTarget ) then SU.SetOn("TargetFrame", true, SU.titles and SU.titles.TargetFrame or "Target frame"); SU.Focus(SU.focus); end end }; end
-	local function MirrorScale() return { "Same size scaling (off: keep its own size)", function() return SS.DB().mirrorSameScale ~= false; end,
+	local function MirrorScale() return { "Same size scaling (off: keep its own size)", short = "Same size scaling", function() return SS.DB().mirrorSameScale ~= false; end,
 		function(v) SS.SetMirrorSameScale(v); end, function() return SS.DB().mirrorTarget; end }; end
 	local function Combine() return { "Combine with the target frame (one button)", function() return SS.DB().combineTarget; end,
-		function(v) SS.SetCombineTarget(v); end, short = "Combine with target", xref = true }; end
+		function(v) SS.SetCombineTarget(v); end, short = "Combine with target", xref = true, warn = W.combine }; end
 	local function NewSchool() return { "New-school player and target frames", function() return SS.DB().newFrames; end, function(v) SS.SetNewFrames(v); end, short = "New-school frames", xref = true }; end
 	local function NewSchoolMirror() return { "...in the new-school design (off: original)", function() return SS.DB().newFrames; end,
 		function(v) SS.SetNewFrames(v); end, function() return SS.DB().mirrorTarget; end, short = "New-school design", xref = true }; end
 	local function BuffsOn() return { "Buffs on the target frame", warn = W.buffsTarget, function() return SS.DB().buffsOnTarget; end, function(v) SS.SetBuffsOnTarget(v); end }; end
-	local function BuffsAbove() return { "...above the target (off: below it)", function() return SS.DB().buffsOnTargetSide == "above"; end,
+	local function BuffsAbove() return { "...above the target (off: below it)", short = "Above the target (off: below)", function() return SS.DB().buffsOnTargetSide == "above"; end,
 		function(v) SS.SetBuffsSide(v and "above" or "below"); end }; end
 	local function PlayerBuffs() return { "Buffs/Debuffs on the player frame", function() return SS.DB().buffsOnPlayer; end, function(v) SU.SetBuffsPlayer(v); end, short = "Buffs/Debuffs on player", xref = true, warn = W.buffsPlayer }; end
 	local function PlayerBuffsBelow() return { "Below the player frame (off: above it)", function() return SS.DB().buffsOnPlayerSide == "below"; end,
@@ -4562,11 +4547,11 @@ function SU.ChecksFor(frame)
 	local list = {
 		PlayerFrame = { Combine(), NewSchool(), Mirror(), MirrorScale(), NewSchoolMirror(), PlayerBuffs(), PlayerBuffsBelow(), LockParty(), LockPartyAbove(), SelfParty() },
 		MainMenuBar = {
-			{ "Hide the bar's artwork (only the spell squares stay)", function() return SS.DB().plainBar; end, function(v) SS.DB().plainBar = v; SS.Safe(SS.PlainBar, v); end },
-			{ "Show all six buttons at all times, even empty ones", function() return SS.DB().showEmptyActionSlots; end, function(v) SS.DB().showEmptyActionSlots = v; SS.Safe(ApplyActionSlotGrid); end },
-			{ "Add your racial as a 7th button", function() return SS.DB().showRacialAbility; end, function(v) SS.Safe(SS.SetRacialAbility, v); end },
+			{ "Hide the bar's artwork (only the spell squares stay)", short = "Hide the bar's artwork", function() return SS.DB().plainBar; end, function(v) SS.DB().plainBar = v; SS.Safe(SS.PlainBar, v); end },
+			{ "Show all six buttons at all times, even empty ones", short = "Show empty buttons", function() return SS.DB().showEmptyActionSlots; end, function(v) SS.DB().showEmptyActionSlots = v; SS.Safe(ApplyActionSlotGrid); end },
+			{ "Add your racial as a 7th button", short = "Racial as a 7th button", function() return SS.DB().showRacialAbility; end, function(v) SS.Safe(SS.SetRacialAbility, v); end },
 			{ "Turn the action bar vertical", function() return SS.DB().orientations.MainMenuBar == "vertical"; end, function(v) SU.SetVertical("MainMenuBar", v); end } },
-		TargetFrame = { Mirror(), MirrorScale(), { "Show debuffs and DoTs on the target", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end }, BuffsOn(), BuffsAbove(),
+		TargetFrame = { Mirror(), MirrorScale(), { "Show debuffs and DoTs on the target", short = "Debuffs and DoTs on target", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end }, BuffsOn(), BuffsAbove(),
 			Combine(), NewSchool(), NewSchoolMirror(), SelfParty() },
 		BuffFrame = { BuffsOn(), BuffsAbove(), PlayerBuffs(), PlayerBuffsBelow() },
 		MinimapCluster = { { "Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end },
@@ -4575,14 +4560,14 @@ function SU.ChecksFor(frame)
 		SlimSuiteMinimapBar = { ButtonPlace(),
 			{ "Vertical", function() return SS.DB().orientations.SlimSuiteMinimapBar == "vertical"; end,
 			function(v) SS.DB().orientations.SlimSuiteMinimapBar = v and "vertical" or "horizontal"; SS.Safe(SS.LayoutMinimapBar); end } },
-		SlimSuiteClockFrame = { { "Show the zone and Heroic affixes under it", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
+		SlimSuiteClockFrame = { { "Show the zone and Heroic affixes under it", short = "Zone and Heroic affixes", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
 		MainMenuExpBar = { { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
 			function(v) SU.SetVertical("MainMenuExpBar", v); SS.Safe(SS.LayoutXpSegments); end },
 			{ "Split into 20 segments", function() return SS.DB().xpSegments ~= false; end,
 			function(v) SS.DB().xpSegments = v and true or false; SS.Safe(SS.LayoutXpSegments); end, xref = true, short = "Split into 20 segments" } },
 		PartyMemberFrame1 = {
 			LockParty(), LockPartyAbove(),
-			{ "Show as thin lines, not face plates", function() return SS.DB().partyCompact; end, function(v) SU.SetPartyOption("partyCompact", v); end },
+			{ "Show as thin lines, not face plates", short = "Thin lines, not face plates", function() return SS.DB().partyCompact; end, function(v) SU.SetPartyOption("partyCompact", v); end },
 			{ "Show character faces", function() return SS.DB().partyFaces ~= false; end, function(v) SU.SetPartyOption("partyFaces", v); end },
 			SelfParty(),
 			{ "Horizontal (off: vertical)", function() return SS.DB().orientations.PartyMemberFrame1 == "horizontal"; end, function(v) SU.SetPartyRow(v); end } },
@@ -4601,19 +4586,16 @@ function SU.ChecksFor(frame)
 	};
 	local out = {};
 	if ( frame and SU.NATIVE[frame] ) then
-		table.insert(out, { "Movable? (Disables Default UI Element)", function() return not (SS.DB().frameDefault and SS.DB().frameDefault[frame]); end,
+		table.insert(out, { "Movable? (Disables Default UI Element)", short = "Movable? (off: default UI)", function() return not (SS.DB().frameDefault and SS.DB().frameDefault[frame]); end,
 			function(v) SU.SetMovable(frame, v); end, warn = SU.WARN_UNMOVABLE[frame] });
 	end
 	for _, c in ipairs(frame and list[frame] or {}) do table.insert(out, c); end
 	return out;
 end
 
--- the settings that refer to another element, for that element's right-click menu
+-- the right-click menu's settings: exactly the ones the setup shows for the element (in the same order)
 function SS.CrossRefs(name)
-	local out = {};
-	local list = SU.ChecksFor(name);
-	for i = 1, table.getn(list) do if ( list[i].xref ) then table.insert(out, list[i]); end end
-	return out;
+	return SU.ChecksFor(name);
 end
 
 -- the game's own frames and every Slim Suite frame: hidden by alpha during setup, restored when it ends
@@ -4674,7 +4656,7 @@ end
 -- turn an element on or off: its frame (and the frames that move with it) and its handle
 function SU.SetOn(frame, on, title)
 	-- the newest choice wins: a target frame turned on or off by its own button takes precedence over the party/combine settings
-	if ( frame == "TargetFrame" and on and not SU.restoring and SS.DB().partyIncludesSelf ) then SS.Safe(SS.ClaimTarget, "target"); end
+	if ( frame == "PlayerFrame" and on and not SU.restoring and SS.DB().partyIncludesSelf ) then SS.Safe(SS.ClaimTarget, "player"); end
 	if ( frame == "TargetFrame" and not on and SS.DB().combineTarget and not SU.restoring and not SU.cascading ) then
 		SS.Notice("Combine turned off: the target frame is off.");
 		SS.DB().combineTarget = false; SS.Safe(SS.RebuildSetup);
@@ -4970,7 +4952,7 @@ function SS.RefreshCard(f)
 	if ( not f ) then return; end
 	if ( f.slimParty and not SS.DB().partyIncludesSelf ) then f:Hide(); return; end
 	if ( not f.slimParty and not SS.DB().newFrames ) then f:Hide(); return; end
-	local unit = f.unit;
+	if ( not f.slimParty and f.unit == "player" and SS.DB().partyIncludesSelf ) then f:Hide(); return; end   -- you are in the party
 	if ( not UnitExists(unit) ) then
 		if ( setupActive and unit == "target" ) then
 			local t = SU.SAMPLE_TARGET;
@@ -5387,41 +5369,54 @@ function SS.SetNewFrames(on)
 end
 
 -- Settings that cannot both be on: the one chosen last wins and the other is turned off (it can be turned back on).
---   "self"   you join the party frames: the target frame goes off, and mirroring with it
---   "mirror" mirroring starts: you leave the party frames and the target frame comes back
---   "target" the target frame is turned on from its button: you leave the party frames
+--   "self"    you join the party frames: your own player frame goes off, since your card is in the party now. The
+--             target frame stays, on its own: Mirror target and Combine, which tie it to the player frame, go off.
+--   "mirror", "combine", "player" (the player frame turned on from its button): you leave the party frames and your
+--             player frame comes back; mirroring also brings back a hidden target frame
 function SS.ClaimTarget(by)
+	local d = SS.DB();
 	if ( by == "self" ) then
-		if ( not SS.DB().hideTarget ) then
-			SS.Notice("The target frame turned off: you are in the party frames now.");
-			SS.DB().targetHiddenBySelf = true;          -- so leaving the party frames brings it back
-		end
-		SS.DB().hideTarget = true; SS.Safe(SS.TargetFrameHidden, true);
-		if ( SS.DB().mirrorTarget ) then SS.SetMirrorTarget(false); SS.Notice("Mirror target turned off: the target frame is off."); end
-		if ( SU.on and SU.on.TargetFrame ) then SU.SetOn("TargetFrame", false, SU.titles and SU.titles.TargetFrame or "Target frame"); end
+		if ( d.mirrorTarget ) then SS.SetMirrorTarget(false); SS.Notice("Mirror target turned off: the target frame stands on its own now."); end
+		if ( d.combineTarget ) then d.combineTarget = false; SS.Notice("Combine turned off: the target frame stands on its own now."); end
+		SS.Notice("The player frame turned off: you are in the party frames now.");
+		SS.Safe(SS.PlayerFrameHidden, true);
+		if ( SU.on and SU.on.PlayerFrame ) then SU.SetOn("PlayerFrame", false, SU.titles and SU.titles.PlayerFrame or "Unit frame"); end
 		return;
 	end
-	if ( SS.DB().partyIncludesSelf ) then
-		SS.DB().partyIncludesSelf = false;
-		SS.Notice("Add yourself to party turned off: the target frame is back.");
+	if ( d.partyIncludesSelf ) then
+		d.partyIncludesSelf = false;
+		SS.Notice("Add yourself to party turned off: the player frame is back.");
+		SS.Safe(SS.PlayerFrameHidden, false);
 		SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
 	end
-	if ( by ~= "self" and SS.DB().hideTarget ) then SS.DB().hideTarget = false; SS.Safe(SS.TargetFrameHidden, false); end
-	SS.DB().targetHiddenBySelf = nil;
+	if ( by == "mirror" and d.hideTarget ) then d.hideTarget = false; SS.Safe(SS.TargetFrameHidden, false); end
 end
 
--- You in the party frames: your own card joins the end of the party column or row. It takes the target frame's
--- place, so the target frame is turned off and mirroring is turned off with it.
-function SS.SetPartySelf(on)
-	SS.DB().partyIncludesSelf = on and true or false;
-	if ( on ) then SS.ClaimTarget("self"); end
-	-- unticked again: the target frame it turned off comes back (one you hid yourself stays hidden)
-	if ( not on and SS.DB().targetHiddenBySelf ) then
-		SS.DB().targetHiddenBySelf = nil;
-		if ( SS.DB().hideTarget ) then
-			SS.DB().hideTarget = false; SS.Safe(SS.TargetFrameHidden, false);
-			SS.Notice("The target frame is back: you left the party frames.");
+-- your own player frame (classic or new-school) is hidden while you are in the party frames
+function SS.PlayerFrameHidden(on)
+	if ( PlayerFrame ) then
+		if ( not SS.playerShow ) then SS.playerShow = PlayerFrame.Show; end
+		if ( on ) then
+			PlayerFrame.Show = function() end;
+			PlayerFrame:Hide();
+		else
+			PlayerFrame.Show = SS.playerShow;
+			PlayerFrame:Show();
 		end
+	end
+	local card = getglobal("SlimSuitePlayerCard");
+	if ( card ) then SS.Safe(SS.RefreshCard, card); end
+end
+
+-- You in the party frames: your own card joins the end of the party column or row and takes your player frame's
+-- place, so the player frame is turned off. Unticked, the player frame comes back.
+function SS.SetPartySelf(on)
+	local was = SS.DB().partyIncludesSelf and true or false;
+	SS.DB().partyIncludesSelf = on and true or false;
+	if ( on ) then SS.ClaimTarget("self");
+	elseif ( was ) then
+		SS.Safe(SS.PlayerFrameHidden, false);
+		SS.Notice("The player frame is back: you left the party frames.");
 	end
 	SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
 	if ( SU.demo ) then SU.demo:Hide(); SU.demo = nil; end
@@ -5430,6 +5425,7 @@ function SS.SetPartySelf(on)
 end
 
 function SS.SetCombineTarget(on)
+	if ( on ) then SS.Safe(SS.ClaimTarget, "combine"); end   -- the newest choice wins: combining needs your player frame
 	SS.DB().combineTarget = on and true or false;
 	SU.Rebuild();
 end
@@ -5489,6 +5485,7 @@ function SU.Begin()
 		local f = SU.elements[i].frame;
 		local want = saved[f] and true or false;
 		if ( f == "SlimSuiteMeterFrame" ) then want = SS.DB().moveMeter and true or false; end   -- follows the setting
+		if ( f == "PlayerFrame" and SS.DB().partyIncludesSelf ) then want = false; end            -- you are in the party
 		SS.Safe(SU.SetOn, f, want, SU.titles[f]);
 	end
 	SU.batching = false;
@@ -5732,7 +5729,7 @@ function SS.WinBuild()
 		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetText("Most custom game UI is not available as reusable addon art or code. This section recreates it as faithfully as possible so it can be moved; a few implementation choices are unavoidable. <3");
 		AddRows(uiChild, {
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
-			{"Hide the target frame", function() return SS.DB().hideTarget; end, function(v) SS.DB().hideTarget = v; SS.DB().targetHiddenBySelf = nil; SS.TargetFrameHidden(v); end},
+			{"Hide the target frame", function() return SS.DB().hideTarget; end, function(v) SS.DB().hideTarget = v; SS.TargetFrameHidden(v); end},
 			{"Show debuffs and DoTs on the target", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end},
 			{"Buffs on the target frame", function() return SS.DB().buffsOnTarget; end, function(v) SS.SetBuffsOnTarget(v); end},
 			{"Replace Default Level Up with Movable Version?", function() return SS.DB().moveLevelButton; end, function(v) SS.DB().moveLevelButton = v; SS.Safe(SS.UpdateLevelButton); end},
@@ -5946,6 +5943,7 @@ loader:SetScript("OnEvent", function()
 	SS.Safe(SS.ApplyTallyLayout, false);
 	SS.Safe(PlaceAll);
 	SS.Safe(SS.TargetFrameHidden, SS.DB().hideTarget);
+	if ( SS.DB().partyIncludesSelf ) then SS.Safe(SS.PlayerFrameHidden, true); end
 	if ( SS.DB().plainBar ) then SS.Safe(SS.PlainBar, true); end
 	SS.Safe(ApplyMovableOrientation, "MainMenuBar");
 	SS.Safe(ApplyMovableOrientation, "MainMenuExpBar");
