@@ -5008,9 +5008,10 @@ function SS.GuardTargetTooltips()
 				local original = f:GetScript("OnEnter");
 				if ( original ) then
 					f.slimGuarded = true;
+					-- the icon's number is known here: not every icon has GetID
 					f:SetScript("OnEnter", function()
-						local id = this:GetID();
-						if ( id and UnitExists("target") and lookup("target", id) ) then original(); end
+						local id = i;
+						if ( UnitExists("target") and lookup("target", id) ) then original(); end
 					end);
 				end
 			end
