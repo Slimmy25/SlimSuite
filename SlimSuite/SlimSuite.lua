@@ -2193,6 +2193,9 @@ ApplyFeatureMute = function(name)
 			handle:SetBackdropColor(0.22, 0.22, 0.24, 0.58);
 			handle:SetBackdropBorderColor(0.6, 0.6, 0.62, 0.85);
 			if ( handle.text and name ~= "GameTooltip" ) then handle.text:SetTextColor(0.72, 0.72, 0.74); end
+		elseif ( handle.quiet ) then
+			handle:SetBackdropColor(0, 0, 0, 0); handle:SetBackdropBorderColor(0.3, 1, 0.3, 0);
+			if ( handle.text ) then handle.text:SetTextColor(1, 1, 1); end
 		else
 			handle:SetBackdropColor(0.1, 0.6, 0.1, 0.45);
 			handle:SetBackdropBorderColor(0.3, 1, 0.3, 0.9);
@@ -3751,6 +3754,14 @@ function SS.Handle(name, label)
 		h.text = h:CreateFontString(nil, "OVERLAY", "GameFontNormal");
 		h.text:SetPoint("CENTER", h, "CENTER", 0, 0);
 		if ( name == "GameTooltip" ) then h.text:Hide(); else h.text:SetText(label); end
+		if ( SS.QUIET_HANDLES[name] ) then
+			-- the player and target frames are previewed as they really look: no green box over them, just a faint
+			-- outline and the name while the mouse is over the frame (it still drags and right-clicks as before)
+			h.quiet = true;
+			h:SetBackdropColor(0, 0, 0, 0); h:SetBackdropBorderColor(0.3, 1, 0.3, 0); h.text:Hide();
+			h:SetScript("OnEnter", function() this:SetBackdropBorderColor(0.3, 1, 0.3, 0.7); this.text:Show(); end);
+			h:SetScript("OnLeave", function() this:SetBackdropBorderColor(0.3, 1, 0.3, 0); this.text:Hide(); end);
+		end
 		local dragStep = function() SS.DragStep(this, name); end;
 		h:SetScript("OnMouseDown", function()
 			if ( arg1 == "RightButton" ) then
@@ -4546,6 +4557,42 @@ function SS.PartyBlockDepth(first)
 	return depth;
 end
 
+-- handles that are invisible until the mouse is over them (the frame under them is its own preview)
+SS.QUIET_HANDLES = { PlayerFrame = true, TargetFrame = true, SlimSuitePlayerCard = true, SlimSuiteTargetCard = true };
+
+-- The target preview in the setup: with no target, the target frame itself (classic or new-school) shows a sample
+-- elite, so you see exactly what you are placing. A real target always shows as itself.
+SU.SAMPLE_TARGET = { name = "Hogger", level = "??", hp = 70 };
+function SU.PreviewTarget()
+	if ( not setupActive or not (SU.on and SU.on.TargetFrame) or SS.DB().hideTarget ) then return; end
+	if ( UnitExists("target") ) then return; end
+	local t = SU.SAMPLE_TARGET;
+	if ( TargetFrame and not SS.DB().newFrames ) then
+		TargetFrame:Show();
+		local name, level = getglobal("TargetName"), getglobal("TargetLevelText");
+		if ( name and name.SetText ) then name:SetText(t.name); end
+		if ( level and level.SetText ) then level:SetText(t.level); end
+		local hp, mana = getglobal("TargetFrameHealthBar"), getglobal("TargetFrameManaBar");
+		if ( hp and hp.SetMinMaxValues ) then hp:SetMinMaxValues(0, 100); hp:SetValue(t.hp); hp:SetStatusBarColor(0, 1, 0); end
+		if ( mana and mana.SetMinMaxValues ) then mana:SetMinMaxValues(0, 100); mana:SetValue(0); end
+		local art = getglobal("TargetFrameTexture");
+		if ( art and art.SetTexture ) then art:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame-Elite"); end
+		local face = getglobal("TargetPortrait");
+		if ( face and face.SetTexture ) then face:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark"); end
+	end
+end
+-- the game redraws the target frame from the real target (or hides it with none) when the setup closes
+function SU.EndTargetPreview()
+	if ( not TargetFrame ) then return; end
+	if ( UnitExists("target") and not SS.DB().hideTarget ) then
+		if ( TargetFrame_Update ) then SS.Safe(TargetFrame_Update); end
+	else
+		TargetFrame:Hide();
+	end
+end
+-- clicking the ground during the setup makes the game hide the empty target frame: show the sample again
+SS.Every("targetPreview", 0.5, function() SU.PreviewTarget(); end);
+
 -- the party demo: five sample members where the party frames stand, while the party element is on
 SU.PARTY_SAMPLE = { { "Brann", "Priest", 82 }, { "Lyra", "Mage", 55 },
                        { "Tomas", "Hunter", 100 }, { "Velka", "Warrior", 30 } };
@@ -4646,8 +4693,9 @@ function SS.RefreshCard(f)
 	local unit = f.unit;
 	if ( not UnitExists(unit) ) then
 		if ( setupActive and unit == "target" ) then
-			f.name:SetText("No target"); f.name:SetTextColor(0.6, 0.6, 0.6);
-			f.hp:SetMinMaxValues(0, 1); f.hp:SetValue(1); f.hpText:SetText("");
+			local t = SU.SAMPLE_TARGET;
+			f.name:SetText(t.name); f.name:SetTextColor(0.9, 0.25, 0.25);
+			f.hp:SetMinMaxValues(0, 100); f.hp:SetValue(t.hp); f.hpText:SetText("Elite");
 			f.power:SetMinMaxValues(0, 1); f.power:SetValue(0);
 			f:Show();
 		elseif ( setupActive and unit == "player" ) then
@@ -4889,15 +4937,9 @@ function SU.UpdateDemo()
 	elseif ( SU.demo ) then
 		SU.demo:Hide();
 	end
-	if ( on.TargetFrame and not SS.DB().hideTarget ) then
-		if ( not SU.targetDemo ) then SU.targetDemo = SU.BuildTargetDemo(); end
-		SU.targetDemo:ClearAllPoints();
-		SU.targetDemo:SetPoint("TOPLEFT", TargetFrame or UIParent, "TOPLEFT", 0, 0);
-		SU.targetDemo:Show();
-		if ( TargetFrame ) then SU.Save(TargetFrame); TargetFrame:SetAlpha(0); end
-	elseif ( SU.targetDemo ) then
-		SU.targetDemo:Hide();
-	end
+	-- the target frame previews itself (SU.PreviewTarget); the old sample card over it is retired
+	if ( SU.targetDemo ) then SU.targetDemo:Hide(); end
+	if ( on.TargetFrame and not SS.DB().hideTarget ) then SU.PreviewTarget(); end
 	local buffFrame = getglobal("BuffFrame");
 	if ( on.BuffFrame ) then
 		if ( not SU.buffDemo ) then SU.buffDemo = SU.BuildBuffDemo(); end
@@ -5296,6 +5338,7 @@ end
 function SS.SetupHide()
 	setupActive = false;
 	SU.Unreveal();
+	SS.Safe(SU.EndTargetPreview);
 	if ( SU.panel ) then SU.panel:Hide(); end
 	if ( SU.bar ) then SU.bar:Hide(); end
 	if ( SU.demo ) then SU.demo:Hide(); end
