@@ -5309,9 +5309,19 @@ function SU.RefreshBar()
 		if ( on ) then b:LockHighlight(); else b:UnlockHighlight(); end
 		if ( b.tag ) then if ( on ) then b.tag:Show(); else b.tag:Hide(); end end
 		if ( frame == "BuffFrame" ) then
+			-- the name stays put; the tag under it says whether the buffs are on, or off because they sit on the player frame
 			local fs = b.GetFontString and b:GetFontString();
-			local text = SS.DB().buffsOnPlayer and "DISABLED" or "Buffs/Debuffs";
-			if ( fs ) then fs:SetText(text); elseif ( b.SetText ) then b:SetText(text); end
+			if ( fs ) then fs:SetText("Buffs/Debuffs"); elseif ( b.SetText ) then b:SetText("Buffs/Debuffs"); end
+			if ( b.tag ) then
+				local off = (not on) or (SS.DB().buffsOnPlayer and true or false);
+				b.tag.text:SetText(off and "Disabled" or "Enabled");
+				if ( off ) then
+					b.tag:SetBackdropColor(0.4, 0.1, 0.1, 0.95); b.tag:SetBackdropBorderColor(1, 0.4, 0.4, 1);
+				else
+					b.tag:SetBackdropColor(0.1, 0.4, 0.1, 0.95); b.tag:SetBackdropBorderColor(0.4, 1, 0.4, 1);
+				end
+				b.tag:Show();
+			end
 		end
 	end
 end
