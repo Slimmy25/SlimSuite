@@ -23,7 +23,7 @@ function K.RGB(hex)
 	return h(1), h(3), h(5);
 end
 
-function K.Sound(name) if ( PlaySound ) then pcall(PlaySound, name); end end
+function K.Sound(name) if ( PlaySound ) then SS.Safe(PlaySound, name); end end
 
 function K.Print(addon, msg)
 	if ( DEFAULT_CHAT_FRAME ) then DEFAULT_CHAT_FRAME:AddMessage("|cffffd100" .. addon .. "|r " .. tostring(msg)); end
@@ -48,7 +48,7 @@ end
 
 -- a frame from one of the game's templates, or a plain one if the game does not have that template
 function K.Templated(kind, name, parent, template, part)
-	local ok, f = pcall(CreateFrame, kind, name, parent, template);
+	local ok, f = SS.Safe(CreateFrame, kind, name, parent, template);
 	if ( ok and f ) then
 		if ( not part or (name and getglobal(name .. part)) ) then return f, true; end
 		return f, false;
@@ -58,7 +58,7 @@ end
 
 -- the game's red panel button (or the same art by hand where the template does not take)
 function K.Button(parent, text, width, onClick)
-	local ok, b = pcall(CreateFrame, "Button", nil, parent, "UIPanelButtonTemplate");
+	local ok, b = SS.Safe(CreateFrame, "Button", nil, parent, "UIPanelButtonTemplate");
 	if ( not ok or not b ) then b = CreateFrame("Button", nil, parent); end
 	if ( not b:GetFontString() ) then
 		local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
@@ -290,6 +290,6 @@ function K.Minimap(o)
 	-- once the saved variables are in: the saved spot
 	local loader = CreateFrame("Frame");
 	loader:RegisterEvent("VARIABLES_LOADED");
-	loader:SetScript("OnEvent", function() pcall(mini.Place); end);
+	loader:SetScript("OnEvent", function() SS.Safe(mini.Place); end);
 	return mini;
 end

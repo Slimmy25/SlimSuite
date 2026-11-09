@@ -4,7 +4,9 @@
 ## Author: Slimjim
 ## Version: 1.02
 ## SavedVariables: SlimSuiteDB
+SlimSuiteCore.lua
 AZSKit.lua
+SlimSuiteErrors.lua
 SlimSuiteItems.lua
 SlimSuiteMeter.lua
 SlimSuite.lua

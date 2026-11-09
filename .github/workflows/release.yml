@@ -1,0 +1,37 @@
+# Publishes a GitHub release whenever a version tag such as v1.03 is pushed.
+# The release carries SlimSuite-<version>.zip, which holds the SlimSuite folder ready to drop into Interface\AddOns.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to create the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the addon version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          toc=$(grep -m1 '^## Version:' SlimSuite/SlimSuite.toc | sed 's/^## Version:[[:space:]]*//' | tr -d '\r')
+          if [ "$tag" != "$toc" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match '## Version: $toc' in SlimSuite.toc. Update one so they match."
+            exit 1
+          fi
+
+      - name: Build the zip
+        run: zip -r "SlimSuite-${GITHUB_REF_NAME#v}.zip" SlimSuite -x "*.git*"
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "SlimSuite-${GITHUB_REF_NAME#v}.zip" \
+            --title "Slim Suite ${GITHUB_REF_NAME#v}" \
+            --generate-notes

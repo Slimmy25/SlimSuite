@@ -27,7 +27,7 @@ local function AddSample(metric, key, amount, crit, owner)
 end
 local function Release(view)
  local id=M.checkpoints[view];
- if id and AZS_ReleaseMeterCheckpoint then pcall(AZS_ReleaseMeterCheckpoint,id);end
+ if id and AZS_ReleaseMeterCheckpoint then SS.Safe(AZS_ReleaseMeterCheckpoint,id);end
  M.checkpoints[view]=nil;
 end
 -- Hit samples are kept in the saved settings for the current run, so the tooltips keep their numbers after a
@@ -233,7 +233,7 @@ end
 
 local function ToggleViewList(frame)
  if not M.viewList then
-  local ok, list = pcall(BuildViewList, frame);
+  local ok, list = SS.Safe(BuildViewList, frame);
   if not ok then
    if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage('|cffffd100Slim Suite|r the meter\'s view list could not be made: ' .. tostring(list)); end
    return;
@@ -309,11 +309,11 @@ function M.Attach(frame)
   if type(SlimSuiteDB) == 'table' and type(SlimSuiteDB.sizes) == 'table' then
    SlimSuiteDB.sizes.SlimSuiteMeterFrame = { w = frame:GetWidth(), h = frame:GetHeight() };
   end
-  if SlimSuite_SavePosition then SlimSuite_SavePosition('SlimSuiteMeterFrame', frame); end
+  if SS.SavePosition then SS.SavePosition('SlimSuiteMeterFrame', frame); end
  end);
  frame:SetScript('OnHide', function() if M.viewList then M.viewList:Hide(); end end);
  -- the view list is made now, with the meter, so it is ready the first time "^" is pressed
- local ok, list = pcall(BuildViewList, frame);
+ local ok, list = SS.Safe(BuildViewList, frame);
  if ok then M.viewList = list; end
 end
 
@@ -321,7 +321,7 @@ end
 -- comes back when that run starts.
 local function CurrentRunId()
  if not AZS_GetMeterContext then return nil; end
- local ok, ctx = pcall(AZS_GetMeterContext);
+ local ok, ctx = SS.Safe(AZS_GetMeterContext);
  if ok and type(ctx) == 'table' then return ctx.runId; end
  return nil;
 end
@@ -352,7 +352,7 @@ local function NowRate(snapshot)
    local q = { apiVersion = 1, runId = ctx.runId, metric = M.view == 'healing' and 'healing' or 'damage', scope = 'self',
     period = M.view == 'boss' and 'encounter' or 'run', groupBy = 'source', windowSeconds = 5 };
    if M.view == 'healing' then q.healingPerspective = 'performed'; end
-   local ok, r = pcall(AZS_GetMeterSnapshot, q);
+   local ok, r = SS.Safe(AZS_GetMeterSnapshot, q);
    if ok and type(r) == 'table' then result = r.totals and r.totals.displayRate; end
   end
   M.nowRate = result;
@@ -438,15 +438,13 @@ function M.Drain()
   if not batch then if err and err.code=='STREAM_CHANGED' then M.cursor=nil;end;return;end
   M.cursor=batch.cursor;M.dropped=(M.dropped or 0)+Num(batch.droppedCount);
   for _,event in ipairs(batch.events or {}) do
-   for _,fn in ipairs(M.listeners) do pcall(fn,event);end
+   for _,fn in ipairs(M.listeners) do SS.Safe(fn,event);end
    if event.kind=='damage' then AddSample('damage',event.meterSourceKey or (event.spellId and ('spell:'..tostring(event.spellId)) or ('name:'..Name(event.abilityName or event.damageType))),event.amount,event.critical==true);end
   end
   if not batch.hasMore then break;end
  end
 end
-stream:SetScript('OnUpdate',function()
- this.elapsed=(this.elapsed or 0)+(arg1 or 0);if this.elapsed<0.1 then return;end;this.elapsed=0;M.Drain();
-end);
+SS.Every('meterStream',0.1,function() M.Drain(); end, stream);
 -- Match only localized heal formats the client actually supplies. Do not parse player chat.
 local healPatterns;
 local function BuildHealPatterns()
@@ -474,7 +472,7 @@ local function BuildHealPatterns()
  end
 end
 local log=CreateFrame('Frame');
-for _,name in ipairs({'CHAT_MSG_SPELL_SELF_BUFF','CHAT_MSG_SPELL_PERIODIC_SELF_BUFFS','CHAT_MSG_SPELL_PARTY_BUFF','CHAT_MSG_SPELL_FRIENDLYPLAYER_BUFF','CHAT_MSG_SPELL_PET_BUFF','CHAT_MSG_SPELL_SELF_DAMAGE','CHAT_MSG_SPELL_PARTY_DAMAGE','CHAT_MSG_SPELL_FRIENDLYPLAYER_DAMAGE','CHAT_MSG_SPELL_PET_DAMAGE','VARIABLES_LOADED'}) do pcall(log.RegisterEvent,log,name);end
+for _,name in ipairs({'CHAT_MSG_SPELL_SELF_BUFF','CHAT_MSG_SPELL_PERIODIC_SELF_BUFFS','CHAT_MSG_SPELL_PARTY_BUFF','CHAT_MSG_SPELL_FRIENDLYPLAYER_BUFF','CHAT_MSG_SPELL_PET_BUFF','CHAT_MSG_SPELL_SELF_DAMAGE','CHAT_MSG_SPELL_PARTY_DAMAGE','CHAT_MSG_SPELL_FRIENDLYPLAYER_DAMAGE','CHAT_MSG_SPELL_PET_DAMAGE','VARIABLES_LOADED'}) do SS.Safe(log.RegisterEvent,log,name);end
 log:SetScript('OnEvent',function()
  if event=='VARIABLES_LOADED' then BuildHealPatterns();return;end
  if type(arg1)~='string' then return;end

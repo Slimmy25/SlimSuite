@@ -14,15 +14,15 @@
 
 local W = {};
 SlimSuiteWorld = W;
-local function DB() return SlimSuite_DB(); end
-local function Editing(name) return SlimSuite_IsEditing and SlimSuite_IsEditing(name); end
+local function DB() return SS.DB(); end
+local function Editing(name) return SS.IsEditing and SS.IsEditing(name); end
 
 -- ---------------------------------------------------------------- the adapter
 local A = {};
 function A.Call(name, a, b)
 	local fn = getglobal(name);
 	if ( type(fn) ~= "function" ) then return nil; end
-	local ok, result = pcall(fn, a, b);
+	local ok, result = SS.Safe(fn, a, b);
 	if ( ok ) then return result; end
 	return nil;
 end
@@ -142,7 +142,7 @@ local function PulledEnemies()
 		for i = 1, table.getn(src) do
 			local u = src[i];
 			if ( type(u) == "table" and u.id ~= nil and not seen[u.id] ) then
-				local kind = SlimSuite_UnitKind(u) or kindDefault;
+				local kind = SS.UnitKind(u) or kindDefault;
 				if ( kind ~= "guardian" or Awake(u) == wantAwake ) then
 					seen[u.id] = true;
 					table.insert(list, { id = u.id, name = u.name, kind = kind });
@@ -161,7 +161,7 @@ local function SleepingGuardians()
 	if ( type(g) == "table" ) then
 		for i = 1, table.getn(g) do
 			local u = g[i];
-			if ( type(u) == "table" and u.id ~= nil and not Awake(u) and (SlimSuite_UnitKind(u) or "guardian") == "guardian" ) then table.insert(list, { id = u.id, name = u.name }); end
+			if ( type(u) == "table" and u.id ~= nil and not Awake(u) and (SS.UnitKind(u) or "guardian") == "guardian" ) then table.insert(list, { id = u.id, name = u.name }); end
 		end
 	end
 	return list;
@@ -207,7 +207,7 @@ local function DownedFriends(now)
 			local u = "party" .. i;
 			local down = UnitExists(u) and (UnitIsDeadOrGhost and UnitIsDeadOrGhost(u)) and true or false;
 			local key = UnitExists(u) and UnitName(u) or nil;
-			if ( key and down ) then current[key] = true; if ( not downed[key] ) then downed[key] = { first = now }; if ( SlimSuite_PlayDeathSound ) then SlimSuite_PlayDeathSound(); end end end
+			if ( key and down ) then current[key] = true; if ( not downed[key] ) then downed[key] = { first = now }; if ( SS.PlayDeathSound ) then SS.PlayDeathSound(); end end end
 		end
 		for k in pairs(downed) do if ( not current[k] ) then downed[k] = nil; end end
 		return {};
@@ -223,7 +223,7 @@ local function DownedFriends(now)
 			if ( not downed[key] ) then
 				local slot = name and PartySlot(name) or nil;
 				downed[key] = { first = now, icon = DEATH_ICONS[slot or i] or DEATH_ICONS[1] };
-				if ( SlimSuite_PlayDeathSound ) then SlimSuite_PlayDeathSound(); end
+				if ( SS.PlayDeathSound ) then SS.PlayDeathSound(); end
 			end
 			table.insert(shown, { entry = f, key = key, name = name, state = downed[key] });
 		end
@@ -326,7 +326,7 @@ local function UpdateMarkers()
 	for i = used + 1, table.getn(pool) do pool[i]:Hide(); end
 end
 
-overlay:SetScript("OnUpdate", function() pcall(UpdateMarkers); end);
+SS.Every("markers", 0, function() SS.Safe(UpdateMarkers); end, overlay);
 
 -- ---------------------------------------------------------------- debuffs on the encounter bars
 local function DebuffIcon(row, i)
@@ -470,8 +470,8 @@ function W.ApplyOnTop()
 	for i = 1, table.getn(ON_TOP) do
 		local f = getglobal(ON_TOP[i]);
 		if ( f ) then
-			local ok = pcall(AZS_SetOnTopOfScreens, f, on);
-			if ( not ok and on ) then pcall(AZS_SetOnTopOfScreens, f); end
+			local ok = SS.Safe(AZS_SetOnTopOfScreens, f, on);
+			if ( not ok and on ) then SS.Safe(AZS_SetOnTopOfScreens, f); end
 		end
 	end
 end
@@ -512,10 +512,10 @@ local function SetNativeHidden(n, on)
 		n.was = shown and true or false;
 		if ( n.was ) then
 			DB()[n.key] = true;
-			n.overridden = pcall(AZS_SetHudShown, n.part, false);
+			n.overridden = SS.Safe(AZS_SetHudShown, n.part, false);
 		end
 	elseif ( not on and n.overridden ) then
-		if ( pcall(AZS_SetHudShown, n.part, n.was ~= false) ) then n.overridden = false; DB()[n.key] = nil; end
+		if ( SS.Safe(AZS_SetHudShown, n.part, n.was ~= false) ) then n.overridden = false; DB()[n.key] = nil; end
 	end
 end
 local reviveNative = Native("revive", "reviveNativeOriginal");
@@ -818,8 +818,8 @@ local function LearnAxes(now)
 	if ( type(DB().minimapAxes) == "table" or now < learn.at ) then return; end
 	learn.at = now + 0.5;
 	if ( not GetPlayerMapPosition or (WorldMapFrame and WorldMapFrame:IsShown()) ) then return; end
-	if ( SetMapToCurrentZone ) then pcall(SetMapToCurrentZone); end
-	local ok, mx, my = pcall(GetPlayerMapPosition, "player");
+	if ( SetMapToCurrentZone ) then SS.Safe(SetMapToCurrentZone); end
+	local ok, mx, my = SS.Safe(GetPlayerMapPosition, "player");
 	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
 	if ( not ok or not mx or (mx == 0 and my == 0) or not run or type(run.px) ~= "number" ) then learn.last = nil; return; end
 	local last = learn.last;
@@ -862,11 +862,11 @@ local function CheckIndoors(mayNudge)
 end
 local zoomWatch = CreateFrame("Frame");
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA", "MINIMAP_UPDATE_ZOOM" }) do
-	pcall(zoomWatch.RegisterEvent, zoomWatch, e);
+	SS.Safe(zoomWatch.RegisterEvent, zoomWatch, e);
 end
 zoomWatch:SetScript("OnEvent", function()
 	if ( GetTime() - nudgedAt < 2 and event == "MINIMAP_UPDATE_ZOOM" ) then return; end
-	pcall(CheckIndoors, event ~= "MINIMAP_UPDATE_ZOOM");
+	SS.Safe(CheckIndoors, event ~= "MINIMAP_UPDATE_ZOOM");
 end);
 
 local pins, pinUsed = {}, 0;
@@ -992,7 +992,7 @@ end
 local pinGather = 0;
 local function UpdateMinimapPins()
 	local now = GetTime();
-	if ( now >= pinGather ) then pinGather = now + 0.1; GatherPins(); pcall(LearnAxes, now); end
+	if ( now >= pinGather ) then pinGather = now + 0.1; GatherPins(); SS.Safe(LearnAxes, now); end
 	pinUsed = 0;
 	local px, py = A.PlayerPos();
 	if ( px and Minimap and Minimap:IsVisible() ) then
@@ -1001,7 +1001,7 @@ local function UpdateMinimapPins()
 	for i = pinUsed + 1, table.getn(pins) do pins[i]:Hide(); end
 end
 local pinDriver = CreateFrame("Frame");
-pinDriver:SetScript("OnUpdate", function() pcall(UpdateMinimapPins); end);
+SS.Every("pins", 0, function() SS.Safe(UpdateMinimapPins); end, pinDriver);
 
 -- ---------------------------------------------------------------- movable local clock (0.136)
 -- AZS_GetLocalTime() gives the clock's text, hour, minute and format, even with the clock or minimap hidden and out of
@@ -1094,7 +1094,24 @@ local function UpdateLocalClock()
 	clock:SetWidth(w); clock:SetHeight(h);
 	clock:Show();
 end
-W.UpdateLocalClock = function() pcall(UpdateLocalClock); end
+W.UpdateLocalClock = function() SS.Safe(UpdateLocalClock); end
+
+-- the local clock either hangs under the minimap or stands alone (then it gets its own button in the setup bar)
+W.SetClockDetached = function(on)
+	local db = SS.DB();
+	if ( on ) then
+		local l, b = clock:GetLeft(), clock:GetBottom();
+		clock:ClearAllPoints();
+		if ( l and b ) then clock:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l, b);
+		else clock:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -60, -170); end
+	else
+		if ( db.places ) then db.places.SlimSuiteLocalClockFrame = nil; end
+		clock:ClearAllPoints();
+		if ( Minimap ) then clock:SetPoint("TOP", Minimap, "BOTTOM", 0, -2);
+		else clock:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -60, -170); end
+	end
+	SS.Safe(UpdateLocalClock);
+end
 
 -- ---------------------------------------------------------------- floating combat text (0.138)
 -- Each of your hits floats up from the enemy it struck, stays over the spot where an enemy fell, and hides when that
@@ -1127,7 +1144,7 @@ local function OnFloatEvent(event)
 	table.insert(floats, { anchor = anchor, born = GetTime(), crit = event.critical == true, heal = kind ~= "damage",
 		text = tostring(math.floor(event.amount + 0.5)), icon = IconFor(event),
 		drift = math.mod(table.getn(floats), 5) * 9 - 18,
-		kind = SlimSuite_UnitKind(A.Field(event, "target", "targetId", "unitId")) });
+		kind = SS.UnitKind(A.Field(event, "target", "targetId", "unitId")) });
 end
 if ( SlimSuiteMeter and SlimSuiteMeter.listeners ) then table.insert(SlimSuiteMeter.listeners, OnFloatEvent); end
 
@@ -1191,8 +1208,8 @@ local function DrawFloats()
 	for i = shown + 1, table.getn(floatPool) do floatPool[i]:Hide(); end
 end
 
-if ( not (A.Has("AZS_RegisterCombatTextFrameHandler") and pcall(AZS_RegisterCombatTextFrameHandler, function() pcall(DrawFloats); end)) ) then
-	floatLayer:SetScript("OnUpdate", function() pcall(DrawFloats); end);
+if ( not (A.Has("AZS_RegisterCombatTextFrameHandler") and SS.Safe(AZS_RegisterCombatTextFrameHandler, function() SS.Safe(DrawFloats); end)) ) then
+	SS.Every("floats", 0, function() SS.Safe(DrawFloats); end, floatLayer);
 end
 
 -- ---------------------------------------------------------------- boss and Guardian kills this run
@@ -1228,7 +1245,7 @@ local function TrackKills()
 		local u = units[i];
 		if ( type(u) == "table" and u.id ~= nil ) then
 			any = true;
-			local kind = SlimSuite_UnitKind(u);
+			local kind = SS.UnitKind(u);
 			local boss = kind == "boss" or kind == "final";
 			if ( boss or kind == "guardian" ) then
 				seen[u.id] = true;
@@ -1264,17 +1281,13 @@ end
 
 -- ---------------------------------------------------------------- tickers
 local ticker = CreateFrame("Frame");
-ticker.elapsed = 0;
-ticker:SetScript("OnUpdate", function()
-	pcall(DrawBox);
-	this.elapsed = this.elapsed + (arg1 or 0);
-	if ( this.elapsed < 0.1 ) then return; end
-	this.elapsed = 0;
-	pcall(TrackKills);
-	pcall(UpdateTargetDebuffs);
-	pcall(UpdateRevive);
-	pcall(UpdateProc);
-	pcall(UpdateLocalClock);
+SS.Every("box", 0, function() SS.Safe(DrawBox); end);
+SS.Every("tracker", 0.1, function()
+	SS.Safe(TrackKills);
+	SS.Safe(UpdateTargetDebuffs);
+	SS.Safe(UpdateRevive);
+	SS.Safe(UpdateProc);
+	SS.Safe(UpdateLocalClock);
 end);
 ticker:RegisterEvent("PLAYER_ENTERING_WORLD");
-ticker:SetScript("OnEvent", function() pcall(W.ApplyOnTop); end);
+ticker:SetScript("OnEvent", function() SS.Safe(W.ApplyOnTop); end);
