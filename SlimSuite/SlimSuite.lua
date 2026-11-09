@@ -2847,33 +2847,92 @@ end
 SS.Every("toggleRefresh", 0.5, function() SS.RefreshToggles(); end);
 
 -- fills the right-click menu's cross-reference rows for this element (the same settings the setup shows)
+-- The feature each right-click row belongs to. Rows of one feature sit together under its name in the menu.
+SS.ROW_GROUP = {
+	["Movable? (Disables Default UI Element)"] = "Frame",
+	["New-school player and target frames"] = "Frame",
+	["Combine with the target frame (one button)"] = "Frame",
+	["Mirror target"] = "Mirror",
+	["Same size scaling (off: keep its own size)"] = "Mirror",
+	["...in the new-school design (off: original)"] = "Mirror",
+	["Buffs on the target frame"] = "Buffs",
+	["...above the target (off: below it)"] = "Buffs",
+	["Show debuffs and DoTs on the target"] = "Buffs",
+	["Buffs/Debuffs on the player frame"] = "Buffs",
+	["Below the player frame (off: above it)"] = "Buffs",
+	["Lock party frames to the player frame"] = "Party",
+	["...above the player frame (off: below)"] = "Party",
+	["Add yourself to the party frames"] = "Party",
+	["Show as thin lines, not face plates"] = "Party",
+	["Show character faces"] = "Party",
+	["Horizontal (off: vertical)"] = "Party",
+	["Hide the bar's artwork (only the spell squares stay)"] = "Action bar",
+	["Show all six buttons at all times, even empty ones"] = "Action bar",
+	["Add your racial as a 7th button"] = "Action bar",
+	["Turn the action bar vertical"] = "Action bar",
+	["Square minimap (off: round)"] = "Minimap",
+	["Minimap buttons"] = "Minimap",
+	["Show the local clock"] = "Clock",
+	["Detach the clock from the minimap (its own button up top)"] = "Clock",
+	["Show the zone and Heroic affixes under it"] = "Clock",
+	["Dark background"] = "Clock",
+	["24-hour time"] = "Clock",
+	["Turn the XP bar vertical"] = "XP bar",
+	["Split into 20 segments"] = "XP bar",
+	["Show boss and Guardian kills"] = "Tally",
+	["Dark band behind it"] = "Tally",
+	["Show debuffs on the bars"] = "Bosses",
+	["Join the worn-jewelry row under the build spells"] = "Jewelry row",
+};
+
 function SS.RefreshCrossRefs(name)
 	if ( not sizeMenu or not sizeMenu.xref ) then return; end
 	local rows = name and SS.CrossRefs(name) or {};
 	-- under the menu's own buttons: the build rows' attach button and the clock's daylight-saving button come first
 	local y = -208;
 	if ( name == "SlimSuiteSpellRowFrame" or name == "SlimSuiteLocalClockFrame" ) then y = -238; end
-	for i = 1, table.getn(sizeMenu.xref) do
-		local cb, e = sizeMenu.xref[i], rows[i];
-		if ( not e ) then SS.RowKind(cb, nil); end
-		if ( e ) then
-			cb.entry = e;
-			cb.get = (not e.choice) and e[2] or nil; cb.cond = e[4];
-			cb:ClearAllPoints();
-			cb:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", e[4] and 26 or 8, y);
-			cb.warn:SetText(e.warn or "");
-			if ( e.warn ) then cb.warn:Show(); else cb.warn:Hide(); end
-			SS.RowKind(cb, e, "below");
-			y = y - 26 - (e.warn and math.max(10, cb.warn:GetHeight() or 10) or 0) - (e.choice and 24 or 0);
-			cb.label:SetText(e.short or e[1]);
-			cb:SetChecked(e[2]() and 1 or nil);
-			if ( e[4] and not e[4]() ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
-			else cb:Enable(); cb.label:SetTextColor(1, 1, 1); end
-			cb:Show();
-		else
-			cb.entry = nil; cb.get = nil; cb.cond = nil; cb:Hide();
-		end
+	-- a sub-setting is shown only while the setting it depends on is on
+	local vis = {};
+	for i = 1, table.getn(rows) do
+		if ( not rows[i][4] or rows[i][4]() ) then table.insert(vis, rows[i]); end
 	end
+	sizeMenu.xrefHeads = sizeMenu.xrefHeads or {};
+	local heads, lastGroup = 0, nil;
+	local cbs = sizeMenu.xref;
+	local n = 0;
+	for k = 1, table.getn(vis) do
+		local e = vis[k];
+		local g = SS.ROW_GROUP[e[1]] or "";
+		if ( g ~= "" and g ~= lastGroup ) then
+			heads = heads + 1;
+			local h = sizeMenu.xrefHeads[heads];
+			if ( not h ) then h = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); sizeMenu.xrefHeads[heads] = h; end
+			h:ClearAllPoints(); h:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, y + 2);
+			h:SetText(g); h:SetTextColor(1, 0.82, 0); h:Show();
+			y = y - 18;
+		end
+		lastGroup = g ~= "" and g or lastGroup;
+		n = n + 1;
+		local cb = cbs[n];
+		if ( not cb ) then break; end
+		cb.entry = e;
+		cb.get = (not e.choice) and e[2] or nil; cb.cond = e[4];
+		cb:ClearAllPoints();
+		cb:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", e[4] and 26 or 8, y);
+		cb.warn:Hide();
+		SS.RowKind(cb, e, "below");
+		y = y - 26 - (e.choice and 24 or 0);
+		cb.label:SetText((e.short or e[1]) .. (e.warn and " |cffff9933(!)|r" or ""));
+		cb:SetChecked(e[2]() and 1 or nil);
+		cb:Enable(); cb.label:SetTextColor(1, 1, 1);
+		cb:Show();
+	end
+	for i = n + 1, table.getn(cbs) do
+		local cb = cbs[i];
+		SS.RowKind(cb, nil);
+		cb.entry = nil; cb.get = nil; cb.cond = nil; cb:Hide();
+	end
+	for i = heads + 1, table.getn(sizeMenu.xrefHeads) do sizeMenu.xrefHeads[i]:Hide(); end
 	sizeMenu:SetHeight(-y + 40);   -- room for Reset and Done under the last setting
 end
 
@@ -3482,6 +3541,8 @@ function SS.OpenSizeMenu(name, label)
 				SS.RefreshCrossRefs(SlimSuiteSizeMenuName);
 				SS.RefreshToggles();
 			end);
+			cb:SetScript("OnEnter", function() if ( this.entry and this.entry.warn ) then SS.ShowWarnTip(this, this.entry.warn); end end);
+			cb:SetScript("OnLeave", function() SS.HideWarnTip(); end);
 			cb:Hide();
 			SS.TrackToggle(cb);
 			sizeMenu.xref[i] = cb;
