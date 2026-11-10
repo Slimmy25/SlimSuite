@@ -117,8 +117,8 @@ local function Samples(source,owner)
  end
  return result.count>0 and result or nil;
 end
--- Class colours for the Party tab. The actor's class comes from the meter data when it has one, else from the party.
-local CLASS_COLORS={WARRIOR='c79c6e',MAGE='69ccf0',ROGUE='fff569',DRUID='ff7d0a',HUNTER='abd473',SHAMAN='0070de',PRIEST='ffffff',WARLOCK='9482c9',PALADIN='f58cba'};
+-- The Party tab's names are in class colour (SS.ClassColor). The actor's class comes from the meter data when it has
+-- one, else from the party.
 local function ClassOf(actor)
  if type(actor)~='table' then return nil;end
  local c=actor.class or actor.classToken or actor.classFile;
@@ -250,7 +250,7 @@ function M.Attach(frame)
  M.frame = frame; frame:SetWidth(230); frame:SetHeight(170);
  frame:EnableMouse(true); frame:EnableMouseWheel(true);
  if frame.SetResizable then frame:SetResizable(true); end
- if frame.SetMinResize then frame:SetMinResize(180, 90); end
+ if frame.SetMinResize then frame:SetMinResize(210, 110); end   -- the same smallest size as Slim Suite's size menu
  -- panel and header
  local body = Tex(frame, 'BACKGROUND', 1, 1, 1, 1); body:SetAllPoints(frame);
  if body.SetGradient then body:SetGradient('VERTICAL', 0.039, 0.031, 0.016, 0.082, 0.063, 0.031); else body:SetVertexColor(0.063, 0.051, 0.024); end
@@ -419,8 +419,8 @@ function M.Draw(active, editing)
    local valueWidth = math.max(60, math.floor(rowWidth * 0.45));
    FitString(button.value, value, valueWidth, 8);
    FitString(button.name, button.label, math.max(24, rowWidth - 20 - valueWidth - 4), 8);
-   local color = M.view == 'group' and not M.owner and CLASS_COLORS[ClassOf(actor) or ''];
-   if color then button.name:SetTextColor(tonumber(string.sub(color, 1, 2), 16) / 255, tonumber(string.sub(color, 3, 4), 16) / 255, tonumber(string.sub(color, 5, 6), 16) / 255);
+   local color = M.view == 'group' and not M.owner and SS.ClassColor and SS.ClassColor(ClassOf(actor));   -- Slim Suite's one class colour table
+   if color then button.name:SetTextColor(color[1], color[2], color[3]);
    else button.name:SetTextColor(CREAM[1], CREAM[2], CREAM[3]); end
    if source and source.icon and source.icon.status == 'ready' then button.icon:SetTexture(source.icon.path); button.icon:Show(); button.name:SetPoint('LEFT', button, 'LEFT', 18, 0);
    else button.icon:Hide(); button.name:SetPoint('LEFT', button, 'LEFT', 4, 0); end

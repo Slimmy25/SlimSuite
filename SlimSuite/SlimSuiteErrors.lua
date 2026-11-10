@@ -21,6 +21,7 @@ local function Refresh()
 	end
 	if ( table.getn(lines) == 0 ) then lines[1] = "No errors logged. Errors are kept here between logins."; end
 	frame.box:SetText(table.concat(lines, "\n"));
+	frame.box:SetHeight(math.max(20, (frame.box.GetHeight and frame.box:GetHeight() or 0), table.getn(lines) * 14));   -- the list scrolls to its end
 end
 
 local function Build()
@@ -67,6 +68,7 @@ local function Build()
 	close:SetScript("OnClick", function() frame:Hide(); end);
 
 	frame:SetScript("OnShow", Refresh);
+	table.insert(UISpecialFrames, "SlimSuiteErrorFrame");   -- Escape closes it
 	frame:Hide();
 end
 

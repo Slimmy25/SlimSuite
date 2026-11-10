@@ -45,15 +45,26 @@ for _, e in ipairs(SU.elements) do
 		local cb = SU.checks[i]
 		if cb.shown and cb.scripts and cb.scripts.OnClick and cb.mouse ~= false then table.insert(shown, cb) end
 	end
-	for _, cb in ipairs(shown) do
-		local label = tostring(cb.label and cb.label.text)
-		if cb.shown then
+	-- rows can move as sub-settings appear: each click finds its row again by its label
+	local labels = {}
+	for _, cb in ipairs(shown) do table.insert(labels, tostring(cb.label and cb.label.text)) end
+	local function find(label)
+		for i = 1, #SU.checks do
+			local c = SU.checks[i]
+			if c.shown and tostring(c.label and c.label.text) == label and c.mouse ~= false then return c end
+		end
+	end
+	for _, label in ipairs(labels) do
+		local cb = find(label)
+		if cb then
 			local c0 = cb.checked and true or false
 			Click(cb); Tick(2)
 			flush(name .. " tick '" .. label .. "' 1")
+			cb = find(label) or cb
 			local c1 = cb.checked and true or false
 			-- the panel may have been rebuilt: refresh reads the setting back
 			Click(cb); Tick(2)
+			cb = find(label) or cb
 			flush(name .. " tick '" .. label .. "' 2")
 			local c2 = cb.checked and true or false
 			if c1 == c0 or c2 ~= c0 then

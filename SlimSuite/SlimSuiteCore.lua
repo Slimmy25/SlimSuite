@@ -34,10 +34,6 @@ function SS.LogError(msg)
 	while ( table.getn(log) > MAX_ENTRIES ) do table.remove(log, 1); end
 end
 
--- Calls fn with the given arguments, like pcall. A real error is logged; a missing function (an optional
--- addon call that is not there) is skipped quietly, since that is expected rather than a fault.
--- each distinct error is shown in the game's error popup once, so it is seen even when chat is unusable;
--- repeats only go to the log. The popup goes through _ERRORMESSAGE, which the error log also records.
 -- True once each time the game's phase (waiting, in a run, ...) has changed since this key was last asked. Used to
 -- check again whether the game has shown one of its own HUD parts that Slim Suite replaces.
 local lastPhase = {};
@@ -59,6 +55,17 @@ function SS.UserPlace(f)
 	pcall(f.SetUserPlaced, f, true);
 end
 
+-- The game's answer to "is this HUD part shown?" as true or false: it can come as true/false, 1/0 or "1"/"0".
+function SS.HudShown(value)
+	if ( type(value) == "number" ) then return value ~= 0; end
+	if ( type(value) == "string" ) then return value ~= "0" and string.lower(value) ~= "false" and value ~= ""; end
+	return value and true or false;
+end
+
+-- Calls fn with the given arguments, like pcall. A real error is logged; a missing function (an optional
+-- addon call that is not there) is skipped quietly, since that is expected rather than a fault.
+-- each distinct error is shown in the game's error popup once, so it is seen even when chat is unusable;
+-- repeats only go to the log. The popup goes through _ERRORMESSAGE, which the error log also records.
 local shownErrors = {};
 function SS.Safe(fn, ...)
 	if ( type(fn) ~= "function" ) then return false; end

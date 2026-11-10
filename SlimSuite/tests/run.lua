@@ -1,6 +1,8 @@
 -- Loads Slim Suite into the mock client and drives the setup screen.
-local DIR = "/home/claude/src/SlimSuite/SlimSuite/"
-dofile("/tmp/harness/wow.lua")
+-- Paths are relative to this file (tests/), so it runs from any checkout: sh tests/run-checks.sh
+local HERE = (arg and arg[0] and string.match(arg[0], "^(.*[/\\])")) or "./"
+local DIR = HERE .. "../"
+dofile(HERE .. "wow.lua")
 
 local function loadFile(name)
 	local fh = assert(io.open(DIR .. name, "rb"))
@@ -24,4 +26,4 @@ Tick(20)
 print("after login; errors: " .. #ERRORS)
 for _, e in ipairs(ERRORS) do print("  " .. e) end
 ERRORS = {}
-dofile("/tmp/harness/" .. scenario .. ".lua")
+dofile(HERE .. scenario .. ".lua")

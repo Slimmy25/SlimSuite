@@ -16,6 +16,8 @@ local W = {};
 SlimSuiteWorld = W;
 local function DB() return SS.DB(); end
 local function Editing(name) return SS.IsEditing and SS.IsEditing(name); end
+-- sample data shows while an element is being placed (the setup or Toggle UI Settings) and in Demo Mode
+local function Previewing(name) return SS.Previewing and SS.Previewing(name); end
 
 -- ---------------------------------------------------------------- the adapter
 local A = {};
@@ -424,7 +426,7 @@ local targetDebuffs = { icons = {} };
 local function TargetDebuffIcon(i)
 	local b = targetDebuffs.icons[i];
 	if ( b ) then return b; end
-	b = CreateFrame("Frame", nil, TargetFrame);
+	b = CreateFrame("Frame", nil, UIParent);
 	b:SetWidth(17); b:SetHeight(17); b:EnableMouse(true);
 	b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetAllPoints(b); b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
 	b.border = b:CreateTexture(nil, "OVERLAY"); b.border:SetPoint("TOPLEFT", b, "TOPLEFT", -1, 1); b.border:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 1, -1);
@@ -454,7 +456,11 @@ end
 
 local function UpdateTargetDebuffs()
 	local list = {};
-	if ( DB().targetDebuffs and TargetFrame and TargetFrame:IsVisible() and UnitExists and UnitExists("target") and not NativeTargetDebuffsShown() ) then
+	-- the frame that shows the target: the new-school card, or the game's own frame (whose own debuffs come first)
+	local card = SS.UsesCard and SS.UsesCard("TargetFrame") and getglobal("SlimSuiteTargetCard") or nil;
+	local anchor = card or TargetFrame;
+	if ( DB().targetDebuffs and anchor and anchor:IsVisible() and (anchor:GetAlpha() or 1) > 0.05 and UnitExists and UnitExists("target")
+		and (card or not NativeTargetDebuffsShown()) ) then
 		local id = type(AZS_TARGET) == "table" and AZS_TARGET.id or nil;
 		local api = id ~= nil and A.Call("AZS_GetDebuffs", id) or nil;
 		if ( type(api) == "table" and table.getn(api) > 0 ) then
@@ -482,9 +488,15 @@ local function UpdateTargetDebuffs()
 		b.count:SetText(e.stacks > 1 and tostring(e.stacks) or "");
 		b.time:SetText(e.left and e.left > 0 and (e.left >= 10 and tostring(math.floor(e.left + 0.5)) or string.format("%.1f", e.left)) or "");
 		b.index, b.name, b.stacks = e.index, e.name, e.stacks;
+		if ( b:GetParent() ~= anchor ) then b:SetParent(anchor); end   -- its scale and visibility come from the target's frame
 		b:ClearAllPoints();
-		-- where the 1.12 target frame puts its own: under the name and bars, eight to a row
-		b:SetPoint("TOPLEFT", TargetFrame, "BOTTOMLEFT", 5 + math.mod(i - 1, 8) * 19, 32 - math.floor((i - 1) / 8) * 22);
+		if ( card ) then
+			-- under the card, eight to a row
+			b:SetPoint("TOPLEFT", card, "BOTTOMLEFT", 2 + math.mod(i - 1, 8) * 19, -2 - math.floor((i - 1) / 8) * 22);
+		else
+			-- where the 1.12 target frame puts its own: under the name and bars, eight to a row
+			b:SetPoint("TOPLEFT", TargetFrame, "BOTTOMLEFT", 5 + math.mod(i - 1, 8) * 19, 32 - math.floor((i - 1) / 8) * 22);
+		end
 		b:Show();
 	end
 	for i = n + 1, table.getn(targetDebuffs.icons) do targetDebuffs.icons[i]:Hide(); end
@@ -494,7 +506,8 @@ end
 local ON_TOP = { "SlimSuiteWorldMarkers", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteClockFrame",
 	"SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame",
 	"SlimSuiteTallyFrame", "SlimSuiteReviveFrame", "SlimSuiteCombatTextFrame", "SlimSuiteProcMeter",
-	"SlimSuiteLocalClockFrame", "SlimSuiteFloatingText", "SlimSuiteStoreLevelsToggle" };
+	"SlimSuiteLocalClockFrame", "SlimSuiteFloatingText", "SlimSuiteStoreLevelsToggle", "SlimSuitePlayerCard", "SlimSuiteTargetCard",
+	"SlimSuitePartyLines", "SlimSuitePartySelfFrame", "SlimSuiteMinimapBar", "SlimSuiteRaidIconPanel" };
 -- Off by default: the game's cards then cover Slim Suite like the rest of the HUD. Only when the player turns the
 -- setting on are Slim Suite's frames lifted above them.
 function W.ApplyOnTop()
@@ -543,13 +556,13 @@ local function SetNativeHidden(n, on)
 	-- already hidden: ask the game again only when its phase changes, and hide its part again if it came back
 	local rearm = SS.PhaseChanged("hud:" .. n.part);
 	if ( on and n.overridden ) then
-		if ( rearm and A.Call("AZS_IsHudShown", n.part) ) then SS.Safe(AZS_SetHudShown, n.part, false); end
+		if ( rearm and SS.HudShown(A.Call("AZS_IsHudShown", n.part)) ) then SS.Safe(AZS_SetHudShown, n.part, false); end
 		return;
 	end
 	if ( on and not n.overridden ) then
 		local shown = A.Call("AZS_IsHudShown", n.part);
 		if ( shown == nil ) then shown = true; end
-		n.was = shown and true or false;
+		n.was = SS.HudShown(shown);
 		if ( n.was ) then
 			DB()[n.key] = true;
 			n.overridden = SS.Safe(AZS_SetHudShown, n.part, false);
@@ -577,8 +590,8 @@ local function UpdateRevive()
 	end
 	if ( progress and progress > 0 ) then
 		revive.bar:SetValue(math.max(0, math.min(1, progress))); revive.text:SetText(label); revive:Show();
-	elseif ( Editing("SlimSuiteReviveFrame") ) then
-		revive.bar:SetValue(0.6); revive.text:SetText("Revive bar"); revive:Show();
+	elseif ( Previewing("SlimSuiteReviveFrame") ) then
+		revive.bar:SetValue(0.6); revive.text:SetText(SS.demoRunning and "Reviving Brann" or "Revive bar"); revive:Show();
 	else
 		revive:Hide();
 	end
@@ -608,7 +621,19 @@ local function UpdateProc()
 	local kind = run and run.proc;
 	local info = kind and PROCS[kind];
 	local value, max = run and tonumber(run.pv) or 0, run and tonumber(run.pm) or 0;
+	if ( DB().procMeter and (not info or max <= 0) and Previewing("SlimSuiteProcMeter") ) then
+		info, value, max = PROCS.seal_fate, 3, 5;          -- a sample while it is placed or in Demo Mode
+	end
 	if ( not DB().procMeter or not info or max <= 0 ) then proc:Hide(); return; end
+	-- under the frame that shows you: the game's player frame, the new-school card, or your place in the party
+	local anchor = (SS.PlayerAnchor and SS.PlayerAnchor()) or PlayerFrame;
+	if ( anchor and proc.anchor ~= anchor ) then
+		proc.anchor = anchor;
+		proc:SetParent(anchor);
+		proc:ClearAllPoints();
+		if ( anchor == PlayerFrame ) then proc:SetPoint("TOPLEFT", PlayerFrame, "BOTTOMLEFT", 104, 26);
+		else proc:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -3); end
+	end
 	proc.text:SetText(info[1]);
 	if ( max <= 10 ) then
 		proc.bar:Hide();
@@ -705,9 +730,11 @@ local function DrawBox()
 	local editing = Editing("SlimSuiteCombatTextFrame");
 	local demo = SS.demoRunning and true or false;   -- Demo Mode shows the box with sample hits
 	if ( not d.combatTextBox and not editing and not demo ) then box:Hide(); return; end
-	box:Show();
 	local now = GetTime();
 	local list = box.entries;
+	-- nothing to show (no hits yet): the box stays out of the way unless it is being placed
+	if ( table.getn(list) == 0 and not editing and not demo ) then box:Hide(); return; end
+	box:Show();
 	if ( editing and table.getn(list) == 0 ) then
 		list = { { born = now, crit = true, amount = 1234, name = "Crit example", icon = "Interface\\Icons\\Spell_Fire_Fireball02" },
 		         { born = now, amount = 512, name = "Hit example", icon = "Interface\\Icons\\Spell_Frost_FrostBolt02" } };
@@ -1104,8 +1131,9 @@ local function UpdateLocalClock()
 	for _, t in ipairs({ clock.bg, clock.left, clock.right }) do if ( band ) then t:Show(); else t:Hide(); end end
 	local custom = DB().sizes and DB().sizes.SlimSuiteLocalClockFrame;
 	local w, h = (clock.text:GetStringWidth() or 40) + 18, 20;
-	if ( type(custom) == "table" ) then w, h = math.max(w, custom.w or 0), math.max(h, custom.h or 0); end
+	if ( type(custom) == "table" and custom.w and custom.h ) then w, h = custom.w, custom.h; end   -- the size set is the size
 	clock:SetWidth(w); clock:SetHeight(h);
+	if ( SS.FitText ) then SS.FitText(clock.text, math.max(10, w - 10)); end   -- the time shrinks to fit a small box
 	clock:Show();
 end
 W.UpdateLocalClock = function() SS.Safe(UpdateLocalClock); end

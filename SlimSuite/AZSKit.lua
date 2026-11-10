@@ -23,7 +23,7 @@ function K.RGB(hex)
 	return h(1), h(3), h(5);
 end
 
-function K.Sound(name) if ( PlaySound ) then SS.Safe(PlaySound, name); end end
+function K.Sound(name) if ( PlaySound ) then pcall(PlaySound, name); end end
 
 function K.Print(addon, msg)
 	if ( DEFAULT_CHAT_FRAME ) then DEFAULT_CHAT_FRAME:AddMessage("|cffffd100" .. addon .. "|r " .. tostring(msg)); end
@@ -48,7 +48,7 @@ end
 
 -- a frame from one of the game's templates, or a plain one if the game does not have that template
 function K.Templated(kind, name, parent, template, part)
-	local ok, f = SS.Safe(CreateFrame, kind, name, parent, template);
+	local ok, f = pcall(CreateFrame, kind, name, parent, template);
 	if ( ok and f ) then
 		if ( not part or (name and getglobal(name .. part)) ) then return f, true; end
 		return f, false;
@@ -58,7 +58,7 @@ end
 
 -- the game's red panel button (or the same art by hand where the template does not take)
 function K.Button(parent, text, width, onClick)
-	local ok, b = SS.Safe(CreateFrame, "Button", nil, parent, "UIPanelButtonTemplate");
+	local ok, b = pcall(CreateFrame, "Button", nil, parent, "UIPanelButtonTemplate");
 	if ( not ok or not b ) then b = CreateFrame("Button", nil, parent); end
 	if ( not b:GetFontString() ) then
 		local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
@@ -215,22 +215,12 @@ function K.Minimap(o)
 
 	function mini.Place()
 		local m = M();
-		if ( o.docked and o.docked() ) then   -- placed by the row it sits in: only shown or hidden here
-			if ( m.hide ) then mini:Hide(); else mini:Show(); end
-			return;
-		end
 		mini:ClearAllPoints();
 		if ( m.detached and m.x and m.y ) then
 			mini:SetPoint("CENTER", UIParent, "BOTTOMLEFT", K.Num(m.x), K.Num(m.y));
 		elseif ( Minimap ) then
 			local a = math.rad(K.Num(m.angle or o.angle));
-			local x, y = math.cos(a), math.sin(a);
-			-- a square minimap: the same direction, but on the square's edge instead of the circle
-			if ( o.square and o.square() ) then
-				local most = math.max(math.abs(x), math.abs(y));
-				if ( most > 0 ) then x, y = x / most, y / most; end
-			end
-			mini:SetPoint("CENTER", Minimap, "CENTER", RING * x, RING * y);
+			mini:SetPoint("CENTER", Minimap, "CENTER", RING * math.cos(a), RING * math.sin(a));
 		else
 			mini:SetPoint("CENTER", UIParent, "TOPRIGHT", -60, -60);
 		end
@@ -245,7 +235,6 @@ function K.Minimap(o)
 	end
 
 	local function Drag()
-		if ( o.docked and o.docked() ) then return; end   -- the row is moved by its own handle instead
 		local x, y = GetCursorPosition();
 		local s = UIParent:GetEffectiveScale();
 		x, y = x / s, y / s;
@@ -301,6 +290,6 @@ function K.Minimap(o)
 	-- once the saved variables are in: the saved spot
 	local loader = CreateFrame("Frame");
 	loader:RegisterEvent("VARIABLES_LOADED");
-	loader:SetScript("OnEvent", function() SS.Safe(mini.Place); end);
+	loader:SetScript("OnEvent", function() pcall(mini.Place); end);
 	return mini;
 end

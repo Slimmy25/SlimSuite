@@ -6,8 +6,8 @@ Click(SU.barButtons.PlayerFrame); Tick(2); Click(SU.barButtons.TargetFrame); Tic
 SS.SetMirrorTarget(true); Tick(2)
 print("before: player on", SU.on.PlayerFrame, "target on", SU.on.TargetFrame, "mirror", SS.DB().mirrorTarget)
 Click(SU.barButtons.PartyMemberFrame1); Tick(2)
-local function row(label) for i = 1, #SU.checks do if SU.checks[i]:IsVisible() and SU.checks[i].label.text == label then return SU.checks[i] end end end
-Click(row("Add yourself to the party frames")); Tick(2)
+local function row(label) for i = 1, #SU.checks do if SU.checks[i]:IsVisible() and string.find(SU.checks[i].label.text, label, 1, true) then return SU.checks[i] end end end
+Click(row("Join the party frames yourself")); Tick(2)
 print("self on: player on", SU.on.PlayerFrame, "player shown", PlayerFrame.shown, "target on", SU.on.TargetFrame, "target on bar", onBar("TargetFrame"), "mirror", SS.DB().mirrorTarget, "hideTarget", SS.DB().hideTarget)
 Click(SU.barButtons.PlayerFrame); Tick(2)
 print("player clicked: self", SS.DB().partyIncludesSelf, "player on", SU.on.PlayerFrame, "player shown", PlayerFrame.shown)
@@ -18,7 +18,7 @@ for _, e in ipairs(SU.elements) do
     SS.OpenSizeMenu(e.frame, e.title)
     sm = sm or upvalue(SS.RefreshCrossRefs, "sizeMenu")
     local n = 0; for i = 1, #sm.xref do if sm.xref[i].shown then n = n + 1 end end
-    local want = #SU.ChecksFor(e.frame)
+    local want = 0; for _, c in ipairs(SU.ChecksFor(e.frame)) do if not c[4] or c[4]() then want = want + 1 end end
     print(string.format("  menu %-24s rows %d / setup %d %s", e.frame, n, want, n == want and "" or "<-- MISMATCH"))
   end
 end
