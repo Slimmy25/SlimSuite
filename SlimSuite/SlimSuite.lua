@@ -3284,7 +3284,7 @@ SS.ROW_GROUP = {
 
 function SS.RefreshCrossRefs(name)
 	if ( not sizeMenu or not sizeMenu.xref ) then return; end
-	local rows = name and SS.CrossRefs(name) or {};
+	local rows = {};                                       -- the settings are the menu's own rows now (SU.Focus)
 	-- under the menu's own buttons: the build rows' attach button and the clock's daylight-saving button come first
 	local y = -208;
 	if ( name == "SlimSuiteSpellRowFrame" or name == "SlimSuiteLocalClockFrame" ) then y = -238; end
@@ -3702,10 +3702,13 @@ function SS.ToggleBuildRowsAttached()
 	end
 end
 
-function SS.OpenSizeMenu(name, label)
+-- The size & layout tools of an element's menu (width, height, scale, padding, layout, growth, hide, the build rows'
+-- join, the clock's daylight saving, Reset): built once, set up for the element, and shown as a section of the
+-- element's menu (SU.Focus), under its settings. Returns false when the element has no frame yet.
+function SS.PrepareSizeTools(name, label)
 	name = SS.Element(name);
 	local f = getglobal(SS.Shown(name));
-	if ( not f ) then return; end
+	if ( not f ) then return false; end
 	if ( sizeMenu and sizeMenu.SetAlpha ) then sizeMenu:SetAlpha(1); end
 	if ( not sizeMenu ) then
 		sizeMenu = CreateFrame("Frame", nil, UIParent);
@@ -3718,6 +3721,7 @@ function SS.OpenSizeMenu(name, label)
 		sizeMenu:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
 		sizeMenuText = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
 		sizeMenuText:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 12, -10);
+		sizeMenu:SetBackdrop(nil);                           -- a section of the element's menu, not a window of its own
 		sizeMenu:SetMovable(true);
 		if ( sizeMenu.SetClampedToScreen ) then sizeMenu:SetClampedToScreen(true); end
 		sizeMenu.dragStrip = CreateFrame("Frame", nil, sizeMenu);
@@ -4007,13 +4011,12 @@ function SS.OpenSizeMenu(name, label)
 			SS.OpenSizeMenu(sizeMenu.element or sizeTarget, sizeMenu.label);
 		end);
 		reset:SetPoint("BOTTOMLEFT", sizeMenu, "BOTTOMLEFT", 10, 8);
-		local close = K.Button(sizeMenu, "Done", 62, function() sizeMenu:Hide(); end);
-		close:SetPoint("BOTTOMRIGHT", sizeMenu, "BOTTOMRIGHT", -10, 8);
+		sizeMenu.dragStrip:Hide();                          -- the menu itself is dragged
 	end
 	sizeTarget = SS.Shown(name);
 	sizeMenu.element, sizeMenu.label = name, label;
 	local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
-	sizeMenuText:SetText("Resize " .. (label or name));
+	sizeMenuText:SetText("Size & layout");
 	sizeMenuWidth:SetText("Width: " .. math.floor(w + 0.5));
 	sizeMenuHeight:SetText("Height: " .. math.floor(h + 0.5));
 	-- the classic player and target frames' artwork has a fixed size: width and height would only change the area you
@@ -4062,29 +4065,9 @@ function SS.OpenSizeMenu(name, label)
 		sizeMenu.clockDst:ClearAllPoints(); sizeMenu.clockDst:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -208);
 		if ( isClock ) then sizeMenu.clockDst:Show(); sizeMenu.ClockLabels(); else sizeMenu.clockDst:Hide(); end
 	end
-	-- The menu opens smaller, right beside the element it is for (on its right, or its left when there is no room),
-	-- top edges level. It can still be dragged anywhere while it is open.
 	SS.sizeMenuName = name;
 	SS.RefreshCrossRefs(name);
-	local MENU_SCALE = 0.82;
-	sizeMenu:SetScale(MENU_SCALE);
-	sizeMenu:ClearAllPoints();
-	local sw, sh = UIParent:GetWidth(), UIParent:GetHeight();
-	local mw, mh = 206 * MENU_SCALE, (sizeMenu:GetHeight() or 270) * MENU_SCALE;
-	local l, r, b, t = RootBounds(f);
-	local x, y;
-	if ( l and r and t ) then
-		x = r + 8;
-		if ( x + mw > sw ) then x = l - 8 - mw; end
-		y = t - mh;
-	else
-		local scale = UIParent:GetEffectiveScale() or 1;
-		x, y = GetCursorPosition(); x, y = x / scale + 8, y / scale + 8;
-	end
-	x = math.max(0, math.min(sw - mw, x));
-	y = math.max(0, math.min(sh - mh, y));
-	sizeMenu:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x / MENU_SCALE, y / MENU_SCALE);
-	sizeMenu:Show();
+	return true;
 end
 
 function SS.ShowLockPanel()
@@ -4116,7 +4099,7 @@ function SS.ShowLockPanel()
 		end);
 		local note = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		note:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", 10, -30);
-		note:SetText("Drag to move. Right-click for size, scale, layout and hide options. Shift-left-click also hides/shows.");
+		note:SetText("Drag to move. Right-click for its settings, size and layout. Shift-left-click also hides/shows.");
 		local gridCheck = CreateFrame("CheckButton", nil, lockPanel, "UICheckButtonTemplate");
 		gridCheck:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", 6, -52); gridCheck:SetWidth(22); gridCheck:SetHeight(22);
 		gridCheck:SetScript("OnShow", function() this:SetChecked(SS.DB().showEditGrid and 1 or nil); end);
@@ -4182,7 +4165,7 @@ function SS.ShowLockPanel()
 			if ( SS.Element(name) == name ) then
 				local row = K.Button(choices, label, 208, function()
 					editOnly = SS.Shown(name); choose:SetText(label .. " ▼"); all:UnlockHighlight(); choices:Hide();
-					if ( sizeMenu ) then sizeMenu:Hide(); end
+					SS.HideElementMenu();
 					SS.SetUnlocked(true, true);
 				end);
 				row:SetPoint("TOPLEFT", choices, "TOPLEFT", 4, -4 - count * 23);
@@ -4194,7 +4177,7 @@ function SS.ShowLockPanel()
 		choose:SetScript("OnClick", function() if ( choices:IsShown() ) then choices:Hide(); else choices:Show(); end end);
 		all = K.Button(lockPanel, "ALL?", 62, function()
 			editOnly = nil; choose:SetText("Choose element ▼"); all:LockHighlight(); choices:Hide();
-			if ( sizeMenu ) then sizeMenu:Hide(); end
+			SS.HideElementMenu();
 			SS.SetUnlocked(true, true);
 		end);
 		all:SetPoint("LEFT", choose, "RIGHT", 6, 0); all:LockHighlight();
@@ -4513,7 +4496,7 @@ function SS.SetUnlocked(on, quiet)
 		SS.Safe(SS.DetachExperienceBar);
 		SS.Safe(PlaceAll);
 	end
-	if ( not on and sizeMenu ) then sizeMenu:Hide(); end
+	if ( not on ) then SS.HideElementMenu(); end
 	if ( not on ) then SS.Safe(SS.EndPreviewsIfDone); end   -- the sample party and target go when nothing previews them
 	if ( on ) then
 		-- Leave the settings/menu window before presenting the in-world mover and its Done control.
@@ -4546,7 +4529,7 @@ function SS.SetUnlocked(on, quiet)
 			SS.Safe(SS.RestoreNativeActionBarLayout);
 		end
 	end
-	if ( not quiet ) then K.Print(NAME, on and "drag a handle to move it; right-click for size, scale, layout or hide. Shift-left-click hides/shows a feature. Use Lock UI when done." or "the UI is locked."); end
+	if ( not quiet ) then K.Print(NAME, on and "drag a handle to move it; right-click for its settings, size and layout. Shift-left-click hides/shows a feature. Use Lock UI when done." or "the UI is locked."); end
 end
 
 function SS.SetMeterReplacement(on)
@@ -4748,7 +4731,7 @@ function SS.ResetUI()
 		SS.Safe(ApplyFeatureMute, name);
 	end
 	PlaceAll();
-	if ( sizeMenu ) then sizeMenu:Hide(); end
+	SS.HideElementMenu();
 	K.Print(NAME, "all movable UI elements are back at their addon defaults.");
 end
 
@@ -4883,16 +4866,16 @@ function SU.Steps()
 	local d = SS.DB();
 	local steps = {
 		{ frame = "PlayerFrame", title = d.combineTarget and "Player + target" or "Unit frame",
-		  text = "Your hero's frame: health, power and level. Drag the green handle to place it. Right-click the handle for size and scale." },
+		  text = "Your hero's frame: health, power and level. Drag the green handle to place it; its size and scale are below." },
 		{ frame = "PartyMemberFrame1", title = "Party frames",
 		  text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Choose a column or a row, face plates or thin lines, and whether you join them." },
 		{ frame = "MainMenuBar", title = "Action bar",
-		  text = "Your spells. Drag to place it, right-click for size or to turn it upright." },
+		  text = "Your spells. Drag to place it; its size, and turning it upright, are below." },
 	};
 	local rest = {
 		{ "TargetFrame", "Target frame", "The enemy the game has picked for you.", function() return not d.hideTarget and not d.combineTarget; end },
-		{ "MainMenuExpBar", "XP bar", "Your experience bar. It can stand upright too (right-click)." },
-		{ "BuffFrame", "Buffs/Debuffs", "Your buffs and debuffs. Right-click to stack them in a column and choose which way they grow. Attached to the target frame, they move and scale with it instead." },
+		{ "MainMenuExpBar", "XP bar", "Your experience bar. It can stand upright too (below)." },
+		{ "BuffFrame", "Buffs/Debuffs", "Your buffs and debuffs. Below, stack them in a column and choose which way they grow. Attached to the target frame, they move and scale with it instead." },
 		{ "MinimapCluster", "Minimap", "The minimap, with its pins." },
 		{ "ChatFrame1", "Chat", "The chat window, its tab and the box you type in move together." },
 		{ "GameTooltip", "Tooltip", "Where tooltips appear while the UI is unlocked, and their size." },
@@ -4904,7 +4887,7 @@ function SU.Steps()
 		{ "SlimSuiteTallyFrame", "Kills / Gold / Cache", "Your run's tally.", function() return d.replaceTally; end },
 		{ "SlimSuiteAnnouncementFrame", "Announcements", "Where event announcements appear.", function() return d.replaceBanners; end },
 		{ "SlimSuiteReviveFrame", "Revive bar", "The bar shown while you bring a friend back.", function() return d.replaceRevive; end },
-		{ "SlimSuiteLocalClockFrame", "Local clock", "Your real-world clock. Right-click for 12/24-hour and its background.", function() return d.replaceLocalClock and d.clockDetached; end },
+		{ "SlimSuiteLocalClockFrame", "Local clock", "Your real-world clock: 12/24-hour, its background and daylight saving are below.", function() return d.replaceLocalClock and d.clockDetached; end },
 		{ "SlimSuiteMinimapBar", "Minimap buttons", "Every minimap button and the day/night moon in one row. Drag it anywhere.", function() return d.minimapBar; end },
 		{ "SlimSuiteCombatTextFrame", "Combat text", "Your newest hits and heals, each with its spell icon. Crits stand out.", function() return d.combatTextBox; end },
 	};
@@ -5005,7 +4988,7 @@ function SS.AfterChoice()
 	SS.RefreshChoices();
 	SS.RefreshToggles();
 	if ( setupActive and SU.focus ) then SU.Focus(SU.focus); end
-	if ( sizeMenu and sizeMenu:IsShown() and SS.sizeMenuName ) then SS.RefreshCrossRefs(SS.sizeMenuName); end
+	if ( not setupActive and SS.MenuOpen() ) then SU.Focus(SU.focus); end
 end
 -- a tick-box row turned into a choice row (or back): the box itself is hidden and the choice button stands beside its
 -- label ("right", the setup) or under it ("below", the narrow right-click menu)
@@ -5346,8 +5329,8 @@ end
 -- the grid: the setting, the bar button and the panel's tick box all agree
 function SU.SetGridSetting(on)
 	SS.DB().showEditGrid = on and true or false;
-	if ( on ) then SS.Safe(ShowEditGrid); end
-	SU.SetOn("SlimSuiteEditGrid", on and true or false);
+	SS.Safe(ShowEditGrid);                                 -- shows it while editing, or takes it away
+	if ( setupActive ) then SU.SetOn("SlimSuiteEditGrid", on and true or false); end
 	if ( SU.grid ) then SU.grid.Refresh(); end
 end
 
@@ -6066,10 +6049,35 @@ function SU.RefreshGridButtons()
 	end
 end
 
+-- The element's menu: the setup's panel for an element, the same in the setup and on a right-click while editing.
+-- Its title and words, its settings, then its size & layout tools; Exit and Complete in the setup, Done otherwise.
+function SS.OpenSizeMenu(name, label)
+	name = SS.Element(name);
+	if ( not getglobal(SS.Shown(name)) ) then return; end
+	if ( not SU.panel ) then SU.Build(); end
+	SU.menuLabel = label;
+	SU.Focus(name);
+end
+function SS.MenuOpen()
+	return SU.panel and SU.panel:IsShown() and SU.focus and true or false;
+end
+function SS.HideElementMenu()
+	if ( sizeMenu ) then sizeMenu:Hide(); end
+	if ( setupActive or not SU.panel ) then return; end
+	SU.panel:Hide();
+	if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
+	SU.focus, SU.placedFor = nil, nil;
+end
+
 function SU.Focus(frame)
 	SU.focus = frame;
 	local e;
 	for i = 1, table.getn(SU.elements or {}) do if ( SU.elements[i].frame == frame ) then e = SU.elements[i]; end end
+	if ( not e and frame and not setupActive ) then
+		local steps = SU.Steps();
+		for i = 1, table.getn(steps) do if ( steps[i].frame == frame ) then e = steps[i]; end end
+		e = e or { frame = frame, title = SU.menuLabel or frame, text = "" };
+	end
 	local checks = {};
 	if ( e ) then
 		SU.panel.title:SetText(e.title);
@@ -6104,13 +6112,37 @@ function SU.Focus(frame)
 			cb.get, cb.set, cb.cond = nil, nil, nil; cb:Hide();
 		end
 	end
+	-- the size & layout tools, under the settings
+	do
+		local ok = frame and SS.PrepareSizeTools(frame, e and e.title);
+		if ( ok and sizeMenu ) then
+			sizeMenu:SetParent(SU.panel);
+			sizeMenu:SetScale(1);
+			sizeMenu:SetFrameLevel((SU.panel:GetFrameLevel() or 1) + 2);
+			sizeMenu:ClearAllPoints();
+			sizeMenu:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 2, -(h - 40));
+			sizeMenu:Show();
+			h = h + (sizeMenu:GetHeight() or 0);               -- Exit/Complete or Done stay under it
+		elseif ( sizeMenu ) then
+			sizeMenu:Hide();
+		end
+	end
+	if ( SU.panel.done ) then
+		if ( setupActive ) then SU.panel.exit:Show(); SU.panel.complete:Show(); SU.panel.done:Hide();
+		else SU.panel.exit:Hide(); SU.panel.complete:Hide(); SU.panel.done:Show(); end
+	end
 	SU.panel:SetHeight(h);
 	if ( SU.grid ) then SU.grid.Refresh(); end
 	SU.RefreshGridButtons();
 	local handle = frame and handles[SS.Shown(frame)];
-	SU.panel:ClearAllPoints();
-	if ( handle and handle:IsShown() ) then SU.panel:SetPoint("TOP", handle, "BOTTOM", 0, -14);
-	else SU.panel:SetPoint("TOP", UIParent, "TOP", 0, -110); end
+	-- placed when it opens for an element (it can be dragged after that and stays where it was put)
+	if ( SU.placedFor ~= (frame or "") or not SU.panel:IsShown() ) then
+		SU.placedFor = frame or "";
+		SU.panel:ClearAllPoints();
+		if ( handle and handle:IsShown() ) then SU.panel:SetPoint("TOP", handle, "BOTTOM", 0, -14);
+		else SU.panel:SetPoint("TOP", UIParent, "TOP", 0, -110); end
+		SS.Safe(SS.KeepMenuOnScreen);
+	end
 	SU.panel:Show();
 	SU.glow.handle = handle;
 	if ( handle ) then
@@ -6121,7 +6153,23 @@ function SU.Focus(frame)
 	else
 		SU.glow:Hide();
 	end
-	SU.RefreshBar();
+	if ( setupActive ) then SU.RefreshBar(); end
+end
+
+-- a menu under an element near the screen's bottom would run off it: it goes above the element then, or as high as fits
+function SS.KeepMenuOnScreen()
+	local p = SU.panel;
+	local b, t = p:GetBottom(), p:GetTop();
+	if ( not b or not t ) then return; end
+	if ( b >= 0 ) then return; end
+	local handle = SU.glow and SU.glow.handle;
+	local h = t - b;
+	p:ClearAllPoints();
+	if ( handle and handle:GetTop() and handle:GetTop() + 14 + h <= UIParent:GetHeight() ) then
+		p:SetPoint("BOTTOM", handle, "TOP", 0, 14);
+	else
+		p:SetPoint("TOP", UIParent, "TOP", 0, -10);
+	end
 end
 
 -- rebuilds the setup's top bar after an element was added or removed from it, keeping the open questions
@@ -6437,6 +6485,10 @@ function SU.Build()
 	SU.panel.exit:SetPoint("BOTTOMLEFT", SU.panel, "BOTTOMLEFT", 10, 8);
 	SU.panel.complete = K.Button(SU.panel, "Complete", 100, function() SS.SetupEnd(true); end);
 	SU.panel.complete:SetPoint("BOTTOMRIGHT", SU.panel, "BOTTOMRIGHT", -10, 8);
+	-- the same panel is every element's right-click menu outside the setup: Done closes it
+	SU.panel.done = K.Button(SU.panel, "Done", 90, function() SS.HideElementMenu(); end);
+	SU.panel.done:SetPoint("BOTTOMRIGHT", SU.panel, "BOTTOMRIGHT", -10, 8);
+	SU.panel.done:Hide();
 	SU.panel:Hide();
 	-- the bar across the top of the screen: one toggle per element
 	SU.bar = CreateFrame("Frame", "SlimSuiteSetupBar", UIParent);

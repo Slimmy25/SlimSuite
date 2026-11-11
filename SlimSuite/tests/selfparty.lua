@@ -17,7 +17,7 @@ for _, e in ipairs(SU.elements) do
   if SU.on[e.frame] or true then
     SS.OpenSizeMenu(e.frame, e.title)
     sm = sm or upvalue(SS.RefreshCrossRefs, "sizeMenu")
-    local n = 0; for i = 1, #sm.xref do if sm.xref[i].shown then n = n + 1 end end
+    local n = 0; for i = 1, #SU.checks do if SU.checks[i]:IsVisible() then n = n + 1 end end
     local want = 0; for _, c in ipairs(SU.ChecksFor(e.frame)) do if not c[4] or c[4]() then want = want + 1 end end
     print(string.format("  menu %-24s rows %d / setup %d %s", e.frame, n, want, n == want and "" or "<-- MISMATCH"))
   end
