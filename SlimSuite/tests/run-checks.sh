@@ -7,7 +7,7 @@ run() { echo "== $1"; out=$(eval "$2" 2>&1); echo "$out" | tail -3; echo "$out" 
 run "block balance"   "python3 tests/bal.py SlimSuite.lua"
 run "stale names"     "python3 tests/stale.py SlimSuite.lua"
 run "load order"      "python3 tests/order.py"
-for s in cards movable square window menu fuzz setup selfparty choices; do
+for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks; do
   run "harness: $s" "cd tests && SCENARIO=$s SEED=7 STEPS=300 luahbtex --luaonly run.lua"
 done
 [ $fail -eq 0 ] && echo "ALL CHECKS PASSED" || echo "SOME CHECKS FAILED"

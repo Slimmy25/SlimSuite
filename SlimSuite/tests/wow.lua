@@ -48,6 +48,9 @@ Frame.methods = {
 	GetCenter = function(self) return 100 + self.w / 2, 100 + self.h / 2 end,
 	GetEffectiveScale = function(self) return 1 end, GetScale = function(self) return self.scale or 1 end,
 	SetScale = function(self, s) self.scale = s end,
+	-- anchors are kept (not laid out), so a scenario can check what a frame is placed against
+	SetPoint = function(self, ...) self.points = self.points or {}; table.insert(self.points, { ... }) end,
+	ClearAllPoints = function(self) self.points = {} end,
 	SetScript = function(self, k, f) self.scripts = self.scripts or {}; self.scripts[k] = f end,
 	GetScript = function(self, k) return self.scripts and self.scripts[k] end,
 	HookScript = noop,
@@ -131,6 +134,16 @@ for _, n in ipairs({ "PlayerFrame", "TargetFrame", "PartyMemberFrame1", "PartyMe
 	CreateFrame("Frame", n, UIParent)
 end
 Minimap = CreateFrame("Frame", "Minimap", MinimapCluster)
+-- the XP bar and its four border pieces, as the game makes them: 256x10 each along the bar's lower edge
+MainMenuExpBar.w, MainMenuExpBar.h = 1024, 13
+for i = 0, 3 do
+	local t = MainMenuExpBar:CreateTexture()
+	t.w, t.h = 256, 10
+	t.GetTexCoord = function() return 0, 0.79, 0, 0.83, 1, 0.79, 1, 0.83 end
+	t.GetPoint = function() return "BOTTOM", MainMenuExpBar, "BOTTOM", -384 + 256 * i, -3 end
+	t.GetTexture = function() return "Interface\\MainMenuBar\\UI-MainMenuBar-Dwarf" end
+	_G["MainMenuXPBarTexture" .. i] = t
+end
 for i = 1, 12 do CreateFrame("CheckButton", "ActionButton" .. i, MainMenuBar) end
 for i = 1, 4 do
 	CreateFrame("Frame", "PartyMemberFrame" .. i .. "Portrait", _G["PartyMemberFrame" .. i])
@@ -139,7 +152,17 @@ DEFAULT_CHAT_FRAME = ChatFrame1
 STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
 MAX_PLAYER_BUFFS = 16
 NUM_CHAT_WINDOWS = 7
-function UnitExists(u) return u == "player" end
+-- raid marks by unit, and the game's usual tooltip corner
+MOCK_MARKS = {}
+function GetRaidTargetIndex(u) return MOCK_MARKS[u] end
+function GameTooltip_SetDefaultAnchor(t, p) t:SetOwner(p, "ANCHOR_NONE"); t:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -13, 70) end
+MOCK_TARGET = false                                    -- a scenario sets this to have something targeted
+function UnitExists(u) return u == "player" or (u == "target" and MOCK_TARGET) end
+-- as in 1.12: the target frame's update works on `this` and fails when `this` is any other frame
+function TargetFrame_Update()
+	if this ~= TargetFrame then error("Interface\\FrameXML\\UnitFrame.lua:25: attempt to index field `name' (a nil value)") end
+	if UnitExists("target") then this:Show() else this:Hide() end
+end
 function UnitName(u) if u == "player" then return "Slim" end end
 function UnitClass(u) if u == "player" then return "Warrior", "WARRIOR" end end
 function UnitHealth() return 100 end

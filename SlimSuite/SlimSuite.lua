@@ -2111,6 +2111,7 @@ SS.Every("tally", 0.25, function()
 		SS.Safe(SS.UpdateLevelButton);
 		SS.Safe(ApplyActionSlotGrid);
 		SS.Safe(SS.RefreshItemRow);
+		SS.Safe(SS.UpdateTooltipPreview);
 		local tooltipHandle = handles.GameTooltip;
 		if ( tooltipHandle ) then
 			if ( SS.IsEditing("GameTooltip") ) then tooltipHandle:Show();
@@ -2263,6 +2264,7 @@ VisualInsets = function(frame)
 			if ( SS.BuffSamples ) then for _, s in pairs(SS.BuffSamples()) do Include(s); end end
 		else
 			for i = 1, 4 do Include(getglobal("PartyMemberFrame" .. i)); end
+			Include(getglobal("SlimSuitePartySelfFrame"));          -- your plate, before the first member
 		end
 		if ( minX and minY and maxX and maxY ) then return minX, minY, maxX, maxY; end
 	end
@@ -2625,10 +2627,98 @@ function SS.RestoreRacialActionButtonLayout()
 	end
 end
 
--- A clean look for the XP bar when it stands upright. The stock bar's segment art and its rested-XP marker
--- (ExhaustionTick, the diamond "end point") are drawn for a horizontal bar and look broken when rotated, so they are
--- hidden and the bar gets a dark background, a thin gold border and a smooth fill. Laid flat again, everything
--- the game drew comes back exactly as it was.
+-- The XP bar keeps the game's own border in every layout. The game draws that border as four art pieces at a fixed
+-- size along the bar where it first sits, so once Slim Suite moves, resizes or turns the bar it draws copies of the
+-- same pieces (the same picture, read from the game's own) that follow the bar's size and turn with it when it stands
+-- upright; the game's pieces step aside. The pieces are read once at load, while the bar is still the game's own. A
+-- client that can't read or turn them keeps the older upright look (a thin gold border) there.
+SS.XP_POINT = { CENTER = { 0, 0 }, TOP = { 0, 0.5 }, BOTTOM = { 0, -0.5 }, LEFT = { -0.5, 0 }, RIGHT = { 0.5, 0 },
+	TOPLEFT = { -0.5, 0.5 }, TOPRIGHT = { 0.5, 0.5 }, BOTTOMLEFT = { -0.5, -0.5 }, BOTTOMRIGHT = { 0.5, -0.5 } };
+SS.xpArt = {};
+function SS.CaptureXpArt()
+	local xp = MainMenuExpBar;
+	if ( SS.xpArt.pieces or SS.xpArt.tried or not xp ) then return; end
+	SS.xpArt.tried = true;
+	local W, H = xp:GetWidth(), xp:GetHeight();
+	if ( not W or not H or W <= 0 or H <= 0 ) then return; end
+	local pieces = {};
+	for i = 0, 3 do
+		local t = getglobal("MainMenuXPBarTexture" .. i);
+		if ( not t or type(t.GetTexCoord) ~= "function" or type(t.GetPoint) ~= "function" or type(t.GetTexture) ~= "function" ) then return; end
+		if ( t.GetNumPoints and t:GetNumPoints() ~= 1 ) then return; end
+		local ok, c1, c2, c3, c4, c5, c6, c7, c8 = pcall(t.GetTexCoord, t);
+		if ( not ok or type(c8) ~= "number" ) then return; end
+		local okPoint, p, rel, rp, x, y = pcall(t.GetPoint, t, 1);
+		local w, h, file = t:GetWidth(), t:GetHeight(), t:GetTexture();
+		if ( not okPoint or rel ~= xp or not file or not w or not h or w <= 0 or h <= 0 ) then return; end
+		local a, b = SS.XP_POINT[p or ""], SS.XP_POINT[rp or p or ""];
+		if ( not a or not b ) then return; end
+		-- the piece's centre from the bar's centre, in parts of the bar's length (u) and thickness (v)
+		local cx = b[1] * W + (x or 0) - a[1] * w;
+		local cy = b[2] * H + (y or 0) - a[2] * h;
+		pieces[i + 1] = { file = file, c = { c1, c2, c3, c4, c5, c6, c7, c8 }, u = cx / W, v = cy / H, w = w / W, h = h / H };
+	end
+	SS.xpArt.pieces = pieces;
+end
+SS.Safe(SS.CaptureXpArt);
+
+-- true while Slim Suite's copies draw the border (the bar is Slim Suite's to move); upright needs the copies turned
+function SS.XpArtShown()
+	local xp, pieces = MainMenuExpBar, SS.xpArt.pieces;
+	if ( not xp or not pieces or not xpBarDetached ) then return false; end
+	if ( SS.DB().orientations.MainMenuExpBar == "vertical" and SS.xpArt.noTurn ) then return false; end
+	return true;
+end
+
+function SS.LayoutXpArt()
+	local xp, pieces = MainMenuExpBar, SS.xpArt.pieces;
+	if ( not xp or not pieces ) then return; end
+	local f = SS.xpArt.frame;
+	if ( not SS.XpArtShown() ) then
+		if ( f ) then f:Hide(); end
+		return;
+	end
+	if ( not f ) then
+		f = CreateFrame("Frame", "SlimSuiteXpArt", xp);
+		f:SetAllPoints(xp);
+		f:EnableMouse(false);
+		f.tex = {};
+		for k = 1, table.getn(pieces) do f.tex[k] = f:CreateTexture(nil, "OVERLAY"); end
+		SS.xpArt.frame = f;
+	end
+	f:SetFrameLevel((xp:GetFrameLevel() or 1) + 2);         -- over the fill, under the 20-segment dividers
+	for i = 0, 3 do                                        -- the game's own pieces step aside for the copies
+		local g = getglobal("MainMenuXPBarTexture" .. i);
+		if ( g and g.SetAlpha ) then g:SetAlpha(0); end
+	end
+	local vertical = SS.DB().orientations.MainMenuExpBar == "vertical";
+	local len, thick = xp:GetWidth() or 0, xp:GetHeight() or 0;
+	if ( vertical ) then len, thick = xp:GetHeight() or 0, xp:GetWidth() or 0; end
+	for k = 1, table.getn(pieces) do
+		local p, t = pieces[k], f.tex[k];
+		local c = p.c;
+		t:SetTexture(p.file);
+		t:ClearAllPoints();
+		if ( vertical ) then
+			-- a quarter turn to the left: the bar's start (its left end) at the bottom, as the upright bar fills
+			t:SetWidth(math.max(1, p.h * thick)); t:SetHeight(math.max(1, p.w * len));
+			t:SetPoint("CENTER", xp, "CENTER", -p.v * thick, p.u * len);
+			if ( not pcall(t.SetTexCoord, t, c[5], c[6], c[1], c[2], c[7], c[8], c[3], c[4]) ) then
+				SS.xpArt.noTurn = true;                        -- this client can't turn art: the older upright look
+				f:Hide();
+				SS.Safe(SS.StyleExpBar, true);
+				return;
+			end
+		else
+			t:SetWidth(math.max(1, p.w * len)); t:SetHeight(math.max(1, p.h * thick));
+			t:SetPoint("CENTER", xp, "CENTER", p.u * len, p.v * thick);
+			t:SetTexCoord(c[1], c[5], c[2], c[4]);             -- left, right, top, bottom
+		end
+		t:Show();
+	end
+	f:Show();
+end
+
 -- "Split into 20 segments": 19 thin dividers over the XP bar, each 5% of a level apart. They sit on the bar, follow its
 -- size, and lie across it when the bar stands upright. On unless turned off.
 function SS.LayoutXpSegments()
@@ -2648,6 +2738,7 @@ function SS.LayoutXpSegments()
 		end
 		seg:SetScript("OnSizeChanged", function() SS.Safe(SS.LayoutXpSegments); end);
 	end
+	SS.Safe(SS.LayoutXpArt);                               -- the game's border follows the bar's size and turn
 	seg:SetAllPoints(xp);
 	seg:SetFrameLevel((xp:GetFrameLevel() or 1) + 3);      -- over the fill and the upright bar's border
 	if ( SS.DB().xpSegments == false ) then seg:Hide(); return; end
@@ -2669,13 +2760,17 @@ function SS.LayoutXpSegments()
 	end
 end
 
+-- Upright, the rested-XP marker (ExhaustionTick, the diamond "end point") is drawn for a flat bar and looks broken,
+-- so it is hidden; the bar gets a dark background and a smooth fill. Laid flat again, all of that comes back.
 local xpStyle = { shows = {} };
 function SS.StyleExpBar(on)
 	local xp = MainMenuExpBar;
 	if ( not xp ) then return; end
+	SS.Safe(SS.LayoutXpArt);
+	local copies = SS.XpArtShown();
 	for i = 0, 3 do
 		local t = getglobal("MainMenuXPBarTexture" .. i);
-		if ( t and t.SetAlpha ) then t:SetAlpha(on and 0 or 1); end
+		if ( t and t.SetAlpha ) then t:SetAlpha((on or copies) and 0 or 1); end
 	end
 	for _, n in ipairs({ "ExhaustionTick", "ExhaustionLevelFillBar" }) do
 		local f = getglobal(n);
@@ -2699,7 +2794,8 @@ function SS.StyleExpBar(on)
 			xpStyle.border:SetBackdropBorderColor(0.75, 0.58, 0.25, 0.9);
 			xpStyle.border:EnableMouse(false);
 		end
-		xpStyle.bg:Show(); xpStyle.border:Show();
+		xpStyle.bg:Show();
+		if ( copies ) then xpStyle.border:Hide(); else xpStyle.border:Show(); end   -- the game's border when it can turn
 		xpStyle.border:SetFrameLevel((xp:GetFrameLevel() or 1) + 2);
 		if ( xp.SetStatusBarTexture ) then xp:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar"); end
 		-- keep the game's own XP text readable on the narrow bar
@@ -2825,7 +2921,7 @@ ApplyMovableOrientation = function(name)
 				if ( frame.SetUserPlaced ) then SS.UserPlace(frame); end
 			end
 		end
-		-- yourself, after the last member (in the party's own look), and the thin lines
+		-- yourself, before the first member (in the party's own look), and the thin lines
 		if ( SS.LayoutPartySelf ) then SS.Safe(SS.LayoutPartySelf, true); SS.Safe(SS.UpdatePartyLines); end
 	end
 end
@@ -3067,10 +3163,26 @@ function SS.AttachBuffs()
 	local anchor = SS.DB().buffsOnTarget and T or (SS.DB().buffsOnPlayer and P) or nil;
 	if ( not anchor or not BuffFrame ) then return; end
 	local side = SS.DB().buffsOnTarget and SS.DB().buffsOnTargetSide or SS.DB().buffsOnPlayerSide;
+	local factor = RootFactor(anchor) or 1;
+	local scale, x = factor, 6;                                -- the unit frame's size on screen
+	if ( anchor == P and SS.DB().partyIncludesSelf and not SS.DB().buffsOnTarget ) then
+		-- you in the party: the buffs are sized to your plate or line (about a third of a plate's height, a little taller
+		-- than a line), and above a plate they start after the room kept for your raid mark
+		local line = (SS.IsPartyLine and SS.IsPartyLine(anchor)) or anchor == getglobal("SlimSuitePartyLines");
+		local h = anchor:GetHeight() or 9;
+		local icon = line and math.max(10, h * 1.5) or math.max(12, math.min(20, h * 0.32));
+		local button = getglobal("BuffButton0") or getglobal("BuffButton1");
+		local bh = (button and button.GetHeight and button:GetHeight()) or 30;
+		if ( not bh or bh <= 0 ) then bh = 30; end
+		scale = factor * icon / bh;
+		local room = 0;
+		if ( side == "above" and not line and SS.RaidMarkSize ) then room = SS.RaidMarkSize(anchor) + 4; end
+		x = (room > 0 and room or 2) * factor / scale;      -- in the buffs' own units
+	end
 	BuffFrame:ClearAllPoints();
-	if ( side == "above" ) then BuffFrame:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT", 6, 2);
-	else BuffFrame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 6, -2); end
-	if ( BuffFrame.SetScale ) then BuffFrame:SetScale(RootFactor(anchor) or 1); end   -- the unit frame's size on screen
+	if ( side == "above" ) then BuffFrame:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT", x, 2);
+	else BuffFrame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x, -2); end
+	if ( BuffFrame.SetScale ) then BuffFrame:SetScale(scale); end
 end
 
 -- Every tick box that shows a setting, wherever it is: the setup, the right-click menu, the settings window, the move
@@ -3138,7 +3250,7 @@ SS.ROW_GROUP = {
 	["Buffs and debuffs"] = "Buffs",
 	["Show debuffs and DoTs on the target"] = "Buffs",
 	["Class proc meter under it"] = "Extras",
-	["Join the party frames yourself (you go last)"] = "Party",
+	["Join the party frames yourself (you go first)"] = "Party",
 	["Party frames sit"] = "Party",
 	["Party layout"] = "Party",
 	["Party look"] = "Party",
@@ -4451,6 +4563,7 @@ function SS.HookTooltipOwner()
 	tooltipOwnerOriginal = GameTooltip.SetOwner;
 	GameTooltip.SetOwner = function(self, owner, anchor, x, y)
 		tooltipOwnerOriginal(self, owner, anchor, x, y);
+		self.slimSample = nil;                                -- a real tooltip replaces the sample
 		if ( self.SetClampedToScreen ) then self:SetClampedToScreen(true); end
 		-- Leave every tooltip at the game's own size until the player resizes it or moves it.
 		if ( not SS.DB().tooltipCustom and not SS.DB().unlocked ) then return; end
@@ -4462,6 +4575,15 @@ function SS.HookTooltipOwner()
 			SetRootPosition(self, p.x, p.y);
 		end
 	end;
+	-- the tooltips the game puts in its usual corner (units in the world, unit frames, most of the HUD) go where the
+	-- player moved the tooltip, in a run as well as while editing; tooltips pinned to a button stay by their button
+	if ( type(GameTooltip_SetDefaultAnchor) == "function" and not SS.tooltipDefaultOriginal ) then
+		SS.tooltipDefaultOriginal = GameTooltip_SetDefaultAnchor;
+		GameTooltip_SetDefaultAnchor = function(tooltip, parent)
+			SS.tooltipDefaultOriginal(tooltip, parent);
+			if ( tooltip == GameTooltip ) then SS.Safe(SS.PlaceTooltip, tooltip); end
+		end;
+	end
 	if ( GameTooltip.Show and not tooltipShowOriginal ) then
 		tooltipShowOriginal = GameTooltip.Show;
 		GameTooltip.Show = function(self)
@@ -4478,6 +4600,40 @@ function SS.HookTooltipOwner()
 			end
 		end;
 	end
+end
+
+-- the tooltip at the place the player moved it to (its lower-left corner), if it has been moved
+function SS.PlaceTooltip(tooltip)
+	local p = SS.DB().places.GameTooltip;
+	if ( type(p) ~= "table" or type(p.x) ~= "number" or type(p.y) ~= "number" ) then return false; end
+	SetRootPosition(tooltip, p.x, p.y);
+	return true;
+end
+
+-- The setup, Edit mode and Demo Mode show a sample tooltip where tooltips will appear, at their size, so there is
+-- something to see and drag. Hovering anything shows the real tooltip instead; the sample comes back when it goes.
+SS.TOOLTIP_SAMPLE = { { "Hogger", 1, 1, 1 }, { "Level ?? Elite", 1, 0.82, 0 }, { "Tooltips appear here.", 0.8, 0.8, 0.8 },
+	{ "Drag the handle to move them; right-click to size them.", 0.6, 0.8, 1 } };
+function SS.UpdateTooltipPreview()
+	local tt = GameTooltip;
+	if ( not tt or not tt.SetOwner ) then return; end
+	if ( not SS.Previewing("GameTooltip") ) then
+		if ( tt.slimSample ) then tt.slimSample = nil; tt:Hide(); end
+		return;
+	end
+	if ( tt:IsShown() ) then return; end
+	tt:SetOwner(UIParent, "ANCHOR_NONE");
+	tt:ClearAllPoints();
+	if ( not SS.PlaceTooltip(tt) ) then
+		local ox = type(CONTAINER_OFFSET_X) == "number" and CONTAINER_OFFSET_X or 0;
+		local oy = type(CONTAINER_OFFSET_Y) == "number" and CONTAINER_OFFSET_Y or 70;
+		tt:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -ox - 13, oy);           -- the game's usual corner
+	end
+	local lines = SS.TOOLTIP_SAMPLE;
+	tt:SetText(lines[1][1], lines[1][2], lines[1][3], lines[1][4]);
+	for i = 2, table.getn(lines) do tt:AddLine(lines[i][1], lines[i][2], lines[i][3], lines[i][4], 1); end
+	tt:Show();
+	tt.slimSample = true;                                     -- set after SetOwner, which clears it
 end
 
 SetAnchorSnap = function(on)
@@ -4958,12 +5114,14 @@ function SU.ChecksFor(frame)
 		function(v) SS.DB().cardPortraits = v and true or false; SS.Safe(SS.ApplyNewFrames); end, function() return SS.UsesCard(el); end, short = "3D portrait" }; end
 	local function BuffsPlace() return { "Buffs and debuffs", function() return SS.BuffsPlace(); end, function(v) SS.SetBuffsPlace(v); end,
 		choice = SS.BUFF_PLACES, short = "Buffs and debuffs", xref = true, warn = W.buffs }; end
-	local function SelfParty() return { "Join the party frames yourself (you go last)", function() return SS.DB().partyIncludesSelf; end,
+	local function SelfParty() return { "Join the party frames yourself (you go first)", function() return SS.DB().partyIncludesSelf; end,
 		function(v) SS.SetPartySelf(v); end, short = "Join the party yourself", xref = true, warn = W.selfParty }; end
 	local function PartyPlace() return { "Party frames sit", function() return SS.PartyPosition(); end, function(v) SS.SetPartyPosition(v); end,
 		choice = SS.PARTY_PLACES, short = "Party frames sit", xref = true, warn = W.partyPlace }; end
 	local function ProcMeter() return { "Class proc meter under it", function() return SS.DB().procMeter; end,
 		function(v) SS.DB().procMeter = v and true or false; end, short = "Class proc meter", xref = true }; end
+	-- one of your own settings, shown under the party while you are in it (your frame is part of the party then)
+	local function YouIn(e) e[4] = function() return SS.DB().partyIncludesSelf; end; return e; end
 	local function HideTarget() return { "Hide the target frame", function() return SS.DB().hideTarget; end,
 		function(v) SS.SetTargetHidden(v); end }; end
 	local function ShowClock() return { "Show the local clock", function() return SS.DB().replaceLocalClock; end,
@@ -5010,7 +5168,7 @@ function SU.ChecksFor(frame)
 			{ "Party look", function() return SS.Look("PartyMemberFrame1"); end, function(v) SS.SetLook("PartyMemberFrame1", v); end,
 				choice = SS.PARTY_LOOKS, short = "Look" },
 			{ "Show character faces", function() return SS.DB().partyFaces ~= false; end, function(v) SU.SetPartyOption("partyFaces", v); end },
-			SelfParty(), PartyPlace() },
+			SelfParty(), YouIn(BuffsPlace()), YouIn(ProcMeter()), PartyPlace() },
 		SlimSuiteBossFrames = { { "Show debuffs on the bars", function() return SS.DB().encounterDebuffs; end, function(v) SS.DB().encounterDebuffs = v; end },
 			{ "Vertical", function() return SS.DB().orientations.SlimSuiteBossFrames == "vertical"; end,
 			function(v) SS.DB().orientations.SlimSuiteBossFrames = v and "vertical" or "horizontal"; SS.DB().sizes.SlimSuiteBossFrames = nil; SS.Safe(SS.UpdateBossFrames); SS.Safe(PlaceAll); SU.UpdateDemo(); end } },
@@ -5109,6 +5267,12 @@ function SU.SetOn(frame, on, title)
 	end
 	-- the damage meter element is the same switch as "Replace Default Damage Meter with Movable Version?"
 	if ( frame == "SlimSuiteMeterFrame" and not SU.restoring ) then SS.DB().moveMeter = on and true or false; end
+	-- the target frame element is the same switch as "Hide the target frame": off here is off in the game too
+	if ( frame == "TargetFrame" and not SU.restoring and (SS.DB().hideTarget and true or false) == (on and true or false) ) then
+		SS.DB().hideTarget = not on;
+		SS.Safe(SS.TargetFrameHidden, not on);
+		SS.Safe(SS.ApplyNewFrames);
+	end
 	SU.on = SU.on or {};
 	SU.on[frame] = on and true or nil;
 	SS.DB().enabledElements = SS.DB().enabledElements or {};
@@ -5230,7 +5394,7 @@ function SU.PreviewTarget()
 	if ( not SS.Previewing("TargetFrame") or SS.DB().hideTarget ) then return; end
 	if ( UnitExists("target") ) then return; end
 	local t = SU.SAMPLE_TARGET;
-	if ( TargetFrame and not SS.DB().newFrames ) then
+	if ( TargetFrame and not SS.UsesCard("TargetFrame") ) then
 		TargetFrame:Show();
 		local name, level = getglobal("TargetName"), getglobal("TargetLevelText");
 		if ( name and name.SetText ) then name:SetText(t.name); end
@@ -5244,11 +5408,13 @@ function SU.PreviewTarget()
 		if ( face and face.SetTexture ) then face:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark"); end
 	end
 end
--- the game redraws the target frame from the real target (or hides it with none) when the setup closes
+-- the game redraws the target frame from the real target (or hides it with none) when the setup closes. The game's
+-- TargetFrame_Update works on `this` (it reads this.name, this.portrait...), so it runs as the target frame itself: called
+-- from a button or a timer, `this` would be that button and the game's code fails ("UnitFrame.lua:25 ... field `name'")
 function SU.EndTargetPreview()
 	if ( not TargetFrame ) then return; end
 	if ( UnitExists("target") and not SS.DB().hideTarget ) then
-		if ( TargetFrame_Update ) then SS.Safe(TargetFrame_Update); end
+		if ( TargetFrame_Update ) then SS.RunAs(TargetFrame, TargetFrame_Update); end
 	else
 		TargetFrame:Hide();
 	end
@@ -5540,7 +5706,7 @@ end
 
 -- The thin-line look: one slim bar per member (name on it, class colour, a small face if faces are on), stacked or in a
 -- row, inside one movable block. The block's size is the player's: its width and height are shared out between its
--- places (four, or five with you), so each line follows it. You go after the last member.
+-- places (four, or five with you), so each line follows it. You go first, before the members.
 SS.PARTY_LINE = { W = 90, H = 9, GAP = 2, ROWGAP = 4 };
 function SS.MakePartyLines()
 	local c = getglobal("SlimSuitePartyLines");
@@ -5575,13 +5741,14 @@ function SS.UpdatePartyLines()
 	if ( SS.Look("PartyMemberFrame1") ~= "thin" ) then c:Hide(); return; end
 	local d = SS.DB();
 	local preview = SS.Previewing("PartyMemberFrame1");
+	-- you first (as the game lists you), then the members: the same in a run, the setup and Demo Mode
 	local entries = {};
+	if ( d.partyIncludesSelf ) then table.insert(entries, { unit = "player" }); end
 	for i = 1, 4 do
 		local unit = "party" .. i;
 		if ( UnitExists(unit) ) then table.insert(entries, { unit = unit, slot = i });
 		elseif ( preview and SU.PARTY_SAMPLE[i] ) then table.insert(entries, { sample = SU.PARTY_SAMPLE[i] }); end
 	end
-	if ( d.partyIncludesSelf ) then table.insert(entries, { unit = "player" }); end
 	local L = SS.PARTY_LINE;
 	local slots = d.partyIncludesSelf and 5 or 4;
 	local vertical = SS.CurrentOrientation("PartyMemberFrame1") ~= "horizontal";
@@ -5705,8 +5872,9 @@ function SS.MakeClassicSelf()
 	return f;
 end
 
--- You join the party after its last member (first, with nobody else there), in the party's look: the classic plate
--- here, a line in the thin look (SS.UpdatePartyLines draws that one).
+-- You join the party first, as the game lists you, in the party's look: the classic plate here (just above the first
+-- member in a column, just left of it in a row), a line in the thin look (SS.UpdatePartyLines draws that one). The
+-- place never depends on who else is there, so a run, the setup and Demo Mode all show you in the same spot.
 function SS.LayoutPartySelf(force)
 	local d = SS.DB();
 	local plate = getglobal("SlimSuitePartySelfFrame");
@@ -5715,23 +5883,39 @@ function SS.LayoutPartySelf(force)
 		return;
 	end
 	plate = plate or SS.MakeClassicSelf();
-	local preview = SS.Previewing("PartyMemberFrame1");
-	local n = 0;
-	for i = 1, 4 do if ( UnitExists("party" .. i) or (preview and SU.PARTY_SAMPLE[i]) ) then n = i; end end
 	local orientation = SS.CurrentOrientation("PartyMemberFrame1");
 	local pf1 = getglobal("PartyMemberFrame1");
 	local scale = pf1 and pf1:GetScale() or 1;
-	local key = n .. orientation .. scale;
+	local key = orientation .. scale;
 	if ( force or plate.laid ~= key ) then
 		plate.laid = key;
 		plate:SetScale(scale);
 		plate:ClearAllPoints();
-		local last = n > 0 and getglobal("PartyMemberFrame" .. n) or nil;
-		if ( not last ) then plate:SetPoint("TOPLEFT", pf1 or UIParent, "TOPLEFT", 0, 0);
-		elseif ( orientation == "horizontal" ) then plate:SetPoint("LEFT", last, "RIGHT", 8, 0);
-		else plate:SetPoint("TOP", last, "BOTTOM", 0, -4); end
+		if ( not pf1 ) then plate:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 10, -128);
+		elseif ( orientation == "horizontal" ) then plate:SetPoint("RIGHT", pf1, "LEFT", -8, 0);
+		else plate:SetPoint("BOTTOM", pf1, "TOP", 0, 4); end
 	end
 	plate:Show();
+	SS.KeepPartySelfOnScreen(plate);
+end
+
+-- Your plate sits before the first member, so a party right at the screen's left edge (a row) or top edge (a column)
+-- would push it off: the whole party then steps right or down just enough to show it. Dragging is held the same way.
+-- Demo Mode's sample row is only for show, so there the step is not saved.
+function SS.KeepPartySelfOnScreen(plate)
+	local pf1 = getglobal("PartyMemberFrame1");
+	if ( not pf1 or not UIParent ) then return; end
+	local h = handles.PartyMemberFrame1;
+	if ( h and h.dragging ) then return; end
+	local left, right, bottom, top = RootBounds(plate);
+	if ( not left or not top ) then return; end
+	local dx = left < 0 and -left or 0;
+	local dy = top > UIParent:GetHeight() and (UIParent:GetHeight() - top) or 0;
+	if ( dx == 0 and dy == 0 ) then return; end
+	local x, _, y = RootBounds(pf1);
+	if ( not x or not y ) then return; end
+	SetRootPosition(pf1, x + dx, y + dy);
+	if ( not SS.demoRunning ) then SS.SavePosition("PartyMemberFrame1", pf1); end
 end
 
 function SS.UpdatePartySelf()
@@ -5780,6 +5964,15 @@ SS.Every("partyLines", 0.2, function()
 	SS.Safe(SS.UpdatePartyLines);
 	SS.Safe(SS.LayoutPartySelf);
 	SS.Safe(SS.UpdatePartySelf);
+	-- your buffs follow your plate or line as it changes size or look
+	local d = SS.DB();
+	if ( d.partyIncludesSelf and d.buffsOnPlayer and not d.buffsOnTarget ) then
+		local P = SS.PlayerAnchor();
+		local key = P and (tostring(P) .. (P:GetHeight() or 0) .. (P:GetEffectiveScale() or 1) .. tostring(d.buffsOnPlayerSide)) or "";
+		if ( key ~= SS.buffAttachKey ) then SS.buffAttachKey = key; SS.Safe(SS.AttachBuffs); end
+	else
+		SS.buffAttachKey = nil;
+	end
 end);
 
 function SU.UpdateDemo()
@@ -5834,6 +6027,10 @@ function SS.SetTargetHidden(on)
 	SS.DB().hideTarget = on and true or false;
 	SS.TargetFrameHidden(on);
 	SS.Safe(SS.ApplyNewFrames);
+	if ( setupActive and SU.on and (SU.on.TargetFrame and true or false) == (on and true or false) ) then
+		SS.Safe(SU.SetOn, "TargetFrame", not on, SU.titles and SU.titles.TargetFrame or "Target frame");
+		SS.Safe(SU.RefreshBar);
+	end
 	if ( SS.DB().unlocked ) then SS.Safe(SS.SetUnlocked, true, true); end
 end
 
@@ -6146,6 +6343,7 @@ function SU.Begin()
 		local want = saved[f] and true or false;
 		if ( f == "SlimSuiteMeterFrame" ) then want = SS.DB().moveMeter and true or false; end   -- follows the setting
 		if ( f == "PlayerFrame" and SS.DB().partyIncludesSelf ) then want = false; end            -- you are in the party
+		if ( f == "TargetFrame" ) then want = not SS.DB().hideTarget; end                         -- follows the setting
 		SS.Safe(SU.SetOn, f, want, SU.titles[f]);
 	end
 	SU.batching = false;
@@ -6457,7 +6655,7 @@ function SS.WinBuild()
 					r.b.entry = row; r.b:SetPoint("LEFT", r.fs, "RIGHT", 10, 0);
 					r.b:SetText(SS.ChoiceText(row) .. "  v");
 					r.b:SetScript("OnShow", function() if ( this.entry ) then this:SetText(SS.ChoiceText(this.entry) .. "  v"); end end);
-					up = nil;
+					if ( lead == 0 ) then up = nil; end
 				else
 					r.kind = "check";
 					r.cb = SS.Check(parent, label, startY, row[2], row[3], lead);
@@ -6510,7 +6708,9 @@ function SS.WinBuild()
 			{"Party layout", function() return SS.DB().orientations.PartyMemberFrame1 == "horizontal" and "horizontal" or "vertical"; end, function(v) SU.SetPartyRow(v == "horizontal"); end, choice = SS.PARTY_LAYOUTS},
 			{"Party look", function() return SS.Look("PartyMemberFrame1"); end, function(v) SS.SetLook("PartyMemberFrame1", v); end, choice = SS.PARTY_LOOKS},
 			{"Show character faces in the party", function() return SS.DB().partyFaces ~= false; end, function(v) SU.SetPartyOption("partyFaces", v); end},
-			{"Join the party frames yourself (you go last, in the party's look)", function() return SS.DB().partyIncludesSelf; end, function(v) SS.SetPartySelf(v); end},
+			{"Join the party frames yourself (you go first, in the party's look)", function() return SS.DB().partyIncludesSelf; end, function(v) SS.SetPartySelf(v); end},
+			{"   Your buffs and debuffs", function() return SS.BuffsPlace(); end, function(v) SS.SetBuffsPlace(v); end, choice = SS.BUFF_PLACES},
+			{"   ...class proc meter under you", function() return SS.DB().procMeter; end, function(v) SS.DB().procMeter = v; end},
 			{"Party frames sit", function() return SS.PartyPosition(); end, function(v) SS.SetPartyPosition(v); end, choice = SS.PARTY_PLACES},
 			{head="Default UI replacements"},
 			{"Replace Default Level Up with Movable Version?", function() return SS.DB().moveLevelButton; end, function(v) SS.DB().moveLevelButton = v; SS.Safe(SS.UpdateLevelButton); end},
@@ -7130,6 +7330,8 @@ function SS.StopDemoMode()
 	if ( demoGlint ) then demoGlint:Hide(); end
 	SS.demoPartyOrient = nil;
 	SS.demoBuffOn = {};
+	-- the sample row may have stepped the party aside for your plate (not saved): back to its own place
+	if ( SS.DB().partyIncludesSelf ) then SS.Safe(SS.Place, "PartyMemberFrame1"); end
 	SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");   -- the party's own layout again
 	SS.Safe(SS.EndPreviewsIfDone);                           -- the sample party and target go
 	SS.Safe(SS.ApplyNewFrames);
@@ -7178,6 +7380,50 @@ local function RaidTargets()
 	end
 	return list;
 end
+
+-- The raid mark on each unit frame, so a mark placed from the row (or by anyone in the party) shows on the frames too,
+-- not only over the heads in the world: a small icon just above a frame's top-left corner (the buffs above a frame
+-- leave room for it), and just right of a thin line. The game's target frame keeps its own icon where it has one.
+function SS.IsPartyLine(f)
+	local c = getglobal("SlimSuitePartyLines");
+	return c and f and f.GetParent and f:GetParent() == c and true or false;
+end
+function SS.RaidMarkSize(f)
+	local h = (f and f.GetHeight and f:GetHeight()) or 0;
+	if ( SS.IsPartyLine(f) ) then return math.max(8, h + 2); end
+	return math.max(12, math.min(20, h * 0.32));
+end
+SS.raidMarked = {};
+function SS.UpdateRaidMarks()
+	local list = RaidTargets();
+	if ( UnitExists("target") ) then
+		local card = getglobal("SlimSuiteTargetCard");
+		if ( card ) then table.insert(list, { f = card, unit = "target" }); end
+		if ( TargetFrame and not getglobal("TargetRaidTargetIcon") ) then table.insert(list, { f = TargetFrame, unit = "target" }); end
+	end
+	local now = {};
+	for i = 1, table.getn(list) do
+		local f, unit = list[i].f, list[i].unit;
+		local index = GetRaidTargetIndex and GetRaidTargetIndex(unit);
+		if ( f and f.CreateTexture and type(index) == "number" and index >= 1 and index <= 8 ) then
+			local t = f.slimRaidMark;
+			if ( not t ) then t = f:CreateTexture(nil, "OVERLAY"); f.slimRaidMark = t; end
+			local size = SS.RaidMarkSize(f);
+			t:SetWidth(size); t:SetHeight(size);
+			t:ClearAllPoints();
+			if ( SS.IsPartyLine(f) ) then t:SetPoint("LEFT", f, "RIGHT", 2, 0);
+			else t:SetPoint("BOTTOMLEFT", f, "TOPLEFT", 2, 1); end
+			local col, row = math.mod(index - 1, 4), math.floor((index - 1) / 4);
+			t:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons");
+			t:SetTexCoord(col * 0.25, (col + 1) * 0.25, row * 0.25, (row + 1) * 0.25);
+			t:Show();
+			now[f] = true;
+		end
+	end
+	for f in pairs(SS.raidMarked) do if ( not now[f] and f.slimRaidMark ) then f.slimRaidMark:Hide(); end end
+	SS.raidMarked = now;
+end
+SS.Every("raidMarks", 0.25, function() SS.Safe(SS.UpdateRaidMarks); end);
 
 local function BuildRaidPanel()
 	local p = CreateFrame("Frame", "SlimSuiteRaidIconPanel", UIParent);

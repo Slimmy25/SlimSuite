@@ -87,6 +87,16 @@ function SS.Safe(fn, ...)
 	return ok, r1, r2, r3, r4;
 end
 
+-- Runs one of the game's own frame functions as that frame: the 1.12 FrameXML functions (TargetFrame_Update,
+-- UnitFrame_Update...) work on the global `this`, which is otherwise whatever frame's script is running now
+function SS.RunAs(frame, fn, ...)
+	local was = this;
+	this = frame;
+	local ok = SS.Safe(fn, unpack(arg));
+	this = was;
+	return ok;
+end
+
 local tasks = {};
 local driver = CreateFrame("Frame");
 -- Runs fn every `seconds` (0 = every frame). If `watch` is given, the task is skipped while that frame is
