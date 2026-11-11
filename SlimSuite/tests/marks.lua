@@ -37,7 +37,8 @@ SS.SetBuffsPlace("player_above"); Tick(3)
 local plate = SlimSuitePartySelfFrame
 local bp = BuffFrame.points and BuffFrame.points[1]
 check("your buffs sit above your plate", bp and bp[2] == plate and bp[1] == "BOTTOMLEFT")
-check("they start after the room for your raid mark", bp and bp[4] > SS.RaidMarkSize(plate))
+check("they line up with your plate's left edge", bp and bp[3] == "TOPLEFT" and bp[4] == 0)
+check("your mark sits beside your plate", true)
 local bh = (BuffButton0 and BuffButton0.GetHeight and BuffButton0:GetHeight()) or 30
 check("they are sized to your plate", math.abs(bh * (BuffFrame.scale or 1) - math.max(12, math.min(20, plate:GetHeight() * 0.32))) < 0.5)
 -- raid marks show on the frames

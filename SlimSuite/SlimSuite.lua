@@ -3167,7 +3167,7 @@ function SS.AttachBuffs()
 	local scale, x = factor, 6;                                -- the unit frame's size on screen
 	if ( anchor == P and SS.DB().partyIncludesSelf and not SS.DB().buffsOnTarget ) then
 		-- you in the party: the buffs are sized to your plate or line (about a third of a plate's height, a little taller
-		-- than a line), and above a plate they start after the room kept for your raid mark
+		-- than a line) and line up with its left edge; your raid mark sits beside your plate, so the row above is theirs
 		local line = (SS.IsPartyLine and SS.IsPartyLine(anchor)) or anchor == getglobal("SlimSuitePartyLines");
 		local h = anchor:GetHeight() or 9;
 		local icon = line and math.max(10, h * 1.5) or math.max(12, math.min(20, h * 0.32));
@@ -3175,9 +3175,7 @@ function SS.AttachBuffs()
 		local bh = (button and button.GetHeight and button:GetHeight()) or 30;
 		if ( not bh or bh <= 0 ) then bh = 30; end
 		scale = factor * icon / bh;
-		local room = 0;
-		if ( side == "above" and not line and SS.RaidMarkSize ) then room = SS.RaidMarkSize(anchor) + 4; end
-		x = (room > 0 and room or 2) * factor / scale;      -- in the buffs' own units
+		x = 0;
 	end
 	BuffFrame:ClearAllPoints();
 	if ( side == "above" ) then BuffFrame:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT", x, 2);
@@ -7382,8 +7380,8 @@ local function RaidTargets()
 end
 
 -- The raid mark on each unit frame, so a mark placed from the row (or by anyone in the party) shows on the frames too,
--- not only over the heads in the world: a small icon just above a frame's top-left corner (the buffs above a frame
--- leave room for it), and just right of a thin line. The game's target frame keeps its own icon where it has one.
+-- not only over the heads in the world: a small icon just above a frame's top-left corner, and just right of a thin
+-- line or of your own plate in the party (your buffs line up above your plate). The game's target frame keeps its own icon where it has one.
 function SS.IsPartyLine(f)
 	local c = getglobal("SlimSuitePartyLines");
 	return c and f and f.GetParent and f:GetParent() == c and true or false;
@@ -7411,7 +7409,7 @@ function SS.UpdateRaidMarks()
 			local size = SS.RaidMarkSize(f);
 			t:SetWidth(size); t:SetHeight(size);
 			t:ClearAllPoints();
-			if ( SS.IsPartyLine(f) ) then t:SetPoint("LEFT", f, "RIGHT", 2, 0);
+			if ( SS.IsPartyLine(f) or f == getglobal("SlimSuitePartySelfFrame") ) then t:SetPoint("LEFT", f, "RIGHT", 2, 0);
 			else t:SetPoint("BOTTOMLEFT", f, "TOPLEFT", 2, 1); end
 			local col, row = math.mod(index - 1, 4), math.floor((index - 1) / 4);
 			t:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons");
