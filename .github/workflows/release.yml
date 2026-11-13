@@ -1,5 +1,5 @@
 # Publishes a GitHub release for each new Slim Suite version.
-# It runs when main is pushed with a changed SlimSuite.toc (or a changed workflow). If the version in
+# It runs when main is pushed with a changed SlimSuite.toc, tests, or workflow. If the version in
 # "## Version:" has no release yet, it builds SlimSuite-<version>.zip and publishes release v<version>,
 # creating that tag itself. Pushing main without changing the version publishes nothing.
 name: Release
@@ -10,6 +10,7 @@ on:
       - main
     paths:
       - "SlimSuite/SlimSuite.toc"
+      - "SlimSuite/tests/**"
       - ".github/workflows/release.yml"
 
 permissions:

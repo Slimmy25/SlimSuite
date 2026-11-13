@@ -7,7 +7,8 @@ local function near(a, b) return type(a) == "number" and math.abs(a - b) < 0.01 
 check("the four pieces were read at load", SS.xpArt.pieces and #SS.xpArt.pieces == 4)
 local p1 = SS.xpArt.pieces[1]
 check("piece 1 sits at the left quarter", near(p1.u, -384 / 1024) and near(p1.w, 0.25))
-SU.SetVertical("MainMenuExpBar", true); Tick(3)
+SS.DetachExperienceBar()
+SU.SetVertical("MainMenuExpBar", true); SS.LayoutXpSegments(); Tick(3)
 local art = SlimSuiteXpArt
 check("upright: the copies show", art and art.shown)
 check("upright: the game's pieces step aside", MainMenuXPBarTexture0.alpha == 0)
