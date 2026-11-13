@@ -1833,6 +1833,7 @@ function SS.SavePlace(name, f)
 end
 SS.SavePosition = function(name, f)
 	SS.SavePlace(name, f);
+	if ( name == "MinimapCluster" ) then SS.Safe(SS.ClockFollowsMap); end   -- a moved map takes Slim Suite's clock with it
 	local p = SS.DB().places[name];
 	if ( p ) then p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil; end
 end
@@ -2864,7 +2865,55 @@ function SS.AttachBuffs()
 	if ( side == "above" ) then BuffFrame:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT", x, 2);
 	else BuffFrame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x, -2); end
 	if ( BuffFrame.SetScale ) then BuffFrame:SetScale(scale); end
+	SS.Safe(SS.LayoutPartyBuffs);
 end
+
+-- You in the party: the buffs start at your plate's top-left corner and grow to the right. A row is never wider than
+-- your plate, so they never reach the next party member beside you; more buffs start a new row, stacked away from the
+-- plate (upwards above it, downwards below it), so they never reach the member under you either.
+local BUFF_BUTTONS = 24;
+function SS.PartyBuffsActive()
+	local d = SS.DB();
+	return d.partyIncludesSelf and d.buffsOnPlayer and not d.buffsOnTarget and BuffFrame and true or false;
+end
+function SS.LayoutPartyBuffs()
+	if ( not BuffFrame ) then return; end
+	local active = SS.PartyBuffsActive();
+	if ( not active ) then
+		if ( SS.partyBuffsLaid ) then
+			SS.partyBuffsLaid = nil;
+			for i = 0, BUFF_BUTTONS - 1 do
+				local b = getglobal("BuffButton" .. i);
+				local o = b and b.slimPartyOrig;
+				if ( o ) then b.slimPartyOrig = nil; b:ClearAllPoints(); if ( o[2] ) then b:SetPoint(o[1], o[2], o[3], o[4], o[5]); end end
+			end
+		end
+		return;
+	end
+	local P = SS.Pair();
+	if ( not P ) then return; end
+	local bs = BuffFrame:GetEffectiveScale() or 1;
+	local width = (P:GetWidth() or 120) * (P:GetEffectiveScale() or 1) / bs;   -- your plate's width, in the buffs' own size
+	local up = SS.DB().buffsOnPlayerSide ~= "below";
+	local gap, col, row, perRow = 2, 0, 0, nil;
+	for i = 0, BUFF_BUTTONS - 1 do
+		local b = getglobal("BuffButton" .. i);
+		if ( b ) then
+			if ( not b.slimPartyOrig ) then local p, rel, rp, x, y = b:GetPoint(1); b.slimPartyOrig = { p, rel, rp, x or 0, y or 0 }; end
+			if ( b:IsShown() ) then
+				local w, h = b:GetWidth() or 30, b:GetHeight() or 30;
+				if ( not perRow ) then perRow = math.max(1, math.floor((width + gap) / (w + gap))); end
+				if ( col >= perRow ) then col = 0; row = row + 1; end
+				b:ClearAllPoints();
+				if ( up ) then b:SetPoint("BOTTOMLEFT", BuffFrame, "BOTTOMLEFT", col * (w + gap), row * (h + gap));
+				else b:SetPoint("TOPLEFT", BuffFrame, "TOPLEFT", col * (w + gap), -row * (h + gap)); end
+				col = col + 1;
+			end
+		end
+	end
+	SS.partyBuffsLaid = true;
+end
+SS.Every("partyBuffs", 0.25, function() if ( SS.PartyBuffsActive() or SS.partyBuffsLaid ) then SS.Safe(SS.LayoutPartyBuffs); end end);
 
 -- Every tick box that shows a setting, wherever it is: the setup, the right-click menu, the settings window, the move
 -- panel. A click always flips the setting itself (not whatever the box happened to show), and afterwards every visible
@@ -2965,6 +3014,8 @@ function SS.ApplyMinimapShape()
 	SS.squareActive = square and ok and true or false;
 	SS.Safe(SS.ArrangeEdgeButtons, square and ok);   -- the buttons follow the shape the map really has
 	if ( MinimapBorder ) then if ( square ) then MinimapBorder:Hide(); else MinimapBorder:Show(); end end
+	SS.Safe(SS.SquareFrame, square and ok);
+	if ( square and ok ) then SS.Safe(SS.ClockFollowsMap); end
 	-- the map is only redrawn with its new shape when it changes zoom: step the zoom and back to force that
 	if ( ok and Minimap.GetZoom and Minimap.SetZoom and Minimap.GetZoomLevels ) then
 		local zoom, levels = Minimap:GetZoom(), Minimap:GetZoomLevels();
@@ -2972,6 +3023,54 @@ function SS.ApplyMinimapShape()
 		if ( other >= 0 ) then SS.Safe(Minimap.SetZoom, Minimap, other); SS.Safe(Minimap.SetZoom, Minimap, zoom); end
 	end
 	return ok;
+end
+
+-- The square map's gold ring: a gold band like the round map's border, with a dark line on each side of it. The zone's
+-- name sits on a small plate centred on its top edge, as the round map's name sits on its top.
+function SS.SquareFrame(on)
+	if ( not Minimap ) then return; end
+	local ring = SS.squareRing;
+	if ( on and not ring ) then
+		ring = CreateFrame("Frame", "SlimSuiteSquareRing", Minimap);
+		ring:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 2);
+		ring:SetPoint("TOPLEFT", Minimap, "TOPLEFT", -5, 5); ring:SetPoint("BOTTOMRIGHT", Minimap, "BOTTOMRIGHT", 5, -5);
+		local function Band(inset, width, r, g, b)
+			local t = {};
+			for i = 1, 4 do t[i] = ring:CreateTexture(nil, "OVERLAY"); t[i]:SetTexture(r, g, b, 1); end
+			t[1]:SetPoint("TOPLEFT", ring, "TOPLEFT", inset, -inset); t[1]:SetPoint("TOPRIGHT", ring, "TOPRIGHT", -inset, -inset); t[1]:SetHeight(width);
+			t[2]:SetPoint("BOTTOMLEFT", ring, "BOTTOMLEFT", inset, inset); t[2]:SetPoint("BOTTOMRIGHT", ring, "BOTTOMRIGHT", -inset, inset); t[2]:SetHeight(width);
+			t[3]:SetPoint("TOPLEFT", ring, "TOPLEFT", inset, -inset); t[3]:SetPoint("BOTTOMLEFT", ring, "BOTTOMLEFT", inset, inset); t[3]:SetWidth(width);
+			t[4]:SetPoint("TOPRIGHT", ring, "TOPRIGHT", -inset, -inset); t[4]:SetPoint("BOTTOMRIGHT", ring, "BOTTOMRIGHT", -inset, inset); t[4]:SetWidth(width);
+		end
+		Band(0, 1, 0.12, 0.08, 0.02);                  -- outer dark line
+		Band(1, 3, 0.83, 0.66, 0.26);                  -- the gold band
+		Band(2, 1, 1, 0.86, 0.45);                     -- its bright middle
+		Band(4, 1, 0.12, 0.08, 0.02);                  -- inner dark line
+		SS.squareRing = ring;
+	end
+	if ( ring ) then if ( on ) then ring:Show(); else ring:Hide(); end end
+	-- the zone's name: on top of the square's upper edge (back where it was when round)
+	local zone = MinimapZoneTextButton;
+	if ( zone ) then
+		if ( on ) then
+			if ( not zone.slimSquareOrig ) then local p, rel, rp, x, y = zone:GetPoint(1); zone.slimSquareOrig = { p, rel, rp, x or 0, y or 0 }; end
+			zone:ClearAllPoints(); zone:SetPoint("BOTTOM", Minimap, "TOP", 0, 1);
+			if ( MinimapBorderTop ) then MinimapBorderTop:ClearAllPoints(); MinimapBorderTop:SetPoint("CENTER", zone, "CENTER", 0, -1); end
+		elseif ( zone.slimSquareOrig ) then
+			local o = zone.slimSquareOrig; zone.slimSquareOrig = nil;
+			zone:ClearAllPoints(); if ( o[2] ) then zone:SetPoint(o[1], o[2], o[3], o[4], o[5]); end
+			if ( MinimapBorderTop and MinimapCluster ) then MinimapBorderTop:ClearAllPoints(); MinimapBorderTop:SetPoint("TOPRIGHT", MinimapCluster, "TOPRIGHT", 0, 0); end
+		end
+	end
+end
+
+-- The game's own clock is made for the round map in its first place. Once the map is square or has been moved,
+-- Slim Suite's clock takes over (it hangs under the map wherever the map goes) so the two never clash.
+function SS.ClockFollowsMap()
+	local d = SS.DB();
+	if ( d.replaceLocalClock ) then return; end
+	SS.SetLocalClockOn(true);
+	if ( SS.Notice ) then SS.Notice("Slim Suite's clock now replaces the game's, so it stays with the map."); end
 end
 
 -- With the square minimap, the buttons around it follow the square: the zoom buttons stand one above the other at
@@ -3019,6 +3118,12 @@ function SS.ArrangeEdgeButtons(square)
 							if ( not f.slimSquareOrig ) then
 								local p, rel, rp, x, y = f:GetPoint(1);
 								f.slimSquareOrig = { p, rel, rp, x or 0, y or 0 };
+								-- its place around the round ring, kept as an angle: on the square it sits on the ring at that angle
+								local fx, fy = f:GetCenter();
+								if ( fx ) then
+									local fs = f:GetEffectiveScale() or 1;
+									f.slimSquareAngle = (math.atan2 or math.atan)(fy * fs / ms - my, fx * fs / ms - mx);
+								end
 							end
 							if ( name == "MinimapZoomIn" ) then zoomIn = f;
 							elseif ( name == "MinimapZoomOut" ) then zoomOut = f;
@@ -3045,28 +3150,20 @@ function SS.ArrangeEdgeButtons(square)
 			local k = ms / (f:GetEffectiveScale() or 1);
 			return (f:GetWidth() or 32) / k, (f:GetHeight() or 32) / k;
 		end
-		-- + over -, sitting on the map just inside its right edge
-		if ( zoomIn ) then local w, h = Size(zoomIn); Put(zoomIn, half - w / 2 - 2, h / 2 + 1); end
-		if ( zoomOut ) then local w, h = Size(zoomOut); Put(zoomOut, half - w / 2 - 2, -(h / 2 + 1)); end
-		-- the moon first, then the others by name, Slim Suite's gear last; hidden ones (no mail, say) leave no gap
-		table.sort(left, function(a, b)
-			local an, bn = a:GetName() or "", b:GetName() or "";
-			if ( an == "GameTimeFrame" ) then return bn ~= "GameTimeFrame"; end
-			if ( bn == "GameTimeFrame" ) then return false; end
-			return an < bn;
-		end);
-		local d = SS.DB();
-		if ( SS.Mini and not (d.minimap and (d.minimap.hide or d.minimap.detached)) ) then table.insert(left, SS.Mini); end   -- one dragged off the map stays put
-		local y, x, widest = halfH, 0, 0;
+		-- every button sits centred on the gold ring at the angle it had around the round map, as the round map does
+		local function OnRing(f, angle)
+			local x, y = math.cos(angle), math.sin(angle);
+			local most = math.max(math.abs(x), math.abs(y));
+			if ( most > 0 ) then x, y = x / most, y / most; end
+			Put(f, x * (half + 3), y * (halfH + 3));
+		end
+		if ( zoomIn ) then table.insert(left, zoomIn); end
+		if ( zoomOut ) then table.insert(left, zoomOut); end
 		for i = 1, table.getn(left) do
 			local f = left[i];
-			if ( f == SS.Mini or (f.IsShown and f:IsShown()) ) then
-				local w, h = Size(f);
-				if ( y - h < -halfH and y < halfH ) then x = x + widest + 2; y = halfH; widest = 0; end   -- a full column: one more beside it
-				Put(f, -(half - 2 - x - w / 2), y - h / 2);   -- inside the left edge, on the map
-				y = y - h - 2;
-				if ( w > widest ) then widest = w; end
-			end
+			local angle = f.slimSquareAngle;
+			if ( not angle ) then angle = math.rad(150 + i * 20); end
+			OnRing(f, angle);
 		end
 	end
 	if ( SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); end
@@ -5410,12 +5507,38 @@ function SS.SetTargetHidden(on)
 	if ( SS.DB().unlocked ) then SS.Safe(SS.SetUnlocked, true, true); end
 end
 
+-- Connected elements: an element that has been joined to another one is still on; its tag says "Connected" and
+-- hovering the tag names the element it is joined to. Add any new joining here so the setup list shows it.
+function SS.ConnectedTo(frame)
+	local d = SS.DB();
+	if ( frame == "PlayerFrame" and d.partyIncludesSelf ) then return "PartyMemberFrame1", "Party frames"; end
+	if ( frame == "BuffFrame" and d.buffsOnPlayer ) then
+		if ( d.partyIncludesSelf ) then return "PartyMemberFrame1", "Party frames (your plate)"; end
+		return "PlayerFrame", "Player frame";
+	end
+	if ( frame == "TargetFrame" and d.combineTarget ) then return "PlayerFrame", "Player frame"; end
+	return nil;
+end
+local function TagLook(b, text, r, g, bl)
+	b.tag.text:SetText(text);
+	b.tag:SetBackdropColor(r * 0.4, g * 0.4, bl * 0.4, 0.95); b.tag:SetBackdropBorderColor(r, g, bl, 1);
+	b.tag:Show();
+end
 function SU.RefreshBar()
 	for frame, b in pairs(SU.barButtons or {}) do
 		local on = SU.on and SU.on[frame];
+		local parentFrame, parentTitle = SS.ConnectedTo(frame);
+		b.tag.parentTitle = parentTitle;
 		if ( on ) then b:LockHighlight(); else b:UnlockHighlight(); end
-		if ( b.tag ) then if ( on ) then b.tag:Show(); else b.tag:Hide(); end end
-		if ( frame == "BuffFrame" ) then
+		if ( b.tag ) then if ( on ) then TagLook(b, "Enabled", 0.4, 1, 0.4); else b.tag:Hide(); end end
+		if ( parentTitle ) then
+			if ( frame == "BuffFrame" ) then
+				local fs = b.GetFontString and b:GetFontString();
+				if ( fs ) then fs:SetText("Buffs/Debuffs"); elseif ( b.SetText ) then b:SetText("Buffs/Debuffs"); end
+			end
+			b:LockHighlight();
+			TagLook(b, "Connected", 0.45, 0.75, 1);
+		elseif ( frame == "BuffFrame" ) then
 			-- the name stays put; the tag under it says whether the buffs are on, or off because they sit on the player frame
 			local fs = b.GetFontString and b:GetFontString();
 			if ( fs ) then fs:SetText("Buffs/Debuffs"); elseif ( b.SetText ) then b:SetText("Buffs/Debuffs"); end
@@ -5817,12 +5940,22 @@ function SU.Begin()
 			b.tag:SetBackdropBorderColor(0.4, 1, 0.4, 1);
 			b.tag.text = b.tag:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 			b.tag.text:SetPoint("CENTER", b.tag, "CENTER", 0, 0); b.tag.text:SetText("Enabled");
+			b.tag:EnableMouse(true);
+			b.tag:SetScript("OnEnter", function()
+				if ( not this.parentTitle or not GameTooltip ) then return; end
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:AddLine("Connected", 0.45, 0.75, 1);
+				GameTooltip:AddLine("Joined to: " .. this.parentTitle, 1, 1, 1);
+				GameTooltip:AddLine("It is still on. It moves and shows with that element.", 0.8, 0.8, 0.8, 1);
+				GameTooltip:Show();
+			end);
+			b.tag:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
 			b.tag:Hide();
 		end
 		local w = math.max(70, string.len(e.title) * 7 + 20);
 		b:SetWidth(w); b:SetHeight(22);
 		-- the Enabled / Disabled tag sits to the right of its button
-		b.tag:SetWidth(64); b.tag:ClearAllPoints(); b.tag:SetPoint("LEFT", b, "RIGHT", 4, 0);
+		b.tag:SetWidth(72); b.tag:ClearAllPoints(); b.tag:SetPoint("LEFT", b, "RIGHT", 4, 0);
 		if ( idx > 0 and 8 + (idx + 1) * LINE > maxH ) then col = col + 1; idx = 0; end
 		b:ClearAllPoints(); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 8 + col * COLUMN, -8 - idx * LINE); b:Show();
 		if ( idx > maxIdx ) then maxIdx = idx; end
@@ -6887,7 +7020,7 @@ if ( SS.Mini and SS.Mini.Place ) then
 	local mini, ringPlace = SS.Mini, SS.Mini.Place;
 	local function Docked()
 		local m = SS.DB().minimap;
-		return SS.DB().minimapBar or (SS.SquareColumn() and not (type(m) == "table" and m.detached));
+		return SS.DB().minimapBar;
 	end
 	mini.Place = function()
 		if ( Docked() ) then
@@ -6903,7 +7036,7 @@ if ( SS.Mini and SS.Mini.Place ) then
 			local most = math.max(math.abs(x), math.abs(y));
 			if ( most > 0 ) then x, y = x / most, y / most; end
 			mini:ClearAllPoints();
-			mini:SetPoint("CENTER", Minimap, "CENTER", 78 * x, 78 * y);
+			mini:SetPoint("CENTER", Minimap, "CENTER", ((Minimap:GetWidth() or 140) / 2 + 3) * x, ((Minimap:GetHeight() or 140) / 2 + 3) * y);
 		end
 	end
 	-- dragging it does nothing while the row or the column holds it (they are moved by their own handle)
@@ -6937,12 +7070,7 @@ local function DemoTick(dt)
 		SS.BOSS_SAMPLE[i][2] = 25 + math.floor(70 * (1 + math.sin(demoT * (0.35 + i * 0.12) + i)) / 2);
 	end
 	SS.Safe(SS.UpdateBossFrames);
-	-- the party: a column, then a row, so both show (the demo's own; your choice is untouched)
-	local want = math.mod(math.floor(demoT / 4), 2) == 0 and "vertical" or "horizontal";
-	if ( SS.demoPartyOrient ~= want ) then
-		SS.demoPartyOrient = want;
-		SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
-	end
+	-- the party keeps the column or row you chose
 	SS.Safe(SU.PreviewTarget);
 	SS.Safe(SU.PreviewParty);
 	-- damage meter: the sample numbers climb
@@ -6978,18 +7106,19 @@ end
 
 -- sample meter rows: the party's names and WoW spells, with damage that grows over time
 local DEMO_METER = {
-	{ "Slimjim", "Fireball", "Spell_Fire_Fireball02", 9200, 2 },
-	{ "Brann", "Smite", "Spell_Holy_Smite", 6100, 1 },
-	{ "Lyra", "Frostbolt", "Spell_Frost_FrostBolt02", 5400, 1.4 },
-	{ "Tomkin", "Shadow Bolt", "Spell_Shadow_ShadowBolt", 3900, 1.7 },
+	{ "Slimjim", "Shadow Bolt", "Spell_Shadow_ShadowBolt", 3900, 1.7, nil, "shadow" },
+	{ "Voidwalker", "Melee", "Ability_MeleeDamage", 2600, 1, "pet" },
+	{ "Voidwalker", "Torment", "Spell_Shadow_GatherShadows", 1200, 0.5, "pet" },
+	{ "Slimjim", "Firebolt", "Spell_Fire_FireBolt", 1500, 0.8, nil, "fire", true },
+	{ "Imp", "Firebolt", "Spell_Fire_FireBolt", 1400, 0.9, "pet" },
 };
 function SS.DemoMeterSnapshot(t)
 	local snap = { actors = {}, sources = {}, rows = {}, totals = { displayRate = { status = "ready", value = math.floor(1400 + 120 * math.sin(t)) } } };
 	for i = 1, table.getn(DEMO_METER) do
 		local d = DEMO_METER[i];
 		local amount = math.floor(d[4] + t * 210 * d[5]);
-		snap.actors["a" .. i] = { name = d[1] };
-		snap.sources["s" .. i] = { name = d[2], icon = { status = "ready", path = "Interface\\Icons\\" .. d[3] } };
+		snap.actors["a" .. i] = { name = d[1], kind = d[6] or "hero" };
+		snap.sources["s" .. i] = { name = d[2], school = d[7], proc = d[8], icon = { status = "ready", path = "Interface\\Icons\\" .. d[3] } };
 		snap.rows[i] = { rowId = "r" .. i, sourceKey = "s" .. i, ownerId = "a" .. i, displayAmount = amount,
 			displayRate = { status = "ready", value = math.floor(d[5] * 210) } };
 	end
@@ -7024,6 +7153,7 @@ function SS.StartDemoMode()
 	SS.Safe(SU.UpdateDemo);
 	DemoRedraw();
 	SS.Every("demoMode", 0.25, function() SS.Safe(DemoTick, 0.25); end);
+	SS.Safe(SS.ShowDemoBox, true);
 end
 
 function SS.StopDemoMode()
@@ -7041,6 +7171,48 @@ function SS.StopDemoMode()
 	SS.Safe(SS.EndPreviewsIfDone);                           -- the sample party and target go
 	SS.Safe(SS.ApplyNewFrames);
 	DemoRedraw();
+	SS.Safe(SS.ShowDemoBox, false);
+end
+
+-- While Demo Mode runs, Slim Suite's menus are put away so the samples can be seen, and a small "DEMO MODE" box
+-- stands in for them: "On" is lit while it runs, "Off" stops it and brings back the menus that were open.
+SS.DEMO_HIDES = { "SlimSuiteFrame", "SlimSuiteLayoutFrame", "SlimSuiteSetupPanel", "SlimSuiteSetupBar", "SlimSuiteSetupGlow",
+	"SlimSuiteMovePanel", "SlimSuiteChoiceMenu", "SlimSuiteRaidIconPanel" };
+local demoHidden = {};
+local function DemoBox()
+	local box = getglobal("SlimSuiteDemoBox");
+	if ( box ) then return box; end
+	box = CreateFrame("Frame", "SlimSuiteDemoBox", UIParent);
+	box:SetWidth(132); box:SetHeight(52); box:SetFrameStrata("DIALOG");
+	box:SetPoint("TOP", UIParent, "TOP", 0, -90);
+	box:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+	box:SetBackdropColor(0.05, 0.04, 0.02, 0.92); box:SetBackdropBorderColor(0.83, 0.66, 0.26, 1);
+	box:EnableMouse(true); box:SetMovable(true); box:RegisterForDrag("LeftButton");
+	box:SetScript("OnDragStart", function() this:StartMoving(); end);
+	box:SetScript("OnDragStop", function() this:StopMovingOrSizing(); end);
+	box.title = box:CreateFontString(nil, "OVERLAY", "GameFontNormal");
+	box.title:SetPoint("TOP", box, "TOP", 0, -7); box.title:SetText("DEMO MODE");
+	box.on = K.Button(box, "On", 54, function() SS.StartDemoMode(); end);
+	box.on:SetHeight(18); box.on:SetPoint("BOTTOMLEFT", box, "BOTTOMLEFT", 8, 7);
+	box.off = K.Button(box, "Off", 54, function() SS.StopDemoMode(); end);
+	box.off:SetHeight(18); box.off:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -8, 7);
+	return box;
+end
+function SS.ShowDemoBox(on)
+	if ( on ) then
+		demoHidden = {};
+		for _, name in ipairs(SS.DEMO_HIDES) do
+			local f = getglobal(name);
+			if ( f and f:IsShown() ) then demoHidden[name] = true; f:Hide(); end
+		end
+		local box = DemoBox(); box:Show(); box.on:LockHighlight(); box.off:UnlockHighlight();
+	else
+		local box = getglobal("SlimSuiteDemoBox");
+		if ( box ) then box:Hide(); end
+		for name in pairs(demoHidden) do local f = getglobal(name); if ( f ) then f:Show(); end end
+		demoHidden = {};
+	end
 end
 
 function SS.ToggleDemoMode()

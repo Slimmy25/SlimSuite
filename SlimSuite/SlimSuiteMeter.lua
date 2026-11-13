@@ -138,6 +138,15 @@ local function Tooltip(button)
 	local row,source=button.entry,button.source;
 	GameTooltip:SetOwner(button,'ANCHOR_RIGHT');GameTooltip:AddLine(button.label or 'Ability',1,0.82,0);
 	if M.view=='group' and not M.owner then GameTooltip:AddLine('Click for this player\'s abilities',1,1,1);GameTooltip:Show();return;end
+	if row.pet then
+		local snap=M.snapshot or {};
+		for _,part in ipairs(row.parts or {}) do
+			local src=snap.sources and snap.sources[part.sourceKey];
+			GameTooltip:AddDoubleLine((src and src.name) or 'Unknown',Text(part.displayAmount),1,1,1,1,0.82,0);
+		end
+		GameTooltip:AddLine(string.format('Share of total: %.1f%%',Num(row.share)*100),1,0.82,0);
+		GameTooltip:Show();return;
+	end
 	local sample=Samples(source,row.ownerId);
 	local healing=M.view=='healing';local noun=healing and 'Heal' or 'Hit';
 	GameTooltip:AddLine(M.view=='boss' and 'Observed hits: all targets' or healing and 'Observed combat-log samples this run' or 'Observed samples this run (kept through /reload)',0.7,0.7,0.7);
@@ -164,13 +173,13 @@ end
 -- ("dps · now 0"), a Reset button and an "x", and a grip in the bottom-right corner to resize it.
 local VIEWS = { { 'damage', 'Damage Done' }, { 'healing', 'Healing Done' }, { 'boss', 'Boss Damage' }, { 'group', 'Party DPS' } };
 local GOLD, MUTED, CREAM, BORDER = { 0.97, 0.82, 0.41 }, { 0.56, 0.5, 0.38 }, { 0.85, 0.81, 0.7 }, { 0.43, 0.33, 0.145 };
-local HEADER, ROW_H = 20, 16;
+local HEADER, ROW_H = 20, 21;
 local FONT = STANDARD_TEXT_FONT or 'Fonts\\FRIZQT__.TTF';
 local function ViewName(view) for _, v in ipairs(VIEWS) do if v[1] == view then return v[2]; end end return 'Damage Done'; end
 local function Short(v)
 	v = Num(v);
 	if v >= 1000000 then return string.format('%.1fm', v / 1000000); end
-	if v >= 10000 then return string.format('%.1fk', v / 1000); end
+	if v >= 1000 then return string.format('%.1fk', v / 1000); end
 	return Text(v);
 end
 local function Tex(parent, layer, r, g, b, a)
@@ -290,12 +299,17 @@ function M.Attach(frame)
 	for i = 1, 64 do
 		local row = CreateFrame('Button', nil, frame);
 		row:SetPoint('TOPLEFT', frame, 'TOPLEFT', 5, -(HEADER + 5) - (i - 1) * ROW_H); row:SetHeight(ROW_H - 1);
-		row.bar = Tex(row, 'BACKGROUND', GOLD[1], GOLD[2], GOLD[3], 0.13); row.bar:SetPoint('TOPLEFT', row, 'TOPLEFT', 0, 0); row.bar:SetPoint('BOTTOMLEFT', row, 'BOTTOMLEFT', 0, 0);
+		row.bar = Tex(row, 'BACKGROUND', GOLD[1], GOLD[2], GOLD[3], 0.5); row.bar:SetPoint('TOPLEFT', row, 'TOPLEFT', 0, 0); row.bar:SetPoint('BOTTOMLEFT', row, 'BOTTOMLEFT', 0, 0);
 		local hi = Tex(row, 'HIGHLIGHT', 1, 0.85, 0.5, 0.08); hi:SetAllPoints(row);
-		row.icon = row:CreateTexture(nil, 'ARTWORK'); row.icon:SetPoint('LEFT', row, 'LEFT', 2, 0); row.icon:SetWidth(13); row.icon:SetHeight(13);
+		row.icon = row:CreateTexture(nil, 'ARTWORK'); row.icon:SetPoint('LEFT', row, 'LEFT', 1, 0); row.icon:SetWidth(18); row.icon:SetHeight(18);
 		row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
-		row.name = Label(row, 11, CREAM); row.name:SetPoint('LEFT', row, 'LEFT', 20, 0);
-		row.value = Label(row, 11, GOLD, 'RIGHT'); row.value:SetPoint('RIGHT', row, 'RIGHT', -3, 0);
+		row.name = Label(row, 12, CREAM); row.name:SetPoint('LEFT', row, 'LEFT', 23, 0);
+		row.proc = CreateFrame('Frame', nil, row); row.proc:SetHeight(12); row.proc:SetWidth(28);
+		row.proc.fill = Tex(row.proc, 'BACKGROUND', 0.1, 0.2, 0.35, 0.9); row.proc.fill:SetAllPoints(row.proc);
+		Border(row.proc, { 0.3, 0.5, 0.75 });
+		row.proc.text = Label(row.proc, 9, { 0.6, 0.8, 1 }, 'CENTER'); row.proc.text:SetPoint('CENTER', row.proc, 'CENTER', 0, 0); row.proc.text:SetText('proc');
+		row.proc:SetPoint('LEFT', row.name, 'RIGHT', 4, 0); row.proc:Hide();
+		row.value = Label(row, 12, CREAM, 'RIGHT'); row.value:SetPoint('RIGHT', row, 'RIGHT', -3, 0);
 		row:SetScript('OnEnter', function() Tooltip(this); end); row:SetScript('OnLeave', function() if GameTooltip then GameTooltip:Hide(); end end);
 		row:SetScript('OnClick', function() if M.view == 'group' and not M.owner and this.entry then M.owner = this.entry.ownerId; M.offset = 0; M.nextRead = 0; if GameTooltip then GameTooltip:Hide(); end end end);
 		row:EnableMouseWheel(true); row:SetScript('OnMouseWheel', frame:GetScript('OnMouseWheel')); frame.rows[i] = row;
@@ -365,6 +379,51 @@ local function NowRate(snapshot)
 	return snapshot and snapshot.totals and snapshot.totals.displayRate;
 end
 
+-- Pets and summons: the game lists each of their abilities as its own line ("Melee", "Shadow Bolt" ...). Slim Suite
+-- shows them like the game's own meter does: one line per pet, named after it, with its abilities added together.
+-- Your own abilities stay one line each. Only lines owned by an actor that is not a hero are put together.
+local SCHOOL = { physical = { 0.78, 0.62, 0.36 }, holy = { 1, 0.9, 0.5 }, fire = { 0.95, 0.42, 0.12 }, nature = { 0.35, 0.8, 0.3 },
+	frost = { 0.45, 0.75, 1 }, shadow = { 0.6, 0.35, 0.85 }, arcane = { 0.85, 0.55, 1 } };
+local PET_COLORS = { { 0.8, 0.18, 0.15 }, { 0.3, 0.45, 0.85 }, { 0.3, 0.7, 0.35 }, { 0.85, 0.6, 0.2 }, { 0.7, 0.35, 0.8 }, { 0.2, 0.7, 0.75 } };
+local function PetColor(name)
+	local h = 0; name = tostring(name or '');
+	for i = 1, string.len(name) do h = math.mod(h * 31 + string.byte(name, i), 997); end
+	return PET_COLORS[math.mod(h, table.getn(PET_COLORS)) + 1];
+end
+local function IsPet(actor, snapshot)
+	if type(actor) ~= 'table' then return false; end
+	local kind = string.lower(tostring(actor.kind or ''));
+	if kind == '' or kind == 'hero' or kind == 'player' then return false; end
+	return actor.name ~= nil;
+end
+local function IsProc(source)
+	if type(source) ~= 'table' then return false; end
+	return source.proc == true or source.isProc == true or string.lower(tostring(source.kind or source.sourceKind or '')) == 'proc';
+end
+local function GroupPets(snapshot, rows)
+	if not snapshot or M.view == 'group' and not M.owner then return rows; end
+	local out, pets = {}, {};
+	for _, row in ipairs(rows) do
+		local actor = snapshot.actors and snapshot.actors[row.ownerId];
+		if IsPet(actor, snapshot) then
+			local g = pets[actor.name];
+			if not g then
+				local src = snapshot.sources and snapshot.sources[row.sourceKey];
+				g = { rowId = 'pet:' .. actor.name, pet = actor.name, ownerId = row.ownerId, displayAmount = 0, share = 0, parts = {},
+					icon = (type(actor.icon) == 'table' and actor.icon) or (type(actor.icon) == 'string' and { status = 'ready', path = actor.icon }) or (src and src.icon),
+					displayRate = { status = 'ready', value = 0 } };
+				pets[actor.name] = g; table.insert(out, g);
+			end
+			g.displayAmount = g.displayAmount + Num(row.displayAmount); g.share = g.share + Num(row.share);
+			if row.displayRate and row.displayRate.status == 'ready' then g.displayRate.value = g.displayRate.value + Num(row.displayRate.value); end
+			table.insert(g.parts, row);
+		else
+			table.insert(out, row);
+		end
+	end
+	return out;
+end
+
 local function ByAmount(a, b)
 	local av, bv = Num(a.displayAmount), Num(b.displayAmount);
 	if av ~= bv then return av > bv; end
@@ -390,7 +449,7 @@ function M.Draw(active, editing)
 	local rows = M.sortedRows;
 	if not rows or M.sortedFor ~= snapshot or (SS.demoRunning and M.demoSnapshot) then
 		rows = {};
-		if snapshot then for _, row in ipairs(snapshot.rows or {}) do table.insert(rows, row); end end
+		if snapshot then for _, row in ipairs(snapshot.rows or {}) do table.insert(rows, row); end rows = GroupPets(snapshot, rows); end
 		table.sort(rows, ByAmount);
 		M.sortedRows, M.sortedFor = rows, snapshot;
 	end
@@ -421,19 +480,31 @@ function M.Draw(active, editing)
 		local row = i <= M.visible and rows[M.offset + i] or nil;
 		if row then
 			local source = snapshot.sources and snapshot.sources[row.sourceKey]; local actor = snapshot.actors and snapshot.actors[row.ownerId];
-			button.entry = row; button.source = source; button.label = source and source.name or actor and actor.name or 'Unknown source';
+			if row.pet then source = nil; end
+			button.entry = row; button.source = source; button.label = row.pet or source and source.name or actor and actor.name or 'Unknown source';
 			local rowWidth = math.max(20, width - 10); button:SetWidth(rowWidth);
 			local share = top > 0 and Num(row.displayAmount) / top or 0;
 			button.bar:SetWidth(math.max(1, rowWidth * math.max(0, math.min(1, share))));
 			local r = row.displayRate and row.displayRate.status == 'ready' and Short(row.displayRate.value) or nil;
-			local value = Short(row.displayAmount) .. (r and ('  (' .. r .. ')') or '');
+			local pct = Num(row.share) > 0 and (math.floor(Num(row.share) * 100 + 0.5) .. '%') or nil;
+			local inner = (r and pct) and (r .. ', ' .. pct) or r or pct;
+			local value = Short(row.displayAmount) .. (inner and (' (' .. inner .. ')') or '');
 			local valueWidth = math.max(60, math.floor(rowWidth * 0.45));
 			FitString(button.value, value, valueWidth, 8);
-			FitString(button.name, button.label, math.max(24, rowWidth - 20 - valueWidth - 4), 8);
+			local proc = not row.pet and IsProc(source);
+			if proc then button.proc:Show(); else button.proc:Hide(); end
+			FitString(button.name, (M.offset + i) .. '. ' .. button.label, math.max(24, rowWidth - 24 - valueWidth - 4 - (proc and 32 or 0)), 8);
 			local color = M.view == 'group' and not M.owner and SS.ClassColor and SS.ClassColor(ClassOf(actor));   -- Slim Suite's one class colour table
-			if color then button.name:SetTextColor(color[1], color[2], color[3]);
+			if not color then
+				if row.pet then color = PetColor(row.pet);
+				elseif source and source.school then color = SCHOOL[string.lower(tostring(source.school))]; end
+			end
+			local bar = color or GOLD;
+			button.bar:SetVertexColor(bar[1], bar[2], bar[3], (M.offset + i) == 1 and 0.6 or 0.35);
+			if color then button.name:SetTextColor(math.min(1, color[1] + 0.25), math.min(1, color[2] + 0.25), math.min(1, color[3] + 0.25));
 			else button.name:SetTextColor(CREAM[1], CREAM[2], CREAM[3]); end
-			if source and source.icon and source.icon.status == 'ready' then button.icon:SetTexture(source.icon.path); button.icon:Show(); button.name:SetPoint('LEFT', button, 'LEFT', 18, 0);
+			local icon = row.pet and row.icon or (source and source.icon);
+			if icon and icon.status == 'ready' then button.icon:SetTexture(icon.path); button.icon:Show(); button.name:SetPoint('LEFT', button, 'LEFT', 23, 0);
 			else button.icon:Hide(); button.name:SetPoint('LEFT', button, 'LEFT', 4, 0); end
 			button:Show();
 		else button.entry = nil; button:Hide(); end

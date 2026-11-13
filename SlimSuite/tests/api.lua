@@ -70,3 +70,46 @@ check("restoring it", shown.localClock ~= false)
 AZS_UNITS = nil; AZS_RUN = nil
 print("api problems: " .. bad)
 for _, e in pairs(ERRORS) do print("  " .. e) end
+-- the meter puts each pet's abilities on one line named after the pet
+SS.StartDemoMode(); Tick(3)
+SlimSuiteMeter.view = 'damage'; SlimSuiteMeter.Draw(true, false)
+local names, void = {}, nil
+for _, r in ipairs(SlimSuiteMeter.rows or {}) do if r.pet then names[r.pet] = (names[r.pet] or 0) + 1; if r.pet == "Voidwalker" then void = r end end end
+check("one Voidwalker line", names.Voidwalker == 1 and void and table.getn(void.parts) == 2)
+check("Imp has its own line", names.Imp == 1)
+SS.StopDemoMode(); Tick(2)
+print("meter problems: " .. bad)
+-- in the setup, your player frame joined to the party says Connected and names the party
+local function upv(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return nil end if n == want then return v end i = i + 1 end end
+local SU = upv(SS.SetupHide, "SU")
+SS.StartSetup(true); Tick(3)
+SS.SetPartySelf(true); Tick(2); SU.RefreshBar()
+local b = SU.barButtons and SU.barButtons.PlayerFrame
+check("player frame tag says Connected", b and b.tag.text:GetText() == "Connected" and b.tag.parentTitle == "Party frames")
+SS.SetPartySelf(false); SS.SetupEnd(true); Tick(2)
+print("connected problems: " .. bad)
+-- you in the party: buffs start at your plate's top-left and grow to the right, wrapping into rows
+for i = 0, 9 do local b = getglobal("BuffButton" .. i) or CreateFrame("Button", "BuffButton" .. i, BuffFrame); b:SetWidth(30); b:SetHeight(30); b:Show() end
+SS.SetPartySelf(true); SS.SetBuffsPlace("player_above"); Tick(3); SS.LayoutPartyBuffs()
+local b0, b1 = BuffButton0.points and BuffButton0.points[1], BuffButton1.points and BuffButton1.points[1]
+check("first buff at the left", b0 and b0[1] == "BOTTOMLEFT" and b0[4] == 0 and b0[5] == 0)
+check("second buff to its right", b1 and b1[4] > 0 and b1[5] == 0)
+local maxRow = 0
+for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; if p[5] > maxRow then maxRow = p[5] end end
+check("more buffs wrap into rows going up", maxRow > 0)
+SS.SetPartySelf(false); Tick(2)
+print("partybuffs problems: " .. bad)
+-- Demo Mode: menus go away for a small On/Off box and come back after; the party keeps your layout
+local win = getglobal("SlimSuiteFrame") or CreateFrame("Frame", "SlimSuiteFrame", UIParent)
+win:Show()
+SS.StartDemoMode(); Tick(2)
+check("menus close in Demo Mode", not win:IsShown())
+check("the DEMO MODE box shows", SlimSuiteDemoBox and SlimSuiteDemoBox:IsShown())
+check("party layout is yours", SS.demoPartyOrient == nil)
+Tick(40)
+check("party layout still yours later", SS.demoPartyOrient == nil)
+Click(SlimSuiteDemoBox.off); Tick(2)
+check("Off stops it", not SS.demoRunning and not SlimSuiteDemoBox:IsShown())
+check("the menus come back", win:IsShown())
+win:Hide()
+print("demo problems: " .. bad)
