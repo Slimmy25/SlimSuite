@@ -73,7 +73,7 @@ function SS.ShowWarnTip(owner, text)
 		tip = CreateFrame("Frame", "SlimSuiteWarnTip", UIParent);
 		tip:SetFrameStrata("TOOLTIP");
 		tip:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		                  tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+			tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 		tip:SetBackdropColor(0.1, 0.05, 0, 0.95); tip:SetBackdropBorderColor(1, 0.6, 0.2, 1);
 		tip.text = tip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		tip.text:SetPoint("TOPLEFT", tip, "TOPLEFT", 8, -7); tip.text:SetWidth(200); tip.text:SetJustifyH("LEFT");
@@ -227,18 +227,18 @@ end
 local HookChat;
 do
 local STAT_WORDS = { "maximum health and", "maximale gesundheit und", "de salud máxima y", "de vida máxima e",
-                     "points de vie maximum et", "maksymalnego zdrowia i", "maximálního zdraví a", "до макс. здоров'я і",
-                     "к макс. здоровью и", "、最大体力+", "最大生命值和每秒", ", 최대 생명력 ", " azami can ve saniyede ",
-                     " viață maximă și " };
+	"points de vie maximum et", "maksymalnego zdrowia i", "maximálního zdraví a", "до макс. здоров'я і",
+	"к макс. здоровью и", "、最大体力+", "最大生命值和每秒", ", 최대 생명력 ", " azami can ve saniyede ",
+	" viață maximă și " };
 -- the game's "New spell" in its languages
 local NEW_SPELL_WORDS = { "new spell", "neuer zauber", "hechizo nuevo", "novo feitiço", "nouveau sort", "nowe zaklęcie",
-                          "nové kouzlo", "vrajă nouă", "yeni büyü", "нове закляття", "новое заклинание", "新しい呪文",
-                          "新法术", "새 주문" };
+	"nové kouzlo", "vrajă nouă", "yeni büyü", "нове закляття", "новое заклинание", "新しい呪文",
+	"新法术", "새 주문" };
 
 -- the "you have learned a new spell" lines: the game's own texts in its language, the part
 -- before the spell's name, and the English ways of saying it
 local LEARN_WORDS = { "you have learned a new spell", "you have learned a new ability", "you have learned", "you learned",
-                      "you learn " };
+	"you learn " };
 
 function SS.Prefix(text)
 	if ( type(text) ~= "string" ) then return nil; end
@@ -335,8 +335,8 @@ CHAT_FILTER.IsRoleplay = function(msg, sourceEvent)
 	if ( string.find(text, "the burning legion", 1, true) and string.find(text, "survive the onslaught", 1, true) ) then return true; end
 	-- These events are game-authored dialogue or narration, not player messages.
 	return sourceEvent == "CHAT_MSG_MONSTER_SAY" or sourceEvent == "CHAT_MSG_MONSTER_YELL" or
-	       sourceEvent == "CHAT_MSG_MONSTER_EMOTE" or sourceEvent == "CHAT_MSG_RAID_BOSS_EMOTE" or
-	       sourceEvent == "CHAT_MSG_RAID_BOSS_WHISPER";
+		sourceEvent == "CHAT_MSG_MONSTER_EMOTE" or sourceEvent == "CHAT_MSG_RAID_BOSS_EMOTE" or
+		sourceEvent == "CHAT_MSG_RAID_BOSS_WHISPER";
 end;
 
 function SS.Hidden(msg, sourceEvent)
@@ -360,8 +360,8 @@ function SS.Hidden(msg, sourceEvent)
 	if ( d.hideLevel ) then
 		-- Hide only the stat-bonus line. Level notices and spell-learning lines have separate controls.
 		if ( SS.Any(low, STAT_WORDS) or
-		     (string.find(low, "you have gained", 1, true) and string.find(low, "% damage", 1, true) and
-		      string.find(low, "health", 1, true)) ) then return true; end
+			(string.find(low, "you have gained", 1, true) and string.find(low, "% damage", 1, true) and
+			string.find(low, "health", 1, true)) ) then return true; end
 	end
 	if ( d.hideNewSpells and (SS.Any(low, NEW_SPELL_WORDS) or SS.LearnLine(low)) ) then return true; end
 	for i = 1, table.getn(d.words) do
@@ -457,20 +457,20 @@ deathSoundFrame:SetScript("OnEvent", function() SS.PlayDeathSound(); end);
 -- Unlocked, each of these frames gets a handle over it (its name on a green panel): drag the handle and the frame
 -- follows. The current lock state and every moved position are retained in SavedVariables across /reload.
 local MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "PartyMemberFrame1", "Party" }, { "SlimSuitePartyLines", "Party" },
-                  { "MinimapCluster", "Minimap" }, { "BuffFrame", "Buffs" },
-                  { "MainMenuBar", "Action bars" }, { "MainMenuExpBar", "XP bar" }, { "ChatFrame1", "Chat" },
-                  { "SlimSuiteMeterFrame", "Damage meter" },
-                  { "SlimSuiteStoredLevelsButton", "Level Up" },
-                  { "SlimSuiteClockFrame", "Run clock / Next boss" },
-                  { "SlimSuiteBossFrames", "Encounter bars" },
-                  { "SlimSuiteAnnouncementFrame", "Event announcements" },
-                  { "SlimSuiteSpellRowFrame", "Build spell row" },
-                  { "SlimSuiteItemRowFrame", "Worn rings / trinkets" },
-                  { "SlimSuiteTallyFrame", "Kills / Gold / Cache" }, { "GameTooltip", "Tooltip" },
-                  { "SlimSuiteReviveFrame", "Revive bar" },
-                  { "SlimSuiteLocalClockFrame", "Local clock" },
-                  { "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
-                  { "SlimSuiteMinimapBar", "Minimap buttons" }, { "SlimSuiteCombatTextFrame", "Combat text" } };
+	{ "MinimapCluster", "Minimap" }, { "BuffFrame", "Buffs" },
+	{ "MainMenuBar", "Action bars" }, { "MainMenuExpBar", "XP bar" }, { "ChatFrame1", "Chat" },
+	{ "SlimSuiteMeterFrame", "Damage meter" },
+	{ "SlimSuiteStoredLevelsButton", "Level Up" },
+	{ "SlimSuiteClockFrame", "Run clock / Next boss" },
+	{ "SlimSuiteBossFrames", "Encounter bars" },
+	{ "SlimSuiteAnnouncementFrame", "Event announcements" },
+	{ "SlimSuiteSpellRowFrame", "Build spell row" },
+	{ "SlimSuiteItemRowFrame", "Worn rings / trinkets" },
+	{ "SlimSuiteTallyFrame", "Kills / Gold / Cache" }, { "GameTooltip", "Tooltip" },
+	{ "SlimSuiteReviveFrame", "Revive bar" },
+	{ "SlimSuiteLocalClockFrame", "Local clock" },
+	{ "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
+	{ "SlimSuiteMinimapBar", "Minimap buttons" }, { "SlimSuiteCombatTextFrame", "Combat text" } };
 local handles = {};
 local handleList = {};
 local editOnly;
@@ -607,6 +607,13 @@ end
 
 -- Default replacement rows mirror the native build cluster: six spells in the upper row,
 -- worn jewelry directly below. The spell row uses the screenshot-based lower-left-center anchor.
+-- an item's own name, from its link ("|cff...|Hitem:...|h[Name]|h|r"): always right, even when two items share an icon
+function SS.ItemLinkName(link)
+	if ( type(link) ~= "string" ) then return nil; end
+	local _, _, name = string.find(link, "%[(.-)%]");
+	return name;
+end
+
 function SS.BuildRowDefaultPlace(name)
 	local x, y = UIParent:GetWidth() * 0.275, UIParent:GetHeight() * 0.35;
 	if ( name == "SlimSuiteItemRowFrame" ) then
@@ -643,7 +650,7 @@ function SS.RefreshItemRow()
 				d.itemRowEquipped[slot] = previous;
 			end
 			equipped[slot] = { texture = texture, link = link, order = previous.order,
-			                   knownName = SlimSuiteItemCatalog and SlimSuiteItemCatalog[SS.ItemTextureKey(texture)] or nil };
+				knownName = SS.ItemLinkName(link) or (SlimSuiteItemCatalog and SlimSuiteItemCatalog[SS.ItemTextureKey(texture)]) or nil };
 			table.insert(visible, { slot = slot, item = equipped[slot] });
 		else
 			d.itemRowEquipped[slot] = nil;
@@ -1001,7 +1008,7 @@ function SS.DrawTally(parts)
 end
 
 function SS.UpdateTally()
- if not SS.DB().replaceTally then if tallyFrame then tallyFrame:Hide();end;SS.HideNative("tally", false);return;end
+	if not SS.DB().replaceTally then if tallyFrame then tallyFrame:Hide();end;SS.HideNative("tally", false);return;end
 	if ( not tallyFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local active = phase and phase ~= "ready";
@@ -1176,7 +1183,7 @@ function SS.CreateLevelButton()
 	levelButton:SetHeight(58);
 	levelButton:SetFrameStrata("MEDIUM");
 	levelButton:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	                         tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	levelButton:SetBackdropColor(0.13, 0.055, 0.025, 0.98);
 	levelButton:SetBackdropBorderColor(0.82, 0.61, 0.24, 1);
 	levelButton:EnableMouse(true);
@@ -1495,10 +1502,17 @@ function SS.UpdateEncounterRows(list)
 	bossFrame:SetWidth(frameWidth);
 	bossFrame:SetHeight(frameHeight);
 	local rowHeight = vertical and math.max(58, frameHeight - (padding * 2)) or math.max(42, (frameHeight - (padding * 2)) / count);
+	-- the rows are laid out again only when what decides their places changes (the bosses, their kinds, the size or
+	-- layout); otherwise only health and debuffs are drawn
+	local sig = (vertical and "v" or "h") .. padding .. "|" .. cardWidth .. "|" .. rowHeight;
+	for i = 1, count do sig = sig .. "|" .. tostring(list[i].name) .. tostring(list[i].kind); end
+	local relayout = bossFrame.sig ~= sig;
+	bossFrame.sig = sig;
 	for i = 1, table.getn(list) do
 		local unit = list[i];
 		local row = SS.EncounterRow(i);
 		row.unit = unit;
+		if ( relayout ) then
 		row:SetWidth(cardWidth);
 		row:SetHeight(rowHeight);
 		row.name:ClearAllPoints();
@@ -1528,6 +1542,7 @@ function SS.UpdateEncounterRows(list)
 			row.bar:SetWidth(unit.kind == "guardian" and math.max(20, width * 0.78) or width);
 			row.bar:SetHeight(12);
 			row.bar:SetPoint("TOPLEFT", row, "TOPLEFT", 4 + padding, -(24 + padding));
+		end
 		end
 		-- Keep the StatusBar range small and stable. Raw boss HP can be very large, and using it as
 		-- the range can hide small health changes at the UI's numeric precision; show the live fraction.
@@ -1564,7 +1579,7 @@ function SS.ZoneText()
 end
 
 function SS.UpdateClock()
- if not SS.DB().replaceClock then if clockFrame then clockFrame:Hide();end;SS.HideNative("clock", false);return;end
+	if not SS.DB().replaceClock then if clockFrame then clockFrame:Hide();end;SS.HideNative("clock", false);return;end
 	if ( not clockFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local live = phase == "ready" or phase == "playing" or phase == "choosing" or phase == "paused";
@@ -1618,7 +1633,7 @@ function SS.UpdateClock()
 end
 
 function SS.UpdateBossFrames()
- if not SS.DB().replaceEncounters then if bossFrame then bossFrame:Hide();end;SS.HideNative("bosses", false);return;end
+	if not SS.DB().replaceEncounters then if bossFrame then bossFrame:Hide();end;SS.HideNative("bosses", false);return;end
 	if ( not bossFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local live = phase == "playing" or phase == "choosing" or phase == "paused";
@@ -1638,10 +1653,13 @@ function SS.UpdateBossFrames()
 		end
 	elseif ( SS.Previewing("SlimSuiteBossFrames") ) then
 		-- while it is placed, or in Demo Mode, it shows the sample bosses, so the frame is there to see and move
-		local sample = {};
+		SS.bossSample = SS.bossSample or {};                   -- made once, its health refreshed each time
+		local sample = SS.bossSample;
 		for i = 1, table.getn(SS.BOSS_SAMPLE) do
 			local b = SS.BOSS_SAMPLE[i];
-			table.insert(sample, { id = -i, name = b[1], kind = "boss", hp = b[2], hpm = 100, priority = i, order = i });
+			local s = sample[i];
+			if ( not s ) then s = { id = -i, kind = "boss", hpm = 100, priority = i, order = i }; sample[i] = s; end
+			s.name, s.hp = b[1], b[2];
 		end
 		local height = SS.UpdateEncounterRows(sample);
 		if ( height > 0 ) then bossFrame:SetHeight(height); end
@@ -1718,7 +1736,7 @@ function SS.ShowAnnouncement(banner)
 end
 
 function SS.UpdateAnnouncementFrame()
- if not SS.DB().replaceBanners then if announcementFrame then announcementFrame:Hide();end;SS.HideNative("banners", false);return;end
+	if not SS.DB().replaceBanners then if announcementFrame then announcementFrame:Hide();end;SS.HideNative("banners", false);return;end
 	if ( not announcementFrame ) then return; end
 	local maxWidth = math.max(40, UIParent:GetWidth() - 24);
 	if ( announcementFrame:GetWidth() > maxWidth ) then announcementFrame:SetWidth(maxWidth); end
@@ -2483,50 +2501,50 @@ ApplyMovableOrientation = function(name)
 	if ( name == "MainMenuBar" ) then
 		local d = SS.DB();
 		if ( not d.unlocked and not d.showRacialAbility and not d.plainBar and orientation ~= "vertical" and type(d.sizes.MainMenuBar) ~= "table" ) then return; end
-        local first = getglobal("ActionButton1");
-        if ( not first ) then return; end
-        local vertical = orientation == "vertical";
-        local saved = SS.DB().sizes.MainMenuBar;
-        local showRacial = d.showRacialAbility and true or false;
-        local buttonCount = showRacial and 7 or 6;
-        local gap, racialGap = 2, showRacial and 4 or 0;
-        local side = first:GetWidth() or 36;
-        if ( type(saved) == "table" ) then
-            side = math.max(12, math.min(vertical and saved.w or saved.h,
-                ((vertical and saved.h or saved.w) - gap * (buttonCount - 1) - racialGap) / buttonCount));
-        end
-        for i = 1, buttonCount do
-            local button = getglobal("ActionButton" .. (i == 7 and 12 or i));
-            if ( button ) then
-                button:SetWidth(side); button:SetHeight(side); button:ClearAllPoints();
-                local offset = (i - 1) * (side + gap) + (showRacial and i == 7 and racialGap or 0);
-                button:SetPoint("TOPLEFT", MainMenuBar, "TOPLEFT", vertical and 0 or offset, vertical and -offset or 0);
-                if ( showRacial and i == 7 and AZS_RacialRim and AZS_RacialRim.SetAllPoints ) then AZS_RacialRim:ClearAllPoints(); AZS_RacialRim:SetAllPoints(button); end
-                if ( showRacial and i == 7 and not button.slimRacialBorder ) then
-                    local rim = CreateFrame("Frame", nil, button);
-                    rim:SetPoint("TOPLEFT", button, "TOPLEFT", -2, 2);
-                    rim:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 2, -2);
-                    rim:SetBackdrop({edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", edgeSize=8});
-                    rim:SetBackdropBorderColor(1, 0.78, 0.18, 1); rim:EnableMouse(false);
-                    button.slimRacialBorder = rim;
-                end
-                if ( showRacial and i == 7 ) then
-                    if ( not button:IsShown() ) then button.slimShownByUs = true; end   -- so it can be hidden again later
-                    button:Show();
-                end
-            end
-        end
+			local first = getglobal("ActionButton1");
+			if ( not first ) then return; end
+			local vertical = orientation == "vertical";
+			local saved = SS.DB().sizes.MainMenuBar;
+			local showRacial = d.showRacialAbility and true or false;
+			local buttonCount = showRacial and 7 or 6;
+			local gap, racialGap = 2, showRacial and 4 or 0;
+			local side = first:GetWidth() or 36;
+			if ( type(saved) == "table" ) then
+			side = math.max(12, math.min(vertical and saved.w or saved.h,
+			((vertical and saved.h or saved.w) - gap * (buttonCount - 1) - racialGap) / buttonCount));
+			end
+			for i = 1, buttonCount do
+			local button = getglobal("ActionButton" .. (i == 7 and 12 or i));
+			if ( button ) then
+			button:SetWidth(side); button:SetHeight(side); button:ClearAllPoints();
+			local offset = (i - 1) * (side + gap) + (showRacial and i == 7 and racialGap or 0);
+			button:SetPoint("TOPLEFT", MainMenuBar, "TOPLEFT", vertical and 0 or offset, vertical and -offset or 0);
+			if ( showRacial and i == 7 and AZS_RacialRim and AZS_RacialRim.SetAllPoints ) then AZS_RacialRim:ClearAllPoints(); AZS_RacialRim:SetAllPoints(button); end
+			if ( showRacial and i == 7 and not button.slimRacialBorder ) then
+			local rim = CreateFrame("Frame", nil, button);
+			rim:SetPoint("TOPLEFT", button, "TOPLEFT", -2, 2);
+			rim:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 2, -2);
+			rim:SetBackdrop({edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", edgeSize=8});
+			rim:SetBackdropBorderColor(1, 0.78, 0.18, 1); rim:EnableMouse(false);
+			button.slimRacialBorder = rim;
+			end
+			if ( showRacial and i == 7 ) then
+			if ( not button:IsShown() ) then button.slimShownByUs = true; end   -- so it can be hidden again later
+			button:Show();
+			end
+			end
+			end
 		if ( not showRacial ) then SS.RestoreRacialActionButtonLayout(); end
-        MainMenuBar:SetWidth(vertical and side or side * buttonCount + gap * (buttonCount - 1) + racialGap);
-        MainMenuBar:SetHeight(vertical and side * buttonCount + gap * (buttonCount - 1) + racialGap or side);
-        if ( ActionBarUpButton ) then
-            ActionBarUpButton:ClearAllPoints(); ActionBarUpButton:SetWidth(12); ActionBarUpButton:SetHeight(12);
-            ActionBarUpButton:SetPoint("TOPRIGHT", first, "TOPLEFT", -2, 0);
-        end
-        if ( ActionBarDownButton ) then
-            ActionBarDownButton:ClearAllPoints(); ActionBarDownButton:SetWidth(12); ActionBarDownButton:SetHeight(12);
-            ActionBarDownButton:SetPoint("TOPRIGHT", first, "TOPLEFT", -2, -14);
-        end
+			MainMenuBar:SetWidth(vertical and side or side * buttonCount + gap * (buttonCount - 1) + racialGap);
+			MainMenuBar:SetHeight(vertical and side * buttonCount + gap * (buttonCount - 1) + racialGap or side);
+			if ( ActionBarUpButton ) then
+			ActionBarUpButton:ClearAllPoints(); ActionBarUpButton:SetWidth(12); ActionBarUpButton:SetHeight(12);
+			ActionBarUpButton:SetPoint("TOPRIGHT", first, "TOPLEFT", -2, 0);
+			end
+			if ( ActionBarDownButton ) then
+			ActionBarDownButton:ClearAllPoints(); ActionBarDownButton:SetWidth(12); ActionBarDownButton:SetHeight(12);
+			ActionBarDownButton:SetPoint("TOPRIGHT", first, "TOPLEFT", -2, -14);
+			end
 	elseif ( name == "MainMenuExpBar" ) then
 		local d = SS.DB();
 		if ( not d.unlocked and type(d.places.MainMenuExpBar) ~= "table" and type(d.sizes.MainMenuExpBar) ~= "table"
@@ -3511,7 +3529,7 @@ function SS.ShowLockPanel()
 		lockPanel:SetMovable(true);
 		if ( lockPanel.SetClampedToScreen ) then lockPanel:SetClampedToScreen(true); end
 		lockPanel:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		                       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+			tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 		lockPanel:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
 		lockPanel:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
 		local header = CreateFrame("Frame", nil, lockPanel);
@@ -3731,10 +3749,15 @@ function SS.FollowHandle(h, name)
 		h:SetFrameStrata("TOOLTIP");
 		if ( h:GetFrameLevel() <= t:GetFrameLevel() ) then h:SetFrameLevel(t:GetFrameLevel() + 1); end
 	end
-	h:ClearAllPoints();
-	local l, r, b = RootBounds(t);
+	local l, r, b, top = RootBounds(t);
 	if ( l and b ) then
+		-- measuring what a frame shows looks at all its parts: done when the frame moves or changes size, and otherwise
+		-- twice a second (its parts can change on their own)
+		local now = GetTime and GetTime() or 0;
+		if ( h.followL == l and h.followR == r and h.followB == b and h.followT == top and now - (h.followAt or 0) < 0.5 and now >= (h.followAt or 0) ) then return; end
+		h.followL, h.followR, h.followB, h.followT, h.followAt = l, r, b, top, now;
 		local x1, y1, x2, y2 = VisualInsets(t);
+		h:ClearAllPoints();
 		h:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l + x1, b + y1);
 		h:SetWidth(math.max(1, x2 - x1)); h:SetHeight(math.max(1, y2 - y1));
 	end
@@ -3777,7 +3800,7 @@ function SS.Handle(name, label)
 		h = CreateFrame("Frame", nil, UIParent);
 		h:SetFrameStrata("DIALOG");
 		h:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		                tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+			tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 		if ( name == "GameTooltip" ) then
 			h:SetBackdropColor(0, 0, 0, 0); -- keep tooltip text readable while its drag outline is active
 			h:SetFrameStrata("TOOLTIP");
@@ -4242,11 +4265,11 @@ function SU.Steps()
 	local d = SS.DB();
 	local steps = {
 		{ frame = "PlayerFrame", title = d.combineTarget and "Player + target" or "Unit frame",
-		  text = "Your hero's frame: health, power and level. Drag the green handle to place it; its size and scale are below." },
+			text = "Your hero's frame: health, power and level. Drag the green handle to place it; its size and scale are below." },
 		{ frame = "PartyMemberFrame1", title = "Party frames",
-		  text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Choose a column or a row, face plates or thin lines, and whether you join them." },
+			text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Choose a column or a row, face plates or thin lines, and whether you join them." },
 		{ frame = "MainMenuBar", title = "Action bar",
-		  text = "Your spells. Drag to place it; its size, and turning it upright, are below." },
+			text = "Your spells. Drag to place it; its size, and turning it upright, are below." },
 	};
 	local rest = {
 		{ "TargetFrame", "Target frame", "The enemy the game has picked for you.", function() return not d.hideTarget and not d.combineTarget; end },
@@ -4396,7 +4419,7 @@ SU.WARN_UNMOVABLE = {
 
 -- the game's own frames that Slim Suite can move; each one's setup step asks "Movable? (Disables Default UI Element)"
 SU.NATIVE = { PlayerFrame = true, TargetFrame = true, PartyMemberFrame1 = true, MinimapCluster = true,
-                 BuffFrame = true, MainMenuBar = true, MainMenuExpBar = true, ChatFrame1 = true };
+	BuffFrame = true, MainMenuBar = true, MainMenuExpBar = true, ChatFrame1 = true };
 
 -- Default: put the frame back where the game places it and stop moving it; Movable: Slim Suite places it again
 function SU.SetMovable(frame, movable)
@@ -4457,7 +4480,7 @@ function SU.ChecksFor(frame)
 	local d = SS.DB();
 	-- Entries tagged xref = true refer to another element, so they also appear in that element's right-click menu.
 	local W = SU.WARN;
-	local function Mirror() return { "Mirror target", warn = W.mirror, function() return SS.DB().mirrorTarget; end, function(v) SS.SetMirrorTarget(v); if ( v and not SS.DB().hideTarget ) then SU.SetOn("TargetFrame", true, SU.titles and SU.titles.TargetFrame or "Target frame"); SU.Focus(SU.focus); end end }; end
+	local function Mirror() return { "Mirror target", warn = W.mirror, function() return SS.DB().mirrorTarget; end, function(v) SS.SetMirrorTarget(v); if ( v and setupActive and not SS.DB().hideTarget ) then SU.SetOn("TargetFrame", true, SU.titles and SU.titles.TargetFrame or "Target frame"); end if ( SS.MenuOpen() ) then SU.Focus(SU.focus); end end }; end
 	local function MirrorScale() return { "Same size scaling (off: keep its own size)", short = "Same size scaling", function() return SS.DB().mirrorSameScale ~= false; end,
 		function(v) SS.SetMirrorSameScale(v); end, function() return SS.DB().mirrorTarget; end }; end
 	local function Combine() return { "Combine with the target frame (one button)", function() return SS.DB().combineTarget; end,
@@ -4833,7 +4856,7 @@ SS.Every("targetPreview", 0.5, function() SU.PreviewTarget(); SU.PreviewParty();
 
 -- the sample party: four members, shown in the party's own frames (or lines) while it is previewed
 SU.PARTY_SAMPLE = { { "Brann", "Priest", 82 }, { "Lyra", "Mage", 55 },
-                       { "Tomas", "Hunter", 100 }, { "Velka", "Warrior", 30 } };
+	{ "Tomas", "Hunter", 100 }, { "Velka", "Warrior", 30 } };
 
 -- the class icons (one sheet, a quarter of it per class) for the faces in the party demo
 SU.CLASS_ICON = { Warrior = { 0, 0.25, 0, 0.25 }, Mage = { 0.25, 0.49, 0, 0.25 }, Rogue = { 0.49, 0.73, 0, 0.25 },
@@ -4860,7 +4883,7 @@ function SU.SetPartyRow(on)
 end
 
 SU.CARD_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-                        tile = true, tileSize = 16, edgeSize = 10, insets = { left = 2, right = 2, top = 2, bottom = 2 } };
+	tile = true, tileSize = 16, edgeSize = 10, insets = { left = 2, right = 2, top = 2, bottom = 2 } };
 SU.BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar";
 SS.BOSS_SAMPLE = { { "Hogger", 60 }, { "Mr. Smite", 40 }, { "Edwin VanCleef", 85 } };   -- real Elwynn Forest bosses
 
@@ -5434,8 +5457,13 @@ function SS.MenuOpen()
 	return SU.panel and SU.panel:IsShown() and SU.focus and true or false;
 end
 function SS.HideElementMenu()
+	if ( not SU.panel ) then if ( sizeMenu ) then sizeMenu:Hide(); end return; end
+	-- in the setup the panel stays: it is drawn again for its element (a Reset there leaves no empty space)
+	if ( setupActive ) then
+		if ( SU.panel:IsShown() and SU.focus ) then SU.Focus(SU.focus); elseif ( sizeMenu ) then sizeMenu:Hide(); end
+		return;
+	end
 	if ( sizeMenu ) then sizeMenu:Hide(); end
-	if ( setupActive or not SU.panel ) then return; end
 	SU.panel:Hide();
 	if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
 	SU.focus, SU.placedFor = nil, nil;
@@ -5784,7 +5812,7 @@ function SU.Begin()
 			b.tag = CreateFrame("Frame", nil, SU.bar);
 			b.tag:SetHeight(14);
 			b.tag:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-			                    tile = true, tileSize = 16, edgeSize = 8, insets = { left = 2, right = 2, top = 2, bottom = 2 } });
+				tile = true, tileSize = 16, edgeSize = 8, insets = { left = 2, right = 2, top = 2, bottom = 2 } });
 			b.tag:SetBackdropColor(0.1, 0.4, 0.1, 0.95);
 			b.tag:SetBackdropBorderColor(0.4, 1, 0.4, 1);
 			b.tag.text = b.tag:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
@@ -5816,7 +5844,7 @@ function SU.Build()
 	SU.panel:SetMovable(true); SU.panel:EnableMouse(true);
 	if ( SU.panel.SetClampedToScreen ) then SU.panel:SetClampedToScreen(true); end
 	SU.panel:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	                         tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	SU.panel:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
 	SU.panel:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
 	SU.panel:RegisterForDrag("LeftButton");
@@ -5868,7 +5896,7 @@ function SU.Build()
 	SU.bar:SetFrameStrata("DIALOG");
 	SU.bar:SetHeight(52);
 	SU.bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	                     tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	SU.bar:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
 	SU.bar:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
 	SU.bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 6, -6);
@@ -5887,9 +5915,22 @@ function SU.Build()
 	SU.glow:Hide();
 end
 
+-- The setup hides the whole UI while it runs. If anything in it fails, the UI is brought back at once and the setup
+-- closes, so a failure can never leave the screen empty until a /reload (the error is still logged and said in chat).
+function SS.SetupRescue(err)
+	SS.Report(err);
+	pcall(SU.Unreveal);
+	pcall(SS.SetupHide);
+	setupActive = false;
+	editOnly = nil;
+	pcall(SS.SetUnlocked, false, true);
+	pcall(PlaceAll);
+	K.Print(NAME, "the setup hit a problem and closed; your UI is back as it was. /slim errors shows what happened.");
+end
 function SS.StartSetup(fromStart)
 	setupActive = true;
-	SU.Begin();
+	local ok, err = pcall(SU.Begin);
+	if ( not ok ) then SS.SetupRescue(err); end
 end
 
 -- what each element brings along: the frames that move with it
@@ -5935,6 +5976,7 @@ end
 
 function SS.SetupHide()
 	setupActive = false;
+	SU.on = {};                                            -- nothing is "on in the setup" outside it
 	SU.Unreveal();
 	if ( SU.panel ) then SU.panel:Hide(); end
 	if ( SU.bar ) then SU.bar:Hide(); end
@@ -5947,8 +5989,8 @@ end
 -- Exit: the UI stays unlocked for moving. Complete: the UI is locked.
 function SS.SetupEnd(finished)
 	SS.DB().setupDone = true;
-	SS.DB().setupStep = nil;
-	SS.SetupHide();
+	local ok, err = pcall(SS.SetupHide);
+	if ( not ok ) then SS.SetupRescue(err); return; end
 	editOnly = nil;
 	if ( finished ) then SS.SetUnlocked(false, true);
 	else SS.SetUnlocked(true, true); end
@@ -6725,7 +6767,7 @@ do
 	bar:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -210);   -- under the minimap until it is moved
 	bar:SetFrameStrata("BACKGROUND");
 	bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	                  tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	bar:SetBackdropColor(0, 0, 0, 0.55);
 	bar:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8);
 	bar:Hide();

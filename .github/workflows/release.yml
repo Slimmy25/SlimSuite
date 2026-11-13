@@ -48,6 +48,12 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         run: zip -r "SlimSuite-${{ steps.version.outputs.version }}.zip" SlimSuite -x "*.git*" "SlimSuite/tests/*"   # the tests are not part of the addon
 
+      - name: Take the notes from the changelog
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          awk -v v="## ${{ steps.version.outputs.version }}" '$0==v{on=1;next} /^## /{on=0} on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Slim Suite ${{ steps.version.outputs.version }}" > notes.md
+
       - name: Create the release
         if: steps.check.outputs.skip != 'true'
         env:
@@ -56,4 +62,4 @@ jobs:
           gh release create "v${{ steps.version.outputs.version }}" "SlimSuite-${{ steps.version.outputs.version }}.zip" \
             --target "$GITHUB_SHA" \
             --title "Slim Suite ${{ steps.version.outputs.version }}" \
-            --generate-notes
+            --notes-file notes.md

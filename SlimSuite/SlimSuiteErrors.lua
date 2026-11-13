@@ -1,11 +1,13 @@
--- Slim Suite's error log, in the style of Bug Grabber: every Lua error the game reports is kept in
--- SlimSuiteDB.errorLog, which the game saves between logins. /slimsuite errors opens it.
+-- Slim Suite's error log, in the style of Bug Grabber: every error in Slim Suite's own files (and the shared AZSKit) is
+-- kept in SlimSuiteDB.errorLog, which the game saves between logins. /slimsuite errors opens it. Other addons' errors
+-- are left to the game (and to BugSack, if it is installed).
 -- recording lives in SlimSuiteCore.lua (SS.LogError); SS.ErrorLog() returns the current log
 
 -- the game calls _ERRORMESSAGE for every Lua error; keep the game's own handling too
 local previousHandler = _ERRORMESSAGE;
 function _ERRORMESSAGE(msg)
-	if ( SS and SS.LogError ) then pcall(SS.LogError, msg); end
+	local text = tostring(msg or "");
+	if ( SS and SS.LogError and (string.find(text, "SlimSuite", 1, true) or string.find(text, "AZSKit", 1, true)) ) then pcall(SS.LogError, msg); end
 	if ( previousHandler ) then previousHandler(msg); end
 end
 
@@ -31,7 +33,7 @@ local function Build()
 	frame:SetFrameStrata("DIALOG");
 	frame:SetMovable(true); frame:EnableMouse(true);
 	frame:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	                    tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	frame:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
 	frame:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
 	frame:RegisterForDrag("LeftButton");

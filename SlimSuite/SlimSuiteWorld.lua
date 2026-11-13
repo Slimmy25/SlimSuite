@@ -71,22 +71,34 @@ end
 -- AZS_ProjectWorldAnchors: requests are { anchorId, attachment ("position" or "overhead"), offset = { z = yards } }.
 -- Gives a map: anchor id -> { x, y, on, dist } in UIParent units, for the anchors on screen only (the game gives no
 -- screen place for one that is off screen or behind the camera). Asks in groups of 256, the most per call.
+-- It runs every frame, so its answer and the spots in it are kept and reused, not made new each time: read them
+-- before the next call.
+local projected, spotPool, spotUsed = {}, {}, 0;
 function A.Project(requests)
-	local out = {};
+	local out = projected;
+	for id in pairs(out) do out[id] = nil; end
+	spotUsed = 0;
 	local n = table.getn(requests);
 	if ( n == 0 or not A.Has("AZS_ProjectWorldAnchors") ) then return out; end
 	local scale = UIParent:GetEffectiveScale() or 1;
 	local first = 1;
 	while ( first <= n ) do
-		local batch = {};
-		for i = first, math.min(n, first + 255) do table.insert(batch, requests[i]); end
+		local batch = requests;                              -- 256 or fewer (nearly always): asked as they are
+		if ( n > 256 ) then
+			batch = {};
+			for i = first, math.min(n, first + 255) do table.insert(batch, requests[i]); end
+		end
 		first = first + 256;
 		local result = A.Call("AZS_ProjectWorldAnchors", batch);
 		if ( type(result) == "table" and type(result.entries) == "table" ) then
 			for i = 1, table.getn(result.entries) do
 				local e = result.entries[i];
 				if ( e.state == "onScreen" and type(e.x) == "number" and type(e.y) == "number" ) then
-					out[e.anchorId] = { x = e.x / scale, y = e.y / scale, on = true, dist = e.playerDistance };
+					spotUsed = spotUsed + 1;
+					local s = spotPool[spotUsed];
+					if ( not s ) then s = {}; spotPool[spotUsed] = s; end
+					s.x, s.y, s.on, s.dist = e.x / scale, e.y / scale, true, e.playerDistance;
+					out[e.anchorId] = s;
 				end
 			end
 		end
@@ -706,7 +718,7 @@ local function DrawBox()
 	box:Show();
 	if ( editing and table.getn(list) == 0 ) then
 		list = { { born = now, crit = true, amount = 1234, name = "Crit example", icon = "Interface\\Icons\\Spell_Fire_Fireball02" },
-		         { born = now, amount = 512, name = "Hit example", icon = "Interface\\Icons\\Spell_Frost_FrostBolt02" } };
+			{ born = now, amount = 512, name = "Hit example", icon = "Interface\\Icons\\Spell_Frost_FrostBolt02" } };
 	end
 	for i = table.getn(box.entries), 1, -1 do
 		local e = box.entries[i];
@@ -1174,6 +1186,7 @@ local function FloatText(i)
 	return f;
 end
 
+local floatIds, floatById, NONE = {}, {}, {};
 local function DrawFloats()
 	if ( DB().floatingText and SlimSuiteMeter and SlimSuiteMeter.Drain ) then SS.Safe(SlimSuiteMeter.Drain); end
 	local now = GetTime();
@@ -1187,15 +1200,18 @@ local function DrawFloats()
 		return;
 	end
 	-- AZS_ProjectCombatTextAnchors(ids, "follow"): over the living enemy, then where it fell
-	local ids = {};
+	-- the lists below are kept and refilled each frame, not made new
+	local ids = floatIds;
 	for i = 1, n do ids[i] = floats[i].anchor; end
+	for i = table.getn(ids), n + 1, -1 do table.remove(ids, i); end
 	local result = A.Call("AZS_ProjectCombatTextAnchors", ids, "follow");
-	local entries = type(result) == "table" and type(result.entries) == "table" and result.entries or {};
+	local entries = type(result) == "table" and type(result.entries) == "table" and result.entries or NONE;
 	-- each reply is matched to its hit by the anchor id it carries; a reply without ids is taken in the order asked
 	local byId;
+	for id in pairs(floatById) do floatById[id] = nil; end
 	for i = 1, table.getn(entries) do
 		local id = type(entries[i]) == "table" and entries[i].anchorId;
-		if ( id ~= nil ) then byId = byId or {}; byId[id] = entries[i]; end
+		if ( id ~= nil ) then byId = floatById; byId[id] = entries[i]; end
 	end
 	local scale = UIParent:GetEffectiveScale() or 1;
 	local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
@@ -1236,11 +1252,18 @@ end
 
 -- ---------------------------------------------------------------- boss and Guardian kills this run
 -- For the Kills / Gold / Cache tally. The game's run summary counts bosses and Guardians only once a run ends, so
--- during a run Slim Suite counts them itself: a boss or Guardian it saw alive in AZS_UNITS that dies (health 0) or
--- leaves the list while the run is still being played. A Guardian that walks back to its lair stays in the list,
--- so it is not counted. If the game ever puts its own counts in AZS_RUN, those are used instead.
+-- during a run Slim Suite counts them itself: a boss or Guardian it saw in AZS_UNITS counts as killed once it is seen
+-- at 3% health or lower (or dead), so one the game takes off the list the moment it dies is still counted. One that
+-- leaves the list with more health left (out of range, despawned, walked off) is never counted. Each is counted once.
+-- If the game ever puts its own counts in AZS_RUN, those are used instead.
 -- The counts are kept in the saved settings per run, so they survive a /reload.
-local tally = { bosses = 0, guardians = 0, alive = {}, run = nil, lastKills = nil };
+local tally = { bosses = 0, guardians = 0, alive = {}, counted = {}, run = nil, lastKills = nil };
+SS.KILL_PERCENT = 3;                                       -- at or under this much health, a boss or Guardian is as good as dead
+local function CountKill(id, kind)
+	if ( tally.counted[id] ) then return; end
+	tally.counted[id] = true;
+	if ( kind == "boss" ) then tally.bosses = tally.bosses + 1; else tally.guardians = tally.guardians + 1; end
+end
 
 local function TrackKills()
 	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
@@ -1257,7 +1280,7 @@ local function TrackKills()
 		else
 			tally.bosses, tally.guardians = 0, 0;
 		end
-		tally.alive, tally.run = {}, key;
+		tally.alive, tally.counted, tally.run = {}, {}, key;
 	end
 	tally.lastKills = kills;
 	if ( not playing ) then tally.alive = {}; return; end
@@ -1271,23 +1294,22 @@ local function TrackKills()
 			local boss = kind == "boss" or kind == "final";
 			if ( boss or kind == "guardian" ) then
 				seen[u.id] = true;
-				local hp = tonumber(u.hp);
-				if ( hp == nil or hp > 0 ) then
-					tally.alive[u.id] = boss and "boss" or "guardian";
-				elseif ( tally.alive[u.id] ) then
-					if ( tally.alive[u.id] == "boss" ) then tally.bosses = tally.bosses + 1; else tally.guardians = tally.guardians + 1; end
+				local what = boss and "boss" or "guardian";
+				local hp, hpm = tonumber(u.hp), tonumber(u.hpm);
+				local pct = (hp and hpm and hpm > 0) and hp * 100 / hpm or nil;
+				if ( (hp and hp <= 0) or (u.dead) or (pct and pct <= SS.KILL_PERCENT) ) then
+					CountKill(u.id, what);
 					tally.alive[u.id] = nil;
+				else
+					tally.alive[u.id] = what;                       -- seen with health left (healed back up too)
 				end
 			end
 		end
 	end
-	-- gone from the list while the run goes on means slain; an empty list (a loading screen) counts nothing
+	-- gone from the list: no longer followed; an empty list (a loading screen) changes nothing
 	if ( any ) then
-		for id, kind in pairs(tally.alive) do
-			if ( not seen[id] ) then
-				if ( kind == "boss" ) then tally.bosses = tally.bosses + 1; else tally.guardians = tally.guardians + 1; end
-				tally.alive[id] = nil;
-			end
+		for id in pairs(tally.alive) do
+			if ( not seen[id] ) then tally.alive[id] = nil; end
 		end
 	end
 	local saved = DB().runKills;

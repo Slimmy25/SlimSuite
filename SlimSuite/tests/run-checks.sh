@@ -8,8 +8,9 @@ run() { echo "== $1"; out=$(eval "$2" 2>&1); echo "$out" | tail -3; echo "$out" 
 run "block balance"   "python3 tests/bal.py SlimSuite.lua"
 run "stale names"     "python3 tests/stale.py SlimSuite.lua"
 run "load order"      "python3 tests/order.py"
+run "shared kit"      "python3 tests/kitversion.py"
 run "lua 5.0"         "python3 tests/lua50.py SlimSuiteCore.lua AZSKit.lua SlimSuiteErrors.lua SlimSuiteItems.lua SlimSuiteMeter.lua SlimSuite.lua SlimSuiteWorld.lua"
-for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks review; do
+for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review; do
   run "harness: $s" "cd tests && SCENARIO=$s SEED=7 STEPS=300 $LUA run.lua"
 done
 [ $fail -eq 0 ] && echo "ALL CHECKS PASSED" || echo "SOME CHECKS FAILED"

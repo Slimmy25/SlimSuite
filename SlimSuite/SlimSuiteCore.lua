@@ -1,6 +1,6 @@
 -- Slim Suite's shared core, loaded before the other Slim Suite files:
 --   SS                 the one namespace for Slim Suite's functions and shared tables (replaces the SlimSuite_* globals)
---   SS.Safe(fn, ...)   calls fn with the given arguments; an error is logged and said once in chat (returns pcall's results)
+--   SS.Safe(fn, a1..a6) calls fn with up to six arguments; an error is logged and said once in chat (returns pcall's results)
 --   SS.Every(name, s, fn, watch)  runs fn every s seconds (0 = every frame) from one shared ticker;
 --                      skipped while the optional watch frame is hidden, as WoW never sends OnUpdate to a hidden frame
 --   SS.Stop(name)      stops a timed task
@@ -9,9 +9,19 @@ local MAX_ENTRIES = 200;
 
 -- The saved variables can be replaced by the game after this file runs, so the log is looked up every time
 -- rather than kept from load. Creates the saved table and the log if they are missing.
+-- The game puts the player's saved settings in place only after the addon's files have run, so an error logged while
+-- loading goes into a table that is then thrown away: those entries are carried over into the saved log.
+local logOwner;
 function SS.ErrorLog()
 	if ( type(SlimSuiteDB) ~= "table" ) then SlimSuiteDB = {}; end
 	if ( type(SlimSuiteDB.errorLog) ~= "table" ) then SlimSuiteDB.errorLog = {}; end
+	if ( logOwner ~= SlimSuiteDB ) then
+		local early = type(logOwner) == "table" and logOwner.errorLog;
+		logOwner = SlimSuiteDB;
+		if ( type(early) == "table" and early ~= SlimSuiteDB.errorLog ) then
+			for i = 1, table.getn(early) do table.insert(SlimSuiteDB.errorLog, early[i]); end
+		end
+	end
 	return SlimSuiteDB.errorLog;
 end
 
@@ -79,10 +89,19 @@ end
 
 -- Calls fn with the given arguments, like pcall. A real error is logged and reported (above); a missing function (an
 -- optional addon call that is not there) is skipped quietly, since that is expected rather than a fault.
-function SS.Safe(fn, ...)
+-- Up to six arguments, passed on without trailing nils (some game functions reject extra nil arguments). Written
+-- without "..." on purpose: in Lua 5.0 every "..." call makes a new table, and this runs hundreds of times a second.
+function SS.Safe(fn, a1, a2, a3, a4, a5, a6)
 	if ( type(fn) ~= "function" ) then return false; end
-	-- exactly the arguments given, as pcall passed them: some game functions reject extra nil arguments
-	local ok, r1, r2, r3, r4 = pcall(fn, unpack(arg));
+	local ok, r1, r2, r3, r4;
+	-- cut after the last argument given (a nil in the middle is still passed)
+	if ( a6 ~= nil ) then ok, r1, r2, r3, r4 = pcall(fn, a1, a2, a3, a4, a5, a6);
+	elseif ( a5 ~= nil ) then ok, r1, r2, r3, r4 = pcall(fn, a1, a2, a3, a4, a5);
+	elseif ( a4 ~= nil ) then ok, r1, r2, r3, r4 = pcall(fn, a1, a2, a3, a4);
+	elseif ( a3 ~= nil ) then ok, r1, r2, r3, r4 = pcall(fn, a1, a2, a3);
+	elseif ( a2 ~= nil ) then ok, r1, r2, r3, r4 = pcall(fn, a1, a2);
+	elseif ( a1 ~= nil ) then ok, r1, r2, r3, r4 = pcall(fn, a1);
+	else ok, r1, r2, r3, r4 = pcall(fn); end
 	if ( not ok ) then SS.Report(r1); end
 	return ok, r1, r2, r3, r4;
 end
@@ -150,20 +169,33 @@ function SS.RunAs(frame, fn, ...)
 	return ok;
 end
 
-local tasks = {};
+-- The tasks are kept in a list, run in order. A task started or stopped by another task while they run takes effect
+-- safely: a stopped one is marked and skipped, and a new one joins the list from the next frame.
+local tasks, list = {}, {};
 local driver = CreateFrame("Frame");
 -- Runs fn every `seconds` (0 = every frame). If `watch` is given, the task is skipped while that frame is
 -- hidden, which matches WoW: a hidden frame never receives OnUpdate.
 function SS.Every(name, seconds, fn, watch)
-	tasks[name] = { interval = seconds or 0, elapsed = 0, fn = fn, watch = watch };
+	local old = tasks[name];
+	if ( old ) then old.stopped = true; end
+	local t = { interval = seconds or 0, elapsed = 0, fn = fn, watch = watch };
+	tasks[name] = t;
+	table.insert(list, t);
 end
 function SS.Stop(name)
+	if ( tasks[name] ) then tasks[name].stopped = true; end
 	tasks[name] = nil;
 end
 driver:SetScript("OnUpdate", function()
 	local dt = arg1 or 0;
-	for _, t in pairs(tasks) do
-		if ( t.watch and not t.watch:IsShown() ) then
+	local n = table.getn(list);
+	local i = 1;
+	while ( i <= n ) do
+		local t = list[i];
+		if ( t.stopped ) then table.remove(list, i); n = n - 1; t = nil; else i = i + 1; end
+		if ( not t ) then
+			-- removed
+		elseif ( t.watch and not t.watch:IsShown() ) then
 			t.elapsed = 0;
 		else
 			t.elapsed = t.elapsed + dt;
