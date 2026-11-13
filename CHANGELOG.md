@@ -2,6 +2,18 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.15
+Buffs where you want them, a proper square map, and a tidier settings window.
+
+- **Party buffs:** your buffs and every party member's buffs sit above their plate, lined up with the portrait. Rows stop before the next party member and grow down when there are many. Friends' buffs can be turned off in the party's menu.
+- **Your buffs vs the target's:** your buffs go in their own place or above, below, left or right of the player frame. The target's buffs and debuffs have their own side setting in the target's menu. Turning on Mirror target offers to match them.
+- **Square map:** its ring now has the round map's colours and can never show on the round map. Slim Suite's gear sits on the ring, round or square, at the same distance as the game's own buttons.
+- **Minimap button row:** optional (off by default). Its buttons are visible again instead of an empty grey box.
+- **Encounter bars:** their green box fits on the screen again.
+- **Game settings:** a part you turned off in the game's Interface settings (Run Clock, Boss Bars ...) gets Slim Suite's movable version once, automatically.
+- **Settings window:** the UI page now only asks the "Replace Default ... with Movable Version?" questions; each element's other settings are in its own menu.
+- **Element list:** two columns, can be dragged anywhere, and has Demo On / Off beside the grid.
+
 ## 1.14
 One list for moving and switching everything.
 

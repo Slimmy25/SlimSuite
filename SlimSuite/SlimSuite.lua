@@ -161,7 +161,7 @@ SS.DEFAULTS = {
 	tallyVertical = false, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
 };
-SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition", "itemRowEquipped",
+SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
 	"itemRowSeen", "chatOffsets", "words", "layouts" };
 function SS.PrepareDB(d)
 	for key, value in pairs(SS.DEFAULTS) do if ( d[key] == nil ) then d[key] = value; end end
@@ -191,7 +191,11 @@ function SS.PrepareDB(d)
 	if ( d.targetLook ~= "classic" and d.targetLook ~= "new" ) then d.targetLook = d.newFrames and "new" or "classic"; end
 	if ( d.partyLook ~= "classic" and d.partyLook ~= "thin" ) then d.partyLook = d.partyCompact and "thin" or "classic"; end
 	d.newFrames, d.partyCompact = nil, nil;                -- replaced by the looks above
+	-- your buffs belong to the player frame only; the target shows its own buffs and debuffs on its own side
+	if ( d.buffsOnTarget ) then d.buffsOnTarget = false; end
 	if ( d.buffsOnTargetSide ~= "above" ) then d.buffsOnTargetSide = "below"; end
+	if ( d.targetAuraSide ~= "above" and d.targetAuraSide ~= "left" and d.targetAuraSide ~= "right" ) then d.targetAuraSide = "below"; end
+	if ( d.buffsOnPlayerSide ~= "below" and d.buffsOnPlayerSide ~= "left" and d.buffsOnPlayerSide ~= "right" ) then d.buffsOnPlayerSide = "above"; end
 	if ( not d.buffsPlayerAboveDefault ) then d.buffsOnPlayerSide = "above"; d.buffsPlayerAboveDefault = true; end   -- buffs sit above by default
 	if ( d.buffGrowthDirection ~= "up" and d.buffGrowthDirection ~= "down" ) then d.buffGrowthDirection = "down"; end
 	if ( d.buffCustomLayout == nil ) then d.buffCustomLayout = d.orientations.BuffFrame == "vertical"; end

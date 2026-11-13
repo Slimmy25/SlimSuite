@@ -1,13 +1,45 @@
 -- Slim Suite: your buffs in the party, the minimap, Edit mode, the element menus and the tooltip.
 if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one set of private names (SS.ENV, in SlimSuiteCore.lua)
 
--- You in the party: the buffs start at your plate's top-left corner and grow to the right. A row is never wider than
--- your plate, so they never reach the next party member beside you; more buffs start a new row, stacked away from the
--- plate (upwards above it, downwards below it), so they never reach the member under you either.
-BUFF_BUTTONS = 24;
+-- Buffs above the party plates (yours and your friends'): they line up with the plate's portrait and fill rows to
+-- the right, each row stopping before the next party member's frame (or the plate's own right edge when the party is
+-- a column). More buffs make more rows; the rows read top to bottom and the last row sits just above the plate.
+local BUFF_BUTTONS = 24;
 function SS.PartyBuffsActive()
 	local d = SS.DB();
 	return d.partyIncludesSelf and d.buffsOnPlayer and not d.buffsOnTarget and BuffFrame and true or false;
+end
+-- the room above a plate, in screen units: left edge (the portrait's), and how wide a row may be
+function SS.BuffRoom(plate, portrait, nextFrame)
+	local pl = (portrait and portrait:IsShown() and portrait:GetLeft()) or plate:GetLeft();
+	if ( not pl ) then return nil; end
+	local ps, ss = (portrait and portrait:GetEffectiveScale()) or plate:GetEffectiveScale() or 1, plate:GetEffectiveScale() or 1;
+	local left = pl * ps;
+	local right = (plate:GetRight() or 0) * ss;
+	if ( nextFrame and nextFrame:IsShown() and nextFrame:GetLeft() and SS.CurrentOrientation("PartyMemberFrame1") == "horizontal" ) then
+		local nl = nextFrame:GetLeft() * (nextFrame:GetEffectiveScale() or 1);
+		if ( nl > left ) then right = nl - 4 * ss; end
+	end
+	return left, math.max(0, right - left), (plate:GetTop() or 0) * ss;
+end
+-- lays out a list of shown buttons (all the same size) above a plate, rows growing down, the last row on the plate
+function SS.LayoutBuffRows(buttons, parent, plate, portrait, nextFrame)
+	local left, width, top = SS.BuffRoom(plate, portrait, nextFrame);
+	local n = table.getn(buttons);
+	if ( not left or n == 0 ) then return; end
+	local ps = parent:GetEffectiveScale() or 1;
+	local w, h = buttons[1]:GetWidth() or 16, buttons[1]:GetHeight() or 16;
+	local gap = 2;
+	local perRow = math.max(1, math.floor((width / ps + gap) / (w + gap)));
+	local rows = math.ceil(n / perRow);
+	local baseX, baseY = left / ps, top / ps + 2;
+	for i = 1, n do
+		local row = math.floor((i - 1) / perRow);                  -- 0 is the top row
+		local col = math.mod(i - 1, perRow);
+		local b = buttons[i];
+		b:ClearAllPoints();
+		b:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", baseX + col * (w + gap), baseY + (rows - 1 - row) * (h + gap));
+	end
 end
 function SS.LayoutPartyBuffs()
 	if ( not BuffFrame ) then return; end
@@ -25,28 +57,72 @@ function SS.LayoutPartyBuffs()
 	end
 	local P = SS.Pair();
 	if ( not P ) then return; end
-	local bs = BuffFrame:GetEffectiveScale() or 1;
-	local width = (P:GetWidth() or 120) * (P:GetEffectiveScale() or 1) / bs;   -- your plate's width, in the buffs' own size
-	local up = SS.DB().buffsOnPlayerSide ~= "below";
-	local gap, col, row, perRow = 2, 0, 0, nil;
+	local shown = {};
 	for i = 0, BUFF_BUTTONS - 1 do
 		local b = getglobal("BuffButton" .. i);
 		if ( b ) then
 			if ( not b.slimPartyOrig ) then local p, rel, rp, x, y = b:GetPoint(1); b.slimPartyOrig = { p, rel, rp, x or 0, y or 0 }; end
-			if ( b:IsShown() ) then
-				local w, h = b:GetWidth() or 30, b:GetHeight() or 30;
-				if ( not perRow ) then perRow = math.max(1, math.floor((width + gap) / (w + gap))); end
-				if ( col >= perRow ) then col = 0; row = row + 1; end
-				b:ClearAllPoints();
-				if ( up ) then b:SetPoint("BOTTOMLEFT", BuffFrame, "BOTTOMLEFT", col * (w + gap), row * (h + gap));
-				else b:SetPoint("TOPLEFT", BuffFrame, "TOPLEFT", col * (w + gap), -row * (h + gap)); end
-				col = col + 1;
-			end
+			if ( b:IsShown() ) then table.insert(shown, b); end
 		end
 	end
+	local nextFrame = getglobal("PartyMemberFrame1");
+	if ( nextFrame == P ) then nextFrame = nil; end
+	SS.LayoutBuffRows(shown, BuffFrame, P, P.portrait, nextFrame);
 	SS.partyBuffsLaid = true;
 end
 SS.Every("partyBuffs", 0.25, function() if ( SS.PartyBuffsActive() or SS.partyBuffsLaid ) then SS.Safe(SS.LayoutPartyBuffs); end end);
+
+-- Your friends' buffs, above each friend's plate in the same way (classic plates only; "Party members' buffs" in the
+-- party's menu). The icons are Slim Suite's own, read from UnitBuff; hover one for its name.
+SS.FRIEND_BUFFS = 16;
+function SS.FriendBuffsOn()
+	local d = SS.DB();
+	return d.partyMemberBuffs ~= false and SS.Look("PartyMemberFrame1") ~= "thin";
+end
+function SS.UpdateFriendBuffs()
+	local on = SS.FriendBuffsOn();
+	local size = SS.PartyBuffsActive() and BuffFrame and (getglobal("BuffButton0") or getglobal("BuffButton1")) or nil;
+	local icon = 16;
+	if ( size and size.GetHeight ) then icon = math.max(10, math.min(22, (size:GetHeight() or 30) * (BuffFrame:GetScale() or 1))); end
+	SS.friendBuffs = SS.friendBuffs or {};
+	for i = 1, 4 do
+		local f = getglobal("PartyMemberFrame" .. i);
+		local unit = "party" .. i;
+		local set = SS.friendBuffs[i];
+		if ( not set and f ) then
+			set = {};
+			for j = 1, SS.FRIEND_BUFFS do
+				local b = CreateFrame("Button", nil, UIParent);
+				b:SetFrameStrata("MEDIUM");
+				b.tex = b:CreateTexture(nil, "ARTWORK"); b.tex:SetAllPoints(b);
+				b.unit, b.index = unit, j;
+				b:SetScript("OnEnter", function()
+					if ( GameTooltip and GameTooltip.SetUnitBuff ) then GameTooltip:SetOwner(this, "ANCHOR_BOTTOMRIGHT"); GameTooltip:SetUnitBuff(this.unit, this.index); end
+				end);
+				b:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
+				b:Hide();
+				set[j] = b;
+			end
+			SS.friendBuffs[i] = set;
+		end
+		if ( set ) then
+			local shown = {};
+			local exists = on and f and f:IsShown() and UnitExists and UnitExists(unit);
+			for j = 1, SS.FRIEND_BUFFS do
+				local b = set[j];
+				local tex = exists and UnitBuff and UnitBuff(unit, j);
+				if ( tex ) then
+					b.tex:SetTexture(tex); b:SetWidth(icon); b:SetHeight(icon); b:SetScale(f:GetEffectiveScale() / (UIParent:GetEffectiveScale() or 1));
+					b:Show(); table.insert(shown, b);
+				else b:Hide(); end
+			end
+			if ( table.getn(shown) > 0 ) then
+				SS.LayoutBuffRows(shown, shown[1], f, getglobal("PartyMemberFrame" .. i .. "Portrait"), getglobal("PartyMemberFrame" .. (i + 1)));
+			end
+		end
+	end
+end
+SS.Every("friendBuffs", 0.5, function() SS.Safe(SS.UpdateFriendBuffs); end);
 
 -- Every tick box that shows a setting, wherever it is: the setup, the right-click menu, the settings window, the move
 -- panel. A click always flips the setting itself (not whatever the box happened to show), and afterwards every visible
@@ -133,7 +209,7 @@ function SS.SetMirrorTarget(on)
 	if ( on ) then SS.Safe(SS.ClaimTarget, "mirror"); end   -- the newest choice wins: mirroring takes the target's place
 	if ( on ) then SS.MakeMovable("PlayerFrame", "Mirror target moves it"); SS.MakeMovable("TargetFrame", "Mirror target moves it"); end
 	SS.DB().mirrorTarget = on and true or false;
-	if ( on ) then SS.Safe(SS.MirrorTarget); end
+	if ( on ) then SS.Safe(SS.MirrorTarget); SS.Safe(SS.OfferMirrorBuffs); end
 end
 
 -- "Square minimap": the minimap's mask is swapped between the round and the square texture. Some clients
@@ -175,10 +251,15 @@ function SS.SquareFrame(on)
 			t[3]:SetPoint("TOPLEFT", ring, "TOPLEFT", inset, -inset); t[3]:SetPoint("BOTTOMLEFT", ring, "BOTTOMLEFT", inset, inset); t[3]:SetWidth(width);
 			t[4]:SetPoint("TOPRIGHT", ring, "TOPRIGHT", -inset, -inset); t[4]:SetPoint("BOTTOMRIGHT", ring, "BOTTOMRIGHT", -inset, inset); t[4]:SetWidth(width);
 		end
-		Band(0, 1, 0.12, 0.08, 0.02);                  -- outer dark line
-		Band(1, 3, 0.83, 0.66, 0.26);                  -- the gold band
-		Band(2, 1, 1, 0.86, 0.45);                     -- its bright middle
-		Band(4, 1, 0.12, 0.08, 0.02);                  -- inner dark line
+		-- the colours of the round map's own ring (measured from it): a dark rim, the worn gold, its lighter middle,
+		-- a darker bronze inside it and a dark inner edge
+		Band(0, 1, 0.12, 0.08, 0.02);
+		Band(1, 3, 0.65, 0.51, 0.20);
+		Band(2, 1, 0.73, 0.58, 0.24);
+		Band(4, 1, 0.40, 0.34, 0.18);
+		Band(5, 1, 0.12, 0.09, 0.03);
+		-- the ring is part of the square map, not a setting of its own: it can only show while the map is square
+		ring:SetScript("OnShow", function() if ( not SS.squareActive ) then this:Hide(); end end);
 		SS.squareRing = ring;
 	end
 	if ( ring ) then if ( on ) then ring:Show(); else ring:Hide(); end end
@@ -303,7 +384,14 @@ function SS.ArrangeEdgeButtons(square)
 end
 
 -- buttons that appear later (new mail, a queue, another addon's button) join the square's column
-SS.Every("squareEdge", 1, function() if ( SS.SquareColumn() ) then SS.ArrangeEdgeButtons(true); end end);
+SS.Every("squareEdge", 1, function()
+	if ( SS.SquareColumn() ) then SS.ArrangeEdgeButtons(true); end
+	-- the ring and the round border always match the map's real shape, whatever else showed or hid them
+	local ring = SS.squareRing;
+	if ( ring and ring:IsShown() and not SS.squareActive ) then ring:Hide(); end
+	if ( ring and not ring:IsShown() and SS.squareActive ) then ring:Show(); end
+	if ( MinimapBorder and SS.squareActive and MinimapBorder:IsShown() ) then MinimapBorder:Hide(); end
+end);
 
 -- The mouse wheel over the minimap zooms it, as the + and - buttons do.
 function SS.MinimapWheel(delta)

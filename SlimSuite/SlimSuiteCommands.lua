@@ -4,6 +4,44 @@ if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one se
 loader = CreateFrame("Frame");
 loader:RegisterEvent("VARIABLES_LOADED");
 loader:RegisterEvent("PLAYER_ENTERING_WORLD");
+-- The game's Interface settings (Show Run Clock, Show Boss Bars ...) can be turned off by the player. A part that is
+-- off when the game loads, and that Slim Suite did not turn off itself, was turned off by the player: Slim Suite's own
+-- movable version is switched on in its place, once (turning Slim Suite's version off afterwards is respected).
+SS.NATIVE_REPLACEMENTS = {
+	clock = { "replaceClock", "Run clock", function() SS.UpdateClock(); end },
+	bosses = { "replaceEncounters", "Encounter bars", function() SS.UpdateBossFrames(); end },
+	tally = { "replaceTally", "Kills / Gold / Cache", function() SS.UpdateTally(); end },
+	build = { "replaceBuildRows", "Build rows", function() SS.ApplyBuildRowReplacement(); end },
+	banners = { "replaceBanners", "Announcements", function() SS.UpdateAnnouncementFrame(); end },
+	meter = { "moveMeter", "Damage meter", function() SS.SetMeterReplacement(true); end },
+	localClock = { "replaceLocalClock", "Local clock", function() SS.SetLocalClockOn(true); end },
+	levels = { "moveLevelButton", "Level Up button", function() SS.UpdateLevelButton(); end },
+	revive = { "replaceRevive", "Revive bar", function() end },
+};
+function SS.NativeIsOff(part)
+	if ( type(AZS_IsHudShown) ~= "function" ) then return nil; end
+	local ok, v = SS.Safe(AZS_IsHudShown, part);
+	if ( not ok or v == nil ) then return nil; end
+	return not SS.HudShown(v);
+end
+function SS.AdoptHiddenNatives()
+	local d = SS.DB();
+	d.nativeAdopted = type(d.nativeAdopted) == "table" and d.nativeAdopted or {};
+	local turned = {};
+	for part, r in pairs(SS.NATIVE_REPLACEMENTS) do
+		local key = SS.NATIVE_KEYS[part];
+		local ours = key and d[key] ~= nil;                      -- Slim Suite hid it (and has not put it back yet)
+		if ( not ours and not d.nativeAdopted[part] and SS.NativeIsOff(part) and not d[r[1]] ) then
+			d[r[1]] = true; d.nativeAdopted[part] = true;
+			SS.Safe(r[3]);
+			table.insert(turned, r[2]);
+		end
+	end
+	if ( table.getn(turned) > 0 and SS.Notice ) then
+		SS.Notice("The game's own " .. table.concat(turned, ", ") .. " " .. (table.getn(turned) == 1 and "is" or "are") .. " off in its Interface settings, so Slim Suite's movable version is on instead.");
+	end
+end
+
 function SS.Startup(entering, loaded)
 	SS.Safe(SS.RegisterAnnouncementHandler);
 	local ok, err = SS.Safe(HookChat);
@@ -13,6 +51,7 @@ function SS.Startup(entering, loaded)
 	if ( loaded ) then
 		SS.DB().unlocked = false;
 		SS.Safe(SS.RestoreNatives);
+		SS.Safe(SS.AdoptHiddenNatives);
 	end
 	if ( entering ) then SS.Safe(SS.LayoutLogin); end        -- this character's own layout, if they are kept apart
 	SS.Safe(SS.Camera, entering);
@@ -360,6 +399,7 @@ function SS.ReleaseFromBar(f)
 	if ( f.slimBarParent and f.SetParent ) then f:SetParent(f.slimBarParent); end
 	if ( f.slimBarStrata and f.SetFrameStrata ) then f:SetFrameStrata(f.slimBarStrata); end
 	f.slimBarParent, f.slimBarStrata = nil, nil;
+	if ( f.SetAlpha ) then f:SetAlpha(1); end
 	if ( f == SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); return; end
 	f:ClearAllPoints();
 	if ( o[2] ) then f:SetPoint(o[1], o[2], o[3], o[4], o[5]); end
@@ -418,6 +458,9 @@ function SS.LayoutMinimapBar()
 		local wanted = f:IsShown();
 		if ( f == SS.Mini ) then wanted = not (d.minimap and d.minimap.hide); end
 		if ( wanted ) then
+			-- the setup hides the minimap's buttons by making them see-through; in the row they must be seen again
+			if ( f.SetAlpha ) then f:SetAlpha(1); end
+			if ( f.SetFrameLevel and bar.GetFrameLevel ) then f:SetFrameLevel((bar:GetFrameLevel() or 1) + 2); end
 			local own = (f.GetScale and f:GetScale()) or 1;
 			local along = pad + slot / 2 + n * slot;
 			f:ClearAllPoints();
@@ -462,6 +505,25 @@ if ( not okMini ) then K.Print(NAME, "|cffff4040the minimap button could not be 
 -- ring. Slim Suite adds its own rules here, so they work whichever addon's copy of that file loaded first: the button
 -- is left alone while the minimap-buttons row or the square minimap's column holds it, and on a square minimap it
 -- sits on the square's edge.
+-- how far the game's own minimap buttons sit from the map's centre on the round map (measured once, in the map's scale)
+function SS.RoundRingRadius()
+	if ( SS.roundRing ) then return SS.roundRing; end
+	local mx, my = Minimap:GetCenter();
+	local ms = Minimap:GetEffectiveScale() or 1;
+	for _, n in ipairs({ "MiniMapTrackingFrame", "MinimapZoomIn", "MiniMapMailFrame" }) do
+		local f = getglobal(n);
+		if ( f and not f.slimSquareOrig and not f.slimBarOrig and mx ) then
+			local fx, fy = f:GetCenter();
+			if ( fx ) then
+				local fs = f:GetEffectiveScale() or 1;
+				local dx, dy = fx * fs / ms - mx, fy * fs / ms - my;
+				local r = math.sqrt(dx * dx + dy * dy);
+				if ( r > 50 and r < 110 ) then SS.roundRing = r; return r; end
+			end
+		end
+	end
+	return 80;
+end
 if ( SS.Mini and SS.Mini.Place ) then
 	local mini, ringPlace = SS.Mini, SS.Mini.Place;
 	local function Docked()
@@ -476,13 +538,23 @@ if ( SS.Mini and SS.Mini.Place ) then
 		end
 		ringPlace();
 		local m = SS.DB().minimap;
-		if ( SS.DB().minimapSquare and Minimap and type(m) == "table" and not m.detached ) then
-			local a = math.rad(K.Num(m.angle or 190));
+		if ( Minimap and not (type(m) == "table" and m.detached) ) then
+			-- on the ring exactly as the game's own buttons sit: the same distance from the centre as its tracking or
+			-- zoom button on the round map, and on the square's gold ring when square. The offsets are worked out in
+			-- the minimap's own scale, so a scaled minimap or button no longer pushes the gear off the ring.
+			local a = math.rad(K.Num(type(m) == "table" and m.angle or 190));
 			local x, y = math.cos(a), math.sin(a);
-			local most = math.max(math.abs(x), math.abs(y));
-			if ( most > 0 ) then x, y = x / most, y / most; end
+			local k = (Minimap:GetEffectiveScale() or 1) / (mini:GetEffectiveScale() or 1);
+			if ( SS.squareActive ) then
+				local most = math.max(math.abs(x), math.abs(y));
+				if ( most > 0 ) then x, y = x / most, y / most; end
+				x, y = x * ((Minimap:GetWidth() or 140) / 2 + 3), y * ((Minimap:GetHeight() or 140) / 2 + 3);
+			else
+				local r = SS.RoundRingRadius();
+				x, y = x * r, y * r;
+			end
 			mini:ClearAllPoints();
-			mini:SetPoint("CENTER", Minimap, "CENTER", ((Minimap:GetWidth() or 140) / 2 + 3) * x, ((Minimap:GetHeight() or 140) / 2 + 3) * y);
+			mini:SetPoint("CENTER", Minimap, "CENTER", x * k, y * k);
 		end
 	end
 	-- dragging it does nothing while the row or the column holds it (they are moved by their own handle)
@@ -622,7 +694,7 @@ end
 
 -- While Demo Mode runs, Slim Suite's menus are put away so the samples can be seen, and a small "DEMO MODE" box
 -- stands in for them: "On" is lit while it runs, "Off" stops it and brings back the menus that were open.
-SS.DEMO_HIDES = { "SlimSuiteFrame", "SlimSuiteLayoutFrame", "SlimSuiteSetupPanel", "SlimSuiteSetupBar", "SlimSuiteSetupGlow",
+SS.DEMO_HIDES = { "SlimSuiteFrame", "SlimSuiteLayoutFrame", "SlimSuiteSetupPanel", "SlimSuiteSetupGlow",
 	"SlimSuiteMovePanel", "SlimSuiteChoiceMenu", "SlimSuiteRaidIconPanel" };
 demoHidden = {};
 function DemoBox()
@@ -652,10 +724,13 @@ function SS.ShowDemoBox(on)
 			local f = getglobal(name);
 			if ( f and f:IsShown() ) then demoHidden[name] = true; f:Hide(); end
 		end
-		local box = DemoBox(); box:Show(); box.on:LockHighlight(); box.off:UnlockHighlight();
+		-- the element list has its own On/Off beside the grid: it stays, and the small box is only for elsewhere
+		local list = getglobal("SlimSuiteSetupBar");
+		if ( not (list and list:IsShown()) ) then local box = DemoBox(); box:Show(); box.on:LockHighlight(); box.off:UnlockHighlight(); end
 	else
 		local box = getglobal("SlimSuiteDemoBox");
 		if ( box ) then box:Hide(); end
+		if ( SU and SU.RefreshDemoButtons ) then SU.RefreshDemoButtons(); end
 		for name in pairs(demoHidden) do local f = getglobal(name); if ( f ) then f:Show(); end end
 		demoHidden = {};
 	end
@@ -757,7 +832,7 @@ SS.Every("raidMarks", 1, function() SS.Safe(SS.UpdateRaidMarks); end);
 -- timed redraws above stay as a slow safety net, for anything this game changes without an event.
 local unitEvents = CreateFrame("Frame");
 for _, e in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_MANA", "UNIT_MAXMANA", "UNIT_RAGE", "UNIT_MAXRAGE", "UNIT_ENERGY",
-	"UNIT_MAXENERGY", "UNIT_LEVEL", "UNIT_NAME_UPDATE", "UNIT_PORTRAIT_UPDATE", "UNIT_DISPLAYPOWER", "PLAYER_TARGET_CHANGED",
+	"UNIT_MAXENERGY", "UNIT_AURA", "UNIT_LEVEL", "UNIT_NAME_UPDATE", "UNIT_PORTRAIT_UPDATE", "UNIT_DISPLAYPOWER", "PLAYER_TARGET_CHANGED",
 	"PARTY_MEMBERS_CHANGED", "PARTY_LEADER_CHANGED", "RAID_TARGET_UPDATE" }) do unitEvents:RegisterEvent(e); end
 local unitsDirty, marksDirty = false, false;
 unitEvents:SetScript("OnEvent", function()
@@ -769,7 +844,7 @@ SS.Every("unitEvents", 0, function()
 	if ( unitsDirty ) then
 		unitsDirty = false;
 		for i = 1, table.getn(SS.cardFrames or {}) do SS.Safe(SS.RefreshCard, SS.cardFrames[i]); end
-		SS.Safe(SS.UpdatePartyLines); SS.Safe(SS.UpdatePartySelf);
+		SS.Safe(SS.UpdatePartyLines); SS.Safe(SS.UpdatePartySelf); SS.Safe(SS.UpdateFriendBuffs);
 	end
 	if ( marksDirty ) then marksDirty = false; SS.Safe(SS.UpdateRaidMarks); end
 end);

@@ -453,7 +453,8 @@ local function TargetDebuffIcon(i)
 	b:SetScript("OnEnter", function()
 		if ( not GameTooltip ) then return; end
 		GameTooltip:SetOwner(this, "ANCHOR_BOTTOMRIGHT");
-		if ( this.index and GameTooltip.SetUnitDebuff ) then GameTooltip:SetUnitDebuff("target", this.index);
+		if ( this.buff and GameTooltip.SetUnitBuff ) then GameTooltip:SetUnitBuff("target", this.buff);
+		elseif ( this.index and GameTooltip.SetUnitDebuff ) then GameTooltip:SetUnitDebuff("target", this.index);
 		else GameTooltip:AddLine(this.name or "Debuff", 1, 0.3, 0.3); if ( this.stacks and this.stacks > 1 ) then GameTooltip:AddLine("Stacks: " .. this.stacks, 1, 1, 1); end end
 		GameTooltip:Show();
 	end);
@@ -493,27 +494,40 @@ local function UpdateTargetDebuffs()
 				table.insert(list, { icon = texture, stacks = tonumber(stacks) or 0, index = i });
 			end
 		end
+		-- and its buffs, after the debuffs
+		if ( UnitBuff ) then
+			for i = 1, 16 do
+				local texture, stacks = UnitBuff("target", i);
+				if ( not texture ) then break; end
+				table.insert(list, { icon = texture, stacks = tonumber(stacks) or 0, buff = i });
+			end
+		end
 	end
-	local n = math.min(16, table.getn(list));
+	local n = math.min(24, table.getn(list));
+	local side = DB().targetAuraSide or "below";
+	local cols = (side == "left" or side == "right") and 4 or 8;
 	for i = 1, n do
 		local e, b = list[i], TargetDebuffIcon(i);
 		b.icon:SetTexture(e.icon);
 		b.count:SetText(e.stacks > 1 and tostring(e.stacks) or "");
 		b.time:SetText(e.left and e.left > 0 and (e.left >= 10 and tostring(math.floor(e.left + 0.5)) or string.format("%.1f", e.left)) or "");
-		b.index, b.name, b.stacks = e.index, e.name, e.stacks;
+		b.index, b.name, b.stacks, b.buff = e.index, e.name, e.stacks, e.buff;
+		if ( e.buff ) then b.border:Hide(); else b.border:Show(); end   -- debuffs keep their red border
 		if ( b:GetParent() ~= anchor ) then b:SetParent(anchor); end   -- its scale and visibility come from the target's frame
 		b:ClearAllPoints();
-		if ( card ) then
-			-- under the card, eight to a row
-			b:SetPoint("TOPLEFT", card, "BOTTOMLEFT", 2 + math.mod(i - 1, 8) * 19, -2 - math.floor((i - 1) / 8) * 22);
-		else
-			-- where the 1.12 target frame puts its own: under the name and bars, eight to a row
-			b:SetPoint("TOPLEFT", TargetFrame, "BOTTOMLEFT", 5 + math.mod(i - 1, 8) * 19, 32 - math.floor((i - 1) / 8) * 22);
-		end
+		-- on the side chosen in the target's menu: eight to a row above or below, four to a row beside it
+		local col, row = math.mod(i - 1, cols), math.floor((i - 1) / cols);
+		local inset = card and 0 or 30;                       -- the 1.12 frame's art has empty space under it
+		if ( side == "above" ) then b:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT", 4 + col * 19, 2 + row * 22);
+		elseif ( side == "left" ) then b:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -2 - col * 19, -4 - row * 22);
+		elseif ( side == "right" ) then b:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 2 + col * 19, -4 - row * 22);
+		else b:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 4 + col * 19, -2 + inset - row * 22); end
 		b:Show();
 	end
 	for i = n + 1, table.getn(targetDebuffs.icons) do targetDebuffs.icons[i]:Hide(); end
 end
+
+W.UpdateTargetAuras = function() SS.Safe(UpdateTargetDebuffs); end
 
 -- ---------------------------------------------------------------- staying above the level-up and new-item cards
 local ON_TOP = { "SlimSuiteWorldMarkers", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteClockFrame",

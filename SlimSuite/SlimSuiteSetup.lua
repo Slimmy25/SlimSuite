@@ -36,7 +36,7 @@ function SU.Steps()
 		{ "SlimSuiteAnnouncementFrame", "Announcements", "Where event announcements appear.", function() return d.replaceBanners; end },
 		{ "SlimSuiteReviveFrame", "Revive bar", "The bar shown while you bring a friend back.", function() return d.replaceRevive; end },
 		{ "SlimSuiteLocalClockFrame", "Local clock", "Your real-world clock: 12/24-hour, its background and daylight saving are below.", function() return d.replaceLocalClock and d.clockDetached; end },
-		{ "SlimSuiteMinimapBar", "Minimap buttons", "Every minimap button and the day/night moon in one row. Drag it anywhere.", function() return d.minimapBar; end },
+		{ "SlimSuiteMinimapBar", "Button row (optional)", "Optional: takes every minimap button and the day/night moon off the map into one row you can drag anywhere. Off, the buttons stay on the map's ring.", function() return d.minimapBar; end },
 		{ "SlimSuiteCombatTextFrame", "Combat text", "Your newest hits and heals, each with its spell icon. Crits stand out.", function() return d.combatTextBox; end },
 	};
 	for i = 1, table.getn(rest) do
@@ -222,8 +222,12 @@ end
 SS.PARTY_LOOKS = { { "Face plates", "classic" }, { "Thin lines", "thin" } };
 SS.PARTY_LAYOUTS = { { "Column", "vertical" }, { "Row", "horizontal" } };
 SS.PARTY_PLACES = { { "Anywhere", "free" }, { "Under the player frame", "below" }, { "Above the player frame", "above" } };
+-- your buffs: in their own place, or on one side of the player frame
 SS.BUFF_PLACES = { { "In their own place", "own" }, { "Above the player frame", "player_above" }, { "Below the player frame", "player_below" },
-	{ "Above the target frame", "target_above" }, { "Below the target frame", "target_below" } };
+	{ "Left of the player frame", "player_left" }, { "Right of the player frame", "player_right" } };
+-- the target's own buffs and debuffs: on one side of the target frame
+SS.TARGET_AURA_SIDES = { { "Above the target frame", "above" }, { "Below the target frame", "below" },
+	{ "Left of the target frame", "left" }, { "Right of the target frame", "right" } };
 
 -- the tick boxes each step offers: that element's own settings, the same ones as in the settings window
 function SU.ChecksFor(frame)
@@ -272,8 +276,9 @@ function SU.ChecksFor(frame)
 			{ "Turn the action bar vertical", function() return SS.DB().orientations.MainMenuBar == "vertical"; end, function(v) SU.SetVertical("MainMenuBar", v); end },
 			{ "Cooldown numbers on the spell squares", short = "Cooldown numbers", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v and true or false; end } },
 		TargetFrame = { TargetLook(), Portraits("TargetFrame"), HideTarget(), Combine(), Mirror(), MirrorScale(),
-			{ "Show debuffs and DoTs on the target", short = "Debuffs and DoTs on target", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end },
-			BuffsPlace() },
+			{ "Show the target's buffs and debuffs", short = "Target's buffs and debuffs", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end },
+			{ "Target's buffs and debuffs sit", short = "They sit", function() return SS.DB().targetAuraSide or "below"; end, function(v) SS.SetTargetAuraSide(v); end,
+				function() return SS.DB().targetDebuffs; end, choice = SS.TARGET_AURA_SIDES } },
 		BuffFrame = { BuffsPlace() },
 		MinimapCluster = { { "Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end },
 			ShowClock(), DetachClock(),
@@ -298,6 +303,7 @@ function SU.ChecksFor(frame)
 			{ "Party look", function() return SS.Look("PartyMemberFrame1"); end, function(v) SS.SetLook("PartyMemberFrame1", v); end,
 				choice = SS.PARTY_LOOKS, short = "Look" },
 			{ "Show character faces", function() return SS.DB().partyFaces ~= false; end, function(v) SU.SetPartyOption("partyFaces", v); end },
+			{ "Party members' buffs above them", function() return SS.DB().partyMemberBuffs ~= false; end, function(v) SS.DB().partyMemberBuffs = v and true or false; SS.Safe(SS.UpdateFriendBuffs); end, short = "Friends' buffs" },
 			SelfParty(), YouIn(BuffsPlace()), YouIn(ProcMeter()), PartyPlace() },
 		SlimSuiteBossFrames = { { "Show debuffs on the bars", function() return SS.DB().encounterDebuffs; end, function(v) SS.DB().encounterDebuffs = v; end },
 			{ "Vertical", function() return SS.DB().orientations.SlimSuiteBossFrames == "vertical"; end,
@@ -1144,27 +1150,43 @@ end
 -- where the buffs sit: "own", "player_above", "player_below", "target_above" or "target_below"
 function SS.BuffsPlace()
 	local d = SS.DB();
-	if ( d.buffsOnTarget ) then return d.buffsOnTargetSide == "above" and "target_above" or "target_below"; end
-	if ( d.buffsOnPlayer ) then return d.buffsOnPlayerSide == "below" and "player_below" or "player_above"; end
+	if ( d.buffsOnPlayer ) then return "player_" .. (d.buffsOnPlayerSide or "above"); end
 	return "own";
 end
 function SS.SetBuffsPlace(v)
 	local d = SS.DB();
-	if ( v == "player_above" or v == "player_below" ) then
-		d.buffsOnPlayerSide = v == "player_below" and "below" or "above";
-		d.buffsOnTarget = false;
+	local side = type(v) == "string" and string.sub(v, 1, 7) == "player_" and string.sub(v, 8) or nil;
+	d.buffsOnTarget = false;
+	if ( side ) then
+		d.buffsOnPlayerSide = side;
 		SU.SetBuffsPlayer(true);
-	elseif ( v == "target_above" or v == "target_below" ) then
-		d.buffsOnTargetSide = v == "target_above" and "above" or "below";
-		d.buffsOnPlayer = false;
-		SS.SetBuffsOnTarget(true);
-	else
-		if ( d.buffsOnTarget ) then SS.SetBuffsOnTarget(false); end
-		if ( d.buffsOnPlayer ) then SU.SetBuffsPlayer(false); end
+	elseif ( d.buffsOnPlayer ) then
+		SU.SetBuffsPlayer(false);
 	end
 	SS.Safe(SS.AttachBuffs);
-	if ( SS.DB().unlocked ) then SS.Safe(SS.SetUnlocked, true, true); end   -- the buff frame's own handle comes or goes
+	SU.RefreshBar();
+	if ( SS.MenuOpen and SS.MenuOpen() ) then SU.Focus(SU.focus); end
 end
+-- the target's buffs and debuffs: which side of the target frame
+function SS.SetTargetAuraSide(v)
+	SS.DB().targetAuraSide = v;
+	if ( SlimSuiteWorld and SlimSuiteWorld.UpdateTargetAuras ) then SlimSuiteWorld.UpdateTargetAuras(); end
+end
+-- mirroring the target to the player: offer to give the target's buffs the player's side, mirrored (left <-> right)
+SS.MIRROR_SIDE = { above = "above", below = "below", left = "right", right = "left" };
+function SS.OfferMirrorBuffs()
+	local d = SS.DB();
+	if ( not d.buffsOnPlayer ) then return; end
+	local want = SS.MIRROR_SIDE[d.buffsOnPlayerSide or "above"] or "below";
+	if ( d.targetDebuffs and d.targetAuraSide == want ) then return; end
+	if ( not StaticPopupDialogs ) then return; end
+	StaticPopupDialogs["SLIMSUITE_MIRROR_BUFFS"] = {
+		text = "Mirror target: show the target's buffs and debuffs " .. want .. " the target frame, to match your player frame's buffs?",
+		button1 = YES or "Yes", button2 = NO or "No", timeout = 0, whileDead = 1, hideOnEscape = 1,
+		OnAccept = function() SS.DB().targetDebuffs = true; SS.SetTargetAuraSide(want); SS.RefreshToggles(); end };
+	if ( StaticPopup_Show ) then StaticPopup_Show("SLIMSUITE_MIRROR_BUFFS"); end
+end
+
 
 -- hiding the target frame: the classic frame and the new-school card alike
 function SS.SetTargetHidden(on)
@@ -1628,7 +1650,9 @@ function SU.Begin()
 		b:SetWidth(w); b:SetHeight(22);
 		-- the Enabled / Disabled tag sits to the right of its button
 		b.tag:SetWidth(72); b.tag:ClearAllPoints(); b.tag:SetPoint("LEFT", b, "RIGHT", 4, 0);
-		if ( idx > 0 and 8 + (idx + 1) * LINE > maxH ) then col = col + 1; idx = 0; end
+		-- two columns, half the elements in each (a third column only if the screen is too short for two)
+		local perCol = math.ceil(table.getn(SU.elements) / 2);
+		if ( idx > 0 and (idx >= perCol or 8 + (idx + 1) * LINE > maxH) ) then col = col + 1; idx = 0; end
 		b:ClearAllPoints(); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 8 + col * COLUMN, -8 - TOP - idx * LINE); b:Show();
 		if ( idx > maxIdx ) then maxIdx = idx; end
 		idx = idx + 1;
@@ -1640,8 +1664,14 @@ function SU.Begin()
 	SU.Focus(nil);
 	SU.RefreshBar();
 	SU.UpdateDemo();
+	SU.RefreshDemoButtons();
 end
 
+function SU.RefreshDemoButtons()
+	if ( not SU.bar or not SU.bar.demoOn ) then return; end
+	if ( SS.demoRunning ) then SU.bar.demoOn:LockHighlight(); SU.bar.demoOff:UnlockHighlight();
+	else SU.bar.demoOff:LockHighlight(); SU.bar.demoOn:UnlockHighlight(); end
+end
 function SU.Build()
 	SU.panel = CreateFrame("Frame", "SlimSuiteSetupPanel", UIParent);
 	SU.panel:SetWidth(420); SU.panel:SetHeight(150);
@@ -1703,6 +1733,13 @@ function SU.Build()
 	SU.panel.done:SetPoint("BOTTOMRIGHT", SU.panel, "BOTTOMRIGHT", -10, 8);
 	SU.panel.done:Hide();
 	SU.panel:Hide();
+	-- Demo Mode beside the grid: On and Off, the one that is in effect lit
+	SU.bar.demoLabel = SU.bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
+	SU.bar.demoLabel:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 218, -12); SU.bar.demoLabel:SetText("Demo");
+	SU.bar.demoOn = K.Button(SU.bar, "On", 36, function() SS.StartDemoMode(); SU.RefreshDemoButtons(); end);
+	SU.bar.demoOn:SetHeight(18); SU.bar.demoOn:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 252, -9);
+	SU.bar.demoOff = K.Button(SU.bar, "Off", 36, function() SS.StopDemoMode(); SU.RefreshDemoButtons(); end);
+	SU.bar.demoOff:SetHeight(18); SU.bar.demoOff:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 290, -9);
 	SU.bar.done = K.Button(SU.bar, "Done", 90, function() SS.SetupEnd(true); end);
 	SU.bar.done:SetPoint("BOTTOMLEFT", SU.bar, "BOTTOMLEFT", 8, 8);
 	SU.bar:SetFrameStrata("DIALOG");
@@ -1711,7 +1748,18 @@ function SU.Build()
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	SU.bar:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
 	SU.bar:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
-	SU.bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 6, -6);
+	-- the list can be dragged by its background; it stays where it was put
+	SU.bar:SetMovable(true); SU.bar:EnableMouse(true); SU.bar:RegisterForDrag("LeftButton");
+	if ( SU.bar.SetClampedToScreen ) then SU.bar:SetClampedToScreen(true); end
+	SU.bar:SetScript("OnDragStart", function() this:StartMoving(); end);
+	SU.bar:SetScript("OnDragStop", function()
+		this:StopMovingOrSizing();
+		local l, t = this:GetLeft(), this:GetTop();
+		if ( l and t ) then SS.DB().elementListPlace = { x = l, y = t - UIParent:GetHeight() }; end
+	end);
+	local saved = SS.DB().elementListPlace;
+	if ( type(saved) == "table" and saved.x and saved.y ) then SU.bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT", saved.x, saved.y);
+	else SU.bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 6, -6); end
 	SU.bar:Hide();
 	-- the gold outline around the element being set up
 	SU.glow = CreateFrame("Frame", "SlimSuiteSetupGlow", UIParent);
@@ -1962,63 +2010,33 @@ function SS.WinBuild()
 	end
 	local function CheckboxRows()
 		local noteTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontNormal");
-		noteTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -8); noteTitle:SetText("About UI replacements");
+		noteTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -8); noteTitle:SetText("Moving the game's UI");
 		local note = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		note:SetPoint("TOPLEFT", noteTitle, "BOTTOMLEFT", 0, -3); note:SetWidth(390); note:SetHeight(38);
-		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetText("Most custom game UI is not available as reusable addon art or code. This section recreates it as faithfully as possible so it can be moved; a few implementation choices are unavoidable. <3");
+		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetHeight(52); note:SetText("The game's own versions of these parts can't be moved. To move one, say yes below: Slim Suite swaps in its own movable copy. Each copy's other settings are in its menu: right-click it in Toggle UI Settings.");
 		AddRows(uiChild, {
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
 			{button = "Layouts (share / paste)", onClick = function() SS.ShowLayoutWindow(); end},
 			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
-			{head="Player and target frames"},
-			{"Player frame look", function() return SS.PlayerLookChoice(); end, function(v) SS.SetPlayerLookChoice(v); end, choice = SS.PLAYER_LOOKS},
-			{"Target frame look", function() return SS.DB().targetLook == "new" and "new" or "classic"; end, function(v) SS.SetLook("TargetFrame", v); end, choice = SS.LOOK_CHOICES},
-			{"3D portraits on the new-school frames", function() return SS.DB().cardPortraits ~= false; end, function(v) SS.DB().cardPortraits = v and true or false; SS.Safe(SS.ApplyNewFrames); end},
-			{"Combine the player and target frames (the player takes the target's look)", function() return SS.DB().combineTarget; end, function(v) SS.SetCombineTarget(v); end},
-			{"Mirror target", function() return SS.DB().mirrorTarget; end, function(v) SS.SetMirrorTarget(v); end},
-			{"Hide the target frame", function() return SS.DB().hideTarget; end, function(v) SS.SetTargetHidden(v); end},
-			{"Show debuffs and DoTs on the target", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end},
-			{"Buffs and debuffs", function() return SS.BuffsPlace(); end, function(v) SS.SetBuffsPlace(v); end, choice = SS.BUFF_PLACES},
-			{"Class proc meter under the player frame", function() return SS.DB().procMeter; end, function(v) SS.DB().procMeter = v; end},
-			{head="Party frames"},
-			{"Party layout", function() return SS.DB().orientations.PartyMemberFrame1 == "horizontal" and "horizontal" or "vertical"; end, function(v) SU.SetPartyRow(v == "horizontal"); end, choice = SS.PARTY_LAYOUTS},
-			{"Party look", function() return SS.Look("PartyMemberFrame1"); end, function(v) SS.SetLook("PartyMemberFrame1", v); end, choice = SS.PARTY_LOOKS},
-			{"Show character faces in the party", function() return SS.DB().partyFaces ~= false; end, function(v) SU.SetPartyOption("partyFaces", v); end},
-			{"Join the party frames yourself (you go first, in the party's look)", function() return SS.DB().partyIncludesSelf; end, function(v) SS.SetPartySelf(v); end},
-			{"   Your buffs and debuffs", function() return SS.BuffsPlace(); end, function(v) SS.SetBuffsPlace(v); end, choice = SS.BUFF_PLACES},
-			{"   ...class proc meter under you", function() return SS.DB().procMeter; end, function(v) SS.DB().procMeter = v; end},
-			{"Party frames sit", function() return SS.PartyPosition(); end, function(v) SS.SetPartyPosition(v); end, choice = SS.PARTY_PLACES},
-			{head="Default UI replacements"},
+			{head="Make the game's UI movable"},
 			{"Replace Default Level Up with Movable Version?", function() return SS.DB().moveLevelButton; end, function(v) SS.DB().moveLevelButton = v; SS.Safe(SS.UpdateLevelButton); end},
 			{"Replace Default Build Rows with Movable Versions?", function() return SS.DB().replaceBuildRows; end, function(v) SS.DB().replaceBuildRows = v; SS.ApplyBuildRowReplacement(); end},
 			{"Replace Default Damage Meter with Movable Version?", function() return SS.DB().moveMeter; end, function(v) SS.SetMeterReplacement(v); end},
 			{"Replace Default Run Clock with Movable Version?", function() return SS.DB().replaceClock;end,function(v) SS.DB().replaceClock=v;SS.UpdateClock();end},
-			{"   ...show the zone and Heroic affixes under it", function() return SS.DB().zoneLine;end,function(v) SS.DB().zoneLine=v;SS.UpdateClock();end},
 			{"Replace Default Encounter Bars with Movable Versions?", function() return SS.DB().replaceEncounters;end,function(v) SS.DB().replaceEncounters=v;SS.UpdateBossFrames();end},
-			{"   ...show debuffs on the encounter bars", function() return SS.DB().encounterDebuffs; end, function(v) SS.DB().encounterDebuffs = v; SS.Safe(SS.UpdateBossFrames); end},
 			{"Replace Default Kills / Gold / Cache with Movable Version?", function() return SS.DB().replaceTally;end,function(v) SS.DB().replaceTally=v;SS.UpdateTally();end},
-			{"   ...show boss and Guardian kills next to Kills", function() return SS.DB().tallyBossKills;end,function(v) SS.DB().tallyBossKills=v;SS.UpdateTally();end},
-			{"   ...dark band behind it", function() return SS.DB().tallyBackground;end,function(v) SS.DB().tallyBackground=v;SS.UpdateTally();end},
 			{"Replace Default Announcements with Movable Version?", function() return SS.DB().replaceBanners;end,function(v) SS.DB().replaceBanners=v;SS.UpdateAnnouncementFrame();end},
 			{"Replace Default Revive Bar with Movable Version?", function() return SS.DB().replaceRevive; end, function(v) SS.DB().replaceRevive = v; end},
 			{"Replace Default Local Clock with Movable Version?", function() return SS.DB().replaceLocalClock; end, function(v) SS.SetLocalClockOn(v); end},
-			{head="Action bar"},
 			{"Replace Default Action Bar Art with Plain Version?", function() return SS.DB().plainBar; end, function(v) SS.DB().plainBar = v; SS.PlainBar(v); end},
-			{"Add racial ability as a 7th Action Bar 1 button?", function() return SS.DB().showRacialAbility; end, function(v) SS.SetRacialAbility(v); end},
-			{"Show empty slots in Action Bar 1", function() return SS.DB().showEmptyActionSlots; end, function(v) SS.DB().showEmptyActionSlots = v; ApplyActionSlotGrid(); end},
-			{head="XP bar"},
-			{"Split the XP bar into 20 segments", function() return SS.DB().xpSegments ~= false; end, function(v) SS.DB().xpSegments = v and true or false; SS.Safe(SS.LayoutXpSegments); end},
-			{head="Extras"},
-			{"Combat text box", function() return SS.DB().combatTextBox; end, function(v) SS.DB().combatTextBox = v; if ( SS.DB().unlocked ) then SS.SetUnlocked(true, true); end SU.Rebuild(); end},
-			{"   ...show heals", function() return SS.DB().ctHeals ~= false; end, function(v) SS.DB().ctHeals = v and true or false; end},
-			{"   ...crits: bigger and longer", function() return SS.DB().ctCrits ~= false; end, function(v) SS.DB().ctCrits = v and true or false; end},
-			{"   ...spell icons", function() return SS.DB().ctIcons ~= false; end, function(v) SS.DB().ctIcons = v and true or false; end},
-			{"   ...lines stay twice as long", function() return SS.DB().ctLong ~= false; end, function(v) SS.DB().ctLong = v and true or false; end},
+			{"Replace Default Combat Text with Movable Box?", function() return SS.DB().combatTextBox; end, function(v) SU.FEATURES.SlimSuiteCombatTextFrame(v and true or false); if ( SS.DB().unlocked ) then SS.SetUnlocked(true, true); end SU.Rebuild(); end},
+			{"Replace Default Minimap Buttons with a Movable Row? (optional)", function() return SS.DB().minimapBar; end, function(v) SS.SetMinimapBar(v); end},
+			{head="Everywhere"},
 			{"Floating combat text over enemies (Slim Suite's own)", function() return SS.DB().floatingText; end, function(v) SS.DB().floatingText = v; end},
 			{"Show Slim Suite above the level-up and new-item cards", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
-		}, -72, function(y) uiLastY = y; PlaceTail(); end);
+		}, -86, function(y) uiLastY = y; PlaceTail(); end);
 	end
 	local function BuildOther()
 		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");

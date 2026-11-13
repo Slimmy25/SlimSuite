@@ -344,11 +344,16 @@ function SS.UpdateEncounterRows(list)
 	local defaultCardWidth = vertical and 48 or 520;
 	local cardMinW, cardMinH = SS.MinSize("SlimSuiteBossFrames");
 	local minCardWidth = cardMinW;   -- a floor only: the default width is still 520 per boss
-	local minimumFrameWidth = count * minCardWidth + ((count - 1) * gap) + (padding * 2);
-	local frameWidth = type(configured) == "table" and configured.w or (count * defaultCardWidth + ((count - 1) * gap) + (padding * 2));
-	frameWidth = math.max(minimumFrameWidth, frameWidth);
-	local cardWidth = math.max(minCardWidth, (frameWidth - (padding * 2) - ((count - 1) * gap)) / count);
-	frameWidth = count * cardWidth + ((count - 1) * gap) + (padding * 2);
+	-- side by side (vertical cards) the width holds every card; as rows (one under the other) each row is the whole
+	-- width, so the width is one card's, not one per boss (that made the frame and its handle run off the screen)
+	local across = vertical and count or 1;
+	local minimumFrameWidth = across * minCardWidth + ((across - 1) * gap) + (padding * 2);
+	local frameWidth = type(configured) == "table" and configured.w or (across * defaultCardWidth + ((across - 1) * gap) + (padding * 2));
+	local screen = (UIParent and UIParent:GetWidth()) or 1024;
+	if ( frameWidth > screen * 0.9 ) then frameWidth = across * defaultCardWidth + ((across - 1) * gap) + (padding * 2); end   -- an old, too-wide saved size
+	frameWidth = math.min(math.max(minimumFrameWidth, frameWidth), screen * 0.9);
+	local cardWidth = math.max(minCardWidth, (frameWidth - (padding * 2) - ((across - 1) * gap)) / across);
+	frameWidth = across * cardWidth + ((across - 1) * gap) + (padding * 2);
 	local frameHeight = type(configured) == "table" and configured.h or (vertical and 252 or (count * 48));
 	local minimumHeight = vertical and cardMinH or math.max(count * 42 + padding * 2, cardMinH);
 	frameHeight = math.max(minimumHeight, frameHeight);
@@ -1715,7 +1720,10 @@ function SS.AttachBuffs()
 		x = 0;
 	end
 	BuffFrame:ClearAllPoints();
+	if ( SS.DB().partyIncludesSelf and (side == "left" or side == "right") ) then side = "above"; end   -- in the party: above your plate
 	if ( side == "above" ) then BuffFrame:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT", x, 2);
+	elseif ( side == "left" ) then BuffFrame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -4, 0);
+	elseif ( side == "right" ) then BuffFrame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 4, 0);
 	else BuffFrame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x, -2); end
 	if ( BuffFrame.SetScale ) then BuffFrame:SetScale(scale); end
 	SS.Safe(SS.LayoutPartyBuffs);

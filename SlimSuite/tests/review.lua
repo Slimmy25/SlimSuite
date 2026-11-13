@@ -104,3 +104,17 @@ SU.SetOn("SlimSuiteCombatTextFrame", true, "Combat text"); SS.SetUnlocked(true, 
 check("turning it on turns the box on", SS.DB().combatTextBox == true)
 check("and it has a green handle", SS.ENV.handles.SlimSuiteCombatTextFrame and SS.ENV.handles.SlimSuiteCombatTextFrame:IsShown())
 print("list problems: " .. bad)
+-- the element list: two columns, and it can be dragged
+local cols = {}
+for _, b in pairs(SU.barButtons) do if b:IsShown() then local p = b.points[1]; cols[p[4]] = true end end
+local nc = 0; for _ in pairs(cols) do nc = nc + 1 end
+check("element list in two columns", nc == 2)
+check("element list can be dragged", SU.bar.movable or (SU.bar.IsMovable and SU.bar:IsMovable()) or SU.bar:GetScript("OnDragStart") ~= nil)
+print("listcols problems: " .. bad)
+-- Demo On/Off beside the grid; the list stays while the demo runs
+Click(SU.bar.demoOn); Tick(2)
+check("Demo On from the list", SS.demoRunning and SU.bar:IsVisible())
+check("no extra box while the list is open", not (SlimSuiteDemoBox and SlimSuiteDemoBox:IsShown()))
+Click(SU.bar.demoOff); Tick(2)
+check("Demo Off from the list", not SS.demoRunning)
+print("listdemo problems: " .. bad)

@@ -92,11 +92,19 @@ print("connected problems: " .. bad)
 for i = 0, 9 do local b = getglobal("BuffButton" .. i) or CreateFrame("Button", "BuffButton" .. i, BuffFrame); b:SetWidth(30); b:SetHeight(30); b:Show() end
 SS.SetPartySelf(true); SS.SetBuffsPlace("player_above"); Tick(3); SS.LayoutPartyBuffs()
 local b0, b1 = BuffButton0.points and BuffButton0.points[1], BuffButton1.points and BuffButton1.points[1]
-check("first buff at the left", b0 and b0[1] == "BOTTOMLEFT" and b0[4] == 0 and b0[5] == 0)
-check("second buff to its right", b1 and b1[4] > 0 and b1[5] == 0)
-local maxRow = 0
-for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; if p[5] > maxRow then maxRow = p[5] end end
-check("more buffs wrap into rows going up", maxRow > 0)
+local plate = SlimSuitePartySelfFrame
+local pl = (plate.portrait and plate.portrait:GetLeft()) or plate:GetLeft()
+check("first buff lines up with your portrait", b0 and pl and math.abs(b0[4] * (BuffFrame:GetEffectiveScale() or 1) - pl * (plate:GetEffectiveScale() or 1)) < 1)
+check("second buff to its right, same row", b1 and b1[4] > b0[4] and b1[5] == b0[5])
+local rows, lowest = {}, nil
+for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; rows[p[5]] = true; if not lowest or p[5] < lowest then lowest = p[5] end end
+local n = 0; for _ in pairs(rows) do n = n + 1 end
+check("more buffs make more rows", n > 1)
+check("first buff is on the top row (rows grow down)", b0[5] > lowest)
+local right = PartyMemberFrame1:GetLeft()
+local last = getglobal("BuffButton9").points[1]
+for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]
+	if SS.CurrentOrientation("PartyMemberFrame1") == "horizontal" and right and (p[4] + 30) * BuffFrame:GetEffectiveScale() > right * PartyMemberFrame1:GetEffectiveScale() then check("buff " .. i .. " stops before the next frame", false) end end
 SS.SetPartySelf(false); Tick(2)
 print("partybuffs problems: " .. bad)
 -- Demo Mode: menus go away for a small On/Off box and come back after; the party keeps your layout
@@ -126,3 +134,76 @@ FireEvent("UNIT_HEALTH", "player"); Tick(1, 0.01)
 check("UNIT_HEALTH redraws the cards at once", calls > 0)
 SS.RefreshCard = old
 print("events problems: " .. bad)
+-- side by side: your buffs stop before the first friend's frame; friends' buffs show above their own plates
+SS.SetPartySelf(true); SU.SetPartyRow(true); Tick(3); SS.LayoutPartyBuffs()
+local L, W = SS.BuffRoom(SlimSuitePartySelfFrame, SlimSuitePartySelfFrame.portrait, PartyMemberFrame1)
+local edge = L + W
+local over = false
+for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; if (p[4] + 30) * BuffFrame:GetEffectiveScale() > edge then over = true end end
+check("row: buffs stay inside the room before party member 1", not over)
+local oldExists, oldBuff = UnitExists, UnitBuff
+UnitExists = function(u) return u == "player" or u == "party1" end
+UnitBuff = function(u, i) if u == "party1" and i <= 5 then return "Interface\\Icons\\Spell_Holy_WordFortitude" end end
+PartyMemberFrame1:Show(); SS.UpdateFriendBuffs()
+local n = 0; for _, b in ipairs(SS.friendBuffs[1]) do if b:IsShown() then n = n + 1 end end
+check("a friend's 5 buffs show above them", n == 5)
+SS.DB().partyMemberBuffs = false; SS.UpdateFriendBuffs()
+n = 0; for _, b in ipairs(SS.friendBuffs[1]) do if b:IsShown() then n = n + 1 end end
+check("and can be turned off", n == 0)
+SS.DB().partyMemberBuffs = nil; UnitExists, UnitBuff = oldExists, oldBuff
+SU.SetPartyRow(false); SS.SetPartySelf(false); Tick(2)
+print("friendbuffs problems: " .. bad)
+-- the square's ring belongs to the square map: off means no ring, even if something shows it again
+SS.SetMinimapSquare(true); Tick(2)
+check("square: ring shows", SS.squareRing and SS.squareRing:IsShown())
+SS.SetMinimapSquare(false); Tick(2)
+check("round: ring gone", not SS.squareRing:IsShown())
+SS.squareRing:Show(); Tick(2, 0.6)
+check("round: ring cannot come back", not SS.squareRing:IsShown())
+print("ring problems: " .. bad)
+-- the button row: optional (off by default), its buttons can be seen, and they go back on the map's ring
+check("the button row is off by default", SS.DEFAULTS.minimapBar == false)
+local gear = SlimSuiteMinimapButton
+gear:SetAlpha(0)                                       -- as the setup's sweep leaves it
+SS.SetMinimapBar(true, true); SS.LayoutMinimapBar()
+check("buttons in the row can be seen", gear:GetAlpha() == 1)
+SS.SetMinimapBar(false, true); Tick(2)
+local p = gear.points and gear.points[1]
+check("the gear goes back to the ring", p and p[2] == Minimap)
+print("corral problems: " .. bad)
+-- encounter bars as rows: the frame (and its green handle) is one bar wide, not one bar per boss
+SS.DB().replaceEncounters = true; SS.DB().orientations.SlimSuiteBossFrames = "horizontal"
+SS.UpdateEncounterRows({ { name = "A", kind = "boss", hp = 5, hpm = 10 }, { name = "B", kind = "boss", hp = 5, hpm = 10 }, { name = "C", kind = "guardian", hp = 5, hpm = 10 } })
+check("encounter bars fit on the screen", SlimSuiteBossFrames:GetWidth() <= UIParent:GetWidth() * 0.9)
+check("rows are one bar wide", SlimSuiteBossFrames:GetWidth() < 600)
+print("encounter problems: " .. bad)
+-- a part the player turned off in the game's Interface settings switches on Slim Suite's version, once
+local hud = { clock = false }
+AZS_IsHudShown = function(p) return hud[p] ~= false end
+AZS_SetHudShown = function(p, on) hud[p] = on end
+SS.DB().replaceClock = false; SS.DB().nativeAdopted = nil; SS.DB().clockNativeOriginal = nil
+SS.AdoptHiddenNatives()
+check("the game's run clock off: Slim Suite's is on", SS.DB().replaceClock == true)
+check("parts still shown are left alone", not SS.DB().replaceTally)
+SS.DB().replaceClock = false; SS.AdoptHiddenNatives()
+check("turning ours off afterwards is kept", SS.DB().replaceClock == false)
+print("adopt problems: " .. bad)
+-- your buffs: own place or a side of the player frame; the target's auras have their own side
+local placeNames = {}
+for _, p in ipairs(SS.BUFF_PLACES) do placeNames[p[2]] = true end
+check("your buffs have no target options", not placeNames.target_above and placeNames.player_left and placeNames.player_right)
+SS.SetBuffsPlace("player_left"); Tick(2)
+local bp = BuffFrame.points and BuffFrame.points[1]
+check("left of the player frame", SS.BuffsPlace() == "player_left" and bp and bp[1] == "TOPRIGHT" and bp[3] == "TOPLEFT")
+SS.SetTargetAuraSide("right")
+check("the target's side is its own", SS.DB().targetAuraSide == "right" and SS.BuffsPlace() == "player_left")
+-- mirroring offers the player's side, mirrored
+local shown
+StaticPopupDialogs = StaticPopupDialogs or {}
+StaticPopup_Show = function(n) shown = n end
+SS.DB().targetAuraSide = "below"; SS.SetMirrorTarget(true)
+check("mirror target offers to match", shown == "SLIMSUITE_MIRROR_BUFFS")
+StaticPopupDialogs.SLIMSUITE_MIRROR_BUFFS.OnAccept()
+check("accepting puts the target's auras on the mirrored side", SS.DB().targetAuraSide == "right")
+SS.SetMirrorTarget(false); SS.SetBuffsPlace("own")
+print("aura problems: " .. bad)

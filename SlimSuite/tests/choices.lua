@@ -6,7 +6,7 @@ local function round()
 	for _, v in ipairs({ "new", "classic" }) do SS.SetLook("TargetFrame", v); Tick(1); check("target look " .. v, SS.Look("TargetFrame"), v) end
 	for _, v in ipairs({ "thin", "classic", "thin" }) do SS.SetLook("PartyMemberFrame1", v); Tick(2); check("party look " .. v, SS.Look("PartyMemberFrame1"), v) end
 	for _, v in ipairs({ "below", "above", "free" }) do SS.SetPartyPosition(v); Tick(1); check("party place " .. v, SS.PartyPosition(), v) end
-	for _, v in ipairs({ "player_above", "player_below", "target_above", "target_below", "own" }) do SS.SetBuffsPlace(v); Tick(1); check("buffs " .. v, SS.BuffsPlace(), v) end
+	for _, v in ipairs({ "player_above", "player_below", "player_left", "player_right", "own" }) do SS.SetBuffsPlace(v); Tick(1); check("buffs " .. v, SS.BuffsPlace(), v) end
 	SS.SetPartySelf(true); Tick(1); SS.SetPartyPosition("below"); Tick(1)
 	check("lock takes you out of the party", SS.DB().partyIncludesSelf, false)
 	SS.SetPartySelf(true); Tick(1)
