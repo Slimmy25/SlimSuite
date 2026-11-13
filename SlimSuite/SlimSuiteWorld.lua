@@ -80,7 +80,7 @@ function A.Project(requests)
 	spotUsed = 0;
 	local n = table.getn(requests);
 	if ( n == 0 or not A.Has("AZS_ProjectWorldAnchors") ) then return out; end
-	local scale = UIParent:GetEffectiveScale() or 1;
+	local scale = SS.EffectiveScale(UIParent);
 	local first = 1;
 	while ( first <= n ) do
 		local batch = requests;                              -- 256 or fewer (nearly always): asked as they are
@@ -775,7 +775,7 @@ local function DrawPops(now)
 		else
 			n = n + 1;
 			local p = PopLine(n);
-			p:SetScale((box:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1) * scale);
+			p:SetScale((SS.EffectiveScale(box)) / (SS.EffectiveScale(UIParent)) * scale);
 			p:ClearAllPoints();
 			p:SetPoint("TOPLEFT", UIParent, "TOPLEFT", ((box:GetLeft() or 0) + x) / scale, (top - 6 - fall) / scale);
 			p.icon:SetTexture(e.icon or nil); p.icon:SetWidth(e.icon and 15 or 0);
@@ -1329,7 +1329,7 @@ local function DrawFloats()
 		local id = type(entries[i]) == "table" and entries[i].anchorId;
 		if ( id ~= nil ) then byId = floatById; byId[id] = entries[i]; end
 	end
-	local scale = UIParent:GetEffectiveScale() or 1;
+	local scale = SS.EffectiveScale(UIParent);
 	local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
 	local shown = 0;
 	for i = 1, n do

@@ -1,4 +1,4 @@
--- random clicks through the setup, checking after each one that the click did what it says
+-- random status and option clicks through the setup, checking enabled elements and their live settings
 local function upvalue(fn, want)
 	local i = 1
 	while true do
@@ -52,12 +52,15 @@ errs("start")
 local sizeMenu
 local function visibleRows()
 	local rows = {}
+	-- A setting can affect a replacement only after its parent element is opted in.
+	if ( not SU.focus or SU.Mode(SU.focus) ~= "enabled" ) then return rows; end
 	for i = 1, #SU.checks do
 		local cb = SU.checks[i]
 		if cb:IsVisible() and cb.enabled ~= false then
 			local e = { cb = cb, where = "setup", label = cb.label.text, get = cb.get }
 			if cb.choiceBtn and cb.choiceBtn.shown and cb.choiceBtn.entry then e.choice = cb.choiceBtn end
-			if e.choice or cb.mouse ~= false then table.insert(rows, e) end
+			local linkedClock = e.label == "Show the local clock" or string.find(e.label or "", "^Detach the clock from the minimap")
+			if (not linkedClock or SU.Mode("SlimSuiteLocalClockFrame") == "enabled") and (e.choice or cb.mouse ~= false) then table.insert(rows, e) end
 		end
 	end
 	return rows
@@ -69,15 +72,16 @@ for step = 1, steps do
 		local e = SU.elements[math.random(#SU.elements)]
 		local name = e.frame
 		local b = SU.barButtons[name]
-		local before = SU.on[name] and true or false
-		note("bar " .. name .. " (was " .. tostring(before) .. ")")
+		local before = SU.Mode(name)
+		note("status " .. name .. " (was " .. tostring(before) .. ")")
 		if not b:IsVisible() then fail("bar button hidden: " .. name) end
-		Click(b); Tick(2)
-		errs("bar " .. name)
+		RunScript(b.tag, "OnMouseUp", "LeftButton"); Tick(2)
+		errs("status " .. name)
+		if ( SU.Mode(name) == "enabled" ) then SU.Click(b); Tick(1); end
 		local still = false
 		for _, x in ipairs(SU.elements) do if x.frame == name then still = true end end
-		local after = SU.on[name] and true or false
-		if still and after == before then fail("bar button did not toggle: " .. name .. " stays " .. tostring(after)) end
+		local after = SU.Mode(name)
+		if still and after == before then fail("status button did not cycle: " .. name .. " stays " .. tostring(after)) end
 	elseif r < 0.5 then
 		-- right-click an element that is on
 		local on = {}
@@ -117,7 +121,7 @@ for step = 1, steps do
 			end
 		end
 	end
-	for _, cb in ipairs(SS.toggleBoxes or {}) do
+	for _, cb in ipairs(SU.checks or {}) do
 		if cb.get and cb:IsVisible() and not (cb.choiceBtn and cb.choiceBtn.shown) then
 			local want = cb.get() and true or false
 			if (cb.checked and true or false) ~= want then fail("stale box '" .. tostring(cb.label and cb.label.text) .. "' shows " .. tostring(not want)) end

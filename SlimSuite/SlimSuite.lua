@@ -50,6 +50,10 @@ if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one se
 K = AZSKIT;
 NAME = "Slim Suite";
 
+-- Inventory/world events can refresh rows before SlimSuiteSetup.lua is loaded.
+-- Setup replaces this safe default with the live demo-state lookup later.
+SS.Demoing = SS.Demoing or function() return false; end
+
 -- the stat bonus a level-up gives, in each of the game's languages (a piece of the line that has no number in it), as
 -- the game itself writes "You have gained {damage}% damage, {health} maximum health and {regen} health per second."
 -- A setting that turns another off says so in the game's message line at the top of the screen (kept visible in the

@@ -299,6 +299,7 @@ function SS.LayoutGather()
 	if ( d.gatherButtons ) then
 		local ourShown = ours and not (d.minimap and d.minimap.hide);
 		if ( ourShown ) then table.insert(want, ours); wantSet[ours] = true; end
+		if ( ours ) then if ( ourShown ) then ours:Show(); else ours:Hide(); end end
 		local kids = { Minimap:GetChildren() };
 		for i = 1, table.getn(kids) do
 			local f = kids[i];
@@ -348,6 +349,16 @@ function SS.MinimapButtonPlace()
 end
 function SS.SetMinimapButtonPlace(v)
 	local d = SS.DB();
+	-- This choice is also exposed under the minimap. Keep the row's element status in
+	-- sync, or a setup refresh can restore its previous Enabled state over the new place.
+	if ( SU and SU.Mode and SU.SetMode ) then
+		local mode = SU.Mode("SlimSuiteMinimapBar");
+		if ( v == "row" and mode ~= "enabled" ) then
+			SU.SetMode("SlimSuiteMinimapBar", "enabled", "Button row");
+		elseif ( v ~= "row" and mode == "enabled" ) then
+			SU.SetMode("SlimSuiteMinimapBar", "default", "Button row");
+		end
+	end
 	if ( v == "row" ) then
 		if ( not d.minimapBar ) then SS.SetMinimapBar(true, true); end
 	elseif ( v == "ring" ) then
@@ -424,7 +435,7 @@ function SS.LayoutMinimapBar()
 	if ( SS.Mini ) then Add(SS.Mini); end
 	for _, n in ipairs(SS.BAR_BLIZZARD) do Add(getglobal(n)); end
 	local mx, my = Minimap:GetCenter();
-	local ms = Minimap:GetEffectiveScale() or 1;
+	local ms = SS.EffectiveScale(Minimap);
 	local half = (Minimap:GetWidth() or 140) * ms / 2;
 	local kids = { Minimap:GetChildren() };
 	for i = 1, table.getn(kids) do
@@ -434,7 +445,7 @@ function SS.LayoutMinimapBar()
 			local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
 			local fx, fy = f:GetCenter();
 			if ( w >= 18 and w <= 40 and h >= 18 and h <= 40 and fx ) then
-				local fs = f:GetEffectiveScale() or 1;
+				local fs = SS.EffectiveScale(f);
 				local dx, dy = fx * fs - mx * ms, fy * fs - my * ms;
 				if ( math.sqrt(dx * dx + dy * dy) >= half * 0.9 ) then Add(f); end
 			end
@@ -456,7 +467,10 @@ function SS.LayoutMinimapBar()
 			if ( f.SetFrameStrata ) then f:SetFrameStrata("MEDIUM"); end   -- above the row's dark background
 		end
 		local wanted = f:IsShown();
-		if ( f == SS.Mini ) then wanted = not (d.minimap and d.minimap.hide); end
+		if ( f == SS.Mini ) then
+			wanted = not (d.minimap and d.minimap.hide);
+			if ( wanted ) then f:Show(); else f:Hide(); end
+		end
 		if ( wanted ) then
 			-- the setup hides the minimap's buttons by making them see-through; in the row they must be seen again
 			if ( f.SetAlpha ) then f:SetAlpha(1); end
@@ -484,7 +498,7 @@ function SS.SetMinimapBar(on, quiet)
 	end
 	SS.Safe(SS.LayoutMinimapBar);
 	if ( not on ) then SS.Safe(SS.ApplyMinimapShape); end   -- the returned buttons follow the round or square edge
-	SU.Rebuild();                                            -- the row gets (or loses) its own button up top
+	if ( not SU.batching ) then SU.Rebuild(); end            -- the row gets (or loses) its own button up top
 end
 
 -- the minimap button: a gear, at the left of the minimap (AZS Stats' is at the bottom, AZS Handbook's at the top
@@ -509,13 +523,13 @@ if ( not okMini ) then K.Print(NAME, "|cffff4040the minimap button could not be 
 function SS.RoundRingRadius()
 	if ( SS.roundRing ) then return SS.roundRing; end
 	local mx, my = Minimap:GetCenter();
-	local ms = Minimap:GetEffectiveScale() or 1;
+	local ms = SS.EffectiveScale(Minimap);
 	for _, n in ipairs({ "MiniMapTrackingFrame", "MinimapZoomIn", "MiniMapMailFrame" }) do
 		local f = getglobal(n);
 		if ( f and not f.slimSquareOrig and not f.slimBarOrig and mx ) then
 			local fx, fy = f:GetCenter();
 			if ( fx ) then
-				local fs = f:GetEffectiveScale() or 1;
+				local fs = SS.EffectiveScale(f);
 				local dx, dy = fx * fs / ms - mx, fy * fs / ms - my;
 				local r = math.sqrt(dx * dx + dy * dy);
 				if ( r > 50 and r < 110 ) then SS.roundRing = r; return r; end
@@ -544,7 +558,7 @@ if ( SS.Mini and SS.Mini.Place ) then
 			-- the minimap's own scale, so a scaled minimap or button no longer pushes the gear off the ring.
 			local a = math.rad(K.Num(type(m) == "table" and m.angle or 190));
 			local x, y = math.cos(a), math.sin(a);
-			local k = (Minimap:GetEffectiveScale() or 1) / (mini:GetEffectiveScale() or 1);
+			local k = (SS.EffectiveScale(Minimap)) / (SS.EffectiveScale(mini));
 			if ( SS.squareActive ) then
 				local most = math.max(math.abs(x), math.abs(y));
 				if ( most > 0 ) then x, y = x / most, y / most; end
@@ -560,6 +574,17 @@ if ( SS.Mini and SS.Mini.Place ) then
 	-- dragging it does nothing while the row or the column holds it (they are moved by their own handle)
 	local drag = mini:GetScript("OnUpdate");
 	mini:SetScript("OnUpdate", function() if ( not Docked() and drag ) then drag(); end end);
+	-- Blizzard and other addons occasionally hide or reanchor minimap children while changing
+	-- map state. Reapply Slim Suite's selected placement so its gear stays on the ring/square.
+	SS.Every("minimapButtonGuard", 1, function()
+		local d = SS.DB();
+		if ( d.minimap and d.minimap.hide ) then mini:Hide(); return; end
+		mini:SetAlpha(1);
+		if ( d.minimapBar ) then
+			mini:Show();
+		elseif ( d.gatherButtons ) then SS.LayoutGather();
+		else SS.Safe(mini.Place); end
+	end, Minimap);
 end
 
 -- Demo Mode: every Slim Suite element shows sample data on its own frame, moving and changing in real time, with its own
@@ -892,7 +917,7 @@ end
 raidPanel, raidOver = nil, nil;
 
 function RaidCursor()
-	local s = UIParent:GetEffectiveScale() or 1;
+	local s = SS.EffectiveScale(UIParent);
 	local x, y = GetCursorPosition();
 	return (x or 0) / s, (y or 0) / s;
 end

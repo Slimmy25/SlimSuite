@@ -405,7 +405,7 @@ SU.FEATURES = {
 	SlimSuiteReviveFrame = function(v) SS.DB().replaceRevive = v; end,
 	SlimSuiteCombatTextFrame = function(v) SS.DB().combatTextBox = v; end,
 	SlimSuiteLocalClockFrame = function(v)
-		if ( v ) then SS.DB().replaceLocalClock = true; SS.DB().clockDetached = true;
+		if ( v ) then SS.DB().replaceLocalClock = true;
 		else SS.DB().replaceLocalClock = false; SS.DB().clockDetached = false; end
 		SS.Safe(SlimSuiteWorld.UpdateLocalClock);
 	end,
@@ -1222,7 +1222,7 @@ SS.Every("partyLines", 0.5, function()
 	local d = SS.DB();
 	if ( d.partyIncludesSelf and d.buffsOnPlayer and not d.buffsOnTarget ) then
 		local P = SS.PlayerAnchor();
-		local key = P and (tostring(P) .. (P:GetHeight() or 0) .. (P:GetEffectiveScale() or 1) .. tostring(d.buffsOnPlayerSide)) or "";
+		local key = P and (tostring(P) .. (P:GetHeight() or 0) .. (SS.EffectiveScale(P)) .. tostring(d.buffsOnPlayerSide)) or "";
 		if ( key ~= SS.buffAttachKey ) then SS.buffAttachKey = key; SS.Safe(SS.AttachBuffs); end
 	else
 		SS.buffAttachKey = nil;
@@ -1592,9 +1592,14 @@ function SS.ClaimTarget(by)
 	if ( by == "self" ) then
 		if ( d.partyLocked ) then d.partyLocked = false; SS.Notice("The party frames are free again: you are in them now."); end
 		if ( d.mirrorTarget ) then SS.SetMirrorTarget(false); SS.Notice("Mirror Target turned off: the target frame stands on its own now."); end
+		-- The player is represented inside the party block now; do not let the next setup
+		-- rebuild reactivate the standalone player frame from an earlier Mirror Target choice.
+		if ( d.elementModes ) then d.elementModes.PlayerFrame = "default"; end
+		if ( d.enabledElements ) then d.enabledElements.PlayerFrame = nil; end
+		if ( SU.on ) then SU.on.PlayerFrame = nil; end
+		if ( handles.PlayerFrame ) then handles.PlayerFrame:Hide(); end
 		SS.Notice("The player frame turned off: you are in the party frames now.");
 		SS.Safe(SS.PlayerFrameHidden, true);
-		if ( SU.on and SU.on.PlayerFrame ) then SU.SetOn("PlayerFrame", false, SU.titles and SU.titles.PlayerFrame or "Unit frame"); end
 		return;
 	end
 	if ( d.partyIncludesSelf ) then
@@ -1633,13 +1638,13 @@ function SS.SetPartySelf(on)
 			SS.Safe(SS.PlayerFrameHidden, false);
 			SS.Notice("The player frame is back: you left the party frames.");
 			-- in the setup the player frame's element comes back on with it
-			if ( setupActive and SU.on and not SU.on.PlayerFrame ) then SU.SetOn("PlayerFrame", true, SU.titles and SU.titles.PlayerFrame or "Unit frame"); end
+			if ( setupActive and SU.on and not SU.on.PlayerFrame ) then SU.SetMode("PlayerFrame", "enabled", SU.titles and SU.titles.PlayerFrame or "Unit frame"); end
 		end
 	end);
 	-- Choosing to join the party frames also turns that frame on in the UI setup; otherwise the option
 	-- would hide the player plate without giving the user a party-frame handle to place.
 	if ( on and setupActive and SU.on and not SU.on.PartyMemberFrame1 ) then
-		SU.SetOn("PartyMemberFrame1", true, SU.titles and SU.titles.PartyMemberFrame1 or "Party frames");
+		SU.SetMode("PartyMemberFrame1", "enabled", SU.titles and SU.titles.PartyMemberFrame1 or "Party frames");
 	end
 	SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
 	SU.Rebuild();
@@ -1653,6 +1658,10 @@ function SS.SetCombineTarget(on)
 end
 
 function SS.SetLocalClockOn(on)
+	local wanted = on and "enabled" or "default";
+	if ( setupActive and SU.Mode and SU.SetMode and SU.Mode("SlimSuiteLocalClockFrame") ~= wanted ) then
+		SU.SetMode("SlimSuiteLocalClockFrame", wanted, SU.titles and SU.titles.SlimSuiteLocalClockFrame or "Local clock");
+	end
 	SS.DB().replaceLocalClock = on and true or false;
 	SS.Safe(SlimSuiteWorld.UpdateLocalClock);
 	SU.Rebuild();
@@ -2287,7 +2296,7 @@ function SS.ToggleMouseProbe()
 	SS.Every("mouseProbe", 0.1, function()
 		local f = GetMouseFocus and GetMouseFocus();
 		local x, y = GetCursorPosition();
-		local scale = UIParent:GetEffectiveScale() or 1;
+		local scale = SS.EffectiveScale(UIParent);
 		probe:ClearAllPoints();
 		probe:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale);
 		if ( not f ) then probe.text:SetText("|cffaaaaaa(the game world)|r"); return; end

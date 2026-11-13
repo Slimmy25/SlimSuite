@@ -9,6 +9,31 @@
 SS = SS or {};
 local MAX_ENTRIES = 200;
 
+-- GetEffectiveScale is missing on a few legacy UI regions and third-party minimap controls.
+-- Use it when available, then reconstruct the inherited scale from the frame tree.
+function SS.EffectiveScale(frame, seen)
+	if ( not frame ) then return 1; end
+	if ( frame.GetEffectiveScale ) then
+		local ok, scale = pcall(frame.GetEffectiveScale, frame);
+		if ( ok and type(scale) == "number" and scale > 0 ) then return scale; end
+	end
+	seen = seen or {};
+	if ( seen[frame] ) then return 1; end
+	seen[frame] = true;
+	local own = 1;
+	if ( frame.GetScale ) then
+		local ok, scale = pcall(frame.GetScale, frame);
+		if ( ok and type(scale) == "number" and scale > 0 ) then own = scale; end
+	end
+	local parent;
+	if ( frame.GetParent ) then
+		local ok, value = pcall(frame.GetParent, frame);
+		if ( ok ) then parent = value; end
+	end
+	if ( parent and parent ~= frame ) then return own * SS.EffectiveScale(parent, seen); end
+	return own;
+end
+
 -- Slim Suite's main code is in several files that share names no other addon should see (its frames, the setup's
 -- table, its state). Each of those files runs with SS.ENV as its globals: a name listed in SS.PRIVATE lives in SS.ENV,
 -- anything else is read from and written to the game's globals as usual. Reading the game's globals goes straight

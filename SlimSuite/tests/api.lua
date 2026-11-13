@@ -2,6 +2,12 @@
 local bad = 0
 local function check(label, ok) if not ok then bad = bad + 1; print("  MISMATCH " .. label) end end
 
+-- Some 1.12 client regions and third-party UI objects do not expose GetEffectiveScale.
+local scaleRoot = { GetScale = function() return 0.8 end };
+local scaleChild = { parent = scaleRoot, GetScale = function() return 1.25 end,
+	GetParent = function(self) return self.parent end };
+check("effective scale falls back through parents", math.abs(SS.EffectiveScale(scaleChild) - 1) < 0.001)
+
 -- kill tally: a boss at 3% or less counts once; a Guardian at 0 counts; one that leaves the list alive does not
 AZS_GetPhase = function() return "playing" end
 AZS_GetMeterContext = function() return { runId = "run1", uiSessionId = 1, epoch = 1 } end
@@ -71,6 +77,8 @@ AZS_UNITS = nil; AZS_RUN = nil
 print("api problems: " .. bad)
 for _, e in pairs(ERRORS) do print("  " .. e) end
 -- the meter puts each pet's abilities on one line named after the pet
+SS.DB().elementModes = SS.DB().elementModes or {}
+SS.DB().elementModes.SlimSuiteMeterFrame = "enabled"
 SS.StartDemoMode(); Tick(3)
 SlimSuiteMeter.view = 'damage'; SlimSuiteMeter.Draw(true, false)
 local names, void = {}, nil
@@ -85,7 +93,7 @@ local SU = upv(SS.SetupHide, "SU")
 SS.StartSetup(true); Tick(3)
 SS.SetPartySelf(true); Tick(2); SU.RefreshBar()
 local b = SU.barButtons and SU.barButtons.PlayerFrame
-check("player frame tag says Connected", b and b.tag.text:GetText() == "Connected" and b.tag.parentTitle == "Party frames")
+check("player frame tag identifies its party parent", b and b.tag.text:GetText() == "Default" and b.tag.parentTitle == "Party frames")
 SS.SetPartySelf(false); SS.SetupEnd(true); Tick(2)
 print("connected problems: " .. bad)
 -- you in the party: buffs start at your plate's top-left and grow to the right, wrapping into rows
@@ -177,6 +185,8 @@ check("buttons in the row can be seen", gear:GetAlpha() == 1)
 SS.SetMinimapBar(false, true); Tick(2)
 local p = gear.points and gear.points[1]
 check("the gear goes back to the ring", p and p[2] == Minimap)
+gear:Hide(); Tick(12, 0.1)
+check("a hidden gear is restored to the ring", gear:IsShown() and gear.points and gear.points[1] and gear.points[1][2] == Minimap)
 print("corral problems: " .. bad)
 -- encounter bars as rows: the frame (and its green handle) is one bar wide, not one bar per boss
 SS.DB().replaceEncounters = true; SS.DB().orientations.SlimSuiteBossFrames = "horizontal"
@@ -236,6 +246,11 @@ check("and goes away in the end", not big:IsShown())
 print("pop problems: " .. bad)
 -- Demo Mode moves everything the way a run would
 SS.DB().replaceEncounters, SS.DB().replaceTally, SS.DB().replaceClock = true, true, true
+SS.DB().elementModes.SlimSuiteBossFrames = "enabled"
+SS.DB().elementModes.SlimSuiteTallyFrame = "enabled"
+SS.DB().elementModes.SlimSuiteClockFrame = "enabled"
+SS.DB().elementModes.MinimapCluster = "enabled"
+SS.DB().elementModes.SlimSuiteReviveFrame = "enabled"
 SS.StartDemoMode(); Tick(4, 0.25)
 local b1 = SS.BOSS_SAMPLE[1][2]; local k1 = SS.TALLY_SAMPLE.kills; local t1 = SS.ENV.SU.SAMPLE_TARGET.hp; local run1 = SS.demoClock.run; local nb1 = SS.demoClock.nextBoss
 local downOnly, tallyUp = true, true

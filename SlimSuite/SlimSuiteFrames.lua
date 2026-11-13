@@ -685,7 +685,7 @@ end);
 -- GetLeft/GetRight are in the queried frame's effective-scale units. All movement state
 -- and comparisons below use UIParent units; SetPoint offsets must be converted back.
 RootFactor = function(frame)
-	return (frame:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1);
+	return SS.EffectiveScale(frame) / SS.EffectiveScale(UIParent);
 end
 
 RootBounds = function(frame)
@@ -793,8 +793,8 @@ end
 VisualInsets = function(frame)
 	local baseLeft, baseRight, baseBottom = RootBounds(frame);
 	if ( not baseLeft or not baseBottom ) then return 0, 0, 0, 0; end
-	local uiScale = UIParent:GetEffectiveScale() or 1;
-	local frameScale = frame:GetEffectiveScale() or uiScale;
+	local uiScale = SS.EffectiveScale(UIParent);
+	local frameScale = SS.EffectiveScale(frame);
 	local factor = frameScale / uiScale;
 	-- MainMenuExpBar's child textures retain their old horizontal extents after the native
 	-- status bar is rotated. Its own bounds are the visible/movable bounds in either layout.
@@ -831,28 +831,10 @@ VisualInsets = function(frame)
 	local minX, minY = 0, 0;
 	local maxX = (frame:GetWidth() or 0) * factor;
 	local maxY = (frame:GetHeight() or 0) * factor;
-	local function IncludeDescendants(parent, seen)
-		if ( not parent or seen[parent] or not parent.GetChildren ) then return; end
-		seen[parent] = true;
-		local ok, children = SS.Safe(function() return { parent:GetChildren() }; end);
-		if ( not ok or type(children) ~= "table" ) then return; end
-		for i = 1, table.getn(children) do
-			local child = children[i];
-			if ( child and (not child.IsShown or child:IsShown()) ) then
-				local got, left, right, bottom, top = pcall(function()
-					return RootBounds(child);
-				end);
-				if ( got and left and right and bottom and top ) then
-					minX = math.min(minX, left - baseLeft);
-					maxX = math.max(maxX, right - baseLeft);
-					minY = math.min(minY, bottom - baseBottom);
-					maxY = math.max(maxY, top - baseBottom);
-				end
-				IncludeDescendants(child, seen);
-			end
-		end
-	end
-	IncludeDescendants(frame, {});
+	-- Generic recursive child bounds can include detached/hidden Blizzard art and stale
+	-- child anchors outside Slim Suite's custom frame. That falsely shrinks the usable
+	-- screen area. Native composite frames above are handled explicitly; custom elements
+	-- are clamped to their own visible rectangle.
 	if ( frame == spellRow and itemRow and SS.DB().buildRowsAttached and itemRow:IsShown() ) then
 		local l, r, b, t = RootBounds(itemRow);
 		if ( l and r and b and t ) then

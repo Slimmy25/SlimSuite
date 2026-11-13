@@ -46,7 +46,7 @@ check("afterwards: the element list again", SU.bar:IsVisible() and not (SlimSuit
 check("grid and Done are on the list", SU.grid:GetParent() == SU.bar and SU.bar.done:IsVisible())
 Click(SU.bar.done); Tick(2)
 check("Done closes it", not SU.bar:IsVisible() and not SS.DB().unlocked)
-SS.SetUnlocked(true); Tick(2)
+SS.SetUnlocked(true, true); Tick(2)
 -- the element menu: only the rows an element uses, and no setting offered twice
 local sm
 local function rows(name) SS.OpenSizeMenu(name, name); Tick(1); sm = sm or upvalue(SS.PrepareSizeTools, "sizeMenu"); return sm.rows end
@@ -100,7 +100,7 @@ SS.SetUnlocked(true); Tick(2)
 local listed = false
 for _, e in ipairs(SU.elements) do if e.frame == "SlimSuiteCombatTextFrame" then listed = true end end
 check("combat text is listed while off", listed)
-SU.SetOn("SlimSuiteCombatTextFrame", true, "Combat text"); SS.SetUnlocked(true, true); Tick(2)
+SU.SetMode("SlimSuiteCombatTextFrame", "enabled", "Combat text"); SS.SetUnlocked(true, true); Tick(2)
 check("turning it on turns the box on", SS.DB().combatTextBox == true)
 check("and it has a green handle", SS.ENV.handles.SlimSuiteCombatTextFrame and SS.ENV.handles.SlimSuiteCombatTextFrame:IsShown())
 print("list problems: " .. bad)

@@ -8,6 +8,7 @@ SS.SetUnlocked(true, true); Tick(3)
 check("editing shows a sample tooltip", GameTooltip.shown and GameTooltip.slimSample)
 SS.SetUnlocked(false, true); Tick(3)
 check("locked: the sample goes", not GameTooltip.slimSample and not GameTooltip.shown)
+SU.SetMode("GameTooltip", "enabled", "Tooltip")
 SS.StartDemoMode(); Tick(5)
 check("Demo Mode shows the sample tooltip", GameTooltip.shown and GameTooltip.slimSample)
 SS.StopDemoMode(); Tick(3)
@@ -29,7 +30,7 @@ SS.SetTargetHidden(false); Tick(1)
 SS.SetPartySelf(true); Tick(2)
 local found = 0
 for _, c in ipairs(SU.ChecksFor("PartyMemberFrame1")) do
-	if (c[1] == "Buffs and debuffs" or c[1] == "Class proc meter under it") and (not c[4] or c[4]()) then found = found + 1 end
+	if (c[1] == "Player buffs position" or c[1] == "Class proc meter under it") and (not c[4] or c[4]()) then found = found + 1 end
 end
 check("your buffs and proc meter settings are under the party", found == 2)
 SS.SetupEnd(true); Tick(3)

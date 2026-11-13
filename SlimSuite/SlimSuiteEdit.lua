@@ -13,7 +13,7 @@ end
 function SS.BuffRoom(plate, portrait, nextFrame)
 	local pl = (portrait and portrait:IsShown() and portrait:GetLeft()) or plate:GetLeft();
 	if ( not pl ) then return nil; end
-	local ps, ss = (portrait and portrait:GetEffectiveScale()) or plate:GetEffectiveScale() or 1, plate:GetEffectiveScale() or 1;
+	local ps, ss = (portrait and SS.EffectiveScale(portrait)) or SS.EffectiveScale(plate), SS.EffectiveScale(plate);
 	local left = pl * ps;
 	local right = (plate:GetRight() or 0) * ss;
 	-- the row ends where the plate's health and mana bars end (the art past them is not the plate's room)
@@ -23,11 +23,11 @@ function SS.BuffRoom(plate, portrait, nextFrame)
 	local mana = plate.mp or (name and getglobal(name .. "ManaBar"));
 	local barRight = 0;
 	for _, b in ipairs({ bar, mana }) do
-		if ( b and b.GetRight and b:GetRight() ) then barRight = math.max(barRight, b:GetRight() * (b:GetEffectiveScale() or 1)); end
+		if ( b and b.GetRight and b:GetRight() ) then barRight = math.max(barRight, b:GetRight() * (SS.EffectiveScale(b))); end
 	end
 	if ( barRight > left ) then right = math.min(right, barRight); end
 	if ( nextFrame and nextFrame:IsShown() and nextFrame:GetLeft() and SS.CurrentOrientation("PartyMemberFrame1") == "horizontal" ) then
-		local nl = nextFrame:GetLeft() * (nextFrame:GetEffectiveScale() or 1);
+		local nl = nextFrame:GetLeft() * (SS.EffectiveScale(nextFrame));
 		if ( nl > left ) then right = nl - 4 * ss; end
 	end
 	return left, math.max(0, right - left), (plate:GetTop() or 0) * ss;
@@ -37,7 +37,7 @@ function SS.LayoutBuffRows(buttons, parent, plate, portrait, nextFrame)
 	local left, width, top = SS.BuffRoom(plate, portrait, nextFrame);
 	local n = table.getn(buttons);
 	if ( not left or n == 0 ) then return; end
-	local ps = parent:GetEffectiveScale() or 1;
+	local ps = SS.EffectiveScale(parent);
 	local w, h = buttons[1]:GetWidth() or 16, buttons[1]:GetHeight() or 16;
 	local gap = 2;
 	local perRow = math.max(1, math.floor((width / ps + gap) / (w + gap)));
@@ -122,7 +122,7 @@ function SS.UpdateFriendBuffs()
 				local b = set[j];
 				local tex = exists and UnitBuff and UnitBuff(unit, j);
 				if ( tex ) then
-					b.tex:SetTexture(tex); b:SetWidth(icon); b:SetHeight(icon); b:SetScale(f:GetEffectiveScale() / (UIParent:GetEffectiveScale() or 1));
+					b.tex:SetTexture(tex); b:SetWidth(icon); b:SetHeight(icon); b:SetScale(SS.EffectiveScale(f) / SS.EffectiveScale(UIParent));
 					b:Show(); table.insert(shown, b);
 				else b:Hide(); end
 			end
@@ -216,6 +216,12 @@ function SS.SetBuffsSide(side)
 end
 
 function SS.SetMirrorTarget(on)
+	-- Mirroring is a combined custom layout. In the setup list, selecting it opts both unit
+	-- frames into Slim Suite so a later Default-state pass cannot immediately undo it.
+	if ( on and setupActive and SU and SU.SetMode ) then
+		SU.SetMode("PlayerFrame", "enabled", SU.titles and SU.titles.PlayerFrame or "Unit frame");
+		SU.SetMode("TargetFrame", "enabled", SU.titles and SU.titles.TargetFrame or "Target frame");
+	end
 	if ( on ) then SS.Safe(SS.ClaimTarget, "mirror"); end   -- the newest choice wins: mirroring takes the target's place
 	if ( on ) then SS.MakeMovable("PlayerFrame", "Mirror target moves it"); SS.MakeMovable("TargetFrame", "Mirror target moves it"); end
 	-- Mirroring and combining are one user-facing behavior: the target follows the player across the screen,
@@ -380,7 +386,7 @@ function SS.ArrangeEdgeButtons(square)
 	if ( not Minimap or not Minimap.GetCenter ) then return; end
 	local mx, my = Minimap:GetCenter();
 	if ( not mx ) then return; end
-	local ms = Minimap:GetEffectiveScale() or 1;
+	local ms = SS.EffectiveScale(Minimap);
 	local half = (Minimap:GetWidth() or 140) / 2;
 	local halfH = (Minimap:GetHeight() or 140) / 2;
 	local column = square and SS.MinimapButtonPlace() == "ring";
@@ -400,7 +406,7 @@ function SS.ArrangeEdgeButtons(square)
 						if ( not member ) then
 							local fx, fy = f:GetCenter();
 							if ( fx ) then
-								local fs = f:GetEffectiveScale() or 1;
+								local fs = SS.EffectiveScale(f);
 								local dx, dy = fx * fs / ms - mx, fy * fs / ms - my;
 								member = math.sqrt(dx * dx + dy * dy) >= half * 0.75;
 							end
@@ -412,7 +418,7 @@ function SS.ArrangeEdgeButtons(square)
 								-- its place around the round ring, kept as an angle: on the square it sits on the ring at that angle
 								local fx, fy = f:GetCenter();
 								if ( fx ) then
-									local fs = f:GetEffectiveScale() or 1;
+									local fs = SS.EffectiveScale(f);
 									f.slimSquareAngle = (math.atan2 or math.atan)(fy * fs / ms - my, fx * fs / ms - mx);
 								end
 							end
@@ -433,12 +439,12 @@ function SS.ArrangeEdgeButtons(square)
 	if ( column ) then
 		-- a button's offsets are in its own scale; sizes and places here are in the minimap's
 		local function Put(f, x, y)
-			local k = ms / (f:GetEffectiveScale() or 1);
+			local k = ms / (SS.EffectiveScale(f));
 			f:ClearAllPoints();
 			f:SetPoint("CENTER", Minimap, "CENTER", x * k, y * k);
 		end
 		local function Size(f)
-			local k = ms / (f:GetEffectiveScale() or 1);
+			local k = ms / (SS.EffectiveScale(f));
 			return (f:GetWidth() or 32) / k, (f:GetHeight() or 32) / k;
 		end
 		-- every button sits centred on the gold ring at the angle it had around the round map, as the round map does
@@ -1178,7 +1184,7 @@ function SS.DragStep(h, name)
 		SS.FinishHandleMove(h, name);
 		return;
 	end
-	local scale = UIParent:GetEffectiveScale() or 1;
+	local scale = SS.EffectiveScale(UIParent);
 	local x, y = GetCursorPosition(); x, y = x / scale, y / scale;
 	local deltaX, deltaY = x - h.dragStartX, y - h.dragStartY;
 	local nextX, nextY = h.frameStartX + deltaX, h.frameStartY + deltaY;
@@ -1253,7 +1259,7 @@ function SS.Handle(name, label)
 			-- parent inside the screen and leave a gap when its buttons extend beyond its edges.
 			if ( t.SetClampedToScreen ) then t:SetClampedToScreen(false); end
 			if ( (name == "BuffFrame" or name == "MainMenuBar" or name == "PartyMemberFrame1") and t.SetUserPlaced ) then SS.UserPlace(t); end
-			local scale = UIParent:GetEffectiveScale() or 1;
+			local scale = SS.EffectiveScale(UIParent);
 			local x, y = GetCursorPosition(); x, y = x / scale, y / scale;
 			this.dragStartX, this.dragStartY = x, y;
 			local left, right, bottom = RootBounds(t);

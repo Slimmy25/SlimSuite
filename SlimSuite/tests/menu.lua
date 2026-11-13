@@ -12,9 +12,10 @@ show("PlayerFrame")
 SS.SetMirrorTarget(true); Tick(1)
 show("PlayerFrame")
 local function row(label) for i = 1, #SU.checks do if SU.checks[i]:IsVisible() and string.find(SU.checks[i].label.text, label, 1, true) then return SU.checks[i] end end end
-Click(row("Combine")); Tick(1)  -- Combine on
+Click(row("Mirror Target")); Tick(1)  -- the combined player/target setting
 show("PlayerFrame")
 -- outside the setup the right-click menu is the setup's panel with Done, its settings and the size tools under them
+SS.SetupEnd(true); Tick(2)
 SS.SetUnlocked(true, true); Tick(2)
 SS.OpenSizeMenu("MainMenuBar", "Action bar"); Tick(1)
 local bad = 0
