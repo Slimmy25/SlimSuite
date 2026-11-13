@@ -1492,7 +1492,7 @@ function SS.ResetElement(name)
 	if ( not frame ) then return false; end
 	local d = SS.DB();
 	d.places[name], d.sizes[name], d.scales[name], d.padding[name], d.orientations[name] = nil, nil, nil, nil, nil;
-	if ( name == "SlimSuiteTallyFrame" ) then d.tallyVertical = false; end
+	if ( name == "SlimSuiteTallyFrame" ) then d.tallyVertical = true; end
 	if ( name == "BuffFrame" ) then d.buffCustomLayout = false; d.buffGrowthDirection = "down"; end
 	if ( name == "SlimSuiteSpellRowFrame" or name == "SlimSuiteItemRowFrame" ) then
 		d.places[name] = SS.BuildRowDefaultPlace(name);
@@ -1528,7 +1528,7 @@ end
 function SS.ResetUI()
 	local d = SS.DB();
 	d.places, d.sizes, d.scales, d.padding, d.orientations, d.muted = {}, {}, {}, {}, {}, {};
-	d.tallyVertical, d.buffCustomLayout, d.buffGrowthDirection = false, false, "down";
+	d.tallyVertical, d.buffCustomLayout, d.buffGrowthDirection = true, false, "down";
 	d.tooltipCustom = nil;
 	d.buildRowsAttached = true;
 	d.places.SlimSuiteSpellRowFrame = SS.BuildRowDefaultPlace("SlimSuiteSpellRowFrame");

@@ -1,4 +1,13 @@
 -- Slim Suite: chat filters, HUD controls, and other optional player tools.
+-- Reference layout map for native defaults and Slim Suite replacements:
+--   1 Player frame; 2 target frame; 3 encounter/boss bars (up to four shown in the reference);
+--   4 run timer with its next-boss countdown; 5 player buffs; 6 minimap; 7 local time;
+--   8 damage meter; 9 stored level-up button; 10 kills/gold/cache tally;
+--   11 action bar with its artwork; 12 XP bar; 13 build spells above worn items; 14 chat.
+-- Additional native reference locations: event announcements ("Swarm surrounds you!") stay centered;
+-- four party frames stack vertically below the player frame (the player is not part of that stack);
+-- tooltips use the bottom-right corner. Replacement defaults should echo these locations only when
+-- their matching replacement is enabled; otherwise the game's native UI remains in control.
 --   * Optional chat filters independently hide level-up stat-bonus lines, newly learned spell lines, racial-buff
 --     notices, selected opening/lair lines, and game-authored
 --     NPC/boss dialogue and run-roleplay lines. /slimsuite hide <words> also hides matching non-player text. Player chat is never hidden.
@@ -158,7 +167,7 @@ SS.DEFAULTS = {
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
 	partyFaces = true, cardPortraits = true, targetDebuffs = true, moveLevelButton = false, moveMeter = false,
 	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
-	tallyVertical = false, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
+	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
 };
 SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
@@ -1070,7 +1079,8 @@ function SS.CreateTallyFrame()
 	tallyFrame = CreateFrame("Frame", "SlimSuiteTallyFrame", UIParent);
 	tallyFrame:SetWidth(252);
 	tallyFrame:SetHeight(28);
-	tallyFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 12, 24);
+	-- Match the centered lower-HUD cluster: above the action bar, without inheriting its frame.
+	tallyFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 145);
 	tallyFrame:SetFrameStrata("HIGH");
 	tallyFrame:EnableMouse(false);
 	tallyFrame.labels, tallyFrame.values = {}, {};

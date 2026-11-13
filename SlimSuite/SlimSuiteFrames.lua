@@ -122,8 +122,8 @@ function SS.CreateLevelButton()
 		RestoreLevelButtonAfterHover();
 		levelButton.glow:SetAlpha(0.16);
 	end);
-	if ( MainMenuBar ) then levelButton:SetPoint("BOTTOMLEFT", MainMenuBar, "TOPLEFT", 0, 6);
-	else levelButton:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 32, 100); end
+	-- Above the default action bar, centered near the bottom as in the supplied reference.
+	levelButton:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 190);
 	levelButton:Hide();
 	-- A tiny toggle to the right of the button: store level-ups or take them as they come (AZS_SetStoringLevels).
 	-- It is its own frame, anchored to the button: it shows in a run while there are points to spend (a choice open, or
