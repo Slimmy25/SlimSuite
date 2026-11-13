@@ -74,7 +74,8 @@ function SS.CreateLevelButton()
 	levelButton.count:SetPoint("TOPRIGHT", levelButton.classIcon, "TOPRIGHT", 7, 7);
 	levelButton.count:SetTextColor(1, 0.78, 0.18);
 	local function LevelButtonBaseScale()
-		return type(SS.DB().scales.SlimSuiteStoredLevelsButton) == "number" and SS.DB().scales.SlimSuiteStoredLevelsButton or 1;
+		local base = type(SS.DB().scales.SlimSuiteStoredLevelsButton) == "number" and SS.DB().scales.SlimSuiteStoredLevelsButton or 1;
+		return SS.DisplayElementScale and SS.DisplayElementScale("SlimSuiteStoredLevelsButton", base) or base;
 	end
 	local function CaptureLevelButtonPoints()
 		local points = {};
@@ -722,6 +723,11 @@ function SS.SavePlace(name, f)
 	if ( type(p) ~= "table" ) then p = {}; SS.DB().places[name] = p; end
 	local left, right, bottom = RootBounds(f);
 	p.x, p.y, p.coordinateSpace = left, bottom, "uiParent";
+	p.displayDefault = nil;
+	local sl, sr, sb, st = SS.ScreenBounds();
+	if ( left and bottom and sr > sl and st > sb ) then
+		p.screen = { left=sl, bottom=sb, width=sr-sl, height=st-sb };
+	end
 end
 SS.SavePosition = function(name, f)
 	SS.SavePlace(name, f);
@@ -741,6 +747,9 @@ function SS.ClampToClient(name, frame)
 	local x, y = SS.ClampPosition(frame, left, bottom);
 	if ( math.abs(x - left) > 0.01 or math.abs(y - bottom) > 0.01 ) then
 		SetRootPosition(frame, x, y);
+		local stored = SS.DB().places[name];
+		if ( SS.displayReflow or (stored and stored.screen and not stored.relative)
+			or (SS.DISPLAY_ANCHORS and SS.DISPLAY_ANCHORS[name] and (not stored or stored.displayDefault)) ) then return; end
 		SS.SavePlace(name, frame);
 		local p = SS.DB().places[name];
 		p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
@@ -793,6 +802,7 @@ function SS.ApplySize(name, f)
 	if ( name == "SlimSuiteSpellRowFrame" ) then SS.LayoutSpellRow(); end
 	if ( name == "SlimSuitePartyLines" and SS.UpdatePartyLines ) then SS.Safe(SS.UpdatePartyLines); end
 	local scale = SS.DB().scales[name];
+	if ( SS.DisplayElementScale ) then scale = SS.DisplayElementScale(name, type(scale) == "number" and scale or 1); end
 	if ( type(scale) == "number" ) then
 		if ( name == "PartyMemberFrame1" ) then
 			for i = 1, 4 do local party = getglobal("PartyMemberFrame" .. i); if ( party and party.SetScale ) then party:SetScale(scale); end end
@@ -1560,6 +1570,7 @@ function SS.Place(name, ignoreAnchor)
 	if ( name == "PartyMemberFrame1" ) then
 		local saved = SS.DB().scales.PartyMemberFrame1;
 		local sc = type(saved) == "number" and saved or 1;
+		if ( SS.DisplayElementScale ) then sc = SS.DisplayElementScale(name, sc); end
 		for i = 1, 4 do local pf = getglobal("PartyMemberFrame" .. i); if ( pf and pf.SetScale ) then pf:SetScale(sc); end end
 		for i = 1, 4 do
 			local portrait = getglobal("PartyMemberFrame" .. i .. "Portrait");
@@ -1587,7 +1598,10 @@ function SS.Place(name, ignoreAnchor)
 		if ( f.SetClampedToScreen ) then f:SetClampedToScreen(false); end
 		if ( (name == "BuffFrame" or name == "MainMenuBar" or name == "MinimapCluster") and f.SetUserPlaced ) then SS.UserPlace(f); end
 	end
-	if ( type(p) ~= "table" ) then return; end
+	if ( type(p) ~= "table" ) then
+		if ( SS.PlaceDisplayDefault ) then SS.PlaceDisplayDefault(name, f); end
+		return;
+	end
 	if ( p.coordinateSpace ~= "uiParent" ) then
 		local factor = RootFactor(f);
 		if ( p.x ) then p.x = p.x * factor; end
@@ -1596,6 +1610,11 @@ function SS.Place(name, ignoreAnchor)
 		if ( p.dy ) then p.dy = p.dy * factor; end
 		p.coordinateSpace = "uiParent";
 	end
+	if ( p.x and p.y and not p.screen and not p.displayDefault ) then
+		local sl, sr, sb, st = SS.ScreenBounds();
+		p.screen = { left=sl, bottom=sb, width=sr-sl, height=st-sb };
+	end
+	if ( p.displayDefault and not p.relative and SS.PlaceDisplayDefault ) then SS.PlaceDisplayDefault(name, f); return; end
 	local relative = not ignoreAnchor and p.relative and getglobal(p.relative) or nil;
 	if ( relative and p.point and p.relativePoint ) then
 		f:ClearAllPoints();
@@ -1604,7 +1623,13 @@ function SS.Place(name, ignoreAnchor)
 	elseif ( p.x and p.y ) then
 		-- Saved coordinates can come from a taller or wider display. Clamp absolute restores to this screen
 		-- without rewriting the saved location, so a later return to the larger display restores the user's layout.
-		local x, y = SS.ClampPosition(f, K.Num(p.x), K.Num(p.y));
+		local px, py = K.Num(p.x), K.Num(p.y);
+		if ( type(p.screen) == "table" and p.screen.width and p.screen.width > 0 and p.screen.height and p.screen.height > 0 ) then
+			local sl, sr, sb, st = SS.ScreenBounds();
+			px = sl + (px - (p.screen.left or 0)) * (sr-sl) / p.screen.width;
+			py = sb + (py - (p.screen.bottom or 0)) * (st-sb) / p.screen.height;
+		end
+		local x, y = SS.ClampPosition(f, px, py);
 		SetRootPosition(f, x, y);
 	end
 end
@@ -1680,7 +1705,11 @@ function SS.MirrorFrames(from, to)
 	local fromName, toName = from:GetName(), to:GetName();
 	local scale = SS.DB().scales[fromName];
 	SS.DB().scales[toName] = scale;
-	if ( to.SetScale ) then to:SetScale(type(scale) == "number" and scale or 1); end
+	if ( to.SetScale ) then
+		local applied = type(scale) == "number" and scale or 1;
+		if ( SS.DisplayElementScale ) then applied = SS.DisplayElementScale(toName, applied); end
+		to:SetScale(applied);
+	end
 	local w, h = from:GetWidth(), from:GetHeight();
 	if ( w and h and w > 0 and h > 0 and toName ~= "PlayerFrame" and toName ~= "TargetFrame" ) then   -- classic art: scale only
 		to:SetWidth(w); to:SetHeight(h);

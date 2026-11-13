@@ -1430,8 +1430,10 @@ end
 -- the tooltip at the place the player moved it to (its lower-left corner), if it has been moved
 function SS.PlaceTooltip(tooltip)
 	local p = SS.DB().places.GameTooltip;
-	if ( type(p) ~= "table" or type(p.x) ~= "number" or type(p.y) ~= "number" ) then return false; end
-	SetRootPosition(tooltip, p.x, p.y);
+	if ( type(p) ~= "table" or type(p.x) ~= "number" or type(p.y) ~= "number" ) then
+		return SS.PlaceDisplayDefault and SS.PlaceDisplayDefault("GameTooltip", tooltip) or false;
+	end
+	SS.Place("GameTooltip");
 	return true;
 end
 

@@ -10,6 +10,7 @@ SlimSuiteErrors.lua
 SlimSuiteItems.lua
 SlimSuiteMeter.lua
 SlimSuite.lua
+SlimSuiteDisplay.lua
 SlimSuiteFrames.lua
 SlimSuiteEdit.lua
 SlimSuiteSetup.lua

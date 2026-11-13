@@ -14,7 +14,7 @@ local function loadFile(name)
 	local ok, e = pcall(chunk)
 	if not ok then print("LOAD " .. tostring(e)) end
 end
-for _, f in ipairs({ "SlimSuiteCore.lua", "AZSKit.lua", "SlimSuiteErrors.lua", "SlimSuiteItems.lua", "SlimSuiteMeter.lua", "SlimSuite.lua", "SlimSuiteFrames.lua", "SlimSuiteEdit.lua", "SlimSuiteSetup.lua", "SlimSuiteCommands.lua", "SlimSuiteWorld.lua" }) do
+for _, f in ipairs({ "SlimSuiteCore.lua", "AZSKit.lua", "SlimSuiteErrors.lua", "SlimSuiteItems.lua", "SlimSuiteMeter.lua", "SlimSuite.lua", "SlimSuiteDisplay.lua", "SlimSuiteFrames.lua", "SlimSuiteEdit.lua", "SlimSuiteSetup.lua", "SlimSuiteCommands.lua", "SlimSuiteWorld.lua" }) do
 	loadFile(f)
 end
 -- every error Slim Suite catches counts as a test error

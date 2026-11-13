@@ -94,3 +94,27 @@ near("resolved height", t - b, rootHeight)
 near("caught runtime errors", #ERRORS, 0)
 print("screen edge problems: " .. bad)
 assert(bad == 0, "screen edge regression")
+
+-- A custom location saved on one display adapts proportionally and returns exactly.
+uiScale, ownScale, originX, originY = 1, 1, 0, 0
+viewportWidth, viewportHeight = 1920,1080
+rootWidth,rootHeight=1920,1080
+UIParent.GetWidth=function() return rootWidth end
+UIParent.GetHeight=function() return rootHeight end
+rootPosition(frame,600,400)
+SS.SavePlace(name,frame)
+local original=SS.CopyTable(SS.DB().places[name])
+for i=1,5 do
+ viewportWidth,viewportHeight=1280,720;rootWidth,rootHeight=1280,720
+ SS.Place(name)
+ near("custom resized horizontal",physicalLeft(),400)
+ near("custom resized vertical",physicalBottom(),400*720/1080)
+ viewportWidth,viewportHeight=1920,1080;rootWidth,rootHeight=1920,1080
+ SS.Place(name)
+ near("custom return horizontal",physicalLeft(),600)
+ near("custom return vertical",physicalBottom(),400)
+end
+near("stored horizontal unchanged",SS.DB().places[name].x,original.x)
+near("stored vertical unchanged",SS.DB().places[name].y,original.y)
+print("resize return problems: "..bad)
+assert(bad==0,"resize return regression")

@@ -646,9 +646,9 @@ function SS.BuildRowDefaultPlace(name)
 			end
 			return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -BUILD.ROW_GAP };
 		end
-		return { x = x, y = y - 40, coordinateSpace = "uiParent" };
+		return { x = x, y = y - 40, coordinateSpace = "uiParent", displayDefault = true };
 	end
-	return { x = x, y = y, coordinateSpace = "uiParent" };
+	return { x = x, y = y, coordinateSpace = "uiParent", displayDefault = true };
 end
 
 function SS.RefreshItemRow()
