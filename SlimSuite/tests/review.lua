@@ -36,13 +36,17 @@ for i = 1, 3 do SS.Safe(function() error("review test error") end) end
 _ERRORMESSAGE, DEFAULT_CHAT_FRAME.AddMessage = oldPopup, oldAdd
 check("no popup, one chat line, every time logged", popups == 0 and lines == 1 and #ERRORS == before + 3)
 for i = #ERRORS, before + 1, -1 do table.remove(ERRORS, i) end
--- the setup is for the first time; after it, Toggle UI Settings opens Edit mode
+-- Toggle UI Settings always opens the element list (with the grid and Done); the old move panel is gone
 SS.DB().setupDone = nil
 SS.SetUnlocked(true); Tick(2)
 check("first time: the setup", SU.bar:IsVisible())
 SS.SetupEnd(true); Tick(2)
 SS.SetUnlocked(true); Tick(2)
-check("afterwards: Edit mode", not SU.bar:IsVisible() and SlimSuiteMovePanel:IsVisible())
+check("afterwards: the element list again", SU.bar:IsVisible() and not (SlimSuiteMovePanel and SlimSuiteMovePanel:IsVisible()))
+check("grid and Done are on the list", SU.grid:GetParent() == SU.bar and SU.bar.done:IsVisible())
+Click(SU.bar.done); Tick(2)
+check("Done closes it", not SU.bar:IsVisible() and not SS.DB().unlocked)
+SS.SetUnlocked(true); Tick(2)
 -- the element menu: only the rows an element uses, and no setting offered twice
 local sm
 local function rows(name) SS.OpenSizeMenu(name, name); Tick(1); sm = sm or upvalue(SS.PrepareSizeTools, "sizeMenu"); return sm.rows end
@@ -90,3 +94,13 @@ SS.cameraZoomed = nil; SS.Camera(true); SS.Camera(true)
 check("the camera zooms out once", zooms == 1)
 print("review problems: " .. bad)
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end
+-- the list shows every element, on or off; the combat text gets its green handle when turned on there
+SS.DB().combatTextBox = false; SS.SetupEnd(true); Tick(1)
+SS.SetUnlocked(true); Tick(2)
+local listed = false
+for _, e in ipairs(SU.elements) do if e.frame == "SlimSuiteCombatTextFrame" then listed = true end end
+check("combat text is listed while off", listed)
+SU.SetOn("SlimSuiteCombatTextFrame", true, "Combat text"); SS.SetUnlocked(true, true); Tick(2)
+check("turning it on turns the box on", SS.DB().combatTextBox == true)
+check("and it has a green handle", SS.ENV.handles.SlimSuiteCombatTextFrame and SS.ENV.handles.SlimSuiteCombatTextFrame:IsShown())
+print("list problems: " .. bad)

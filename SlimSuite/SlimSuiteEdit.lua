@@ -1137,7 +1137,8 @@ end
 function SS.SetUnlocked(on, quiet)
 	-- The first time the mover is opened, the setup walks through the UI one element at a time instead.
 	-- After that it opens Edit mode (every handle, and the move panel with "Run setup again").
-	if ( on and not quiet and not setupActive and SS.StartSetup and not SS.DB().setupDone ) then
+	-- Edit mode is the element list: every element, Enabled or Disabled, the grid on top and Done at the bottom.
+	if ( on and not quiet and not setupActive and SS.StartSetup ) then
 		SS.StartSetup();
 		return;
 	end
@@ -1168,8 +1169,7 @@ function SS.SetUnlocked(on, quiet)
 	if ( on ) then
 		-- Leave the settings/menu window before presenting the in-world mover and its Done control.
 		if ( win ) then win:Hide(); end
-		if ( setupActive ) then if ( lockPanel ) then lockPanel:Hide(); end
-		else SS.ShowLockPanel(); end
+		if ( lockPanel ) then lockPanel:Hide(); end   -- the old move panel is gone: the element list replaces it
 	elseif ( lockPanel ) then
 		lockPanel:Hide();
 	end

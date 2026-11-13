@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.14
+One list for moving and switching everything.
+
+- **Toggle UI Settings** now always opens the element list: every element Slim Suite can change, each tagged Enabled, Disabled or Connected. The old move panel (Choose element, ALL?, Run setup again, centre lines) is gone.
+- **Grid** sits on top of the list: a tick box and 16 / 32 / 64 / 128 blocks. **Done** at the bottom closes the list.
+- **Every element is listed, on or off.** Turning one on in the list turns its feature on and gives it a green handle, including the combat text box.
+- An element's own menu has just a Done button, which closes that menu.
+
 ## 1.13
 Under the hood: Slim Suite is split into smaller files, and the unit frames react to the game's events.
 

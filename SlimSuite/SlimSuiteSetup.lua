@@ -41,14 +41,15 @@ function SU.Steps()
 	};
 	for i = 1, table.getn(rest) do
 		local r = rest[i];
-		if ( getglobal(r[1]) and (not r[4] or r[4]()) ) then table.insert(steps, { frame = r[1], title = r[2], text = r[3] }); end
+		-- every element Slim Suite can change is listed, on or off; turning one on here turns on its feature too
+		if ( getglobal(r[1]) ) then table.insert(steps, { frame = r[1], title = r[2], text = r[3] }); end
 	end
 	local kept = {};
 	for i = 1, table.getn(steps) do
 		if ( not (d.setupDisabled and d.setupDisabled[steps[i].frame]) ) then table.insert(kept, steps[i]); end
 	end
 	steps = kept;
-	table.insert(steps, { title = "All set", text = "That's everything. Press Finish to lock the UI. You can move anything again with Toggle UI Settings, and run this setup again from the move panel." });
+	table.insert(steps, { title = "All set", text = "That's everything. Press Finish to lock the UI. You can move anything again with Toggle UI Settings. Done closes the list." });
 	return steps;
 end
 
@@ -381,6 +382,21 @@ function SU.HideAll()
 end
 
 -- turn an element on or off: its frame (and the frames that move with it) and its handle
+SU.FEATURES = {
+	SlimSuiteStoredLevelsButton = function(v) SS.DB().moveLevelButton = v; SS.UpdateLevelButton(); end,
+	SlimSuiteSpellRowFrame = function(v) SS.DB().replaceBuildRows = v; SS.ApplyBuildRowReplacement(); end,
+	SlimSuiteClockFrame = function(v) SS.DB().replaceClock = v; SS.UpdateClock(); end,
+	SlimSuiteBossFrames = function(v) SS.DB().replaceEncounters = v; SS.UpdateBossFrames(); end,
+	SlimSuiteTallyFrame = function(v) SS.DB().replaceTally = v; SS.UpdateTally(); end,
+	SlimSuiteAnnouncementFrame = function(v) SS.DB().replaceBanners = v; SS.UpdateAnnouncementFrame(); end,
+	SlimSuiteReviveFrame = function(v) SS.DB().replaceRevive = v; end,
+	SlimSuiteCombatTextFrame = function(v) SS.DB().combatTextBox = v; end,
+	SlimSuiteLocalClockFrame = function(v)
+		if ( v ) then SS.DB().replaceLocalClock = true; SS.DB().clockDetached = true; else SS.DB().clockDetached = false; end
+		SS.Safe(SlimSuiteWorld.UpdateLocalClock);
+	end,
+	SlimSuiteMinimapBar = function(v) SS.SetMinimapBar(v, true); end,
+};
 function SU.SetOn(frame, on, title)
 	-- the newest choice wins: a target frame turned on or off by its own button takes precedence over the party/combine settings
 	if ( frame == "PlayerFrame" and on and not SU.restoring and SS.DB().partyIncludesSelf ) then SS.Safe(SS.ClaimTarget, "player"); end
@@ -390,6 +406,9 @@ function SU.SetOn(frame, on, title)
 	end
 	-- the damage meter element is the same switch as "Replace Default Damage Meter with Movable Version?"
 	if ( frame == "SlimSuiteMeterFrame" and not SU.restoring ) then SS.DB().moveMeter = on and true or false; end
+	-- the same goes for every replacement: its element in the list is its on/off switch
+	local feature = SU.FEATURES[frame];
+	if ( feature and not SU.restoring ) then SS.Safe(feature, on and true or false); end
 	-- the target frame element is the same switch as "Hide the target frame": off here is off in the game too
 	if ( frame == "TargetFrame" and not SU.restoring and (SS.DB().hideTarget and true or false) == (on and true or false) ) then
 		SS.DB().hideTarget = not on;
@@ -1304,8 +1323,7 @@ function SU.Focus(frame)
 		end
 	end
 	if ( SU.panel.done ) then
-		if ( setupActive ) then SU.panel.exit:Show(); SU.panel.complete:Show(); SU.panel.done:Hide();
-		else SU.panel.exit:Hide(); SU.panel.complete:Hide(); SU.panel.done:Show(); end
+		SU.panel.exit:Hide(); SU.panel.complete:Hide(); SU.panel.done:Show();   -- the list's own Done ends Edit mode
 	end
 	SU.panel:SetHeight(h);
 	if ( SU.grid ) then SU.grid.Refresh(); end
@@ -1564,6 +1582,7 @@ function SU.Begin()
 		local f = SU.elements[i].frame;
 		local want = saved[f] and true or false;
 		if ( f == "SlimSuiteMeterFrame" ) then want = SS.DB().moveMeter and true or false; end   -- follows the setting
+		if ( SU.FEATURES[f] ) then want = SS.AvailableElements()[f] and true or false; end        -- follows its feature
 		if ( f == "PlayerFrame" and SS.DB().partyIncludesSelf ) then want = false; end            -- you are in the party
 		if ( f == "TargetFrame" ) then want = not SS.DB().hideTarget; end                         -- follows the setting
 		SS.Safe(SU.SetOn, f, want, SU.titles[f]);
@@ -1575,7 +1594,8 @@ function SU.Begin()
 	-- a vertical list from the top left corner: one element per line, a new column when the screen runs out of height
 	local wanted, col, idx, maxIdx = {}, 0, 0, 0;
 	local maxH = (UIParent:GetHeight() or 768) - 80;
-	local COLUMN, LINE = 250, 26;
+	local COLUMN, LINE, TOP, BOTTOM = 250, 26, 30, 34;   -- the grid row on top, Done at the bottom
+	maxH = maxH - TOP - BOTTOM;
 	for i = 1, table.getn(SU.elements) do
 		local e = SU.elements[i];
 		local name = e.frame;
@@ -1609,13 +1629,13 @@ function SU.Begin()
 		-- the Enabled / Disabled tag sits to the right of its button
 		b.tag:SetWidth(72); b.tag:ClearAllPoints(); b.tag:SetPoint("LEFT", b, "RIGHT", 4, 0);
 		if ( idx > 0 and 8 + (idx + 1) * LINE > maxH ) then col = col + 1; idx = 0; end
-		b:ClearAllPoints(); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 8 + col * COLUMN, -8 - idx * LINE); b:Show();
+		b:ClearAllPoints(); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 8 + col * COLUMN, -8 - TOP - idx * LINE); b:Show();
 		if ( idx > maxIdx ) then maxIdx = idx; end
 		idx = idx + 1;
 	end
 	for name, b in pairs(SU.barButtons) do if ( not wanted[name] ) then b:Hide(); if ( b.tag ) then b.tag:Hide(); end end end
 	SU.bar:SetWidth(8 + (col + 1) * COLUMN);
-	SU.bar:SetHeight((maxIdx + 1) * LINE + 16);
+	SU.bar:SetHeight((maxIdx + 1) * LINE + 16 + TOP + BOTTOM);
 	SU.bar:Show();
 	SU.Focus(nil);
 	SU.RefreshBar();
@@ -1642,8 +1662,8 @@ function SU.Build()
 	SU.panel.text:SetWidth(396); SU.panel.text:SetJustifyH("LEFT"); SU.panel.text:SetJustifyV("TOP");
 	-- the grid settings, top right: grid on/off and its size; the red centre lines; frames snapping together
 	local function Tick(x, y, label, get, set)
-		local cb = CreateFrame("CheckButton", nil, SU.panel, "UICheckButtonTemplate");
-		cb:SetWidth(20); cb:SetHeight(20); cb:SetPoint("TOPRIGHT", SU.panel, "TOPRIGHT", x, y);
+		local cb = CreateFrame("CheckButton", nil, SU.bar, "UICheckButtonTemplate");
+		cb:SetWidth(20); cb:SetHeight(20); cb:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", x, y);
 		cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		cb.label:SetPoint("LEFT", cb, "RIGHT", 0, 1); cb.label:SetText(label);
 		cb.Refresh = function() cb:SetChecked(get() and 1 or nil); end;
@@ -1653,31 +1673,38 @@ function SU.Build()
 		return cb;
 	end
 	-- the grid, top right of every setup panel: on or off, and its size
-	SU.grid = Tick(-176, -7, "Grid", function() return SS.DB().showEditGrid; end, function(v) SU.SetGridSetting(v); end);
+	-- the bar down the left of the screen: the grid on top, one toggle per element, Done at the bottom
+	SU.bar = CreateFrame("Frame", "SlimSuiteSetupBar", UIParent);
+	SU.grid = Tick(8, -8, "Grid", function() return SS.DB().showEditGrid; end, function(v) SU.SetGridSetting(v); end);
 	SU.sizes = {};
 	local sizes = { 16, 32, 64, 128 };
 	for i = 1, 4 do
 		local pixels = sizes[i];
-		local b = K.Button(SU.panel, tostring(pixels), 34, function()
+		local b = K.Button(SU.bar, tostring(pixels), 34, function()
 			SS.DB().gridDivisions = pixels; SU.SetGridSetting(SS.DB().showEditGrid and true or false); SU.RefreshGridButtons();
 		end);
-		b:SetHeight(18); b:SetPoint("TOPRIGHT", SU.panel, "TOPRIGHT", -8 - (4 - i) * 36, -8);
+		b:SetHeight(18); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 64 + (i - 1) * 36, -9);
 		SU.sizes[i] = b;
 	end
 	-- the element's own settings (more rows are made when an element needs them)
 	SU.checks = {};
 	for i = 1, 12 do SU.checks[i] = SU.Check(SU.panel); end
 	SU.panel.exit = K.Button(SU.panel, "Exit", 90, function() SS.SetupEnd(false); end);
-	SU.panel.exit:SetPoint("BOTTOMLEFT", SU.panel, "BOTTOMLEFT", 10, 8);
+	SU.panel.exit:SetPoint("BOTTOMLEFT", SU.panel, "BOTTOMLEFT", 10, 8); SU.panel.exit:Hide();
 	SU.panel.complete = K.Button(SU.panel, "Complete", 100, function() SS.SetupEnd(true); end);
 	SU.panel.complete:SetPoint("BOTTOMRIGHT", SU.panel, "BOTTOMRIGHT", -10, 8);
 	-- the same panel is every element's right-click menu outside the setup: Done closes it
-	SU.panel.done = K.Button(SU.panel, "Done", 90, function() SS.HideElementMenu(); end);
+	SU.panel.done = K.Button(SU.panel, "Done", 90, function()
+		if ( setupActive ) then
+			SU.panel:Hide(); if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
+			SU.focus, SU.placedFor = nil, nil;
+		else SS.HideElementMenu(); end
+	end);
 	SU.panel.done:SetPoint("BOTTOMRIGHT", SU.panel, "BOTTOMRIGHT", -10, 8);
 	SU.panel.done:Hide();
 	SU.panel:Hide();
-	-- the bar across the top of the screen: one toggle per element
-	SU.bar = CreateFrame("Frame", "SlimSuiteSetupBar", UIParent);
+	SU.bar.done = K.Button(SU.bar, "Done", 90, function() SS.SetupEnd(true); end);
+	SU.bar.done:SetPoint("BOTTOMLEFT", SU.bar, "BOTTOMLEFT", 8, 8);
 	SU.bar:SetFrameStrata("DIALOG");
 	SU.bar:SetHeight(52);
 	SU.bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -1777,8 +1804,7 @@ function SS.SetupEnd(finished)
 	local ok, err = pcall(SS.SetupHide);
 	if ( not ok ) then SS.SetupRescue(err); return; end
 	editOnly = nil;
-	if ( finished ) then SS.SetUnlocked(false, true);
-	else SS.SetUnlocked(true, true); end
+	SS.SetUnlocked(false, true);   -- Done (or Exit) leaves Edit mode
 end
 
 -- ---------------------------------------------------------------- the settings window
