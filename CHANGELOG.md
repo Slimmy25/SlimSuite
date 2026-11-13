@@ -2,6 +2,9 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.22
+- **Screen edges:** dragging, saved positions, live boundary checks and the edit grid now share measured screen bounds, including the world viewport when the UI root occupies a smaller area. Scaled elements retain their visible bounds when placed against an edge.
+
 ## 1.19
 More predictable UI setup, with native defaults preserved until you opt in.
 

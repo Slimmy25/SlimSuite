@@ -256,26 +256,13 @@ function SS.ClampAbsoluteFrame(name, f)
 	if ( not f or SS.DB().unlocked ) then return; end
 	local saved = SS.DB().places[name];
 	if ( type(saved) == "table" and saved.relative ) then return; end
-	do   -- checked already at this place and size on this screen: nothing can have moved off it
-		local l, _, b = RootBounds(f);
-		local w, h, sw, sh = f:GetWidth(), f:GetHeight(), UIParent:GetWidth(), UIParent:GetHeight();
-		local c = f.slimClamp;
-		if ( c and l and c[1] == l and c[2] == b and c[3] == w and c[4] == h and c[5] == sw and c[6] == sh ) then return; end
-		if ( not c ) then c = {}; f.slimClamp = c; end
-		c[1], c[2], c[3], c[4], c[5], c[6] = l, b, w, h, sw, sh;
-	end
-	local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(f);
-	local maxX = UIParent:GetWidth() - maxOffsetX;
-	local maxY = UIParent:GetHeight() - maxOffsetY;
 	local x, right, y = RootBounds(f);
 	if ( x == nil and type(saved) == "table" ) then x = saved.x; end
 	if ( y == nil and type(saved) == "table" ) then y = saved.y; end
 	if ( type(x) ~= "number" or type(y) ~= "number" ) then return; end
-	local nx = math.max(-minX, math.min(maxX, x));
-	local ny = math.max(-minY, math.min(maxY, y));
+	local nx, ny = SS.ClampPosition(f, x, y);
 	if ( nx ~= x or ny ~= y ) then
 		SetRootPosition(f, nx, ny);
-		f.slimClamp[1] = nil;                                -- moved: looked at once more next time
 	end
 end
 
@@ -704,6 +691,32 @@ SetRootPosition = function(frame, x, y)
 	frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x / factor, y / factor);
 end
 
+-- Use resolved edges, in the same units as RootBounds and saved places. A scaled or
+-- inset UIParent is not necessarily the whole client viewport. WorldFrame supplies
+-- the remaining screen area; taking the union also handles a reduced world viewport
+-- without cutting off UI space. Never change either root frame's scale or anchors.
+function SS.ScreenBounds()
+	local left, right, bottom, top = RootBounds(UIParent);
+	if ( not left or not right or not bottom or not top or right <= left or top <= bottom ) then
+		left, right, bottom, top = 0, UIParent:GetWidth(), 0, UIParent:GetHeight();
+	end
+	if ( WorldFrame ) then
+		local l, r, b, t = RootBounds(WorldFrame);
+		if ( l and r and b and t and r > l and t > b ) then
+			left, right = math.min(left, l), math.max(right, r);
+			bottom, top = math.min(bottom, b), math.max(top, t);
+		end
+	end
+	return left, right, bottom, top;
+end
+
+function SS.ClampPosition(frame, x, y)
+	local left, right, bottom, top = SS.ScreenBounds();
+	local minX, minY, maxX, maxY = VisualInsets(frame);
+	return math.max(left - minX, math.min(right - maxX, x)),
+		math.max(bottom - minY, math.min(top - maxY, y));
+end
+
 function SS.SavePlace(name, f)
 	local p = SS.DB().places[name];
 	if ( type(p) ~= "table" ) then p = {}; SS.DB().places[name] = p; end
@@ -725,12 +738,7 @@ function SS.ClampToClient(name, frame)
 	if ( name == "SlimSuiteItemRowFrame" and SS.DB().buildRowsAttached ) then return; end   -- the spell row is clamped for both
 	local left, right, bottom = RootBounds(frame);
 	if ( not left or not bottom ) then return; end
-	local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(frame);
-	local minClientX, minClientY = -minX, -minY;
-	local maxX = UIParent:GetWidth() - maxOffsetX;
-	local maxY = UIParent:GetHeight() - maxOffsetY;
-	local x = math.max(minClientX, math.min(maxX, left));
-	local y = math.max(minClientY, math.min(maxY, bottom));
+	local x, y = SS.ClampPosition(frame, left, bottom);
 	if ( math.abs(x - left) > 0.01 or math.abs(y - bottom) > 0.01 ) then
 		SetRootPosition(frame, x, y);
 		SS.SavePlace(name, frame);
@@ -1594,13 +1602,9 @@ function SS.Place(name, ignoreAnchor)
 		local factor = RootFactor(f);
 		f:SetPoint(p.point, relative, p.relativePoint, K.Num(p.dx) / factor, K.Num(p.dy) / factor);
 	elseif ( p.x and p.y ) then
-		-- Saved coordinates can come from a taller or wider display. Clamp absolute restores to this UIParent
+		-- Saved coordinates can come from a taller or wider display. Clamp absolute restores to this screen
 		-- without rewriting the saved location, so a later return to the larger display restores the user's layout.
-		local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(f);
-		local maxX = UIParent:GetWidth() - maxOffsetX;
-		local maxY = UIParent:GetHeight() - maxOffsetY;
-		local x = math.max(-minX, math.min(maxX, K.Num(p.x)));
-		local y = math.max(-minY, math.min(maxY, K.Num(p.y)));
+		local x, y = SS.ClampPosition(f, K.Num(p.x), K.Num(p.y));
 		SetRootPosition(f, x, y);
 	end
 end

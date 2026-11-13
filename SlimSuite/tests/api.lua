@@ -13,11 +13,13 @@ SS.ENV.SetRootPosition(SlimSuiteClockFrame, 140, 110)
 local rootPoint = SlimSuiteClockFrame.points and SlimSuiteClockFrame.points[1]
 check("root placement uses UIParent-relative coordinates", rootPoint and rootPoint[4] == 140 and rootPoint[5] == 110)
 local oldWidth, oldHeight = UIParent.GetWidth, UIParent.GetHeight
+local oldRight, oldTop = UIParent.GetRight, UIParent.GetTop
 local clockFrame = SlimSuiteClockFrame
 local oldFrameMethods = { GetLeft = rawget(clockFrame, "GetLeft"), GetRight = rawget(clockFrame, "GetRight"),
 	GetBottom = rawget(clockFrame, "GetBottom"), GetTop = rawget(clockFrame, "GetTop"),
 	GetWidth = rawget(clockFrame, "GetWidth"), GetHeight = rawget(clockFrame, "GetHeight") }
 UIParent.GetWidth = function() return 500 end; UIParent.GetHeight = function() return 400 end
+UIParent.GetRight = function() return 600 end; UIParent.GetTop = function() return 480 end
 clockFrame.GetLeft = function() return 605 end; clockFrame.GetRight = function() return 705 end
 clockFrame.GetBottom = function() return 545 end; clockFrame.GetTop = function() return 565 end
 clockFrame.GetWidth = function() return 100 end; clockFrame.GetHeight = function() return 20 end
@@ -25,6 +27,7 @@ SS.ClampToClient("SlimSuiteClockFrame", clockFrame)
 rootPoint = clockFrame.points and clockFrame.points[1]
 check("elements can reach the UIParent's upper-right edge", rootPoint and rootPoint[4] == 400 and rootPoint[5] == 380)
 UIParent.GetLeft, UIParent.GetBottom, UIParent.GetWidth, UIParent.GetHeight = oldLeft, oldBottom, oldWidth, oldHeight
+UIParent.GetRight, UIParent.GetTop = oldRight, oldTop
 for name, method in pairs(oldFrameMethods) do clockFrame[name] = method end
 
 -- kill tally: a boss at 3% or less counts once; a Guardian at 0 counts; one that leaves the list alive does not

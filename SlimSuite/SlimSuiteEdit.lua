@@ -1069,14 +1069,17 @@ ShowEditGrid = function()
 	if ( not SS.DB().showEditGrid or not SS.DB().unlocked ) then return; end
 	if ( not editGrid ) then
 		editGrid = CreateFrame("Frame", "SlimSuiteEditGrid", UIParent);
-		editGrid:SetAllPoints(UIParent);
 		editGrid:SetFrameStrata("HIGH");
 		editGrid:EnableMouse(false);
 		editGrid:SetScript("OnSizeChanged", function()
 			if ( SS.DB().showEditGrid and SS.DB().unlocked ) then ShowEditGrid(); end
 		end);
 	end
-	local width, height = UIParent:GetWidth(), UIParent:GetHeight();
+	local left, right, bottom, top = SS.ScreenBounds();
+	local width, height = right - left, top - bottom;
+	editGrid:ClearAllPoints();
+	editGrid:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom);
+	editGrid:SetWidth(width); editGrid:SetHeight(height);
 	local count, i = 1, 1;
 	local function Line(x, y, w, h, color)
 		local tex = editGridLines[count];
@@ -1189,11 +1192,7 @@ function SS.DragStep(h, name)
 	local deltaX, deltaY = x - h.dragStartX, y - h.dragStartY;
 	local nextX, nextY = h.frameStartX + deltaX, h.frameStartY + deltaY;
 	local moved = getglobal(h.mover or name) or t;
-	local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(moved);
-	local maxX = UIParent:GetWidth() - maxOffsetX;
-	local maxY = UIParent:GetHeight() - maxOffsetY;
-	nextX = math.max(-minX, math.min(maxX, nextX));
-	nextY = math.max(-minY, math.min(maxY, nextY));
+	nextX, nextY = SS.ClampPosition(moved, nextX, nextY);
 	SetRootPosition(moved, nextX, nextY);
 	SS.SavePlace(h.mover or name, moved);          -- keep the newest location even if /reload happens mid-session
 	-- mirrored frames move together: drag either one and the other moves the opposite way
