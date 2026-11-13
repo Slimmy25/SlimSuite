@@ -692,7 +692,10 @@ RootBounds = function(frame)
 	local l, r, b, t = frame:GetLeft(), frame:GetRight(), frame:GetBottom(), frame:GetTop();
 	if ( not l or not r or not b or not t ) then return nil; end
 	local factor = RootFactor(frame);
-	return l * factor, r * factor, b * factor, t * factor;
+	-- All saved positions and UIParent anchors use coordinates from its bottom-left, even
+	-- on clients where UIParent itself is inset from the physical screen origin.
+	local originX, originY = UIParent:GetLeft() or 0, UIParent:GetBottom() or 0;
+	return l * factor - originX, r * factor - originX, b * factor - originY, t * factor - originY;
 end
 
 SetRootPosition = function(frame, x, y)
@@ -723,10 +726,11 @@ function SS.ClampToClient(name, frame)
 	local left, right, bottom = RootBounds(frame);
 	if ( not left or not bottom ) then return; end
 	local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(frame);
+	local minClientX, minClientY = -minX, -minY;
 	local maxX = UIParent:GetWidth() - maxOffsetX;
 	local maxY = UIParent:GetHeight() - maxOffsetY;
-	local x = math.max(-minX, math.min(maxX, left));
-	local y = math.max(-minY, math.min(maxY, bottom));
+	local x = math.max(minClientX, math.min(maxX, left));
+	local y = math.max(minClientY, math.min(maxY, bottom));
 	if ( math.abs(x - left) > 0.01 or math.abs(y - bottom) > 0.01 ) then
 		SetRootPosition(frame, x, y);
 		SS.SavePlace(name, frame);
@@ -1573,7 +1577,7 @@ function SS.Place(name, ignoreAnchor)
 	-- Our edge clamp uses visible child bounds; let it place an inset parent slightly outside the screen.
 	if ( SS.DB().unlocked or type(p) == "table" ) then
 		if ( f.SetClampedToScreen ) then f:SetClampedToScreen(false); end
-		if ( (name == "BuffFrame" or name == "MainMenuBar") and f.SetUserPlaced ) then SS.UserPlace(f); end
+		if ( (name == "BuffFrame" or name == "MainMenuBar" or name == "MinimapCluster") and f.SetUserPlaced ) then SS.UserPlace(f); end
 	end
 	if ( type(p) ~= "table" ) then return; end
 	if ( p.coordinateSpace ~= "uiParent" ) then

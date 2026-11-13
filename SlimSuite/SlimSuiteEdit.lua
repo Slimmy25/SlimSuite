@@ -1258,7 +1258,7 @@ function SS.Handle(name, label)
 			-- We clamp the visible child bounds ourselves below; native clamping would keep the
 			-- parent inside the screen and leave a gap when its buttons extend beyond its edges.
 			if ( t.SetClampedToScreen ) then t:SetClampedToScreen(false); end
-			if ( (name == "BuffFrame" or name == "MainMenuBar" or name == "PartyMemberFrame1") and t.SetUserPlaced ) then SS.UserPlace(t); end
+			if ( (name == "BuffFrame" or name == "MainMenuBar" or name == "MinimapCluster" or name == "PartyMemberFrame1") and t.SetUserPlaced ) then SS.UserPlace(t); end
 			local scale = SS.EffectiveScale(UIParent);
 			local x, y = GetCursorPosition(); x, y = x / scale, y / scale;
 			this.dragStartX, this.dragStartY = x, y;

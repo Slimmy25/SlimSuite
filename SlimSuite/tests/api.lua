@@ -7,6 +7,25 @@ local scaleRoot = { GetScale = function() return 0.8 end };
 local scaleChild = { parent = scaleRoot, GetScale = function() return 1.25 end,
 	GetParent = function(self) return self.parent end };
 check("effective scale falls back through parents", math.abs(SS.EffectiveScale(scaleChild) - 1) < 0.001)
+local oldLeft, oldBottom = UIParent.GetLeft, UIParent.GetBottom
+UIParent.GetLeft = function() return 100 end; UIParent.GetBottom = function() return 80 end
+SS.ENV.SetRootPosition(SlimSuiteClockFrame, 140, 110)
+local rootPoint = SlimSuiteClockFrame.points and SlimSuiteClockFrame.points[1]
+check("root placement uses UIParent-relative coordinates", rootPoint and rootPoint[4] == 140 and rootPoint[5] == 110)
+local oldWidth, oldHeight = UIParent.GetWidth, UIParent.GetHeight
+local clockFrame = SlimSuiteClockFrame
+local oldFrameMethods = { GetLeft = rawget(clockFrame, "GetLeft"), GetRight = rawget(clockFrame, "GetRight"),
+	GetBottom = rawget(clockFrame, "GetBottom"), GetTop = rawget(clockFrame, "GetTop"),
+	GetWidth = rawget(clockFrame, "GetWidth"), GetHeight = rawget(clockFrame, "GetHeight") }
+UIParent.GetWidth = function() return 500 end; UIParent.GetHeight = function() return 400 end
+clockFrame.GetLeft = function() return 605 end; clockFrame.GetRight = function() return 705 end
+clockFrame.GetBottom = function() return 545 end; clockFrame.GetTop = function() return 565 end
+clockFrame.GetWidth = function() return 100 end; clockFrame.GetHeight = function() return 20 end
+SS.ClampToClient("SlimSuiteClockFrame", clockFrame)
+rootPoint = clockFrame.points and clockFrame.points[1]
+check("elements can reach the UIParent's upper-right edge", rootPoint and rootPoint[4] == 400 and rootPoint[5] == 380)
+UIParent.GetLeft, UIParent.GetBottom, UIParent.GetWidth, UIParent.GetHeight = oldLeft, oldBottom, oldWidth, oldHeight
+for name, method in pairs(oldFrameMethods) do clockFrame[name] = method end
 
 -- kill tally: a boss at 3% or less counts once; a Guardian at 0 counts; one that leaves the list alive does not
 AZS_GetPhase = function() return "playing" end
