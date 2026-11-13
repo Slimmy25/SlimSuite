@@ -227,13 +227,21 @@ end
 -- the square mask is Slim Suite's own full-size white square: the game's tiny 8x8 white texture cuts the whole map out
 SlimSuiteMinimapMask = { round = "Textures\\MinimapMask", square = "Interface\\AddOns\\SlimSuite\\textures\\MinimapSquare" };
 function SS.ApplyMinimapShape()
-	if ( not Minimap or not Minimap.SetMaskTexture ) then return false; end
+	if ( not Minimap ) then return false; end
+	-- Capture the round map's original appearance before the square/transparent options hide either border.
+	SS.Safe(SS.ApplyMinimapTransparency);
 	local square = SS.DB().minimapSquare and true or false;
-	local ok = SS.Safe(Minimap.SetMaskTexture, Minimap, square and SlimSuiteMinimapMask.square or SlimSuiteMinimapMask.round);
+	local ok = false;
+	if ( Minimap.SetMaskTexture ) then
+		ok = SS.Safe(Minimap.SetMaskTexture, Minimap, square and SlimSuiteMinimapMask.square or SlimSuiteMinimapMask.round);
+	else
+		ok = not square;                                      -- a round transparent map still works without mask support
+	end
 	SS.squareActive = square and ok and true or false;
 	SS.Safe(SS.ArrangeEdgeButtons, square and ok);   -- the buttons follow the shape the map really has
-	if ( MinimapBorder ) then if ( square ) then MinimapBorder:Hide(); else MinimapBorder:Show(); end end
+	if ( MinimapBorder ) then if ( SS.squareActive or SS.DB().minimapTransparent ) then MinimapBorder:Hide(); else MinimapBorder:Show(); end end
 	SS.Safe(SS.SquareFrame, square and ok);
+	SS.Safe(SS.ApplyMinimapTransparency);
 	if ( square and ok ) then SS.Safe(SS.ClockFollowsMap); end
 	-- the map is only redrawn with its new shape when it changes zoom: step the zoom and back to force that
 	if ( ok and Minimap.GetZoom and Minimap.SetZoom and Minimap.GetZoomLevels ) then
@@ -242,6 +250,30 @@ function SS.ApplyMinimapShape()
 		if ( other >= 0 ) then SS.Safe(Minimap.SetZoom, Minimap, other); SS.Safe(Minimap.SetZoom, Minimap, zoom); end
 	end
 	return ok;
+end
+
+local minimapOriginalAlpha, minimapBorderWasShown, minimapBorderTopWasShown;
+function SS.ApplyMinimapTransparency()
+	if ( not Minimap ) then return; end
+	if ( minimapOriginalAlpha == nil and Minimap.GetAlpha ) then minimapOriginalAlpha = Minimap:GetAlpha() or 1; end
+	if ( minimapBorderWasShown == nil and MinimapBorder and MinimapBorder.IsShown ) then minimapBorderWasShown = MinimapBorder:IsShown(); end
+	if ( minimapBorderTopWasShown == nil and MinimapBorderTop and MinimapBorderTop.IsShown ) then minimapBorderTopWasShown = MinimapBorderTop:IsShown(); end
+	local transparent = SS.DB().minimapTransparent and true or false;
+	if ( Minimap.SetAlpha ) then Minimap:SetAlpha(transparent and 0.58 or (minimapOriginalAlpha or 1)); end
+	if ( MinimapBorder ) then
+		if ( transparent or SS.squareActive ) then MinimapBorder:Hide();
+		elseif ( minimapBorderWasShown ) then MinimapBorder:Show(); else MinimapBorder:Hide(); end
+	end
+	if ( MinimapBorderTop ) then
+		if ( transparent or SS.squareActive ) then MinimapBorderTop:Hide();
+		elseif ( minimapBorderTopWasShown ) then MinimapBorderTop:Show(); else MinimapBorderTop:Hide(); end
+	end
+	if ( SS.squareTitle ) then
+		if ( SS.squareActive ) then SS.squareTitle:Show(); else SS.squareTitle:Hide(); end
+		if ( SS.squareTitle.bg ) then if ( transparent ) then SS.squareTitle.bg:Hide(); else SS.squareTitle.bg:Show(); end end
+		if ( SS.squareTitle.line ) then if ( transparent ) then SS.squareTitle.line:Hide(); else SS.squareTitle.line:Show(); end end
+	end
+	if ( SS.squareRing ) then if ( transparent or not SS.squareActive ) then SS.squareRing:Hide(); else SS.squareRing:Show(); end end
 end
 
 -- The square map's gold ring: a gold band like the round map's border, with a dark line on each side of it. The zone's
@@ -272,18 +304,47 @@ function SS.SquareFrame(on)
 		ring:SetScript("OnShow", function() if ( not SS.squareActive ) then this:Hide(); end end);
 		SS.squareRing = ring;
 	end
-	if ( ring ) then if ( on ) then ring:Show(); else ring:Hide(); end end
-	-- the zone's name: on top of the square's upper edge (back where it was when round)
+	if ( ring ) then if ( on and not SS.DB().minimapTransparent ) then ring:Show(); else ring:Hide(); end end
+	-- A dedicated header keeps the zone name readable and puts a straight lower edge between its title and the square map.
+	local title = SS.squareTitle;
+	if ( on and not title ) then
+		title = CreateFrame("Frame", "SlimSuiteSquareMapTitle", MinimapCluster or UIParent);
+		title:SetFrameStrata("HIGH"); title:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 5);
+		title:SetHeight(16); title:SetPoint("BOTTOMLEFT", Minimap, "TOPLEFT", 0, 0); title:SetPoint("BOTTOMRIGHT", Minimap, "TOPRIGHT", 0, 0);
+		title.bg = title:CreateTexture(nil, "BACKGROUND"); title.bg:SetAllPoints(title); title.bg:SetTexture(0.02, 0.02, 0.03, 0.88);
+		title.line = title:CreateTexture(nil, "BORDER"); title.line:SetTexture(0.72, 0.55, 0.2, 1);
+		title.line:SetPoint("BOTTOMLEFT", title, "BOTTOMLEFT", 0, 0); title.line:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", 0, 0); title.line:SetHeight(1);
+		title.text = title:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
+		title.text:SetPoint("LEFT", title, "LEFT", 4, 0); title.text:SetPoint("RIGHT", title, "RIGHT", -4, 0);
+		title.text:SetJustifyH("CENTER"); title.text:SetTextColor(1, 0.82, 0.32);
+		SS.squareTitle = title;
+	end
+	if ( title ) then if ( on ) then title:Show(); else title:Hide(); end end
+	-- Keep the original zone label alive over the custom title, and restore its original anchor on return to round.
 	local zone = MinimapZoneTextButton;
 	if ( zone ) then
 		if ( on ) then
-			if ( not zone.slimSquareOrig ) then local p, rel, rp, x, y = zone:GetPoint(1); zone.slimSquareOrig = { p, rel, rp, x or 0, y or 0 }; end
-			zone:ClearAllPoints(); zone:SetPoint("BOTTOM", Minimap, "TOP", 0, 1);
-			if ( MinimapBorderTop ) then MinimapBorderTop:ClearAllPoints(); MinimapBorderTop:SetPoint("CENTER", zone, "CENTER", 0, -1); end
+			if ( not zone.slimSquareOrig ) then
+				local p, rel, rp, x, y = zone:GetPoint(1); zone.slimSquareOrig = { p, rel, rp, x or 0, y or 0 };
+				zone.slimSquareWasShown = not zone.IsShown or zone:IsShown();
+				zone.slimSquareStrata, zone.slimSquareLevel = zone:GetFrameStrata(), zone:GetFrameLevel();
+				zone.slimSquareAlpha = zone:GetAlpha() or 1;
+			end
+			zone:ClearAllPoints(); zone:SetPoint("TOPLEFT", title or Minimap, "TOPLEFT", 2, -1); zone:SetPoint("BOTTOMRIGHT", title or Minimap, "BOTTOMRIGHT", -2, 1);
+			zone:SetFrameStrata("HIGH"); zone:SetFrameLevel((title and title:GetFrameLevel() or Minimap:GetFrameLevel() or 1) + 1);
+			zone:SetAlpha(0);                               -- the custom title text is stable even when the native label glitches
+			zone:Show();
+			if ( MinimapBorderTop ) then
+				MinimapBorderTop:Hide();
+			end
 		elseif ( zone.slimSquareOrig ) then
 			local o = zone.slimSquareOrig; zone.slimSquareOrig = nil;
 			zone:ClearAllPoints(); if ( o[2] ) then zone:SetPoint(o[1], o[2], o[3], o[4], o[5]); end
-			if ( MinimapBorderTop and MinimapCluster ) then MinimapBorderTop:ClearAllPoints(); MinimapBorderTop:SetPoint("TOPRIGHT", MinimapCluster, "TOPRIGHT", 0, 0); end
+			if ( zone.slimSquareStrata ) then zone:SetFrameStrata(zone.slimSquareStrata); end
+			if ( zone.slimSquareLevel ) then zone:SetFrameLevel(zone.slimSquareLevel); end
+			zone:SetAlpha(zone.slimSquareAlpha or 1);
+			if ( zone.slimSquareWasShown ) then zone:Show(); else zone:Hide(); end
+			zone.slimSquareWasShown, zone.slimSquareStrata, zone.slimSquareLevel, zone.slimSquareAlpha = nil, nil, nil, nil;
 		end
 	end
 end
@@ -302,9 +363,10 @@ end
 -- gear) lines up in a column down its left edge. Switching back to round puts each one back where it was.
 -- Gathered buttons and the buttons in their own row are left to those layouts; the map's pins are never touched (they
 -- have no name), and neither is the minimap's close button.
-SS.SQUARE_KNOWN = { MinimapZoomIn = true, MinimapZoomOut = true, GameTimeFrame = true, MiniMapTrackingFrame = true,
+SS.SQUARE_KNOWN = { MinimapZoomIn = true, MinimapZoomOut = true, MinimapToggleButton = true, MiniMapWorldMapButton = true,
+	WorldMapFrameMinimizeButton = true, GameTimeFrame = true, MiniMapTrackingFrame = true,
 	MiniMapMailFrame = true, MiniMapBattlefieldFrame = true, MiniMapMeetingStoneFrame = true };
-SS.SQUARE_SKIP = { MinimapPing = true, MinimapToggleButton = true };
+SS.SQUARE_SKIP = { MinimapPing = true };
 -- true while the square layout places the buttons (the minimap buttons' "Around the minimap" choice)
 function SS.SquareColumn()
 	return SS.squareActive and SS.MinimapButtonPlace() == "ring";
@@ -396,6 +458,11 @@ end
 -- buttons that appear later (new mail, a queue, another addon's button) join the square's column
 SS.Every("squareEdge", 1, function()
 	if ( SS.SquareColumn() ) then SS.ArrangeEdgeButtons(true); end
+	if ( SS.squareActive and SS.squareTitle and SS.squareTitle.text ) then
+		local mapName = type(GetRealZoneText) == "function" and GetRealZoneText() or nil;
+		if ( type(mapName) ~= "string" or mapName == "" ) then mapName = type(GetZoneText) == "function" and GetZoneText() or ""; end
+		SS.squareTitle.text:SetText(mapName or "");
+	end
 	-- the ring and the round border always match the map's real shape, whatever else showed or hid them
 	local ring = SS.squareRing;
 	if ( ring and ring:IsShown() and not SS.squareActive ) then ring:Hide(); end
@@ -424,6 +491,12 @@ function SS.SetMinimapSquare(on)
 	if ( not SS.ApplyMinimapShape() ) then
 		K.Print(NAME, "this client cannot change the minimap's shape.");
 	end
+end
+
+function SS.SetMinimapTransparent(on)
+	SS.DB().minimapTransparent = on and true or false;
+	SS.Safe(SS.ApplyMinimapShape);
+	SS.Safe(SS.ApplyMinimapTransparency);
 end
 
 -- "Same size scaling": the mirrored target copies the player frame's scale. Only meaningful while mirroring.

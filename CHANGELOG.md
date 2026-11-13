@@ -2,6 +2,15 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.17
+Clearer demo and minimap details.
+
+- **Demo Mode XP bar:** purple progress steadily fills and returns to empty at 100%.
+- **Combat text:** hits drift right more slowly and use smaller text.
+- **Square minimap:** the map title stays visible above the map, its border fits below the title, and the map button joins the square edge layout.
+- **Transparent minimap:** optional for round or square maps, with borders removed.
+- **Kills / Gold / Cache:** shows the current map and the documented difficulty multiplier when available.
+
 ## 1.16
 Demo Mode runs the whole interface like a real run, big hits pop, and raid marks show on the encounter bars.
 

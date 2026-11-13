@@ -91,7 +91,7 @@ end);
 SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets" };
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget", "mirrorSameScale",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
-	"partyFaces", "cardPortraits", "tallyVertical", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare",
+	"partyFaces", "cardPortraits", "tallyVertical", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare", "minimapTransparent",
 	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments" };
 function SS.CopyTable(t)
 	local out = {};
@@ -573,6 +573,29 @@ demoHitIndex = 1;
 demoHitClock = 0;
 -- sample minimap pins and an XP-bar glint, drawn on the real frames and removed when the demo stops
 demoPins, demoGlint = {}, nil;
+local demoXPOriginal;
+
+local function SetDemoXP(on)
+	local xp = MainMenuExpBar;
+	if ( not xp or not xp.GetValue or not xp.SetMinMaxValues or not xp.SetValue ) then return; end
+	if ( on ) then
+		if ( not demoXPOriginal ) then
+			local lo, hi = xp:GetMinMaxValues();
+			local r, g, b;
+			if ( xp.GetStatusBarColor ) then r, g, b = xp:GetStatusBarColor(); end
+			demoXPOriginal = { lo = lo, hi = hi, value = xp:GetValue(), r = r, g = g, b = b };
+		end
+		xp:SetMinMaxValues(0, 100); xp:SetValue(0);
+		if ( xp.SetStatusBarColor ) then xp:SetStatusBarColor(0.64, 0.22, 0.9); end
+	else
+		local old = demoXPOriginal;
+		if ( old ) then
+			xp:SetMinMaxValues(old.lo or 0, old.hi or 1); xp:SetValue(old.value or 0);
+			if ( old.r and xp.SetStatusBarColor ) then xp:SetStatusBarColor(old.r, old.g, old.b); end
+		end
+		demoXPOriginal = nil;
+	end
+end
 
 function DemoTick(dt)
 	demoT = demoT + dt;
@@ -583,11 +606,9 @@ function DemoTick(dt)
 	SS.Safe(SU.PreviewParty);
 	-- damage meter: the sample numbers climb
 	if ( SlimSuiteMeter and SlimSuiteMeter.demoSnapshot ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(demoT); end
-	-- XP bar: a glint sweeps across it
-	if ( demoGlint and MainMenuExpBar ) then
-		local w = MainMenuExpBar:GetWidth() or 100;
-		demoGlint:ClearAllPoints();
-		demoGlint:SetPoint("LEFT", MainMenuExpBar, "LEFT", math.mod(demoT * 70, math.max(1, w)), 0);
+	-- Demo XP: purple progress climbs evenly and returns to empty at 100%, without changing saved XP.
+	if ( MainMenuExpBar and demoXPOriginal ) then
+		MainMenuExpBar:SetValue(math.mod(demoT * 8, 100));
 	end
 	-- buffs: each sample comes and goes on its own rhythm, on the real buff frame
 	local changed = false;
@@ -751,10 +772,8 @@ function SS.StartDemoMode()
 		end
 	end
 	for i = 1, table.getn(demoPins) do demoPins[i]:Hide(); end   -- the minimap's samples are real pins now (SS.DemoWorld)
-	if ( MainMenuExpBar and MainMenuExpBar.CreateTexture ) then
-		if ( not demoGlint ) then demoGlint = MainMenuExpBar:CreateTexture(nil, "OVERLAY"); demoGlint:SetWidth(16); demoGlint:SetTexture(1, 1, 1, 0.35); end
-		demoGlint:SetHeight(MainMenuExpBar:GetHeight() or 12); demoGlint:Show();
-	end
+	SetDemoXP(true);
+	if ( demoGlint ) then demoGlint:Hide(); end
 	SS.Safe(SU.UpdateDemo);
 	DemoRedraw();
 	SS.Every("demoMode", 0.25, function() SS.Safe(DemoTick, 0.25); end);
@@ -772,6 +791,7 @@ function SS.StopDemoMode()
 	SS.TALLY_SAMPLE.kills, SS.TALLY_SAMPLE.gold, SS.TALLY_SAMPLE.chest, SS.TALLY_SAMPLE.bosses, SS.TALLY_SAMPLE.guardians = 1284, 356, 120, 2, 3;
 	SS.BOSS_SAMPLE[1][2], SS.BOSS_SAMPLE[2][2], SS.BOSS_SAMPLE[3][2], SS.BOSS_SAMPLE[4][2] = 60, 40, 85, 100;
 	if ( demoGlint ) then demoGlint:Hide(); end
+	SetDemoXP(false);
 	SS.demoPartyOrient = nil;
 	SS.demoBuffOn = {};
 	-- the sample row may have stepped the party aside for your plate (not saved): back to its own place

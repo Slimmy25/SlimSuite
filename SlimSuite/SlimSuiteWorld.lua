@@ -739,11 +739,12 @@ local function PopLine(i)
 	local p = box.pops[i];
 	if ( p ) then return p; end
 	p = CreateFrame("Frame", nil, UIParent);
-	p:SetFrameStrata("HIGH"); p:SetWidth(300); p:SetHeight(28);
-	p.icon = p:CreateTexture(nil, "ARTWORK"); p.icon:SetPoint("LEFT", p, "LEFT", 0, 0); p.icon:SetWidth(22); p.icon:SetHeight(22);
+	p:SetFrameStrata("HIGH"); p:SetWidth(260); p:SetHeight(20);
+	p.icon = p:CreateTexture(nil, "ARTWORK"); p.icon:SetPoint("LEFT", p, "LEFT", 0, 0); p.icon:SetWidth(15); p.icon:SetHeight(15);
 	p.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
-	p.text = p:CreateFontString(nil, "OVERLAY", "NumberFontNormalLarge");
+	p.text = p:CreateFontString(nil, "OVERLAY");
 	p.text:SetPoint("LEFT", p.icon, "RIGHT", 4, 0); p.text:SetJustifyH("LEFT");
+	p.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 11, "OUTLINE");
 	box.pops[i] = p;
 	return p;
 end
@@ -757,8 +758,8 @@ local function DrawPops(now)
 		local life = 2.5 + 1.5 * r;                         -- bigger hits hang on longer
 		local age = now - e.born;
 		local grow = math.min(1, age / 0.35);                -- it swells in the first third of a second
-		local scale = 1 + (0.25 + 0.3 * (r - 1)) * grow;     -- up to about twice the size for a 4x hit
-		local x = 26 + age * (25 + 20 * r);                  -- drifts right, faster when bigger
+		local scale = 1 + (0.05 + 0.08 * (r - 1)) * grow;   -- subtle growth for large hits
+		local x = 14 + age * (8 + 5 * r);                    -- a slow drift keeps repeated hits easy to read
 		local hang = 0.4 + 0.35 * r;                         -- it holds before it falls
 		local fall = age > hang and (age - hang) * (age - hang) * (120 / r) or 0;   -- bigger ones fall more slowly
 		local top = (box:GetTop() or 400) - (UIParent:GetTop() or 768);
@@ -770,7 +771,7 @@ local function DrawPops(now)
 			p:SetScale((box:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1) * scale);
 			p:ClearAllPoints();
 			p:SetPoint("TOPLEFT", UIParent, "TOPLEFT", ((box:GetLeft() or 0) + x) / scale, (top - 6 - fall) / scale);
-			p.icon:SetTexture(e.icon or nil); p.icon:SetWidth(e.icon and 22 or 0);
+			p.icon:SetTexture(e.icon or nil); p.icon:SetWidth(e.icon and 15 or 0);
 			p.text:SetText((e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name);
 			if ( e.crit ) then p.text:SetTextColor(1, 0.85, 0.2); else p.text:SetTextColor(1, 0.55, 0.25); end
 			local fade = life - age < 0.6 and math.max(0, (life - age) / 0.6) or 1;
