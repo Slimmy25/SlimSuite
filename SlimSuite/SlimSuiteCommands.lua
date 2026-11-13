@@ -88,8 +88,8 @@ end);
 -- A layout is everything about where the UI sits and how it looks: places, sizes, scales, padding, layouts, hidden
 -- elements and the frame looks. Layouts are saved by name (/slim layout save <name>), loaded again, shared as one line
 -- of text (the Layouts window), and can be kept apart for each character.
-SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets" };
-SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget", "mirrorSameScale",
+SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes" };
+SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
 	"partyFaces", "cardPortraits", "tallyVertical", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare", "minimapTransparent",
 	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments" };
@@ -602,23 +602,25 @@ function DemoTick(dt)
 	demoHitClock = demoHitClock + dt;
 	SS.Safe(SS.DemoWorld, dt);
 	-- the party keeps the column or row you chose
-	SS.Safe(SU.PreviewTarget);
-	SS.Safe(SU.PreviewParty);
+	if ( SS.Demoing("TargetFrame") ) then SS.Safe(SU.PreviewTarget); end
+	if ( SS.Demoing("PartyMemberFrame1") ) then SS.Safe(SU.PreviewParty); end
 	-- damage meter: the sample numbers climb
-	if ( SlimSuiteMeter and SlimSuiteMeter.demoSnapshot ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(demoT); end
+	if ( SS.Demoing("SlimSuiteMeterFrame") and SlimSuiteMeter and SlimSuiteMeter.demoSnapshot ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(demoT); end
 	-- Demo XP: purple progress climbs evenly and returns to empty at 100%, without changing saved XP.
-	if ( MainMenuExpBar and demoXPOriginal ) then
+	if ( SS.Demoing("MainMenuExpBar") and MainMenuExpBar and demoXPOriginal ) then
 		MainMenuExpBar:SetValue(math.mod(demoT * 8, 100));
 	end
 	-- buffs: each sample comes and goes on its own rhythm, on the real buff frame
-	local changed = false;
-	for i = 1, table.getn(SS.BUFF_SAMPLES) do
-		local on = math.mod(math.floor(demoT / (1.5 + i * 0.4)) + i, 2) == 0;
-		if ( (SS.demoBuffOn[i] and true or false) ~= on ) then SS.demoBuffOn[i] = on; changed = true; end
+	if ( SS.Demoing("BuffFrame") ) then
+		local changed = false;
+		for i = 1, table.getn(SS.BUFF_SAMPLES) do
+			local on = math.mod(math.floor(demoT / (1.5 + i * 0.4)) + i, 2) == 0;
+			if ( (SS.demoBuffOn[i] and true or false) ~= on ) then SS.demoBuffOn[i] = on; changed = true; end
+		end
+		if ( changed ) then SS.buffDirty = true; end
 	end
-	if ( changed ) then SS.buffDirty = true; end
 	-- combat text: a hit or heal arrives every 0.9 seconds
-	if ( demoHitClock >= 0.9 and SlimSuiteWorld and SlimSuiteWorld.DemoHit ) then
+	if ( SS.Demoing("SlimSuiteCombatTextFrame") and demoHitClock >= 0.9 and SlimSuiteWorld and SlimSuiteWorld.DemoHit ) then
 		demoHitClock = 0;
 		local h = DEMO_HITS[demoHitIndex];
 		SS.Safe(SlimSuiteWorld.DemoHit, h[1], h[2], "Interface\\Icons\\" .. h[3], h[4], h[5]);
@@ -656,78 +658,94 @@ function SS.DemoWorld(dt)
 		SS.TALLY_SAMPLE.kills, SS.TALLY_SAMPLE.gold, SS.TALLY_SAMPLE.chest = 0, 0, 25;
 		SS.TALLY_SAMPLE.bosses, SS.TALLY_SAMPLE.guardians = 0, 0;
 	end
-	-- bosses: down only, each at its own pace; full again at the bottom
-	for i = 1, table.getn(SS.BOSS_SAMPLE) do
-		local b = SS.BOSS_SAMPLE[i];
-		b[2] = b[2] - dt * (1.2 + i * 0.7);
-		if ( b[2] <= 0 ) then b[2] = 100; end
+	-- Each sample source advances only when its own element was enabled before Demo began.
+	if ( SS.Demoing("SlimSuiteBossFrames") ) then
+		for i = 1, table.getn(SS.BOSS_SAMPLE) do
+			local b = SS.BOSS_SAMPLE[i];
+			b[2] = b[2] - dt * (1.2 + i * 0.7);
+			if ( b[2] <= 0 ) then b[2] = 100; end
+		end
+		SS.Safe(SS.UpdateBossFrames);
 	end
-	SS.Safe(SS.UpdateBossFrames);
 	-- the target: down only, full again at the bottom
-	SU.SAMPLE_TARGET.hp = SU.SAMPLE_TARGET.hp - dt * 4;
-	if ( SU.SAMPLE_TARGET.hp <= 0 ) then SU.SAMPLE_TARGET.hp = 100; end
+	if ( SS.Demoing("TargetFrame") ) then
+		SU.SAMPLE_TARGET.hp = SU.SAMPLE_TARGET.hp - dt * 4;
+		if ( SU.SAMPLE_TARGET.hp <= 0 ) then SU.SAMPLE_TARGET.hp = 100; end
+	end
 	-- the party: each member gets a burst now and then (ticking damage, a heal, or a big hit) that plays out slowly
-	for i = 1, table.getn(SU.PARTY_SAMPLE) do
-		local s, p = SU.PARTY_SAMPLE[i], D.party[i];
-		if ( not p ) then p = { left = 0, rate = 0, wait = math.random() * 2 }; D.party[i] = p; end
-		if ( p.left > 0 ) then
-			s[3] = math.max(5, math.min(100, s[3] + p.rate * dt));
-			p.left = p.left - dt;
-		else
-			p.wait = p.wait - dt;
-			if ( p.wait <= 0 ) then
-				local roll = math.random();
-				if ( s[3] < 35 or (roll < 0.35 and s[3] < 90) ) then p.rate, p.left = 18, 1 + math.random();            -- a heal
-				elseif ( roll < 0.55 ) then p.rate, p.left = -45, 0.5;                                                -- a big hit
-				else p.rate, p.left = -6, 1.5 + math.random() * 1.5; end                                              -- ticking damage
-				p.wait = 0.8 + math.random() * 2;
+	if ( SS.Demoing("PartyMemberFrame1") ) then
+		for i = 1, table.getn(SU.PARTY_SAMPLE) do
+			local s, p = SU.PARTY_SAMPLE[i], D.party[i];
+			if ( not p ) then p = { left = 0, rate = 0, wait = math.random() * 2 }; D.party[i] = p; end
+			if ( p.left > 0 ) then
+				s[3] = math.max(5, math.min(100, s[3] + p.rate * dt));
+				p.left = p.left - dt;
+			else
+				p.wait = p.wait - dt;
+				if ( p.wait <= 0 ) then
+					local roll = math.random();
+					if ( s[3] < 35 or (roll < 0.35 and s[3] < 90) ) then p.rate, p.left = 18, 1 + math.random();            -- a heal
+					elseif ( roll < 0.55 ) then p.rate, p.left = -45, 0.5;                                                -- a big hit
+					else p.rate, p.left = -6, 1.5 + math.random() * 1.5; end                                              -- ticking damage
+					p.wait = 0.8 + math.random() * 2;
+				end
 			end
 		end
 	end
 	-- the revive bar: fills over about five seconds, then starts again
-	SS.demoRevive = SS.demoRevive + dt / 5;
-	if ( SS.demoRevive > 1 ) then SS.demoRevive = 0; end
+	if ( SS.Demoing("SlimSuiteReviveFrame") ) then
+		SS.demoRevive = SS.demoRevive + dt / 5;
+		if ( SS.demoRevive > 1 ) then SS.demoRevive = 0; end
+		SS.Safe(SlimSuiteWorld.UpdateRevive);
+	end
 	-- the tally: only climbs; after about 90 seconds it goes back to 0 and climbs again
 	local T = SS.TALLY_SAMPLE;
-	D.cycle = D.cycle + dt;
-	if ( D.cycle > 90 ) then
-		D.cycle = 0; T.kills, T.gold, T.chest, T.bosses, T.guardians = 0, 0, 25, 0, 0;
-	else
-		T.kills = T.kills + math.random(0, 3);
-		if ( math.random() < 0.3 ) then T.gold = T.gold + math.random(1, 4); end
-		if ( math.random() < 0.02 ) then T.chest = T.chest + 25; end
-		if ( math.random() < 0.006 ) then T.bosses = T.bosses + 1; end
-		if ( math.random() < 0.01 ) then T.guardians = T.guardians + 1; end
+	if ( SS.Demoing("SlimSuiteTallyFrame") ) then
+		D.cycle = D.cycle + dt;
+		if ( D.cycle > 90 ) then
+			D.cycle = 0; T.kills, T.gold, T.chest, T.bosses, T.guardians = 0, 0, 25, 0, 0;
+		else
+			T.kills = T.kills + math.random(0, 3);
+			if ( math.random() < 0.3 ) then T.gold = T.gold + math.random(1, 4); end
+			if ( math.random() < 0.02 ) then T.chest = T.chest + 25; end
+			if ( math.random() < 0.006 ) then T.bosses = T.bosses + 1; end
+			if ( math.random() < 0.01 ) then T.guardians = T.guardians + 1; end
+		end
+		SS.Safe(SS.UpdateTally);
 	end
-	SS.Safe(SS.UpdateTally);
 	-- the clocks
-	local C = SS.demoClock;
-	C.run = C.run + dt;
-	C.nextBoss = C.nextBoss - dt;
-	if ( C.nextBoss <= 0 ) then C.nextBoss = math.random(60, 180); end
-	SS.Safe(SS.UpdateClock);
-	SS.Safe(SlimSuiteWorld.UpdateRevive);
+	if ( SS.Demoing("SlimSuiteClockFrame") ) then
+		local C = SS.demoClock;
+		C.run = C.run + dt;
+		C.nextBoss = C.nextBoss - dt;
+		if ( C.nextBoss <= 0 ) then C.nextBoss = math.random(60, 180); end
+		SS.Safe(SS.UpdateClock);
+	end
 	-- announcements: one every 6 seconds, in turn
-	D.news = D.news - dt;
-	if ( D.news <= 0 ) then
-		D.news = 6;
-		local n = DEMO_NEWS[D.newsIndex];
-		D.newsIndex = math.mod(D.newsIndex, table.getn(DEMO_NEWS)) + 1;
-		SS.Safe(SS.ShowAnnouncement, { id = "demo" .. D.newsIndex .. "-" .. math.floor(demoT), text = n[1], boss = n[2] });
+	if ( SS.Demoing("SlimSuiteAnnouncementFrame") ) then
+		D.news = D.news - dt;
+		if ( D.news <= 0 ) then
+			D.news = 6;
+			local n = DEMO_NEWS[D.newsIndex];
+			D.newsIndex = math.mod(D.newsIndex, table.getn(DEMO_NEWS)) + 1;
+			SS.Safe(SS.ShowAnnouncement, { id = "demo" .. D.newsIndex .. "-" .. math.floor(demoT), text = n[1], boss = n[2] });
+		end
 	end
 	-- the minimap: caches sit still, the bosses walk slowly around you with their marks
-	local pins = {};
-	local caches = { { 60, 40 }, { -90, 20 }, { 30, -110 } };
-	for i = 1, table.getn(caches) do
-		table.insert(pins, { x = caches[i][1], y = caches[i][2], size = 13, rim = true, crop = true, texture = "Interface\\Icons\\INV_Box_02", tip = "Cache (sample)" });
+	if ( SS.Demoing("MinimapCluster") ) then
+		local pins = {};
+		local caches = { { 60, 40 }, { -90, 20 }, { 30, -110 } };
+		for i = 1, table.getn(caches) do
+			table.insert(pins, { x = caches[i][1], y = caches[i][2], size = 13, rim = true, crop = true, texture = "Interface\\Icons\\INV_Box_02", tip = "Cache (sample)" });
+		end
+		for i = 1, table.getn(SS.BOSS_SAMPLE) do
+			local a = demoT * (0.08 + i * 0.03) + i * 1.6;
+			local r = 70 + i * 25;
+			table.insert(pins, { x = math.cos(a) * r, y = math.sin(a) * r, size = 15, rim = true, texture = "Interface\\TargetingFrame\\UI-RaidTargetingIcons",
+				raid = SlimSuiteWorld.BOSS_ICONS and SlimSuiteWorld.BOSS_ICONS[i] or 8, tip = SS.BOSS_SAMPLE[i][1] .. " (sample)" });
+		end
+		SlimSuiteWorld.demoPins = pins;
 	end
-	for i = 1, table.getn(SS.BOSS_SAMPLE) do
-		local a = demoT * (0.08 + i * 0.03) + i * 1.6;
-		local r = 70 + i * 25;
-		table.insert(pins, { x = math.cos(a) * r, y = math.sin(a) * r, size = 15, rim = true, texture = "Interface\\TargetingFrame\\UI-RaidTargetingIcons",
-			raid = SlimSuiteWorld.BOSS_ICONS and SlimSuiteWorld.BOSS_ICONS[i] or 8, tip = SS.BOSS_SAMPLE[i][1] .. " (sample)" });
-	end
-	SlimSuiteWorld.demoPins = pins;
 end
 
 -- sample meter rows: the party's names and WoW spells, with damage that grows over time
@@ -753,6 +771,7 @@ end
 
 -- every element that shows samples is told to draw again (starting or stopping)
 function DemoRedraw()
+	-- Refreshers own their enabled/default checks; call them after stop to restore live data or setup previews.
 	SS.Safe(SS.UpdateBossFrames); SS.Safe(SS.UpdateTally); SS.Safe(SS.UpdateClock); SS.Safe(SS.UpdateAnnouncementFrame);
 	SS.Safe(SS.UpdateLevelButton); SS.Safe(SS.RefreshItemRow); SS.Safe(SS.RefreshSpellRow);
 	SS.buffDirty = true;
@@ -760,11 +779,28 @@ end
 
 function SS.StartDemoMode()
 	if ( SS.demoRunning ) then return; end
+	local enabled, list = {}, SU and SU.elements or {};
+	if ( table.getn(list) == 0 and SU and SU.Steps ) then
+		local steps = SU.Steps();
+		for i = 1, table.getn(steps) do if ( steps[i].frame ) then table.insert(list, steps[i]); end end
+	end
+	local hasMeter = false;
+	for i = 1, table.getn(list) do if ( list[i].frame == "SlimSuiteMeterFrame" ) then hasMeter = true; end end
+	if ( not hasMeter and getglobal("SlimSuiteMeterFrame") ) then table.insert(list, { frame = "SlimSuiteMeterFrame" }); end
+	for i = 1, table.getn(list) do
+		local frame = list[i].frame;
+		if ( frame and SU.Mode(frame) == "enabled" ) then enabled[frame] = true; end
+	end
+	if ( not next(enabled) ) then
+		if ( SU and SU.RefreshDemoButtons ) then SU.RefreshDemoButtons(); end
+		return false;
+	end
+	SS.demoElements = enabled;
 	SS.demoRunning = true;
 	demoT = 0; demoHitClock = 0;
 	SS.demoBuffOn = {};
-	if ( SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(0); end
-	if ( Minimap and Minimap.CreateTexture and table.getn(demoPins) == 0 ) then
+	if ( SS.Demoing("SlimSuiteMeterFrame") and SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(0); end
+	if ( SS.Demoing("MinimapCluster") and Minimap and Minimap.CreateTexture and table.getn(demoPins) == 0 ) then
 		for i = 1, 4 do
 			local p = Minimap:CreateTexture(nil, "OVERLAY");
 			p:SetWidth(6); p:SetHeight(6); p:SetTexture(i == 1 and 1 or 0.9, i == 2 and 0.8 or 0.4, 0.2, 1);
@@ -772,7 +808,7 @@ function SS.StartDemoMode()
 		end
 	end
 	for i = 1, table.getn(demoPins) do demoPins[i]:Hide(); end   -- the minimap's samples are real pins now (SS.DemoWorld)
-	SetDemoXP(true);
+	SetDemoXP(SS.Demoing("MainMenuExpBar"));
 	if ( demoGlint ) then demoGlint:Hide(); end
 	SS.Safe(SU.UpdateDemo);
 	DemoRedraw();
@@ -783,6 +819,7 @@ end
 function SS.StopDemoMode()
 	if ( not SS.demoRunning ) then return; end
 	SS.demoRunning = false;
+	SS.demoElements = nil;
 	SS.Stop("demoMode");
 	if ( SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = nil; end
 	for i = 1, table.getn(demoPins) do demoPins[i]:Hide(); end

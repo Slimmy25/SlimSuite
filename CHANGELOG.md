@@ -2,6 +2,15 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.19
+More predictable UI setup, with native defaults preserved until you opt in.
+
+- **Toggle UI Settings:** every element now has Default, Enabled and Disabled states. Default restores the game's UI; Enabled uses Slim Suite's movable version; Disabled hides the element.
+- **Demo Mode:** only elements enabled before Demo starts are previewed. Turning one off during a preview removes it from the demo.
+- **Element list:** compacted the list and placed Reset All beside Done at the lower-right corner.
+- **Mirrored frames:** Player and Target now use one Mirror Target setting and stay the same size and scale.
+- **Buffs and debuffs:** attached auras wrap within the player's or target's frame bounds and grow outward from the selected edge.
+
 ## 1.17
 Clearer demo and minimap details.
 

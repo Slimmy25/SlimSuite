@@ -514,7 +514,10 @@ local function UpdateTargetDebuffs()
 	end
 	local n = math.min(24, table.getn(list));
 	local side = DB().targetAuraSide or "below";
-	local cols = (side == "left" or side == "right") and 4 or 8;
+	local across = side == "above" or side == "below";
+	local stride = across and 19 or 22;
+	local extent = across and (anchor.GetWidth and anchor:GetWidth() or 152) or (anchor.GetHeight and anchor:GetHeight() or 44);
+	local perLine = math.max(1, math.floor((extent - 8) / stride));
 	for i = 1, n do
 		local e, b = list[i], TargetDebuffIcon(i);
 		b.icon:SetTexture(e.icon);
@@ -524,8 +527,11 @@ local function UpdateTargetDebuffs()
 		if ( e.buff ) then b.border:Hide(); else b.border:Show(); end   -- debuffs keep their red border
 		if ( b:GetParent() ~= anchor ) then b:SetParent(anchor); end   -- its scale and visibility come from the target's frame
 		b:ClearAllPoints();
-		-- on the side chosen in the target's menu: eight to a row above or below, four to a row beside it
-		local col, row = math.mod(i - 1, cols), math.floor((i - 1) / cols);
+		-- Keep icons within the frame's width above/below or its height beside it; additional rows/columns
+		-- extend away from the frame in the chosen direction.
+		local col, row;
+		if ( across ) then col, row = math.mod(i - 1, perLine), math.floor((i - 1) / perLine);
+		else col, row = math.floor((i - 1) / perLine), math.mod(i - 1, perLine); end
 		local inset = card and 0 or 30;                       -- the 1.12 frame's art has empty space under it
 		if ( side == "above" ) then b:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT", 4 + col * 19, 2 + row * 22);
 		elseif ( side == "left" ) then b:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -2 - col * 19, -4 - row * 22);
@@ -595,8 +601,9 @@ local function UpdateRevive()
 	if ( progress and progress > 0 ) then
 		revive.bar:SetValue(math.max(0, math.min(1, progress))); revive.text:SetText(label); revive:Show();
 	elseif ( Previewing("SlimSuiteReviveFrame") ) then
-		local share = SS.demoRunning and SS.demoRevive or 0.6;     -- Demo Mode: it fills, starts again, fills again
-		revive.bar:SetValue(share); revive.text:SetText(SS.demoRunning and ("Reviving Brann  " .. math.floor(share * 100) .. "%") or "Revive bar"); revive:Show();
+		local demo = SS.Demoing("SlimSuiteReviveFrame");
+		local share = demo and SS.demoRevive or 0.6;
+		revive.bar:SetValue(share); revive.text:SetText(demo and ("Reviving Brann  " .. math.floor(share * 100) .. "%") or "Revive bar"); revive:Show();
 	else
 		revive:Hide();
 	end
@@ -811,7 +818,7 @@ end
 local function DrawBox()
 	local d = DB();
 	local editing = Editing("SlimSuiteCombatTextFrame");
-	local demo = SS.demoRunning and true or false;   -- Demo Mode shows the box with sample hits
+	local demo = SS.Demoing("SlimSuiteCombatTextFrame");   -- Demo Mode samples only this enabled element
 	local now = GetTime();
 	if ( not d.combatTextBox and not editing and not demo ) then box:Hide(); box.popList = {}; DrawPops(now); return; end
 	DrawPops(now);
@@ -1051,7 +1058,7 @@ local function GatherPins(space)
 	local d = DB();
 	local phase = A.Call("AZS_GetPhase");
 	local inRun = phase == nil or phase == "playing" or phase == "choosing" or phase == "paused";
-	if ( SS.demoRunning and Minimap and type(W.demoPins) == "table" ) then
+	if ( SS.Demoing("MinimapCluster") and Minimap and type(W.demoPins) == "table" ) then
 		-- Demo Mode: sample caches sitting still and sample bosses (with their marks) walking about, around you
 		for i = 1, table.getn(W.demoPins) do table.insert(targets, W.demoPins[i]); end
 		return;
@@ -1109,14 +1116,14 @@ end
 local pinGather = 0;
 local function UpdateMinimapPins()
 	local d = DB();
-	if ( not (d.minimapCaches or d.minimapBosses or d.minimapLairs or SS.demoRunning) ) then
+	if ( not (d.minimapCaches or d.minimapBosses or d.minimapLairs or SS.Demoing("MinimapCluster")) ) then
 		if ( pinUsed > 0 ) then for i = 1, table.getn(pins) do pins[i]:Hide(); end pinUsed = 0; end
 		return;
 	end
 	local now = GetTime();
 	pinUsed = 0;
 	local px, py, space = A.PlayerPos();
-	if ( SS.demoRunning and not px ) then px, py = 0, 0; end   -- Demo Mode: the samples are placed around (0, 0)
+	if ( SS.Demoing("MinimapCluster") and not px ) then px, py = 0, 0; end   -- Demo Mode samples use the player's map centre
 	if ( now >= pinGather ) then pinGather = now + 0.1; GatherPins(space); end
 	if ( px and Minimap and Minimap:IsVisible() ) then
 		for i = 1, table.getn(targets) do PlacePin(px, py, targets[i]); end

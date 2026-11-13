@@ -443,11 +443,11 @@ function M.Draw(active, editing)
 		local snapshot, err = Query(); M.snapshot = snapshot; M.error = err;
 		M.nextRead = now + math.max(0.35, type(err) == 'table' and Num(err.retryAfterSeconds) or 0);
 	end
-	if SS.demoRunning and M.demoSnapshot then M.snapshot = M.demoSnapshot; M.error = nil; end   -- Demo Mode: sample rows
+	if SS.Demoing("SlimSuiteMeterFrame") and M.demoSnapshot then M.snapshot = M.demoSnapshot; M.error = nil; end   -- Demo Mode: sample rows
 	local snapshot = M.snapshot;
 	-- the rows are copied and sorted once per new snapshot (it changes about three times a second), not on every redraw
 	local rows = M.sortedRows;
-	if not rows or M.sortedFor ~= snapshot or (SS.demoRunning and M.demoSnapshot) then
+	if not rows or M.sortedFor ~= snapshot or (SS.Demoing("SlimSuiteMeterFrame") and M.demoSnapshot) then
 		rows = {};
 		if snapshot then for _, row in ipairs(snapshot.rows or {}) do table.insert(rows, row); end rows = GroupPets(snapshot, rows); end
 		table.sort(rows, ByAmount);

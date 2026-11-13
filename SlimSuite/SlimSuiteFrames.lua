@@ -479,7 +479,7 @@ function SS.UpdateClock()
 		clockFrame.next:Show();
 	else
 		SS.HideNative("clock", false);
-		if ( preview and SS.demoRunning and SS.demoClock ) then
+		if ( preview and SS.Demoing("SlimSuiteClockFrame") and SS.demoClock ) then
 			-- Demo Mode: the run time counts up from a random start; the (made-up) next boss counts down and starts over
 			clockFrame.time:SetText(SS.ClockText(math.floor(SS.demoClock.run)));
 			clockFrame.next:SetText("next boss in " .. SS.ClockText(math.ceil(SS.demoClock.nextBoss)));
@@ -934,7 +934,7 @@ function SS.ToggleFeatureMute(name)
 end
 
 function SS.CurrentOrientation(name)
-	if ( name == "PartyMemberFrame1" and SS.demoRunning and SS.demoPartyOrient ) then return SS.demoPartyOrient; end
+	if ( name == "PartyMemberFrame1" and SS.Demoing("PartyMemberFrame1") and SS.demoPartyOrient ) then return SS.demoPartyOrient; end
 	local orientation = SS.DB().orientations[name];
 	if ( orientation == "vertical" or orientation == "horizontal" ) then return orientation; end
 	if ( name == "SlimSuiteClockFrame" ) then return "vertical"; end
@@ -982,6 +982,9 @@ SS.BuffButtons = BuffButtons;
 function SS.ApplyBuffOrientation()
 	if ( not BuffFrame or buffLayoutApplying ) then return; end
 	local orientation = SS.CurrentOrientation("BuffFrame");
+	local attached;
+	if ( SS.Pair and SS.DB().buffsOnTarget ) then local _, target = SS.Pair(); attached = target;
+	elseif ( SS.Pair and SS.DB().buffsOnPlayer ) then local player = SS.Pair(); attached = player; end
 	local buttons = BuffButtons();
 	local visible, real, iconW, iconH, durationW, durationH = {}, 0, nil, nil, 0, 0;
 	for k = 1, table.getn(buttons) do
@@ -1013,7 +1016,7 @@ function SS.ApplyBuffOrientation()
 	end
 	local samples = {};
 	for i = 1, table.getn(SS.BUFF_SAMPLES) do
-		local on = preview and (not SS.demoRunning or SS.demoBuffOn[i]);
+		local on = preview and (not SS.Demoing("BuffFrame") or SS.demoBuffOn[i]);
 		if ( on ) then
 			local s = SS.BuffSample(i);
 			s:SetWidth(iconW); s:SetHeight(iconH); s:Show();
@@ -1071,11 +1074,19 @@ function SS.ApplyBuffOrientation()
 		if ( type(customSize) == "table" and customSize.h and customSize.h > 0 ) then
 			maxRows = math.max(1, math.floor((customSize.h + gap) / (cellH + gap)));
 		end
+		-- When attached to a unit frame, a column stays inside that frame's height; additional
+		-- columns grow away from the selected edge instead of spilling over the unit frame itself.
+		if ( attached and attached.GetHeight ) then
+			local limit = math.max(1, math.floor((attached:GetHeight() + gap) / (cellH + gap)));
+			maxRows = math.min(maxRows, limit);
+		end
 		rows = math.min(count, maxRows);
 		columns = math.ceil(count / rows);
 	else
 		local base = baseSizes.BuffFrame;
 		local maxWidth = type(customSize) == "table" and customSize.w or (base and base.w) or (iconW * 10);
+		-- Attached horizontal rows stay within the unit frame's width and wrap outward from it.
+		if ( attached and attached.GetWidth ) then maxWidth = math.min(maxWidth, attached:GetWidth()); end
 		columns = math.max(1, math.min(count, math.floor((maxWidth + gap) / (cellW + gap))));
 		rows = math.ceil(count / columns);
 	end
@@ -1672,21 +1683,18 @@ function SS.Pair()
 	return SS.PlayerAnchor(), getglobal(SS.Shown("TargetFrame"));
 end
 
--- Places "to" as the mirror image of "from" across the screen's vertical centre line: to's right edge sits where
--- from's left edge would be reflected, and the two share a vertical centre. With "Same size scaling" on (the
--- default), "to" also takes from's width, height and scale, so the pair stays identical.
+-- Places "to" as the mirror image of "from" across the screen's vertical centre line. The pair always shares
+-- scale, so there is no separate same-size setting to maintain.
 function SS.MirrorFrames(from, to)
 	if ( not from or not to ) then return; end
 	local fromName, toName = from:GetName(), to:GetName();
-	if ( SS.DB().mirrorSameScale ~= false ) then
-		local scale = SS.DB().scales[fromName];
-		SS.DB().scales[toName] = scale;
-		if ( to.SetScale ) then to:SetScale(type(scale) == "number" and scale or 1); end
-		local w, h = from:GetWidth(), from:GetHeight();
-		if ( w and h and w > 0 and h > 0 and toName ~= "PlayerFrame" and toName ~= "TargetFrame" ) then   -- classic art: scale only
-			to:SetWidth(w); to:SetHeight(h);
-			SS.DB().sizes[toName] = { w = w, h = h };
-		end
+	local scale = SS.DB().scales[fromName];
+	SS.DB().scales[toName] = scale;
+	if ( to.SetScale ) then to:SetScale(type(scale) == "number" and scale or 1); end
+	local w, h = from:GetWidth(), from:GetHeight();
+	if ( w and h and w > 0 and h > 0 and toName ~= "PlayerFrame" and toName ~= "TargetFrame" ) then   -- classic art: scale only
+		to:SetWidth(w); to:SetHeight(h);
+		SS.DB().sizes[toName] = { w = w, h = h };
 	end
 	local l, r, b, t = RootBounds(from);
 	if ( not l or not t ) then return; end

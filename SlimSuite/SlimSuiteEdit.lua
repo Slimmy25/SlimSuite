@@ -218,8 +218,13 @@ end
 function SS.SetMirrorTarget(on)
 	if ( on ) then SS.Safe(SS.ClaimTarget, "mirror"); end   -- the newest choice wins: mirroring takes the target's place
 	if ( on ) then SS.MakeMovable("PlayerFrame", "Mirror target moves it"); SS.MakeMovable("TargetFrame", "Mirror target moves it"); end
-	SS.DB().mirrorTarget = on and true or false;
+	-- Mirroring and combining are one user-facing behavior: the target follows the player across the screen,
+	-- and the pair uses the same frame appearance and size.
+	SS.DB().mirrorTarget, SS.DB().combineTarget = on and true or false, on and true or false;
+	SS.DB().mirrorSameScale = true;
 	if ( on ) then SS.Safe(SS.MirrorTarget); SS.Safe(SS.OfferMirrorBuffs); end
+	SS.Safe(SS.ApplyNewFrames);
+	if ( SU and SU.Rebuild ) then SS.Safe(SU.Rebuild); end
 end
 
 -- "Square minimap": the minimap's mask is swapped between the round and the square texture. Some clients
@@ -501,8 +506,9 @@ end
 
 -- "Same size scaling": the mirrored target copies the player frame's scale. Only meaningful while mirroring.
 function SS.SetMirrorSameScale(on)
-	SS.DB().mirrorSameScale = on and true or false;
-	if ( SS.DB().mirrorTarget and SS.DB().mirrorSameScale ) then SS.Safe(SS.MirrorTarget); end
+	-- Legacy saved value retained for migration; mirrored frames are always the same scale now.
+	SS.DB().mirrorSameScale = true;
+	if ( SS.DB().mirrorTarget ) then SS.Safe(SS.MirrorTarget); end
 end
 
 function SS.ApplyTallyLayout(resetSize)

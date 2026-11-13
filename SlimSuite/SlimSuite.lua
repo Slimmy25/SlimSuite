@@ -171,7 +171,7 @@ SS.DEFAULTS = {
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
 };
 SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
-	"itemRowSeen", "chatOffsets", "words", "layouts" };
+	"itemRowSeen", "chatOffsets", "words", "layouts", "enabledElements", "elementModes" };
 function SS.PrepareDB(d)
 	for key, value in pairs(SS.DEFAULTS) do if ( d[key] == nil ) then d[key] = value; end end
 	for i = 1, table.getn(SS.DEFAULT_TABLES) do
@@ -214,6 +214,9 @@ function SS.PrepareDB(d)
 	if ( d.gridDivisions ~= 16 and d.gridDivisions ~= 32 and d.gridDivisions ~= 64 and d.gridDivisions ~= 128 ) then d.gridDivisions = 64; end
 	d.gridSpacing = nil;
 	if ( not d.gridOffDefault ) then d.showEditGrid = false; d.mirrorTarget = false; d.gridOffDefault = true; end
+	-- Mirror Target is now one setting that both combines the unit frames and mirrors their positions.
+	if ( d.mirrorTarget or d.combineTarget ) then d.mirrorTarget, d.combineTarget = true, true; end
+	d.mirrorSameScale = true;                                -- retained only for older saved profiles; size is implicit
 	-- earlier versions let the classic player and target frames take a width and height that only changed their click area
 	if ( not d.classicSizesCleared ) then
 		d.sizes.PlayerFrame = nil; d.sizes.TargetFrame = nil;
@@ -501,7 +504,7 @@ function SS.IsEditing(name)
 end
 -- True while an element shows sample data: while it is being placed (above) or in Demo Mode
 function SS.Previewing(name)
-	return (SS.demoRunning or SS.IsEditing(name)) and true or false;
+	return (SS.Demoing and SS.Demoing(name) or SS.IsEditing(name)) and true or false;
 end
 baseSizes = {};
 basePoints = {};
@@ -689,7 +692,7 @@ function SS.RefreshItemRow()
 				button.icon:SetTexture(nil);
 				-- Like the game, an empty slot is not drawn. While the rows are being placed, empty slots show
 				-- as dark squares so the row can still be found, moved and sized before anything is worn.
-				if ( SS.demoRunning and SS.DEMO_JEWELRY[i] ) then
+				if ( SS.Demoing("SlimSuiteItemRowFrame") and SS.DEMO_JEWELRY[i] ) then
 					button.icon:SetTexture("Interface\\Icons\\" .. SS.DEMO_JEWELRY[i]); button.icon:Show(); button:Show();
 				elseif ( SS.Previewing("SlimSuiteItemRowFrame") ) then button:Show(); else button:Hide(); end
 			end
@@ -816,7 +819,7 @@ function SS.RefreshSpellRow()
 				button.icon:SetTexture(nil); button.icon:Hide();
 			end
 		end
-		if ( not iconLoaded and SS.demoRunning and SS.DEMO_SPELLS[i] ) then
+		if ( not iconLoaded and SS.Demoing("SlimSuiteSpellRowFrame") and SS.DEMO_SPELLS[i] ) then
 			button.icon:SetTexture("Interface\\Icons\\" .. SS.DEMO_SPELLS[i]); button.icon:Show(); iconLoaded = true;
 		end
 		if ( iconLoaded or SS.Previewing("SlimSuiteSpellRowFrame") ) then button:Show(); else button:Hide(); end
@@ -976,7 +979,7 @@ function SS.DrawTally(parts)
 	local custom = SS.DB().sizes.SlimSuiteTallyFrame;
 	local fixed = type(custom) == "table" and custom.w and custom.h;
 	local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
-	local context = SS.TallyContext(SS.demoRunning or SS.IsEditing("SlimSuiteTallyFrame"));
+	local context = SS.TallyContext(SS.Demoing("SlimSuiteTallyFrame") or SS.IsEditing("SlimSuiteTallyFrame"));
 	local sig = (vertical and "v" or "h") .. pad .. (SS.DB().tallyBackground and "b" or "") .. context .. (fixed and (custom.w .. "x" .. custom.h) or "");
 	for i = 1, n do sig = sig .. "|" .. parts[i][1] .. parts[i][2]; end
 	if ( tallyFrame.sig == sig ) then return; end           -- nothing it shows has changed

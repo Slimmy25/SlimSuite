@@ -77,8 +77,8 @@ end
 -- What turning a setting on turns off (the newest choice always wins), shown in orange under the setting in the setup
 -- and the right-click menus. "Movable?" warns about what unticking it turns off.
 SU.WARN = {
-	mirror = "Turns off: Join the party yourself. Makes both frames movable.",
-	selfParty = "Turns off: your player frame (back when unticked), Mirror target, Combine and the party sitting by the player frame. You take the party's look.",
+	mirror = "Turns off: Join the party yourself. Combines both frames and mirrors their positions at the same size.",
+	selfParty = "Turns off: your player frame (back when unticked) and Mirror Target. Your frame joins the party list.",
 	combine = "Turns off: Join the party yourself. The player frame takes the target's look.",
 	buffs = "One place at a time: choosing a frame takes them off the other one.",
 	partyPlace = "Under or above the player frame takes you out of the party frames and makes the party movable.",
@@ -161,8 +161,8 @@ function SS.RowKind(cb, e, where)
 	end
 end                                       -- the same, for code above SU's declaration
 SU.WARN_UNMOVABLE = {
-	PlayerFrame = "Unticking turns off: Mirror target.",
-	TargetFrame = "Unticking turns off: Mirror target.",
+	PlayerFrame = "Unticking turns off: Mirror Target.",
+	TargetFrame = "Unticking turns off: Mirror Target.",
 	PartyMemberFrame1 = "Unticking turns off: Lock to player frame.",
 	BuffFrame = "Unticking turns off: buffs on the player or target frame.",
 };
@@ -177,7 +177,7 @@ function SU.SetMovable(frame, movable)
 	if ( not movable ) then
 		local d = SS.DB();
 		if ( (frame == "PlayerFrame" or frame == "TargetFrame") and d.mirrorTarget ) then
-			SS.SetMirrorTarget(false); SS.Notice("Mirror target turned off: that frame is back in the game's own layout.");
+			SS.SetMirrorTarget(false); SS.Notice("Mirror Target turned off: that frame is back in the game's own layout.");
 		elseif ( frame == "PartyMemberFrame1" and d.partyLocked ) then
 			d.partyLocked = false; SS.Notice("Lock to player frame turned off: the party frames are back in the game's own layout.");
 		elseif ( frame == "BuffFrame" and (d.buffsOnTarget or d.buffsOnPlayer) ) then
@@ -234,11 +234,14 @@ function SU.ChecksFor(frame)
 	local d = SS.DB();
 	-- Entries tagged xref = true refer to another element, so they also appear in that element's right-click menu.
 	local W = SU.WARN;
-	local function Mirror() return { "Mirror target", warn = W.mirror, function() return SS.DB().mirrorTarget; end, function(v) SS.SetMirrorTarget(v); if ( v and setupActive and not SS.DB().hideTarget ) then SU.SetOn("TargetFrame", true, SU.titles and SU.titles.TargetFrame or "Target frame"); end if ( SS.MenuOpen() ) then SU.Focus(SU.focus); end end }; end
-	local function MirrorScale() return { "Same size scaling (off: keep its own size)", short = "Same size scaling", function() return SS.DB().mirrorSameScale ~= false; end,
-		function(v) SS.SetMirrorSameScale(v); end, function() return SS.DB().mirrorTarget; end }; end
-	local function Combine() return { "Combine with the target frame (one button)", function() return SS.DB().combineTarget; end,
-		function(v) SS.SetCombineTarget(v); end, short = "Combine with target", xref = true, warn = W.combine }; end
+	local function Mirror(disableWhenPlayerOff)
+		local e = { "Mirror Target", warn = W.mirror, function() return SS.DB().mirrorTarget and SS.DB().combineTarget; end,
+			function(v) SS.SetMirrorTarget(v); if ( v and setupActive and not SS.DB().hideTarget ) then SU.SetOn("TargetFrame", true, SU.titles and SU.titles.TargetFrame or "Target frame"); end if ( SS.MenuOpen() ) then SU.Focus(SU.focus); end end,
+			short = "Mirror Target", xref = true };
+		-- Keep the control visible in target settings, but make its dependency explicit when the player frame is off.
+		if ( disableWhenPlayerOff ) then e[5] = function() return SU.on and SU.on.PlayerFrame and true or false; end; end
+		return e;
+	end
 	-- the player's look: its own, or the same as the party (you join it) or as the target (combined with it)
 	local function PlayerLook() return { "Player frame look", function() return SS.PlayerLookChoice(); end,
 		function(v) SS.SetPlayerLookChoice(v); end, choice = SS.PLAYER_LOOKS, short = "Look" }; end
@@ -246,8 +249,11 @@ function SU.ChecksFor(frame)
 		function(v) SS.SetLook("TargetFrame", v); end, choice = SS.LOOK_CHOICES, short = "Look" }; end
 	local function Portraits(el) return { "3D portrait on the new-school frame", function() return SS.DB().cardPortraits ~= false; end,
 		function(v) SS.DB().cardPortraits = v and true or false; SS.Safe(SS.ApplyNewFrames); end, function() return SS.UsesCard(el); end, short = "3D portrait" }; end
-	local function BuffsPlace() return { "Buffs and debuffs", function() return SS.BuffsPlace(); end, function(v) SS.SetBuffsPlace(v); end,
+	local function BuffsPlace() return { "Player buffs position", function() return SS.BuffsPlace(); end, function(v) SS.SetBuffsPlace(v); end,
 		choice = SS.BUFF_PLACES, short = "Buffs and debuffs", xref = true, warn = W.buffs }; end
+	local function TargetBuffsPlace() return { "Target buffs/debuffs position", function() return SS.DB().targetAuraSide or "below"; end,
+		function(v) SS.SetTargetAuraSide(v); end, function() return SS.DB().targetDebuffs; end,
+		choice = SS.TARGET_AURA_SIDES, short = "Target buffs/debuffs" }; end
 	local function SelfParty() return { "Join the party frames yourself (you go first)", function() return SS.DB().partyIncludesSelf; end,
 		function(v) SS.SetPartySelf(v); end, short = "Join the party yourself", xref = true, warn = W.selfParty }; end
 	local function PartyPlace() return { "Party frames sit", function() return SS.PartyPosition(); end, function(v) SS.SetPartyPosition(v); end,
@@ -268,17 +274,16 @@ function SU.ChecksFor(frame)
 	local function JoinRows() return { "Join the worn-jewelry row under the build spells", function() return SS.DB().buildRowsAttached; end,
 		function(v) if ( (v and true or false) ~= (SS.DB().buildRowsAttached and true or false) ) then SS.ToggleBuildRowsAttached(); end end, short = "Join the jewelry row", xref = true }; end
 	local list = {
-		PlayerFrame = { PlayerLook(), Portraits("PlayerFrame"), Combine(), Mirror(), MirrorScale(), BuffsPlace(), ProcMeter(), SelfParty(), PartyPlace() },
+		PlayerFrame = { PlayerLook(), Portraits("PlayerFrame"), Mirror(), BuffsPlace(), TargetBuffsPlace(), ProcMeter(), SelfParty(), PartyPlace() },
 		MainMenuBar = {
 			{ "Hide the bar's artwork (only the spell squares stay)", short = "Hide the bar's artwork", function() return SS.DB().plainBar; end, function(v) SS.DB().plainBar = v; SS.Safe(SS.PlainBar, v); end },
 			{ "Show all six buttons at all times, even empty ones", short = "Show empty buttons", function() return SS.DB().showEmptyActionSlots; end, function(v) SS.DB().showEmptyActionSlots = v; SS.Safe(ApplyActionSlotGrid); end },
 			{ "Add your racial as a 7th button", short = "Racial as a 7th button", function() return SS.DB().showRacialAbility; end, function(v) SS.Safe(SS.SetRacialAbility, v); end },
 			{ "Turn the action bar vertical", function() return SS.DB().orientations.MainMenuBar == "vertical"; end, function(v) SU.SetVertical("MainMenuBar", v); end },
 			{ "Cooldown numbers on the spell squares", short = "Cooldown numbers", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v and true or false; end } },
-		TargetFrame = { TargetLook(), Portraits("TargetFrame"), HideTarget(), Combine(), Mirror(), MirrorScale(),
+		TargetFrame = { TargetLook(), Portraits("TargetFrame"), HideTarget(), Mirror(true),
 			{ "Show the target's buffs and debuffs", short = "Target's buffs and debuffs", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end },
-			{ "Target's buffs and debuffs sit", short = "They sit", function() return SS.DB().targetAuraSide or "below"; end, function(v) SS.SetTargetAuraSide(v); end,
-				function() return SS.DB().targetDebuffs; end, choice = SS.TARGET_AURA_SIDES } },
+			TargetBuffsPlace() },
 		BuffFrame = { BuffsPlace() },
 		MinimapCluster = { { "Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end },
 			{ "Transparent minimap (round or square, no borders)", function() return SS.DB().minimapTransparent; end, function(v) SS.SetMinimapTransparent(v); end },
@@ -400,7 +405,8 @@ SU.FEATURES = {
 	SlimSuiteReviveFrame = function(v) SS.DB().replaceRevive = v; end,
 	SlimSuiteCombatTextFrame = function(v) SS.DB().combatTextBox = v; end,
 	SlimSuiteLocalClockFrame = function(v)
-		if ( v ) then SS.DB().replaceLocalClock = true; SS.DB().clockDetached = true; else SS.DB().clockDetached = false; end
+		if ( v ) then SS.DB().replaceLocalClock = true; SS.DB().clockDetached = true;
+		else SS.DB().replaceLocalClock = false; SS.DB().clockDetached = false; end
 		SS.Safe(SlimSuiteWorld.UpdateLocalClock);
 	end,
 	SlimSuiteMinimapBar = function(v) SS.SetMinimapBar(v, true); end,
@@ -408,9 +414,9 @@ SU.FEATURES = {
 function SU.SetOn(frame, on, title)
 	-- the newest choice wins: a target frame turned on or off by its own button takes precedence over the party/combine settings
 	if ( frame == "PlayerFrame" and on and not SU.restoring and SS.DB().partyIncludesSelf ) then SS.Safe(SS.ClaimTarget, "player"); end
-	if ( frame == "TargetFrame" and not on and SS.DB().combineTarget and not SU.restoring and not SU.cascading ) then
-		SS.Notice("Combine turned off: the target frame is off.");
-		SS.DB().combineTarget = false; SS.Safe(SS.RebuildSetup);
+	if ( frame == "TargetFrame" and not on and SS.DB().combineTarget and not SU.restoring and not SU.cascading and not SU.defaulting ) then
+		SS.Notice("Mirror Target turned off: the target frame is off.");
+		SS.Safe(SS.SetMirrorTarget, false); SS.Safe(SS.RebuildSetup);
 	end
 	-- the damage meter element is the same switch as "Replace Default Damage Meter with Movable Version?"
 	if ( frame == "SlimSuiteMeterFrame" and not SU.restoring ) then SS.DB().moveMeter = on and true or false; end
@@ -418,7 +424,7 @@ function SU.SetOn(frame, on, title)
 	local feature = SU.FEATURES[frame];
 	if ( feature and not SU.restoring ) then SS.Safe(feature, on and true or false); end
 	-- the target frame element is the same switch as "Hide the target frame": off here is off in the game too
-	if ( frame == "TargetFrame" and not SU.restoring and (SS.DB().hideTarget and true or false) == (on and true or false) ) then
+	if ( frame == "TargetFrame" and not SU.restoring and not SU.defaulting and (SS.DB().hideTarget and true or false) == (on and true or false) ) then
 		SS.DB().hideTarget = not on;
 		SS.Safe(SS.TargetFrameHidden, not on);
 		SS.Safe(SS.ApplyNewFrames);
@@ -478,21 +484,24 @@ function SU.SetOn(frame, on, title)
 				if ( fname == "TargetFrame" and not SS.DB().hideTarget and f.Show ) then f:Show(); end
 				local p = f:GetParent();                     -- a hidden parent would hide the element too
 				while ( p and p ~= UIParent and p.SetAlpha ) do SU.Save(p); p:SetAlpha(SU.saved[p]); p = p:GetParent(); end
-			elseif ( not SU.KEEP_VISIBLE[fname] ) then
+			elseif ( not SU.defaulting and not SU.KEEP_VISIBLE[fname] ) then
 				f:SetAlpha(0);
 			end
 		end
 	end
-	-- turning the target frame off ends the mirror, but reopening the setup only restores what is shown; it changes no settings
-	if ( frame == "TargetFrame" and not on and SS.DB().mirrorTarget and not SU.restoring ) then
-		SS.SetMirrorTarget(false); SS.Notice("Mirror target turned off: the target frame is off.");
+	-- Turning the target frame off ends the combined mirror; reopening setup only restores what is shown.
+	if ( frame == "TargetFrame" and not on and SS.DB().mirrorTarget and not SU.restoring and not SU.defaulting ) then
+		SS.SetMirrorTarget(false); SS.Notice("Mirror Target turned off: the target frame is off.");
 	end
 	local hname = SS.Shown(frame);
 	if ( hname ~= frame and handles[frame] ) then handles[frame]:Hide(); end    -- the hidden frame's handle never shows
 	if ( on and not handles[hname] and title ) then SS.Safe(SS.Handle, hname, title); end
 	if ( handles[hname] ) then if ( on and SS.HandleAllowed(hname) ) then handles[hname]:Show(); else handles[hname]:Hide(); end end
 	if ( frame == "MinimapCluster" and on ) then SS.Safe(SS.ApplyMinimapShape); end   -- round border or square edge
-	if ( not SU.batching ) then SU.RefreshBar(); SU.UpdateDemo(); end
+	if ( not SU.batching ) then
+		SU.RefreshBar(); SU.UpdateDemo();
+		if ( frame == "PlayerFrame" and SU.focus == "TargetFrame" ) then SU.Focus("TargetFrame"); end
+	end
 end
 
 -- the grid: the setting, the bar button and the panel's tick box all agree
@@ -501,6 +510,99 @@ function SU.SetGridSetting(on)
 	SS.Safe(ShowEditGrid);                                 -- shows it while editing, or takes it away
 	if ( setupActive ) then SU.SetOn("SlimSuiteEditGrid", on and true or false); end
 	if ( SU.grid ) then SU.grid.Refresh(); end
+end
+
+function SU.Mode(frame)
+	local modes = SS.DB().elementModes or {};
+	local mode = modes[frame];
+	if ( mode == "enabled" or mode == "disabled" or mode == "default" ) then return mode; end
+	if ( SS.DB().enabledElements and SS.DB().enabledElements[frame] ) then return "enabled"; end
+	-- Preserve explicit settings from older versions, but availability alone must never activate a replacement.
+	local d = SS.DB();
+	local legacy = {
+		SlimSuiteStoredLevelsButton = d.moveLevelButton,
+		SlimSuiteSpellRowFrame = d.replaceBuildRows,
+		SlimSuiteClockFrame = d.replaceClock,
+		SlimSuiteBossFrames = d.replaceEncounters,
+		SlimSuiteTallyFrame = d.replaceTally,
+		SlimSuiteAnnouncementFrame = d.replaceBanners,
+		SlimSuiteReviveFrame = d.replaceRevive,
+		SlimSuiteCombatTextFrame = d.combatTextBox,
+		SlimSuiteLocalClockFrame = d.replaceLocalClock,
+		SlimSuiteMinimapBar = d.minimapBar,
+	};
+	if ( legacy[frame] ) then return "enabled"; end
+	if ( frame == "SlimSuiteMeterFrame" and SS.DB().moveMeter ) then return "enabled"; end
+	if ( (frame == "PlayerFrame" or frame == "TargetFrame") and SS.UsesCard(frame) ) then return "enabled"; end
+	if ( frame == "PartyMemberFrame1" and SS.Look(frame) == "thin" ) then return "enabled"; end
+	if ( frame == "TargetFrame" and SS.DB().hideTarget ) then return "disabled"; end
+	return "default";
+end
+
+function SU.SetMode(frame, mode, title)
+	if ( mode ~= "enabled" and mode ~= "disabled" and mode ~= "default" ) then mode = "default"; end
+	local d = SS.DB();
+	d.elementModes = d.elementModes or {};
+	d.elementModes[frame] = mode;
+	if ( mode == "enabled" ) then
+		SU.defaulting = false;
+		SU.SetOn(frame, true, title);
+	elseif ( mode == "disabled" ) then
+		SU.defaulting = false;
+		SU.SetOn(frame, false, title);
+	else
+		-- Restore the game's native element without treating Default as an instruction to hide it.
+		SU.defaulting = true;
+		SU.SetOn(frame, false, title);
+		SU.defaulting = false;
+		if ( SU.NATIVE[frame] ) then SS.Safe(SU.SetMovable, frame, false); end
+		if ( frame == "TargetFrame" ) then
+			d.hideTarget = false;
+			if ( SS.UsesCard("TargetFrame") ) then SS.Safe(SS.SetLook, "TargetFrame", "classic"); end
+			SS.Safe(SS.TargetFrameHidden, false); SS.Safe(SS.ApplyNewFrames);
+		elseif ( frame == "PlayerFrame" and SS.UsesCard("PlayerFrame") ) then
+			SS.Safe(SS.SetLook, "PlayerFrame", "classic");
+		elseif ( frame == "PartyMemberFrame1" and SS.Look("PartyMemberFrame1") == "thin" ) then
+			SS.Safe(SS.SetLook, "PartyMemberFrame1", "classic");
+		elseif ( frame == "MinimapCluster" ) then
+			d.minimapSquare, d.minimapTransparent = false, false;
+		end
+		local names = { frame };
+		local companions = SU.CompanionsOf(frame);
+		for i = 1, table.getn(companions) do table.insert(names, companions[i]); end
+		for i = 1, table.getn(names) do
+			local name = names[i];
+			if ( name == "PlayerFrame" or name == "TargetFrame" or name == "PartyMemberFrame1" ) then name = SS.Shown(name); end
+			local f = type(name) == "table" and name or getglobal(name);
+			if ( f and f.SetAlpha and not SU.FEATURES[frame] ) then
+				f:SetAlpha(1);
+				if ( f.Show and frame ~= "GameTooltip" ) then f:Show(); end
+			end
+		end
+		if ( frame == "MinimapCluster" ) then SS.Safe(SS.ApplyMinimapShape); end
+		if ( frame == "SlimSuiteMeterFrame" ) then SS.Safe(SS.HideNative, "meter", false); end
+	end
+	d.enabledElements = d.enabledElements or {};
+	d.enabledElements[frame] = mode == "enabled" and true or nil;
+	if ( not SU.batching ) then SU.RefreshBar(); SU.UpdateDemo(); SU.RefreshDemoButtons(); end
+end
+
+function SU.CycleMode(frame)
+	local nextMode = { default = "enabled", enabled = "disabled", disabled = "default" };
+	SU.SetMode(frame, nextMode[SU.Mode(frame)] or "default", SU.titles and SU.titles[frame]);
+	if ( SU.Mode(frame) == "enabled" ) then SU.Focus(frame); elseif ( SU.focus == frame ) then SU.Focus(nil); end
+end
+
+function SS.Demoing(name)
+	if ( not SS.demoRunning or not SS.demoElements ) then return false; end
+	local element = SS.Element and SS.Element(name) or name;
+	local selected = SS.demoElements[name] or SS.demoElements[element];
+	-- The spell and worn-jewelry rows are one default build element and preview together.
+	if ( name == "SlimSuiteItemRowFrame" or name == "SlimSuiteSpellRowFrame" ) then
+		selected = SS.demoElements.SlimSuiteSpellRowFrame;
+	end
+	if ( not selected ) then return false; end
+	return not SU or not SU.Mode or SU.Mode(element) == "enabled";
 end
 
 -- the action bar: vertical or horizontal, kept until changed
@@ -786,7 +888,7 @@ function SS.MakeCards()
 	if ( getglobal("SlimSuitePlayerCard") ) then return; end
 	local function Make(name, unit)
 		local f = CreateFrame("Button", name, UIParent);
-		f:SetWidth(180); f:SetHeight(44); f:SetFrameStrata("MEDIUM");
+		f:SetWidth(unit == "player" and 160 or 180); f:SetHeight(44); f:SetFrameStrata("MEDIUM");
 		f:SetBackdrop(SU.CARD_BACKDROP);
 		f:SetBackdropColor(0.05, 0.05, 0.05, 0.9);
 		f:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
@@ -1221,32 +1323,28 @@ function TagLook(b, text, r, g, bl)
 end
 function SU.RefreshBar()
 	for frame, b in pairs(SU.barButtons or {}) do
-		local on = SU.on and SU.on[frame];
+		local mode = SU.Mode(frame);
 		local parentFrame, parentTitle = SS.ConnectedTo(frame);
-		b.tag.parentTitle = parentTitle;
-		if ( on ) then b:LockHighlight(); else b:UnlockHighlight(); end
-		if ( b.tag ) then if ( on ) then TagLook(b, "Enabled", 0.4, 1, 0.4); else b.tag:Hide(); end end
+		if ( b.tag ) then
+			b.tag.parentTitle = parentTitle;
+			b.tag.modeLabel = string.upper(string.sub(mode, 1, 1)) .. string.sub(mode, 2);
+		end
+		if ( mode == "enabled" ) then b:LockHighlight(); else b:UnlockHighlight(); end
+		if ( b.tag ) then
+			local colors = { enabled = { 0.4, 1, 0.4 }, disabled = { 1, 0.4, 0.4 }, default = { 0.7, 0.7, 0.7 } };
+			local color = colors[mode] or colors.default;
+			TagLook(b, string.upper(string.sub(mode, 1, 1)) .. string.sub(mode, 2), color[1], color[2], color[3]);
+		end
 		if ( parentTitle ) then
 			if ( frame == "BuffFrame" ) then
 				local fs = b.GetFontString and b:GetFontString();
 				if ( fs ) then fs:SetText("Buffs/Debuffs"); elseif ( b.SetText ) then b:SetText("Buffs/Debuffs"); end
 			end
 			b:LockHighlight();
-			TagLook(b, "Connected", 0.45, 0.75, 1);
 		elseif ( frame == "BuffFrame" ) then
 			-- the name stays put; the tag under it says whether the buffs are on, or off because they sit on the player frame
 			local fs = b.GetFontString and b:GetFontString();
 			if ( fs ) then fs:SetText("Buffs/Debuffs"); elseif ( b.SetText ) then b:SetText("Buffs/Debuffs"); end
-			if ( b.tag ) then
-				local off = (not on) or (SS.DB().buffsOnPlayer and true or false);
-				b.tag.text:SetText(off and "Disabled" or "Enabled");
-				if ( off ) then
-					b.tag:SetBackdropColor(0.4, 0.1, 0.1, 0.95); b.tag:SetBackdropBorderColor(1, 0.4, 0.4, 1);
-				else
-					b.tag:SetBackdropColor(0.1, 0.4, 0.1, 0.95); b.tag:SetBackdropBorderColor(0.4, 1, 0.4, 1);
-				end
-				b.tag:Show();
-			end
 		end
 	end
 end
@@ -1296,17 +1394,18 @@ function SU.Focus(frame)
 		for i = 1, table.getn(steps) do if ( steps[i].frame == frame ) then e = steps[i]; end end
 		e = e or { frame = frame, title = SU.menuLabel or frame, text = "" };
 	end
-	local checks = {};
+	local checks, mode = {}, nil;
 	if ( e ) then
 		SU.panel.title:SetText(e.title);
-		SU.panel.text:SetText(e.text);
+		mode = setupActive and frame and SU.Mode(frame) or nil;
+		SU.panel.text:SetText(e.text .. (mode and mode ~= "enabled" and "\nChoose Enabled beside the element before changing its layout or options." or ""));
 		-- a sub-setting shows only while the setting it depends on is on
 		local all, shown = SU.ChecksFor(frame), {};
 		for i = 1, table.getn(all) do if ( not all[i][4] or all[i][4]() ) then table.insert(shown, all[i]); end end
 		checks = shown;
 	else
 		SU.panel.title:SetText("Setup");
-		SU.panel.text:SetText("Click an element on the bar above to turn it on, then set its options here. Click it again to turn it off.");
+		SU.panel.text:SetText("Choose Default to keep the game's normal element, Enabled to use Slim Suite's movable version, or Disabled to hide it. Select Enabled before changing its layout.");
 	end
 	local h = 58 + (SU.panel.text:GetHeight() or 28) + 40;
 	for i = 1, math.max(table.getn(checks), table.getn(SU.checks)) do
@@ -1324,7 +1423,8 @@ function SU.Focus(frame)
 			else cb:SetPoint("TOPLEFT", SU.checks[i - 1], "BOTTOMLEFT", dx - (SU.checks[i - 1].indentX or 0), -(SU.checks[i - 1].warnGap or 0)); end
 			cb.warn:Hide(); cb.warnGap = 0;
 			cb.Refresh(); cb:Show();
-			if ( c[4] and not c[4]() ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
+			if ( setupActive and mode ~= "enabled" ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
+			elseif ( c[5] and not c[5]() ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
 			else cb:Enable(); cb.label:SetTextColor(1, 1, 1); end
 			h = h + 24 + cb.warnGap;
 		else
@@ -1333,7 +1433,7 @@ function SU.Focus(frame)
 	end
 	-- the size & layout tools, under the settings
 	do
-		local ok = frame and SS.PrepareSizeTools(frame, e and e.title);
+		local ok = frame and (not setupActive or SU.Mode(frame) == "enabled") and SS.PrepareSizeTools(frame, e and e.title);
 		if ( ok and sizeMenu ) then
 			sizeMenu:SetParent(SU.panel);
 			sizeMenu:SetScale(1);
@@ -1484,15 +1584,14 @@ end
 
 -- Settings that cannot both be on: the one chosen last wins and the other is turned off (it can be turned back on).
 --   "self"    you join the party frames: your own player frame goes off, since your card is in the party now. The
---             target frame stays, on its own: Mirror target and Combine, which tie it to the player frame, go off.
+--             target frame stays on its own: Mirror Target, which needs the player frame, goes off.
 --   "mirror", "combine", "player" (the player frame turned on from its button): you leave the party frames and your
 --             player frame comes back; mirroring also brings back a hidden target frame
 function SS.ClaimTarget(by)
 	local d = SS.DB();
 	if ( by == "self" ) then
 		if ( d.partyLocked ) then d.partyLocked = false; SS.Notice("The party frames are free again: you are in them now."); end
-		if ( d.mirrorTarget ) then SS.SetMirrorTarget(false); SS.Notice("Mirror target turned off: the target frame stands on its own now."); end
-		if ( d.combineTarget ) then d.combineTarget = false; SS.Notice("Combine turned off: the target frame stands on its own now."); end
+		if ( d.mirrorTarget ) then SS.SetMirrorTarget(false); SS.Notice("Mirror Target turned off: the target frame stands on its own now."); end
 		SS.Notice("The player frame turned off: you are in the party frames now.");
 		SS.Safe(SS.PlayerFrameHidden, true);
 		if ( SU.on and SU.on.PlayerFrame ) then SU.SetOn("PlayerFrame", false, SU.titles and SU.titles.PlayerFrame or "Unit frame"); end
@@ -1537,6 +1636,11 @@ function SS.SetPartySelf(on)
 			if ( setupActive and SU.on and not SU.on.PlayerFrame ) then SU.SetOn("PlayerFrame", true, SU.titles and SU.titles.PlayerFrame or "Unit frame"); end
 		end
 	end);
+	-- Choosing to join the party frames also turns that frame on in the UI setup; otherwise the option
+	-- would hide the player plate without giving the user a party-frame handle to place.
+	if ( on and setupActive and SU.on and not SU.on.PartyMemberFrame1 ) then
+		SU.SetOn("PartyMemberFrame1", true, SU.titles and SU.titles.PartyMemberFrame1 or "Party frames");
+	end
 	SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
 	SU.Rebuild();
 	SU.UpdateDemo();
@@ -1544,11 +1648,8 @@ end
 
 -- combined, the player and target are one element in the setup, and the player frame takes the target's look
 function SS.SetCombineTarget(on)
-	SS.ChangeLooks(function()
-		if ( on ) then SS.Safe(SS.ClaimTarget, "combine"); end   -- the newest choice wins: combining needs your player frame
-		SS.DB().combineTarget = on and true or false;
-	end);
-	SU.Rebuild();
+	-- Kept as an internal compatibility entry point; the UI now has one combined Mirror Target switch.
+	SS.SetMirrorTarget(on);
 end
 
 function SS.SetLocalClockOn(on)
@@ -1566,19 +1667,14 @@ end
 -- a bar button: first click turns the element on and opens its questions; clicking the open one turns it off
 function SU.Click(frame)
 	if ( frame == "SlimSuiteEditGrid" ) then SU.SetGridSetting(not (SU.on and SU.on[frame])); return; end
-	local was = SU.on and SU.on[frame];
-	SU.SetOn(frame, not was, SU.titles[frame]);
-	if ( was ) then
-		if ( SU.focus == frame ) then SU.Focus(nil); end
-	else
-		SU.Focus(frame);
-	end
+	if ( SU.focus == frame ) then SU.Focus(nil); else SU.Focus(frame); end
 	SS.RefreshToggles();
 end
 
--- the setup: everything hidden, one bar of elements, all off
+-- the setup leaves Blizzard's interface visible until an element is explicitly enabled or disabled
 function SU.Begin()
 	if ( not SU.panel ) then SU.Build(); end
+	SU.Unreveal();
 	for name in pairs(SU.KEEP_VISIBLE) do                        -- undo an earlier sweep of these, if any
 		local c = getglobal(name);
 		if ( c and c.SetAlpha and c.GetAlpha and c:GetAlpha() == 0 ) then c:SetAlpha(1); end
@@ -1594,31 +1690,30 @@ function SU.Begin()
 	if ( not hasMeter ) then table.insert(SU.elements, { frame = "SlimSuiteMeterFrame", title = "Damage meter", text = "The damage meter. Its corner grip resizes it any time." }); end
 	SU.titles = {};
 	for i = 1, table.getn(SU.elements) do SU.titles[SU.elements[i].frame] = SU.elements[i].title; end
-	SU.HideAll();
-	SS.Safe(SS.HideNative, "meter", true);
+	local modes = SS.DB().elementModes or {};
+	SS.DB().elementModes = modes;
 	local saved = SS.DB().enabledElements or {};
-	SU.restoring = true;
+	SU.restoring = false;
 	SU.batching = true;      -- one bar and demo refresh at the end, not one per element
-	-- hiding everything also hid the grid: show it again if it is on, so the Grid tick always matches the screen
 	SS.Safe(SU.SetGridSetting, SS.DB().showEditGrid and true or false);
-	-- one element failing to come back must not stop the rest of the setup from opening (the error is still shown)
+	-- Migrate prior binary selections: old enabled elements stay enabled; untouched elements stay at Blizzard defaults.
 	for i = 1, table.getn(SU.elements) do
 		local f = SU.elements[i].frame;
-		local want = saved[f] and true or false;
-		if ( f == "SlimSuiteMeterFrame" ) then want = SS.DB().moveMeter and true or false; end   -- follows the setting
-		if ( SU.FEATURES[f] ) then want = SS.AvailableElements()[f] and true or false; end        -- follows its feature
-		if ( f == "PlayerFrame" and SS.DB().partyIncludesSelf ) then want = false; end            -- you are in the party
-		if ( f == "TargetFrame" ) then want = not SS.DB().hideTarget; end                         -- follows the setting
-		SS.Safe(SU.SetOn, f, want, SU.titles[f]);
+		local mode = SU.Mode(f);
+		if ( modes[f] == nil and saved[f] ) then modes[f] = "enabled"; mode = "enabled"; end
+		if ( f == "SlimSuiteMeterFrame" and SS.DB().moveMeter ) then mode = modes[f] or "enabled"; end
+		if ( f == "PlayerFrame" and SS.DB().partyIncludesSelf ) then mode = modes[f] or "default"; end
+		if ( f == "TargetFrame" and SS.DB().hideTarget ) then mode = modes[f] or "disabled"; end
+		if ( mode == "enabled" or mode == "disabled" ) then SS.Safe(SU.SetMode, f, mode, SU.titles[f]);
+		else SS.Safe(SU.SetMode, f, "default", SU.titles[f]); end
 	end
 	SU.batching = false;
-	SU.restoring = false;
 	-- the bar: one button per element
 	SU.barButtons = SU.barButtons or {};
 	-- a vertical list from the top left corner: one element per line, a new column when the screen runs out of height
 	local wanted, col, idx, maxIdx = {}, 0, 0, 0;
 	local maxH = (UIParent:GetHeight() or 768) - 80;
-	local COLUMN, LINE, TOP, BOTTOM = 250, 26, 30, 34;   -- the grid row on top, Done at the bottom
+	local COLUMN, LINE, TOP, BOTTOM = 204, 19, 26, 27;   -- compact two-column list; actions stay on its bottom edge
 	maxH = maxH - TOP - BOTTOM;
 	for i = 1, table.getn(SU.elements) do
 		local e = SU.elements[i];
@@ -1629,39 +1724,45 @@ function SU.Begin()
 			b = K.Button(SU.bar, e.title, 80, function() SU.Click(name); end);
 			SU.barButtons[name] = b;
 			b.tag = CreateFrame("Frame", nil, SU.bar);
-			b.tag:SetHeight(14);
+			b.tag:SetHeight(13);
 			b.tag:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 				tile = true, tileSize = 16, edgeSize = 8, insets = { left = 2, right = 2, top = 2, bottom = 2 } });
 			b.tag:SetBackdropColor(0.1, 0.4, 0.1, 0.95);
 			b.tag:SetBackdropBorderColor(0.4, 1, 0.4, 1);
 			b.tag.text = b.tag:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-			b.tag.text:SetPoint("CENTER", b.tag, "CENTER", 0, 0); b.tag.text:SetText("Enabled");
+			b.tag.text:SetPoint("CENTER", b.tag, "CENTER", 0, 0); b.tag.text:SetText("Default");
 			b.tag:EnableMouse(true);
 			b.tag:SetScript("OnEnter", function()
-				if ( not this.parentTitle or not GameTooltip ) then return; end
+				if ( not GameTooltip ) then return; end
 				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
-				GameTooltip:AddLine("Connected", 0.45, 0.75, 1);
-				GameTooltip:AddLine("Joined to: " .. this.parentTitle, 1, 1, 1);
-				GameTooltip:AddLine("It is still on. It moves and shows with that element.", 0.8, 0.8, 0.8, 1);
+				GameTooltip:AddLine("Element status: " .. (this.modeLabel or "Default"), 1, 0.82, 0.2);
+				if ( this.parentTitle ) then GameTooltip:AddLine("Connected to: " .. this.parentTitle, 0.7, 0.85, 1); end
+				GameTooltip:AddLine("Click to cycle Default, Enabled and Disabled.", 0.8, 0.8, 0.8, 1);
 				GameTooltip:Show();
 			end);
+			b.tag:SetScript("OnMouseUp", function() if ( arg1 == "LeftButton" ) then SU.CycleMode(this.ownerFrame); end end);
 			b.tag:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
 			b.tag:Hide();
 		end
-		local w = math.max(70, string.len(e.title) * 7 + 20);
-		b:SetWidth(w); b:SetHeight(22);
-		-- the Enabled / Disabled tag sits to the right of its button
-		b.tag:SetWidth(72); b.tag:ClearAllPoints(); b.tag:SetPoint("LEFT", b, "RIGHT", 4, 0);
+		local w = math.min(140, math.max(66, string.len(e.title) * 5.2 + 12));
+		b:SetWidth(w); b:SetHeight(17);
+		-- the three-state selector sits directly beside its element
+		b.tag.ownerFrame = name;
+		b.tag:SetWidth(58); b.tag:ClearAllPoints(); b.tag:SetPoint("LEFT", b, "RIGHT", 3, 0);
 		-- two columns, half the elements in each (a third column only if the screen is too short for two)
 		local perCol = math.ceil(table.getn(SU.elements) / 2);
-		if ( idx > 0 and (idx >= perCol or 8 + (idx + 1) * LINE > maxH) ) then col = col + 1; idx = 0; end
-		b:ClearAllPoints(); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 8 + col * COLUMN, -8 - TOP - idx * LINE); b:Show();
+		if ( idx > 0 and (idx >= perCol or 6 + (idx + 1) * LINE > maxH) ) then col = col + 1; idx = 0; end
+		b:ClearAllPoints(); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 6 + col * COLUMN, -6 - TOP - idx * LINE); b:Show(); b.tag:Show();
 		if ( idx > maxIdx ) then maxIdx = idx; end
 		idx = idx + 1;
 	end
 	for name, b in pairs(SU.barButtons) do if ( not wanted[name] ) then b:Hide(); if ( b.tag ) then b.tag:Hide(); end end end
-	SU.bar:SetWidth(8 + (col + 1) * COLUMN);
-	SU.bar:SetHeight((maxIdx + 1) * LINE + 16 + TOP + BOTTOM);
+	SU.bar:SetWidth(6 + (col + 1) * COLUMN);
+	SU.bar:SetHeight((maxIdx + 1) * LINE + 12 + TOP + BOTTOM);
+	if ( SU.bar.resetAll ) then
+		SU.bar.resetAll:ClearAllPoints(); SU.bar.resetAll:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -104, 7);
+		SU.bar.done:ClearAllPoints(); SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
+	end
 	SU.bar:Show();
 	SU.Focus(nil);
 	SU.RefreshBar();
@@ -1671,8 +1772,26 @@ end
 
 function SU.RefreshDemoButtons()
 	if ( not SU.bar or not SU.bar.demoOn ) then return; end
+	local count = 0;
+	for i = 1, table.getn(SU.elements or {}) do
+		local frame = SU.elements[i].frame;
+		if ( SU.Mode(frame) == "enabled" ) then
+			count = count + 1;
+		end
+	end
+	if ( SS.demoRunning and SS.demoElements ) then
+		local stillEnabled = 0;
+		for frame in pairs(SS.demoElements) do
+			if ( SU.Mode(frame) ~= "enabled" ) then SS.demoElements[frame] = nil; else stillEnabled = stillEnabled + 1; end
+		end
+		if ( stillEnabled == 0 ) then SS.StopDemoMode(); return; end
+	end
+	if ( SU.bar.demoLabel ) then SU.bar.demoLabel:SetText("Demo"); end
+	if ( count == 0 and not SS.demoRunning ) then SU.bar.demoOn:Disable(); else SU.bar.demoOn:Enable(); end
 	if ( SS.demoRunning ) then SU.bar.demoOn:LockHighlight(); SU.bar.demoOff:UnlockHighlight();
 	else SU.bar.demoOff:LockHighlight(); SU.bar.demoOn:UnlockHighlight(); end
+	local box = getglobal("SlimSuiteDemoBox");
+	if ( box and box.on ) then if ( count == 0 ) then box.on:Disable(); else box.on:Enable(); end end
 end
 function SU.Build()
 	SU.panel = CreateFrame("Frame", "SlimSuiteSetupPanel", UIParent);
@@ -1743,7 +1862,9 @@ function SU.Build()
 	SU.bar.demoOff = K.Button(SU.bar, "Off", 36, function() SS.StopDemoMode(); SU.RefreshDemoButtons(); end);
 	SU.bar.demoOff:SetHeight(18); SU.bar.demoOff:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 290, -9);
 	SU.bar.done = K.Button(SU.bar, "Done", 90, function() SS.SetupEnd(true); end);
-	SU.bar.done:SetPoint("BOTTOMLEFT", SU.bar, "BOTTOMLEFT", 8, 8);
+	SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
+	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);
+	SU.bar.resetAll:SetPoint("RIGHT", SU.bar.done, "LEFT", -6, 0);
 	SU.bar:SetFrameStrata("DIALOG");
 	SU.bar:SetHeight(52);
 	SU.bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
