@@ -1,5 +1,5 @@
 -- the new-school cards show the real player and target once they exist
-local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return nil end if n == want then return v end i = i + 1 end end
+local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
 SS.DB().playerLook = "new"; SS.DB().targetLook = "new"
 SS.ApplyNewFrames(); Tick(2)
 local pc = getglobal("SlimSuitePlayerCard")

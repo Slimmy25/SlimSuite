@@ -1,4 +1,4 @@
-local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return nil end if n == want then return v end i = i + 1 end end
+local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
 SU = upvalue(SS.SetupHide, "SU")
 SS.StartSetup(true); Tick(3)
 Click(SU.barButtons.PlayerFrame); Tick(2)

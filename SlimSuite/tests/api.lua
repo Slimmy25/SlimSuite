@@ -80,7 +80,7 @@ check("Imp has its own line", names.Imp == 1)
 SS.StopDemoMode(); Tick(2)
 print("meter problems: " .. bad)
 -- in the setup, your player frame joined to the party says Connected and names the party
-local function upv(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return nil end if n == want then return v end i = i + 1 end end
+local function upv(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
 local SU = upv(SS.SetupHide, "SU")
 SS.StartSetup(true); Tick(3)
 SS.SetPartySelf(true); Tick(2); SU.RefreshBar()
@@ -113,3 +113,16 @@ check("Off stops it", not SS.demoRunning and not SlimSuiteDemoBox:IsShown())
 check("the menus come back", win:IsShown())
 win:Hide()
 print("demo problems: " .. bad)
+-- the shared private names stay out of the game's globals
+local G = _G
+check("private names are not global", rawget(G, "SU") == nil and rawget(G, "win") == nil and rawget(G, "PlaceAll") == nil)
+check("they are shared between the files", SS.ENV.SU ~= nil and type(SS.ENV.PlaceAll) == "function")
+print("env problems: " .. bad)
+-- unit frames redraw on the game's events, not only on the timer
+local calls = 0; local old = SS.RefreshCard
+SS.RefreshCard = function(f) calls = calls + 1; return old(f) end
+Tick(1, 0.01); calls = 0
+FireEvent("UNIT_HEALTH", "player"); Tick(1, 0.01)
+check("UNIT_HEALTH redraws the cards at once", calls > 0)
+SS.RefreshCard = old
+print("events problems: " .. bad)

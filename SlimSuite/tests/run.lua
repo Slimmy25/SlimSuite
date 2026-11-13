@@ -8,12 +8,13 @@ local function loadFile(name)
 	local fh = assert(io.open(DIR .. name, "rb"))
 	local src = fh:read("a"); fh:close()
 	src = src:gsub("unpack%(arg%)", "...")
+	src = src:gsub("if %( setfenv %) then setfenv%(1, SS%.ENV%); end", "local _ENV = SS.ENV;")
 	local chunk, err = load(src, "@" .. name)
 	if not chunk then print("COMPILE " .. err) return end
 	local ok, e = pcall(chunk)
 	if not ok then print("LOAD " .. tostring(e)) end
 end
-for _, f in ipairs({ "SlimSuiteCore.lua", "AZSKit.lua", "SlimSuiteErrors.lua", "SlimSuiteItems.lua", "SlimSuiteMeter.lua", "SlimSuite.lua", "SlimSuiteWorld.lua" }) do
+for _, f in ipairs({ "SlimSuiteCore.lua", "AZSKit.lua", "SlimSuiteErrors.lua", "SlimSuiteItems.lua", "SlimSuiteMeter.lua", "SlimSuite.lua", "SlimSuiteFrames.lua", "SlimSuiteEdit.lua", "SlimSuiteSetup.lua", "SlimSuiteCommands.lua", "SlimSuiteWorld.lua" }) do
 	loadFile(f)
 end
 -- every error Slim Suite catches counts as a test error

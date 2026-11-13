@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.13
+Under the hood: Slim Suite is split into smaller files, and the unit frames react to the game's events.
+
+- **Faster unit frames:** the player and target cards, the party's lines, your party plate and the raid marks now update the moment health, power, level, target, party or marks change, instead of waiting for the next check. The checks still run, less often, as a safety net.
+- **Smaller files:** the main file is split into five (basics, frames, edit mode, setup, commands). Nothing changes in the game, and the settings are kept. If you install by hand, replace the whole SlimSuite folder.
+
 ## 1.12
 The damage meter looks like the game's own, the square map gets a gold ring, and Demo Mode is easier to use.
 

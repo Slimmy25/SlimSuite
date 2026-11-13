@@ -4,8 +4,22 @@
 --   SS.Every(name, s, fn, watch)  runs fn every s seconds (0 = every frame) from one shared ticker;
 --                      skipped while the optional watch frame is hidden, as WoW never sends OnUpdate to a hidden frame
 --   SS.Stop(name)      stops a timed task
+--   SS.ENV             the private names shared by Slim Suite's main files (SlimSuite.lua, SlimSuiteFrames.lua,
+--                      SlimSuiteEdit.lua, SlimSuiteSetup.lua, SlimSuiteCommands.lua)
 SS = SS or {};
 local MAX_ENTRIES = 200;
+
+-- Slim Suite's main code is in several files that share names no other addon should see (its frames, the setup's
+-- table, its state). Each of those files runs with SS.ENV as its globals: a name listed in SS.PRIVATE lives in SS.ENV,
+-- anything else is read from and written to the game's globals as usual. Reading the game's globals goes straight
+-- through __index (a table, so it costs about as much as a normal global).
+do
+	local G = getfenv and getfenv(0) or _G;
+	SS.PRIVATE = SS.PRIVATE or {};
+	SS.ENV = setmetatable({}, { __index = G, __newindex = function(t, k, v)
+		if ( SS.PRIVATE[k] ) then rawset(t, k, v); else G[k] = v; end
+	end });
+end
 
 -- The saved variables can be replaced by the game after this file runs, so the log is looked up every time
 -- rather than kept from load. Creates the saved table and the log if they are missing.

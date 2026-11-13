@@ -2,7 +2,7 @@ local function upvalue(fn, want)
 	local i = 1
 	while true do
 		local n, v = debug.getupvalue(fn, i)
-		if not n then return nil end
+		if not n then return SS.ENV and SS.ENV[want] end
 		if n == want then return v end
 		i = i + 1
 	end

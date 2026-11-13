@@ -1,5 +1,5 @@
 -- checks for the 1.10 review fixes
-local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return nil end if n == want then return v end i = i + 1 end end
+local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
 SU = upvalue(SS.SetupHide, "SU")
 local bad = 0
 local function check(label, ok) if not ok then bad = bad + 1; print("  MISMATCH " .. label) end end
