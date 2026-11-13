@@ -2,6 +2,21 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.16
+Demo Mode runs the whole interface like a real run, big hits pop, and raid marks show on the encounter bars.
+
+- **Demo Mode:**
+  - Four sample bosses and the target only ever lose health, then start again full.
+  - The party takes ticking damage, heals and big hits in short bursts, and the revive bar fills and starts over.
+  - Kills, gold and the cache price only climb, then start again from 0.
+  - The run clock counts up from a random time while the next boss counts down.
+  - Announcements of different lengths show every few seconds.
+  - The minimap shows sample caches and walking bosses with their marks.
+  - Starting it from the element list closes the list and shows only the small DEMO MODE box.
+- **Raid marks on the encounter bars:** each boss or Guardian bar shows the same mark that is over its head and on the minimap.
+- **Combat text:** crits and your biggest hits grow, drift to the right and slowly fall away. How much depends on how big they are next to your normal hits. This can be turned off in the combat text box's menu.
+- **Your buffs in the party:** a row ends where your plate's health and mana bars end.
+
 ## 1.15
 Buffs where you want them, a proper square map, and a tidier settings window.
 

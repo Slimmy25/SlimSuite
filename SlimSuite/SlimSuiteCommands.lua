@@ -577,29 +577,12 @@ demoPins, demoGlint = {}, nil;
 function DemoTick(dt)
 	demoT = demoT + dt;
 	demoHitClock = demoHitClock + dt;
-	-- target and party health rise and fall (the sample values the previews read)
-	SU.SAMPLE_TARGET.hp = 40 + math.floor(35 * (1 + math.sin(demoT * 0.9)) / 2);
-	for i = 1, table.getn(SU.PARTY_SAMPLE) do
-		local s = SU.PARTY_SAMPLE[i];
-		s[3] = 35 + math.floor(60 * (1 + math.sin(demoT * (0.6 + i * 0.25) + i)) / 2);
-	end
-	-- the encounter bars: the three sample bosses lose and regain health
-	for i = 1, table.getn(SS.BOSS_SAMPLE) do
-		SS.BOSS_SAMPLE[i][2] = 25 + math.floor(70 * (1 + math.sin(demoT * (0.35 + i * 0.12) + i)) / 2);
-	end
-	SS.Safe(SS.UpdateBossFrames);
+	SS.Safe(SS.DemoWorld, dt);
 	-- the party keeps the column or row you chose
 	SS.Safe(SU.PreviewTarget);
 	SS.Safe(SU.PreviewParty);
 	-- damage meter: the sample numbers climb
 	if ( SlimSuiteMeter and SlimSuiteMeter.demoSnapshot ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(demoT); end
-	-- minimap pins circle the map inside its edge
-	local mm = Minimap and Minimap.GetWidth and (Minimap:GetWidth() or 140) / 2 - 10 or 60;
-	for i = 1, table.getn(demoPins) do
-		local a = demoT * (0.5 + i * 0.2) + i * 1.6;
-		demoPins[i]:ClearAllPoints();
-		demoPins[i]:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * mm * (0.4 + 0.15 * i), math.sin(a) * mm * (0.4 + 0.15 * i));
-	end
 	-- XP bar: a glint sweeps across it
 	if ( demoGlint and MainMenuExpBar ) then
 		local w = MainMenuExpBar:GetWidth() or 100;
@@ -620,6 +603,110 @@ function DemoTick(dt)
 		SS.Safe(SlimSuiteWorld.DemoHit, h[1], h[2], "Interface\\Icons\\" .. h[3], h[4], h[5]);
 		demoHitIndex = math.mod(demoHitIndex, table.getn(DEMO_HITS)) + 1;
 	end
+end
+
+-- Demo Mode's world: everything the elements show moves the way a real run would.
+--   bosses and the target only ever lose health, and start again full when they reach the bottom
+--   the party takes ticking damage, heals and big hits in short bursts
+--   the revive bar fills, starts over and fills again
+--   kills, gold and the next cache's price only climb; after a while they go back to 0 and climb again
+--   the run clock counts up from a random time; the next boss counts down and starts over
+--   the announcements show the game's kinds of messages, short and long, every few seconds
+--   the minimap shows sample caches sitting still and the sample bosses, with their marks, walking about
+local DEMO_NEWS = {
+	{ "Hogger enters the battlefield!", true },
+	{ "A Guardian stirs in its lair." },
+	{ "Edwin VanCleef has been slain!", true },
+	{ "Level up!" },
+	{ "The cache is ready to open." },
+	{ "Heroic: Sanguine, Explosive. Enemies leave pools of blood and some explode when they die." },
+	{ "Mr. Smite calls for his crew!", true },
+	{ "Your party revived Brann." },
+	{ "Next zone: Westfall. The Defias Brotherhood waits for you there." },
+	{ "Cookie is enraged!", true },
+};
+function SS.DemoWorld(dt)
+	local D = SS.demoState;
+	if ( not D ) then
+		D = { news = 0, newsIndex = 1, cycle = 0, party = {} };
+		SS.demoState = D;
+		SS.demoClock = { run = 60 * math.random(3, 14) + math.random(0, 59), nextBoss = math.random(40, 150) };
+		SS.demoRevive = 0;
+		SS.TALLY_SAMPLE.kills, SS.TALLY_SAMPLE.gold, SS.TALLY_SAMPLE.chest = 0, 0, 25;
+		SS.TALLY_SAMPLE.bosses, SS.TALLY_SAMPLE.guardians = 0, 0;
+	end
+	-- bosses: down only, each at its own pace; full again at the bottom
+	for i = 1, table.getn(SS.BOSS_SAMPLE) do
+		local b = SS.BOSS_SAMPLE[i];
+		b[2] = b[2] - dt * (1.2 + i * 0.7);
+		if ( b[2] <= 0 ) then b[2] = 100; end
+	end
+	SS.Safe(SS.UpdateBossFrames);
+	-- the target: down only, full again at the bottom
+	SU.SAMPLE_TARGET.hp = SU.SAMPLE_TARGET.hp - dt * 4;
+	if ( SU.SAMPLE_TARGET.hp <= 0 ) then SU.SAMPLE_TARGET.hp = 100; end
+	-- the party: each member gets a burst now and then (ticking damage, a heal, or a big hit) that plays out slowly
+	for i = 1, table.getn(SU.PARTY_SAMPLE) do
+		local s, p = SU.PARTY_SAMPLE[i], D.party[i];
+		if ( not p ) then p = { left = 0, rate = 0, wait = math.random() * 2 }; D.party[i] = p; end
+		if ( p.left > 0 ) then
+			s[3] = math.max(5, math.min(100, s[3] + p.rate * dt));
+			p.left = p.left - dt;
+		else
+			p.wait = p.wait - dt;
+			if ( p.wait <= 0 ) then
+				local roll = math.random();
+				if ( s[3] < 35 or (roll < 0.35 and s[3] < 90) ) then p.rate, p.left = 18, 1 + math.random();            -- a heal
+				elseif ( roll < 0.55 ) then p.rate, p.left = -45, 0.5;                                                -- a big hit
+				else p.rate, p.left = -6, 1.5 + math.random() * 1.5; end                                              -- ticking damage
+				p.wait = 0.8 + math.random() * 2;
+			end
+		end
+	end
+	-- the revive bar: fills over about five seconds, then starts again
+	SS.demoRevive = SS.demoRevive + dt / 5;
+	if ( SS.demoRevive > 1 ) then SS.demoRevive = 0; end
+	-- the tally: only climbs; after about 90 seconds it goes back to 0 and climbs again
+	local T = SS.TALLY_SAMPLE;
+	D.cycle = D.cycle + dt;
+	if ( D.cycle > 90 ) then
+		D.cycle = 0; T.kills, T.gold, T.chest, T.bosses, T.guardians = 0, 0, 25, 0, 0;
+	else
+		T.kills = T.kills + math.random(0, 3);
+		if ( math.random() < 0.3 ) then T.gold = T.gold + math.random(1, 4); end
+		if ( math.random() < 0.02 ) then T.chest = T.chest + 25; end
+		if ( math.random() < 0.006 ) then T.bosses = T.bosses + 1; end
+		if ( math.random() < 0.01 ) then T.guardians = T.guardians + 1; end
+	end
+	SS.Safe(SS.UpdateTally);
+	-- the clocks
+	local C = SS.demoClock;
+	C.run = C.run + dt;
+	C.nextBoss = C.nextBoss - dt;
+	if ( C.nextBoss <= 0 ) then C.nextBoss = math.random(60, 180); end
+	SS.Safe(SS.UpdateClock);
+	SS.Safe(SlimSuiteWorld.UpdateRevive);
+	-- announcements: one every 6 seconds, in turn
+	D.news = D.news - dt;
+	if ( D.news <= 0 ) then
+		D.news = 6;
+		local n = DEMO_NEWS[D.newsIndex];
+		D.newsIndex = math.mod(D.newsIndex, table.getn(DEMO_NEWS)) + 1;
+		SS.Safe(SS.ShowAnnouncement, { id = "demo" .. D.newsIndex .. "-" .. math.floor(demoT), text = n[1], boss = n[2] });
+	end
+	-- the minimap: caches sit still, the bosses walk slowly around you with their marks
+	local pins = {};
+	local caches = { { 60, 40 }, { -90, 20 }, { 30, -110 } };
+	for i = 1, table.getn(caches) do
+		table.insert(pins, { x = caches[i][1], y = caches[i][2], size = 13, rim = true, crop = true, texture = "Interface\\Icons\\INV_Box_02", tip = "Cache (sample)" });
+	end
+	for i = 1, table.getn(SS.BOSS_SAMPLE) do
+		local a = demoT * (0.08 + i * 0.03) + i * 1.6;
+		local r = 70 + i * 25;
+		table.insert(pins, { x = math.cos(a) * r, y = math.sin(a) * r, size = 15, rim = true, texture = "Interface\\TargetingFrame\\UI-RaidTargetingIcons",
+			raid = SlimSuiteWorld.BOSS_ICONS and SlimSuiteWorld.BOSS_ICONS[i] or 8, tip = SS.BOSS_SAMPLE[i][1] .. " (sample)" });
+	end
+	SlimSuiteWorld.demoPins = pins;
 end
 
 -- sample meter rows: the party's names and WoW spells, with damage that grows over time
@@ -663,7 +750,7 @@ function SS.StartDemoMode()
 			demoPins[i] = p;
 		end
 	end
-	for i = 1, table.getn(demoPins) do demoPins[i]:Show(); end
+	for i = 1, table.getn(demoPins) do demoPins[i]:Hide(); end   -- the minimap's samples are real pins now (SS.DemoWorld)
 	if ( MainMenuExpBar and MainMenuExpBar.CreateTexture ) then
 		if ( not demoGlint ) then demoGlint = MainMenuExpBar:CreateTexture(nil, "OVERLAY"); demoGlint:SetWidth(16); demoGlint:SetTexture(1, 1, 1, 0.35); end
 		demoGlint:SetHeight(MainMenuExpBar:GetHeight() or 12); demoGlint:Show();
@@ -680,6 +767,10 @@ function SS.StopDemoMode()
 	SS.Stop("demoMode");
 	if ( SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = nil; end
 	for i = 1, table.getn(demoPins) do demoPins[i]:Hide(); end
+	SS.demoState, SS.demoClock = nil, nil;
+	if ( SlimSuiteWorld ) then SlimSuiteWorld.demoPins = nil; end
+	SS.TALLY_SAMPLE.kills, SS.TALLY_SAMPLE.gold, SS.TALLY_SAMPLE.chest, SS.TALLY_SAMPLE.bosses, SS.TALLY_SAMPLE.guardians = 1284, 356, 120, 2, 3;
+	SS.BOSS_SAMPLE[1][2], SS.BOSS_SAMPLE[2][2], SS.BOSS_SAMPLE[3][2], SS.BOSS_SAMPLE[4][2] = 60, 40, 85, 100;
 	if ( demoGlint ) then demoGlint:Hide(); end
 	SS.demoPartyOrient = nil;
 	SS.demoBuffOn = {};
@@ -694,7 +785,7 @@ end
 
 -- While Demo Mode runs, Slim Suite's menus are put away so the samples can be seen, and a small "DEMO MODE" box
 -- stands in for them: "On" is lit while it runs, "Off" stops it and brings back the menus that were open.
-SS.DEMO_HIDES = { "SlimSuiteFrame", "SlimSuiteLayoutFrame", "SlimSuiteSetupPanel", "SlimSuiteSetupGlow",
+SS.DEMO_HIDES = { "SlimSuiteFrame", "SlimSuiteLayoutFrame", "SlimSuiteSetupPanel", "SlimSuiteSetupBar", "SlimSuiteSetupGlow",
 	"SlimSuiteMovePanel", "SlimSuiteChoiceMenu", "SlimSuiteRaidIconPanel" };
 demoHidden = {};
 function DemoBox()
@@ -724,9 +815,8 @@ function SS.ShowDemoBox(on)
 			local f = getglobal(name);
 			if ( f and f:IsShown() ) then demoHidden[name] = true; f:Hide(); end
 		end
-		-- the element list has its own On/Off beside the grid: it stays, and the small box is only for elsewhere
-		local list = getglobal("SlimSuiteSetupBar");
-		if ( not (list and list:IsShown()) ) then local box = DemoBox(); box:Show(); box.on:LockHighlight(); box.off:UnlockHighlight(); end
+		-- wherever it was started (the element list too), only the small box shows; Off brings the menus back
+		local box = DemoBox(); box:Show(); box.on:LockHighlight(); box.off:UnlockHighlight();
 	else
 		local box = getglobal("SlimSuiteDemoBox");
 		if ( box ) then box:Hide(); end

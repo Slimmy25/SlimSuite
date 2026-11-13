@@ -321,7 +321,8 @@ function SU.ChecksFor(frame)
 			{ "Show heals", function() return SS.DB().ctHeals ~= false; end, function(v) SS.DB().ctHeals = v and true or false; end },
 			{ "Crits: bigger and longer", function() return SS.DB().ctCrits ~= false; end, function(v) SS.DB().ctCrits = v and true or false; end },
 			{ "Spell icons", function() return SS.DB().ctIcons ~= false; end, function(v) SS.DB().ctIcons = v and true or false; end },
-			{ "Lines stay twice as long", function() return SS.DB().ctLong ~= false; end, function(v) SS.DB().ctLong = v and true or false; end } },
+			{ "Lines stay twice as long", function() return SS.DB().ctLong ~= false; end, function(v) SS.DB().ctLong = v and true or false; end },
+			{ "Crits and your biggest hits grow and fall away", short = "Big hits grow and fall", function() return SS.DB().ctPop ~= false; end, function(v) SS.DB().ctPop = v and true or false; end } },
 	};
 	local out = {};
 	-- "Movable?" belongs to the game's own frame: not offered while a card or the thin lines show the element
@@ -659,7 +660,7 @@ end
 SU.CARD_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 	tile = true, tileSize = 16, edgeSize = 10, insets = { left = 2, right = 2, top = 2, bottom = 2 } };
 SU.BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar";
-SS.BOSS_SAMPLE = { { "Hogger", 60 }, { "Mr. Smite", 40 }, { "Edwin VanCleef", 85 } };   -- real Elwynn Forest bosses
+SS.BOSS_SAMPLE = { { "Hogger", 60 }, { "Mr. Smite", 40 }, { "Edwin VanCleef", 85 }, { "Cookie", 100 } };   -- real bosses of the first zones
 
 -- The new-school player and target frames: cards in the party frames' look, showing name, health and power.
 -- They are only shown while the design is on; the game's own frames are made transparent (not removed) meanwhile.

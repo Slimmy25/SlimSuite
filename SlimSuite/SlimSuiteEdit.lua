@@ -16,6 +16,16 @@ function SS.BuffRoom(plate, portrait, nextFrame)
 	local ps, ss = (portrait and portrait:GetEffectiveScale()) or plate:GetEffectiveScale() or 1, plate:GetEffectiveScale() or 1;
 	local left = pl * ps;
 	local right = (plate:GetRight() or 0) * ss;
+	-- the row ends where the plate's health and mana bars end (the art past them is not the plate's room)
+	local name = plate.GetName and plate:GetName();
+	if ( type(name) ~= "string" ) then name = nil; end
+	local bar = plate.hp or (name and getglobal(name .. "HealthBar"));
+	local mana = plate.mp or (name and getglobal(name .. "ManaBar"));
+	local barRight = 0;
+	for _, b in ipairs({ bar, mana }) do
+		if ( b and b.GetRight and b:GetRight() ) then barRight = math.max(barRight, b:GetRight() * (b:GetEffectiveScale() or 1)); end
+	end
+	if ( barRight > left ) then right = math.min(right, barRight); end
 	if ( nextFrame and nextFrame:IsShown() and nextFrame:GetLeft() and SS.CurrentOrientation("PartyMemberFrame1") == "horizontal" ) then
 		local nl = nextFrame:GetLeft() * (nextFrame:GetEffectiveScale() or 1);
 		if ( nl > left ) then right = nl - 4 * ss; end

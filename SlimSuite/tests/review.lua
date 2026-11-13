@@ -113,8 +113,8 @@ check("element list can be dragged", SU.bar.movable or (SU.bar.IsMovable and SU.
 print("listcols problems: " .. bad)
 -- Demo On/Off beside the grid; the list stays while the demo runs
 Click(SU.bar.demoOn); Tick(2)
-check("Demo On from the list", SS.demoRunning and SU.bar:IsVisible())
-check("no extra box while the list is open", not (SlimSuiteDemoBox and SlimSuiteDemoBox:IsShown()))
-Click(SU.bar.demoOff); Tick(2)
-check("Demo Off from the list", not SS.demoRunning)
+check("Demo On from the list closes the list", SS.demoRunning and not SU.bar:IsVisible())
+check("only the small box shows", SlimSuiteDemoBox and SlimSuiteDemoBox:IsShown())
+Click(SlimSuiteDemoBox.off); Tick(2)
+check("Off brings the list back", not SS.demoRunning and SU.bar:IsVisible())
 print("listdemo problems: " .. bad)

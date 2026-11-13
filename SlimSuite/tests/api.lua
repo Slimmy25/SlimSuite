@@ -90,7 +90,9 @@ SS.SetPartySelf(false); SS.SetupEnd(true); Tick(2)
 print("connected problems: " .. bad)
 -- you in the party: buffs start at your plate's top-left and grow to the right, wrapping into rows
 for i = 0, 9 do local b = getglobal("BuffButton" .. i) or CreateFrame("Button", "BuffButton" .. i, BuffFrame); b:SetWidth(30); b:SetHeight(30); b:Show() end
-SS.SetPartySelf(true); SS.SetBuffsPlace("player_above"); Tick(3); SS.LayoutPartyBuffs()
+SS.SetPartySelf(true); SS.SetBuffsPlace("player_above"); Tick(3)
+SlimSuitePartySelfFrame.hp:SetWidth(100); SlimSuitePartySelfFrame.mp:SetWidth(100)   -- the mock lays bars out at their own size only
+SS.LayoutPartyBuffs()
 local b0, b1 = BuffButton0.points and BuffButton0.points[1], BuffButton1.points and BuffButton1.points[1]
 local plate = SlimSuitePartySelfFrame
 local pl = (plate.portrait and plate.portrait:GetLeft()) or plate:GetLeft()
@@ -135,7 +137,12 @@ check("UNIT_HEALTH redraws the cards at once", calls > 0)
 SS.RefreshCard = old
 print("events problems: " .. bad)
 -- side by side: your buffs stop before the first friend's frame; friends' buffs show above their own plates
-SS.SetPartySelf(true); SU.SetPartyRow(true); Tick(3); SS.LayoutPartyBuffs()
+SS.SetPartySelf(true); SU.SetPartyRow(true); Tick(3)
+SlimSuitePartySelfFrame.hp:SetWidth(100); SlimSuitePartySelfFrame.mp:SetWidth(100); SS.LayoutPartyBuffs()
+local barEnd = SlimSuitePartySelfFrame.hp:GetRight()
+local pastBar = false
+for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; if (p[4] + 30) * BuffFrame:GetEffectiveScale() > barEnd + 0.5 then pastBar = true end end
+check("buffs stop where the plate's bars end", not pastBar)
 local L, W = SS.BuffRoom(SlimSuitePartySelfFrame, SlimSuitePartySelfFrame.portrait, PartyMemberFrame1)
 local edge = L + W
 local over = false
@@ -207,3 +214,43 @@ StaticPopupDialogs.SLIMSUITE_MIRROR_BUFFS.OnAccept()
 check("accepting puts the target's auras on the mirrored side", SS.DB().targetAuraSide == "right")
 SS.SetMirrorTarget(false); SS.SetBuffsPlace("own")
 print("aura problems: " .. bad)
+-- combat text: crits and the biggest hits pop out, grow right and fall, sized by how big they are next to normal hits
+SS.DB().combatTextBox = true
+for i = 1, 8 do SlimSuiteWorld.DemoHit(100, "Hit", nil, false) end
+SlimSuiteWorld.DemoHit(400, "Big crit", nil, true)
+SlimSuiteWorld.DemoHit(150, "Small crit", nil, true)
+Tick(1, 0.05)
+local big, small
+for _, p in ipairs(SlimSuiteCombatTextFrame.pops) do
+	if p:IsShown() then local t = p.text:GetText() or ""; if string.find(t, "Big") then big = p elseif string.find(t, "Small") then small = p end end
+end
+check("crits pop out", big and small)
+Tick(20, 0.05)
+local bigS, smallS = big:GetScale(), small:GetScale()
+check("a bigger crit grows bigger", bigS > smallS)
+local bx = big.points[1][4] * bigS
+Tick(10, 0.05)
+check("it moves right", big.points[1][4] * big:GetScale() > bx)
+Tick(200, 0.05)
+check("and goes away in the end", not big:IsShown())
+print("pop problems: " .. bad)
+-- Demo Mode moves everything the way a run would
+SS.DB().replaceEncounters, SS.DB().replaceTally, SS.DB().replaceClock = true, true, true
+SS.StartDemoMode(); Tick(4, 0.25)
+local b1 = SS.BOSS_SAMPLE[1][2]; local k1 = SS.TALLY_SAMPLE.kills; local t1 = SS.ENV.SU.SAMPLE_TARGET.hp; local run1 = SS.demoClock.run; local nb1 = SS.demoClock.nextBoss
+local downOnly, tallyUp = true, true
+for i = 1, 40 do
+	local before, kb = SS.BOSS_SAMPLE[1][2], SS.TALLY_SAMPLE.kills
+	Tick(1, 0.25)
+	local now = SS.BOSS_SAMPLE[1][2]
+	if now > before and now ~= 100 then downOnly = false end
+	if SS.TALLY_SAMPLE.kills < kb and SS.demoState.cycle > 1 then tallyUp = false end
+end
+check("bosses only lose health (or start again full)", downOnly)
+check("the tally only climbs", tallyUp and SS.TALLY_SAMPLE.kills > k1)
+check("the run clock counts up", SS.demoClock.run > run1)
+check("four sample bosses with marks", table.getn(SS.BOSS_SAMPLE) == 4 and SlimSuiteWorld.MarkFor(-1) == 8 and SlimSuiteWorld.MarkFor(-2) == 7)
+check("the minimap has sample caches and bosses", SlimSuiteWorld.demoPins and table.getn(SlimSuiteWorld.demoPins) == 7)
+check("the revive bar fills", SS.demoRevive and SS.demoRevive > 0)
+SS.StopDemoMode(); Tick(2)
+print("demoworld problems: " .. bad)

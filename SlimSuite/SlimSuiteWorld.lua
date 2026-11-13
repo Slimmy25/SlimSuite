@@ -176,6 +176,15 @@ end
 local assigned = {};                                      -- unit id -> icon index
 
 local function Awake(u) return u.awake == true or u.state == 1; end
+-- the raid mark a boss or Guardian has right now (Skull, Cross, Circle, Star), for the encounter bars too; Demo Mode's
+-- sample bosses (ids -1 to -4) take them in order
+W.BOSS_ICONS = BOSS_ICONS;
+function W.MarkFor(id)
+	if ( id == nil ) then return nil; end
+	if ( type(id) == "number" and id < 0 and id >= -4 ) then return BOSS_ICONS[-id]; end
+	return assigned[id];
+end
+W.SetRaidIcon = function(tex, index) SetRaidIcon(tex, index); end
 
 local function PulledEnemies()
 	local list, seen = {}, {};
@@ -586,11 +595,13 @@ local function UpdateRevive()
 	if ( progress and progress > 0 ) then
 		revive.bar:SetValue(math.max(0, math.min(1, progress))); revive.text:SetText(label); revive:Show();
 	elseif ( Previewing("SlimSuiteReviveFrame") ) then
-		revive.bar:SetValue(0.6); revive.text:SetText(SS.demoRunning and "Reviving Brann" or "Revive bar"); revive:Show();
+		local share = SS.demoRunning and SS.demoRevive or 0.6;     -- Demo Mode: it fills, starts again, fills again
+		revive.bar:SetValue(share); revive.text:SetText(SS.demoRunning and ("Reviving Brann  " .. math.floor(share * 100) .. "%") or "Revive bar"); revive:Show();
 	else
 		revive:Hide();
 	end
 end
+W.UpdateRevive = function() SS.Safe(UpdateRevive); end
 
 -- ---------------------------------------------------------------- class proc meter, attached under the player frame
 local PROCS = {
@@ -702,30 +713,107 @@ local function IconFor(event)
 	return icon;
 end
 
+-- Big hits: a crit, or a hit as big as the best of the last few, leaves the list and "pops": it grows to the right and
+-- slowly falls away, off the screen if it gets that far. How big it grows, how far right it goes and how long it hangs
+-- before falling all depend on how big it is next to your normal hits (the running average of your non-crit damage).
+local recentBest = {};                                     -- the biggest damage of the last 20 hits
+local function MarkBig(e)
+	if ( e.heal ) then return e; end
+	if ( not e.crit ) then
+		box.normalAvg = box.normalAvg and (box.normalAvg * 0.9 + e.amount * 0.1) or e.amount;
+	end
+	table.insert(recentBest, e.amount);
+	if ( table.getn(recentBest) > 20 ) then table.remove(recentBest, 1); end
+	local best = 0;
+	for i = 1, table.getn(recentBest) do if ( recentBest[i] > best ) then best = recentBest[i]; end end
+	local top = table.getn(recentBest) >= 5 and e.amount >= best;
+	if ( (e.crit or top) and CTOn("ctPop") ) then
+		local normal = box.normalAvg or e.amount;
+		e.pop = math.max(1, math.min(4, e.amount / math.max(1, normal)));   -- 1 = a normal-sized hit, 4 = four times or more
+	end
+	return e;
+end
+local POP_LIMIT = 6;
+box.pops = {};
+local function PopLine(i)
+	local p = box.pops[i];
+	if ( p ) then return p; end
+	p = CreateFrame("Frame", nil, UIParent);
+	p:SetFrameStrata("HIGH"); p:SetWidth(300); p:SetHeight(28);
+	p.icon = p:CreateTexture(nil, "ARTWORK"); p.icon:SetPoint("LEFT", p, "LEFT", 0, 0); p.icon:SetWidth(22); p.icon:SetHeight(22);
+	p.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
+	p.text = p:CreateFontString(nil, "OVERLAY", "NumberFontNormalLarge");
+	p.text:SetPoint("LEFT", p.icon, "RIGHT", 4, 0); p.text:SetJustifyH("LEFT");
+	box.pops[i] = p;
+	return p;
+end
+local function DrawPops(now)
+	local n = 0;
+	local list = box.popList or {};
+	local screenBottom = -((UIParent:GetHeight() or 768) + 60);
+	for i = table.getn(list), 1, -1 do
+		local e = list[i];
+		local r = e.pop;
+		local life = 2.5 + 1.5 * r;                         -- bigger hits hang on longer
+		local age = now - e.born;
+		local grow = math.min(1, age / 0.35);                -- it swells in the first third of a second
+		local scale = 1 + (0.25 + 0.3 * (r - 1)) * grow;     -- up to about twice the size for a 4x hit
+		local x = 26 + age * (25 + 20 * r);                  -- drifts right, faster when bigger
+		local hang = 0.4 + 0.35 * r;                         -- it holds before it falls
+		local fall = age > hang and (age - hang) * (age - hang) * (120 / r) or 0;   -- bigger ones fall more slowly
+		local top = (box:GetTop() or 400) - (UIParent:GetTop() or 768);
+		if ( age > life or top - 6 - fall < screenBottom or n >= POP_LIMIT ) then
+			table.remove(list, i);
+		else
+			n = n + 1;
+			local p = PopLine(n);
+			p:SetScale((box:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1) * scale);
+			p:ClearAllPoints();
+			p:SetPoint("TOPLEFT", UIParent, "TOPLEFT", ((box:GetLeft() or 0) + x) / scale, (top - 6 - fall) / scale);
+			p.icon:SetTexture(e.icon or nil); p.icon:SetWidth(e.icon and 22 or 0);
+			p.text:SetText((e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name);
+			if ( e.crit ) then p.text:SetTextColor(1, 0.85, 0.2); else p.text:SetTextColor(1, 0.55, 0.25); end
+			local fade = life - age < 0.6 and math.max(0, (life - age) / 0.6) or 1;
+			p:SetAlpha(fade);
+			p:Show();
+		end
+	end
+	for i = n + 1, table.getn(box.pops) do box.pops[i]:Hide(); end
+end
+local function AddEntry(e)
+	MarkBig(e);
+	if ( e.pop ) then
+		box.popList = box.popList or {};
+		table.insert(box.popList, e);
+		return;                                            -- it pops instead of taking a line in the list
+	end
+	table.insert(box.entries, 1, e);
+	while ( table.getn(box.entries) > 40 ) do table.remove(box.entries); end
+end
+
 local function OnCombatEvent(event)
 	if ( not DB().combatTextBox or type(event) ~= "table" or type(event.amount) ~= "number" ) then return; end
 	local kind = event.kind;
 	if ( kind ~= "damage" and kind ~= "heal" and kind ~= "healing" ) then return; end
 	if ( kind ~= "damage" and not CTOn("ctHeals") ) then return; end
 	local name = event.meterSource or event.abilityName or event.spell or event.damageType or "";
-	table.insert(box.entries, 1, { born = GetTime(), crit = event.critical == true and CTOn("ctCrits"), heal = kind ~= "damage",
+	AddEntry({ born = GetTime(), crit = event.critical == true and CTOn("ctCrits"), heal = kind ~= "damage",
 		amount = math.floor(event.amount + 0.5), name = tostring(name), icon = CTOn("ctIcons") and IconFor(event) or nil });
-	while ( table.getn(box.entries) > 40 ) do table.remove(box.entries); end
 end
 if ( SlimSuiteMeter and SlimSuiteMeter.listeners ) then table.insert(SlimSuiteMeter.listeners, OnCombatEvent); end
 -- Demo Mode: a sample hit or heal goes into the real box (its own options still apply to what is drawn)
 function SlimSuiteWorld.DemoHit(amount, name, icon, crit, heal)
-	table.insert(box.entries, 1, { born = GetTime(), crit = crit and CTOn("ctCrits"), heal = heal and true or false,
+	AddEntry({ born = GetTime(), crit = crit and CTOn("ctCrits"), heal = heal and true or false,
 		amount = amount, name = name, icon = CTOn("ctIcons") and icon or nil });
-	while ( table.getn(box.entries) > 40 ) do table.remove(box.entries); end
 end
 
 local function DrawBox()
 	local d = DB();
 	local editing = Editing("SlimSuiteCombatTextFrame");
 	local demo = SS.demoRunning and true or false;   -- Demo Mode shows the box with sample hits
-	if ( not d.combatTextBox and not editing and not demo ) then box:Hide(); return; end
 	local now = GetTime();
+	if ( not d.combatTextBox and not editing and not demo ) then box:Hide(); box.popList = {}; DrawPops(now); return; end
+	DrawPops(now);
 	local list = box.entries;
 	-- nothing to show (no hits yet): the box stays out of the way unless it is being placed
 	if ( table.getn(list) == 0 and not editing and not demo ) then box:Hide(); return; end
@@ -962,6 +1050,11 @@ local function GatherPins(space)
 	local d = DB();
 	local phase = A.Call("AZS_GetPhase");
 	local inRun = phase == nil or phase == "playing" or phase == "choosing" or phase == "paused";
+	if ( SS.demoRunning and Minimap and type(W.demoPins) == "table" ) then
+		-- Demo Mode: sample caches sitting still and sample bosses (with their marks) walking about, around you
+		for i = 1, table.getn(W.demoPins) do table.insert(targets, W.demoPins[i]); end
+		return;
+	end
 	if ( not Minimap or not inRun ) then return; end
 	if ( d.minimapCaches ) then
 		local caches = A.Caches();
@@ -1015,13 +1108,14 @@ end
 local pinGather = 0;
 local function UpdateMinimapPins()
 	local d = DB();
-	if ( not (d.minimapCaches or d.minimapBosses or d.minimapLairs) ) then
+	if ( not (d.minimapCaches or d.minimapBosses or d.minimapLairs or SS.demoRunning) ) then
 		if ( pinUsed > 0 ) then for i = 1, table.getn(pins) do pins[i]:Hide(); end pinUsed = 0; end
 		return;
 	end
 	local now = GetTime();
 	pinUsed = 0;
 	local px, py, space = A.PlayerPos();
+	if ( SS.demoRunning and not px ) then px, py = 0, 0; end   -- Demo Mode: the samples are placed around (0, 0)
 	if ( now >= pinGather ) then pinGather = now + 0.1; GatherPins(space); end
 	if ( px and Minimap and Minimap:IsVisible() ) then
 		for i = 1, table.getn(targets) do PlacePin(px, py, targets[i]); end

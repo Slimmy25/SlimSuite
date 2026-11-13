@@ -286,6 +286,11 @@ function SS.EncounterRow(index)
 	row:SetHeight(48);
 	row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
 	row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 4, -2);
+	-- the boss's raid mark (the same one over its head and on the minimap), left of its name
+	row.mark = row:CreateTexture(nil, "OVERLAY");
+	row.mark:SetWidth(18); row.mark:SetHeight(18);
+	row.mark:SetPoint("RIGHT", row.name, "LEFT", -2, 0);
+	row.mark:Hide();
 	row.name:SetWidth(176);
 	row.name:SetHeight(22);
 	row.name:SetJustifyH("LEFT");
@@ -404,6 +409,14 @@ function SS.UpdateEncounterRows(list)
 		end
 		-- Keep the StatusBar range small and stable. Raw boss HP can be very large, and using it as
 		-- the range can hide small health changes at the UI's numeric precision; show the live fraction.
+		local mark = SlimSuiteWorld and SlimSuiteWorld.MarkFor and SlimSuiteWorld.MarkFor(unit.id);
+		if ( mark and SlimSuiteWorld.SetRaidIcon ) then
+			SlimSuiteWorld.SetRaidIcon(row.mark, mark);
+			row.mark:ClearAllPoints();
+			if ( vertical ) then row.mark:SetPoint("BOTTOM", row.name, "TOP", 0, 0);
+			else row.mark:SetPoint("LEFT", row, "LEFT", 4 + padding, -(2 + padding) - 11); end
+			row.mark:Show();
+		else row.mark:Hide(); end
 		local health = math.max(0, math.min(1, unit.hp / unit.hpm));
 		row.bar:SetMinMaxValues(0, 1);
 		row.bar:SetValue(health);
@@ -466,7 +479,12 @@ function SS.UpdateClock()
 		clockFrame.next:Show();
 	else
 		SS.HideNative("clock", false);
-		if ( preview ) then
+		if ( preview and SS.demoRunning and SS.demoClock ) then
+			-- Demo Mode: the run time counts up from a random start; the (made-up) next boss counts down and starts over
+			clockFrame.time:SetText(SS.ClockText(math.floor(SS.demoClock.run)));
+			clockFrame.next:SetText("next boss in " .. SS.ClockText(math.ceil(SS.demoClock.nextBoss)));
+			clockFrame.time:Show(); clockFrame.next:Show();
+		elseif ( preview ) then
 			clockFrame.time:SetText("00:00");
 			clockFrame.next:SetText("next boss in --:--");
 			clockFrame.time:Show();
