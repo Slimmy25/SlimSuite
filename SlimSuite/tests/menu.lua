@@ -2,7 +2,7 @@ local function upvalue(fn, want) local i = 1 while true do local n, v = debug.ge
 SU = upvalue(SS.SetupHide, "SU")
 local sm
 local function show(name)
-  SS.OpenSizeMenu(name, name); Tick(1); sm = sm or upvalue(SS.RefreshCrossRefs, "sizeMenu")
+  SS.OpenSizeMenu(name, name); Tick(1); sm = sm or upvalue(SS.PrepareSizeTools, "sizeMenu")
   local rows, heads = {}, {}
   for i = 1, #SU.checks do if SU.checks[i]:IsVisible() then table.insert(rows, SU.checks[i].label.text) end end
   print(name .. ": headers [" .. table.concat(heads, ", ") .. "]  rows " .. #rows)

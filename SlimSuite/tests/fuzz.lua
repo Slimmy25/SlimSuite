@@ -60,17 +60,6 @@ local function visibleRows()
 			if e.choice or cb.mouse ~= false then table.insert(rows, e) end
 		end
 	end
-	sizeMenu = sizeMenu or upvalue(SS.RefreshCrossRefs, "sizeMenu")
-	if sizeMenu and sizeMenu:IsVisible() then
-		for i = 1, #sizeMenu.xref do
-			local cb = sizeMenu.xref[i]
-			if cb:IsVisible() and cb.enabled ~= false and cb.entry then
-				local e = { cb = cb, where = "menu", label = cb.label.text, get = cb.entry[2] }
-				if cb.choiceBtn and cb.choiceBtn.shown and cb.choiceBtn.entry then e.choice = cb.choiceBtn end
-				if e.choice or cb.mouse ~= false then table.insert(rows, e) end
-			end
-		end
-	end
 	return rows
 end
 

@@ -16,6 +16,8 @@ end
 for _, f in ipairs({ "SlimSuiteCore.lua", "AZSKit.lua", "SlimSuiteErrors.lua", "SlimSuiteItems.lua", "SlimSuiteMeter.lua", "SlimSuite.lua", "SlimSuiteWorld.lua" }) do
 	loadFile(f)
 end
+-- every error Slim Suite catches counts as a test error
+do local log = SS.LogError; SS.LogError = function(m) table.insert(ERRORS, "error: " .. tostring(m)); return log(m) end end
 local scenario = os.getenv("SCENARIO") or "setup"
 print("loaded; errors so far: " .. #ERRORS)
 FireEvent("ADDON_LOADED", "SlimSuite")

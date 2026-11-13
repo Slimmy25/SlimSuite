@@ -1,6 +1,6 @@
 -- Slim Suite's shared core, loaded before the other Slim Suite files:
 --   SS                 the one namespace for Slim Suite's functions and shared tables (replaces the SlimSuite_* globals)
---   SS.Safe(fn, ...)   calls fn with the given arguments and logs any error to the error log (returns pcall's results)
+--   SS.Safe(fn, ...)   calls fn with the given arguments; an error is logged and said once in chat (returns pcall's results)
 --   SS.Every(name, s, fn, watch)  runs fn every s seconds (0 = every frame) from one shared ticker;
 --                      skipped while the optional watch frame is hidden, as WoW never sends OnUpdate to a hidden frame
 --   SS.Stop(name)      stops a timed task
@@ -62,29 +62,82 @@ function SS.HudShown(value)
 	return value and true or false;
 end
 
--- Calls fn with the given arguments, like pcall. A real error is logged; a missing function (an optional
--- addon call that is not there) is skipped quietly, since that is expected rather than a fault.
--- each distinct error is shown in the game's error popup once, so it is seen even when chat is unusable;
--- repeats only go to the log. The popup goes through _ERRORMESSAGE, which the error log also records.
+-- An error caught by Slim Suite: always kept in the error log, and said once in chat per place in the code
+-- ("File.lua:123"), with where to read it. No popup: a box in the middle of the screen stops a run.
 local shownErrors = {};
+function SS.Report(err)
+	pcall(SS.LogError, err);                               -- logging must never raise an error of its own
+	local key = tostring(err);
+	local _, _, where = string.find(key, "^(.-:%d+):");
+	key = where or (string.gsub(key, "%d+", "#"));
+	if ( shownErrors[key] ) then return; end
+	shownErrors[key] = true;
+	if ( DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage ) then
+		pcall(DEFAULT_CHAT_FRAME.AddMessage, DEFAULT_CHAT_FRAME, "|cffffd100Slim Suite|r |cffff6060hit an error|r (kept in /slim errors): " .. tostring(err));
+	end
+end
+
+-- Calls fn with the given arguments, like pcall. A real error is logged and reported (above); a missing function (an
+-- optional addon call that is not there) is skipped quietly, since that is expected rather than a fault.
 function SS.Safe(fn, ...)
 	if ( type(fn) ~= "function" ) then return false; end
 	-- exactly the arguments given, as pcall passed them: some game functions reject extra nil arguments
 	local ok, r1, r2, r3, r4 = pcall(fn, unpack(arg));
-	if ( not ok ) then
-		-- one popup per place in the code ("File.lua:123"), not per message: a message carrying a changing number or
-		-- name would otherwise count as new every time
-		local key = tostring(r1);
-		local _, _, where = string.find(key, "^(.-:%d+):");
-		key = where or (string.gsub(key, "%d+", "#"));
-		if ( not shownErrors[key] and type(_ERRORMESSAGE) == "function" ) then
-			shownErrors[key] = true;
-			pcall(_ERRORMESSAGE, r1);
-		else
-			pcall(SS.LogError, r1);   -- logging must never raise an error of its own
+	if ( not ok ) then SS.Report(r1); end
+	return ok, r1, r2, r3, r4;
+end
+
+-- Hiding one of the game's own HUD parts while a Slim Suite replacement is on, and putting it back exactly as it was:
+-- one set of rules for every part (meter, clock, bosses, banners, levels, tally, build, revive, localClock). The
+-- original is kept in the saved settings (key) until it is put back, so a crash can never leave the game's part hidden;
+-- a part the player had already turned off is never touched.
+SS.NATIVE_KEYS = { build = "buildNativeOriginal", tally = "tallyNativeOriginal", meter = "meterNativeOriginal",
+	clock = "clockNativeOriginal", bosses = "bossNativeOriginal", banners = "bannerNativeOriginal",
+	levels = "levelNativeOriginal", revive = "reviveNativeOriginal", localClock = "localClockNativeOriginal" };
+local natives = {};
+function SS.HideNative(part, on)
+	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
+	local key = SS.NATIVE_KEYS[part];
+	if ( not key ) then return; end                        -- a missing name would hide the whole HUD
+	local n = natives[part];
+	if ( not n ) then n = {}; natives[part] = n; end
+	-- already hidden: ask the game again only when its phase changes, and hide its part again if it came back
+	local rearm = SS.PhaseChanged("hud:" .. part);
+	if ( on and n.overridden ) then
+		if ( rearm and type(AZS_IsHudShown) == "function" ) then
+			local ok, shown = SS.Safe(AZS_IsHudShown, part);
+			if ( ok and SS.HudShown(shown) ) then SS.Safe(AZS_SetHudShown, part, false); end
+		end
+		return;
+	end
+	if ( on ) then
+		if ( n.off and not rearm ) then return; end         -- the player's own choice: looked at again when the phase changes
+		local shown = true;
+		if ( type(AZS_IsHudShown) == "function" ) then
+			local ok, value = SS.Safe(AZS_IsHudShown, part);
+			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
+		end
+		n.off = not shown;
+		if ( shown ) then
+			SS.DB()[key] = true;
+			n.overridden = SS.Safe(AZS_SetHudShown, part, false) and true or false;
+		end
+	else
+		n.off = nil;
+		if ( n.overridden and SS.Safe(AZS_SetHudShown, part, true) ) then n.overridden = false; SS.DB()[key] = nil; end
+	end
+end
+-- every part Slim Suite hid goes back to shown: at logout (so turning Slim Suite off leaves nothing hidden) and once
+-- the saved settings are in (for a session that crashed before it could)
+function SS.RestoreNatives()
+	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
+	local d = SS.DB();
+	for part, key in pairs(SS.NATIVE_KEYS) do
+		if ( d[key] ~= nil and SS.Safe(AZS_SetHudShown, part, d[key] and true or false) ) then
+			d[key] = nil;
+			if ( natives[part] ) then natives[part].overridden = false; natives[part].off = nil; end
 		end
 	end
-	return ok, r1, r2, r3, r4;
 end
 
 -- Runs one of the game's own frame functions as that frame: the 1.12 FrameXML functions (TargetFrame_Update,
@@ -116,7 +169,8 @@ driver:SetScript("OnUpdate", function()
 			t.elapsed = t.elapsed + dt;
 			if ( t.elapsed >= t.interval ) then
 				t.elapsed = 0;
-				SS.Safe(t.fn);
+				local ok, err = pcall(t.fn);                  -- called directly: nothing is made just to run a timer
+				if ( not ok ) then SS.Report(err); end
 			end
 		end
 	end

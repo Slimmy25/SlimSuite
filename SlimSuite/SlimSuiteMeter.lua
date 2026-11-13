@@ -3,6 +3,7 @@
 local K = AZSKIT;
 local M = { view = 'damage', sort = 'amount', offset = 0, checkpoints = {}, samples = {damage={},healing={}}, listeners = {} };
 SlimSuiteMeter = M;
+M.fields = {};
 local function Count(t) return table.getn(t or {}); end
 local function Num(v) return type(v)=='number' and v or 0; end
 local function Text(v) return tostring(math.floor(Num(v)+0.5)); end
@@ -477,12 +478,17 @@ for _,name in ipairs({'CHAT_MSG_SPELL_SELF_BUFF','CHAT_MSG_SPELL_PERIODIC_SELF_B
 log:SetScript('OnEvent',function()
  if event=='VARIABLES_LOADED' then BuildHealPatterns();return;end
  if type(arg1)~='string' then return;end
+ -- our own spells' and pets' damage comes from the game's hit stream when it has one: its log lines are not read at all
+ if AZS_GetCombatTextEvents and (event=='CHAT_MSG_SPELL_SELF_DAMAGE' or event=='CHAT_MSG_SPELL_PET_DAMAGE') then return;end
  if AZS_GetMeterContext then local context=AZS_GetMeterContext();if not context then return;end;SyncContext(context);end
  if not healPatterns then BuildHealPatterns();end
  for _,format in ipairs(healPatterns) do
-  local matches={string.find(arg1,format.pattern)};
-  if matches[1] then
-   local fields={};for i,index in ipairs(format.fields) do fields[index]=matches[i+2];end
+  local found,_,m1,m2,m3,m4=string.find(arg1,format.pattern);   -- a line has at most four parts
+  if found then
+   local fields=M.fields;fields[1],fields[2],fields[3],fields[4]=nil,nil,nil,nil;
+   local order=format.fields;
+   if order[1] then fields[order[1]]=m1;end;if order[2] then fields[order[2]]=m2;end
+   if order[3] then fields[order[3]]=m3;end;if order[4] then fields[order[4]]=m4;end
    local owner=format.actor and M.knownActors and M.knownActors[fields[format.actor]] or (not format.actor and M.context and M.context.localOwnerId);
    local isLocal=owner and M.context and owner==M.context.localOwnerId;
    -- The native outgoing stream already covers our own pets and spells. Never count its

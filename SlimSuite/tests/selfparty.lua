@@ -12,11 +12,11 @@ print("self on: player on", SU.on.PlayerFrame, "player shown", PlayerFrame.shown
 Click(SU.barButtons.PlayerFrame); Tick(2)
 print("player clicked: self", SS.DB().partyIncludesSelf, "player on", SU.on.PlayerFrame, "player shown", PlayerFrame.shown)
 -- right-click menus show the same settings as the setup
-local sm = upvalue(SS.RefreshCrossRefs, "sizeMenu")
+local sm = upvalue(SS.PrepareSizeTools, "sizeMenu")
 for _, e in ipairs(SU.elements) do
   if SU.on[e.frame] or true then
     SS.OpenSizeMenu(e.frame, e.title)
-    sm = sm or upvalue(SS.RefreshCrossRefs, "sizeMenu")
+    sm = sm or upvalue(SS.PrepareSizeTools, "sizeMenu")
     local n = 0; for i = 1, #SU.checks do if SU.checks[i]:IsVisible() then n = n + 1 end end
     local want = 0; for _, c in ipairs(SU.ChecksFor(e.frame)) do if not c[4] or c[4]() then want = want + 1 end end
     print(string.format("  menu %-24s rows %d / setup %d %s", e.frame, n, want, n == want and "" or "<-- MISMATCH"))

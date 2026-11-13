@@ -10,14 +10,15 @@ An addon for Azeroth Survivors by Slimjim: a movable default UI with a set of sm
 3. If an older `AZSMinorMods` folder is there (Slim Suite's old name), delete it.
 4. The addon loads at your next world entry.
 
-Open the settings with `/slimsuite` (or `/slim`), or the gear button by the minimap.
+Open the settings with `/slimsuite` (or `/slim`), or the gear button by the minimap. `/slim help` lists the commands,
+including `/slim edit` (move and size the UI), `/slim layout` (save, load and share layouts) and `/slim errors`.
 
 ## The game's own HUD
 
 When Slim Suite replaces part of the game's HUD (the meter, run clock, boss bars, tally, build rows, banners, Level Up!
 button, revive bar or local clock), it hides the game's version with the game's own "Show …" setting, and turns it
-back on when you turn the replacement off. Those settings are saved by the game, so if you remove Slim Suite while a
-replacement is on, turn the part back on in Options → Interface.
+back on when you turn the replacement off and whenever you log out or reload, so removing or disabling Slim Suite
+leaves the game's HUD as it was. (After a crash, the next login with Slim Suite puts them back.)
 
 ## Source
 

@@ -9,26 +9,30 @@
 --   * In co-op, a friend who falls gets a marker over their head, blinking on and off 16 times. Each friend has their
 --     own (Diamond, Triangle, Moon, Square), so several can be down at once. Those four are kept for this alone.
 --   * Play the included sound once when you or a teammate dies (off until enabled).
---   * Move, resize and scale the UI: drag a green handle to move it; right-click for width, height and scale.
---     The action bar, XP bar, buffs, cast bar, party frames and kills/gold/cache tally can switch between horizontal and vertical layouts.
+--   * Move, resize and scale the UI: drag a green handle to move it; right-click it for that element's menu (its
+--     settings, then its size and layout). The first time, a setup walks through the elements; after that "Toggle UI
+--     Settings" opens Edit mode. The action bar, XP bar, buffs, party frames, build rows, encounter bars, run clock and
+--     kills/gold/cache tally can switch between horizontal and vertical layouts.
 --     Bar 2 and Right bar are intentionally not included; Action Bar 1 can optionally show empty slots.
 --     Optional anchoring latches nearby movable frames together. Positions and custom sizes are saved continuously across /reload.
---     The resize menu and tooltip can also be moved while settings are active. Native frames stay in their game layout until a UI replacement or edit is chosen.
+--     Native frames stay in their game layout until a UI replacement or edit is chosen. Layouts can be saved, loaded,
+--     shared as text and kept per character (/slim layout).
 --     The primary chat window, tab and input box move together from one Chat handle.
 --   * The kills, gold and next-cache cost use the documented AZS_RUN values in a movable replacement for the tally.
---     Right-click its green handle to switch between a compact horizontal row and a vertical three-line layout.
+--     Its menu switches between a compact horizontal row and a vertical layout.
 --   * The run clock and next-boss countdown stay together in one movable replacement for the game's clock.
 --   * Event announcements use the game's localized text, remain visible for 10 seconds, fade at both ends, and move
 --     with their own handle. They are separate from the "Move to Begin" prompt.
 --   * The stored-levels button is a movable replacement that opens the game's own choices through its documented API.
 --   * Active boss, guardian and elite bars sit in the upper-left encounter area, separate from the centered run
---     clock. Horizontal cards grow from the left; right-click switches to narrow vertical bars. HP uses the
+--     clock. Horizontal cards grow from the left; its menu switches to narrow vertical bars. HP uses the
 --     documented current/maximum values, refreshed on AZSUNITS updates.
 --   * Hide the target frame: this game picks its own targets, so the frame can go.
 --   * Plain action bar: the gryphons and the bar's art go, and only the six spell squares are left, with the bar
 --     no wider than they are (and the two page arrows), so it leaves no empty space.
 --   * Cooldown numbers: each spell square shows the seconds until its spell is ready again.
--- /slimsuite (or the gear by the minimap) opens the settings window: every one of these on or off.
+-- /slimsuite (or the gear by the minimap) opens the settings window: every one of these on or off. /slim help lists
+-- the commands.
 -- Lua 5.0 / 1.12 interface: scripts read `this`, `event`, `arg1`, `arg2`; no # operator; only the 1.12 API.
 
 local K = AZSKIT;
@@ -51,6 +55,9 @@ function SS.FitText(fs, width, minSize)
 		fs.slimBase = { font, size or 12, flags };
 	end
 	local b = fs.slimBase;
+	local text = fs.GetText and fs:GetText() or "";
+	if ( fs.slimFitText == text and fs.slimFitWidth == width and fs.slimFitMin == minSize ) then return; end   -- already fitted
+	fs.slimFitText, fs.slimFitWidth, fs.slimFitMin = text, width, minSize;
 	local size = b[2];
 	fs:SetFont(b[1], size, b[3]);
 	while ( size > (minSize or 7) and (fs:GetStringWidth() or 0) > width ) do
@@ -126,19 +133,40 @@ local UnitKind = SS.UnitKind;
 -- the class colours, by class token ("MAGE") or English class name ("Mage")
 SS.CLASS_COLORS = { WARRIOR = { 0.78, 0.61, 0.43 }, MAGE = { 0.41, 0.8, 0.94 }, ROGUE = { 1, 0.96, 0.41 }, DRUID = { 1, 0.49, 0.04 },
 	HUNTER = { 0.67, 0.83, 0.45 }, SHAMAN = { 0, 0.44, 0.87 }, PRIEST = { 1, 1, 1 }, WARLOCK = { 0.58, 0.51, 0.79 }, PALADIN = { 0.96, 0.55, 0.73 } };
+-- colours used again and again by the unit frames (made once, not on every redraw)
+SS.RGB = { white = { 1, 1, 1 }, enemy = { 0.9, 0.25, 0.25 }, friend = { 0.6, 0.9, 0.3 }, mana = { 0.2, 0.4, 1 }, rage = { 0.9, 0.15, 0.15 },
+	energy = { 1, 0.9, 0.2 }, classicMana = { 0, 0, 1 }, classicRage = { 1, 0, 0 }, classicEnergy = { 1, 1, 0 }, health = { 0.2, 0.75, 0.2 },
+	dead = { 0.4, 0.4, 0.4 } };
 function SS.ClassColor(class)
 	return SS.CLASS_COLORS[string.upper(tostring(class or ""))];
 end
 
-function SS.DB()
-	if ( type(SlimSuiteDB) ~= "table" ) then SlimSuiteDB = {}; end
-	local d = SlimSuiteDB;
-	if ( d.hideLevel == nil ) then d.hideLevel = true; end
- if ( d.hideNewSpells == nil ) then d.hideNewSpells = d.hideLevel; end
-	if ( d.hideRP == nil ) then d.hideRP = false; end
-	if ( d.hideRacialInfo == nil ) then d.hideRacialInfo = false; end
-	if ( d.hideOpeningLine == nil ) then d.hideOpeningLine = false; end
-	if ( d.hideLairLine == nil ) then d.hideLairLine = false; end
+-- The saved settings. Their defaults and one-time migrations are applied once per saved table (SS.PrepareDB): when the
+-- addon loads, and again when the game swaps in the player's saved settings, which it does after these files have run.
+-- After that SS.DB() only hands the table back: it is asked for hundreds of times a second.
+SS.DEFAULTS = {
+	hideLevel = true, hideRP = false, hideRacialInfo = false, hideOpeningLine = false, hideLairLine = false,
+	replaceClock = false, replaceEncounters = false, replaceTally = false, replaceBanners = false,
+	camera = true, plainBar = false, cooldowns = false, bossMarks = true, deathMarks = true, prePullMarks = false,
+	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
+	minimapCaches = false, minimapBosses = false, minimapLairs = false, zoneLine = true, replaceLocalClock = false,
+	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
+	partyIncludesSelf = false, floatingText = false, deathSound = false, hideTarget = false, mirrorTarget = false,
+	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
+	partyFaces = true, cardPortraits = true, targetDebuffs = true, moveLevelButton = false, moveMeter = false,
+	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
+	tallyVertical = false, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
+	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
+};
+SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition", "itemRowEquipped",
+	"itemRowSeen", "chatOffsets", "words", "layouts" };
+function SS.PrepareDB(d)
+	for key, value in pairs(SS.DEFAULTS) do if ( d[key] == nil ) then d[key] = value; end end
+	for i = 1, table.getn(SS.DEFAULT_TABLES) do
+		local key = SS.DEFAULT_TABLES[i];
+		if ( type(d[key]) ~= "table" ) then d[key] = {}; end
+	end
+	if ( d.hideNewSpells == nil ) then d.hideNewSpells = d.hideLevel; end
 	if ( d.showGuardianFlag == nil ) then
 		d.showGuardianFlag = true;
 		if ( type(AZS_IsHudShown) == "function" ) then
@@ -146,93 +174,35 @@ function SS.DB()
 			if ( ok and shown ~= nil ) then d.showGuardianFlag = SS.HudShown(shown); end
 		end
 	end
-	for _,key in ipairs({'replaceClock','replaceEncounters','replaceTally','replaceBanners'}) do if d[key]==nil then d[key]=false;end end
-	if ( d.camera == nil ) then d.camera = true; end
-	if ( d.plainBar == nil ) then d.plainBar = false; end
-	if ( d.cooldowns == nil ) then d.cooldowns = false; end
-	d.box, d.bloat, d.x, d.y, d.helloOnStart = nil, nil, nil, nil, nil;          -- the retired Say & Party box and "Remove bloat"
-	if ( d.bossMarks == nil ) then d.bossMarks = true; end
-	if ( d.deathMarks == nil ) then d.deathMarks = true; end
-	if ( d.prePullMarks == nil ) then d.prePullMarks = false; end
-	if ( d.encounterDebuffs == nil ) then d.encounterDebuffs = true; end
+	-- retired settings
+	d.box, d.bloat, d.x, d.y, d.helloOnStart = nil, nil, nil, nil, nil;          -- the Say & Party box and "Remove bloat"
+	d.partyMeter = nil;                                     -- the party meter is now the damage meter's Party tab
+	d.demoMode = nil;                                       -- Demo Mode is never saved
+	d.startUnlocked = nil;                                  -- the UI always starts locked
+	d.sizeMenuPosition, d.setupStep, d.setupDisabled = nil, nil, nil;   -- the old right-click menu's place; never used
 	-- Slim Suite stays under the game's level-up and new-item cards unless the player turns this on. An early
 	-- test build had it on by default; this switches it off once for anyone who got that default.
 	if ( (tonumber(d.onTopDefaultVersion) or 0) < 1 ) then d.onTopOfScreens = false; d.onTopDefaultVersion = 1; end
-	if ( d.onTopOfScreens == nil ) then d.onTopOfScreens = false; end
-	if ( d.replaceRevive == nil ) then d.replaceRevive = false; end
-	if ( d.procMeter == nil ) then d.procMeter = false; end
-	if ( d.combatTextBox == nil ) then d.combatTextBox = false; end
-	if ( d.minimapCaches == nil ) then d.minimapCaches = false; end
-	if ( d.minimapBosses == nil ) then d.minimapBosses = false; end
-	if ( d.minimapLairs == nil ) then d.minimapLairs = false; end
-	if ( d.zoneLine == nil ) then d.zoneLine = true; end
-	if ( d.replaceLocalClock == nil ) then d.replaceLocalClock = false; end
-	if ( d.clockDetached == nil ) then d.clockDetached = false; end
-	if ( d.combineTarget == nil ) then d.combineTarget = false; end
-	if ( d.gatherButtons == nil ) then d.gatherButtons = false; end
-	if ( d.gatherSide == nil ) then d.gatherSide = "left"; end
-	if ( d.minimapBar == nil ) then d.minimapBar = false; end
 	-- each unit frame's look: "classic" (the game's art) or "new" (Slim Suite's cards); the party: face plates or thin lines
 	if ( d.playerLook ~= "classic" and d.playerLook ~= "new" ) then d.playerLook = d.newFrames and "new" or "classic"; end
 	if ( d.targetLook ~= "classic" and d.targetLook ~= "new" ) then d.targetLook = d.newFrames and "new" or "classic"; end
 	if ( d.partyLook ~= "classic" and d.partyLook ~= "thin" ) then d.partyLook = d.partyCompact and "thin" or "classic"; end
 	d.newFrames, d.partyCompact = nil, nil;                -- replaced by the looks above
-	if ( d.partyIncludesSelf == nil ) then d.partyIncludesSelf = false; end
-	d.partyMeter = nil;                                     -- the party meter is now the damage meter's Party tab
-	d.demoMode = nil;                                       -- Demo Mode is never saved
-	if ( d.floatingText == nil ) then d.floatingText = false; end
-	if ( d.deathSound == nil ) then d.deathSound = false; end
-	if ( d.hideTarget == nil ) then d.hideTarget = false; end
-	if ( d.mirrorTarget == nil ) then d.mirrorTarget = false; end
-	if ( d.mirrorSameScale == nil ) then d.mirrorSameScale = true; end
-	if ( d.buffsOnTarget == nil ) then d.buffsOnTarget = false; end
 	if ( d.buffsOnTargetSide ~= "above" ) then d.buffsOnTargetSide = "below"; end
-	if ( d.buffsOnPlayer == nil ) then d.buffsOnPlayer = false; end
 	if ( not d.buffsPlayerAboveDefault ) then d.buffsOnPlayerSide = "above"; d.buffsPlayerAboveDefault = true; end   -- buffs sit above by default
-	if ( d.partyLocked == nil ) then d.partyLocked = false; end
-	if ( d.partyLockAbove == nil ) then d.partyLockAbove = false; end   -- locked party frames hang below the player by default
-	if ( d.partyFaces == nil ) then d.partyFaces = true; end
-	if ( d.cardPortraits == nil ) then d.cardPortraits = true; end   -- the 3D character model on the new-school frames
-	if ( d.targetDebuffs == nil ) then d.targetDebuffs = true; end
-	if ( d.moveLevelButton == nil ) then d.moveLevelButton = false; end
-	if ( d.moveMeter == nil ) then d.moveMeter = false; end
-	if ( d.showRacialAbility == nil ) then d.showRacialAbility = false; end
-	if ( type(d.places) ~= "table" ) then d.places = {}; end
-	if ( type(d.sizes) ~= "table" ) then d.sizes = {}; end
-	if ( type(d.scales) ~= "table" ) then d.scales = {}; end
-	if ( type(d.muted) ~= "table" ) then d.muted = {}; end
-	if ( type(d.padding) ~= "table" ) then d.padding = {}; end
-	if ( type(d.orientations) ~= "table" ) then d.orientations = {}; end
 	if ( d.buffGrowthDirection ~= "up" and d.buffGrowthDirection ~= "down" ) then d.buffGrowthDirection = "down"; end
 	if ( d.buffCustomLayout == nil ) then d.buffCustomLayout = d.orientations.BuffFrame == "vertical"; end
-	if ( type(d.sizeMenuPosition) ~= "table" ) then d.sizeMenuPosition = {}; end
-	if ( type(d.lockPanelPosition) ~= "table" ) then d.lockPanelPosition = {}; end
+	if ( type(d.itemRowCounter) ~= "number" ) then d.itemRowCounter = 0; end
 	if ( type(d.gridDivisions) ~= "number" ) then d.gridDivisions = tonumber(d.gridSpacing) or 128; end
 	if ( not d.gridHalved ) then d.gridDivisions = (d.gridDivisions or 128) / 2; d.gridHalved = true; end   -- grid sizes were halved in v1.02
 	if ( d.gridDivisions ~= 16 and d.gridDivisions ~= 32 and d.gridDivisions ~= 64 and d.gridDivisions ~= 128 ) then d.gridDivisions = 64; end
 	d.gridSpacing = nil;
-	if ( d.showEditGrid == nil ) then d.showEditGrid = false; end
 	if ( not d.gridOffDefault ) then d.showEditGrid = false; d.mirrorTarget = false; d.gridOffDefault = true; end
-	if ( d.gridCenterVertical == nil ) then d.gridCenterVertical = true; end
-	if ( d.gridCenterHorizontal == nil ) then d.gridCenterHorizontal = true; end
-	d.startUnlocked = nil;                                  -- the retired "Open UI modifier at startup": the UI always starts locked
-	if ( d.tallyVertical == nil ) then d.tallyVertical = false; end
 	-- earlier versions let the classic player and target frames take a width and height that only changed their click area
 	if ( not d.classicSizesCleared ) then
-		if ( type(d.sizes) == "table" ) then d.sizes.PlayerFrame = nil; d.sizes.TargetFrame = nil; end
+		d.sizes.PlayerFrame = nil; d.sizes.TargetFrame = nil;
 		d.classicSizesCleared = true;
 	end
-	if ( d.tallyBossKills == nil ) then d.tallyBossKills = true; end
-	if ( d.tallyBackground == nil ) then d.tallyBackground = true; end
-	if ( d.showEmptyActionSlots == nil ) then d.showEmptyActionSlots = false; end
-	if ( d.buildRowsAttached == nil ) then d.buildRowsAttached = true; end
-	if ( d.replaceBuildRows == nil ) then d.replaceBuildRows = false; end
-	if ( type(d.itemRowEquipped) ~= "table" ) then d.itemRowEquipped = {}; end
-	if ( type(d.itemRowSeen) ~= "table" ) then d.itemRowSeen = {}; end
-	if ( type(d.itemRowCounter) ~= "number" ) then d.itemRowCounter = 0; end
-	if ( type(d.chatOffsets) ~= "table" ) then d.chatOffsets = {}; end
-	if ( d.anchorSnap == nil ) then d.anchorSnap = false; end
-	if ( type(d.words) ~= "table" ) then d.words = {}; end
 	-- Older versions enabled several replacement controls as defaults. This one-time migration
 	-- returns those defaults to the native game UI while keeping saved positions and sizes intact.
 	if ( (tonumber(d.uiDefaultsVersion) or 0) < 1 ) then
@@ -240,6 +210,14 @@ function SS.DB()
 		d.moveLevelButton, d.moveMeter, d.replaceBuildRows = false, false, false;
 		d.showRacialAbility, d.cooldowns = false, false;
 		d.uiDefaultsVersion = 1;
+	end
+end
+function SS.DB()
+	local d = SlimSuiteDB;
+	if ( d ~= SS.preparedDB or type(d) ~= "table" ) then
+		if ( type(d) ~= "table" ) then d = {}; SlimSuiteDB = d; end
+		SS.preparedDB = d;
+		SS.PrepareDB(d);
 	end
 	return d;
 end
@@ -271,9 +249,10 @@ function SS.Prefix(text)
 	return head;
 end
 
+local LEARN_GLOBALS = { "ERR_LEARN_SPELL_S", "ERR_LEARN_ABILITY_S", "ERR_LEARN_RECIPE_S" };
 function SS.LearnLine(low)
-	for _, g in ipairs({ "ERR_LEARN_SPELL_S", "ERR_LEARN_ABILITY_S", "ERR_LEARN_RECIPE_S" }) do
-		local own = SS.Prefix(getglobal(g));
+	for i = 1, 3 do
+		local own = SS.Prefix(getglobal(LEARN_GLOBALS[i]));
 		if ( own and string.find(low, own, 1, true) ) then return true; end
 	end
 	for i = 1, table.getn(LEARN_WORDS) do
@@ -365,6 +344,7 @@ function SS.Hidden(msg, sourceEvent)
 	if ( CHAT_FILTER.allowPlayers or CHAT_FILTER.playerEvents[sourceEvent or CHAT_FILTER.activeEvent] ) then return false; end
 	if ( string.find(msg, "|Hplayer:", 1, true) ) then return false; end   -- a player's own words
 	local d = SS.DB();
+	if ( not (d.hideLevel or d.hideNewSpells or d.hideRP or d.hideRacialInfo or d.hideOpeningLine or d.hideLairLine or d.words[1]) ) then return false; end
 	local low = CHAT_FILTER.PlainText(msg);
 	if ( d.hideRacialInfo ) then
 		local racialInfo = SS.Any(low, RACIAL_INFO_WORDS);
@@ -397,7 +377,8 @@ function SS.HookFrame(cf)
 	hooked[cf] = true;
 	local orig = cf.AddMessage;
 	cf.AddMessage = function(self, msg, r, g, b, id, hold)
-		if ( SS.Hidden(msg) ) then return; end
+		-- a line printed for a chat event was judged when the event came in (below): not read a second time
+		if ( not CHAT_FILTER.activeEvent and SS.Hidden(msg) ) then return; end
 		return orig(self, msg, r, g, b, id, hold);
 	end;
 end
@@ -410,9 +391,11 @@ HookChat = function()
 		local orig = ChatFrame_OnEvent;
 		ChatFrame_OnEvent = function(ev)
 			local e = ev or event;
-			if ( type(arg1) == "string" and e and string.find(e, "^CHAT_MSG_") and SS.Hidden(arg1, e) ) then return; end
+			-- the combat log's lines (hundreds a second in a fight) are only read when the player has words of their own to hide
+			local combat = e and (string.find(e, "^CHAT_MSG_COMBAT_") or string.find(e, "^CHAT_MSG_SPELL_"));
+			if ( type(arg1) == "string" and e and string.find(e, "^CHAT_MSG_") and (not combat or SS.DB().words[1]) and SS.Hidden(arg1, e) ) then return; end
 			local previousEvent, previousPlayerGuard = CHAT_FILTER.activeEvent, CHAT_FILTER.allowPlayers;
-			CHAT_FILTER.activeEvent = e;
+			CHAT_FILTER.activeEvent = e or "event";
 			CHAT_FILTER.allowPlayers = CHAT_FILTER.playerEvents[e] and true or false;
 			local ok, result = pcall(orig, ev);              -- an error is raised again below, so it is reported once
 			CHAT_FILTER.activeEvent, CHAT_FILTER.allowPlayers = previousEvent, previousPlayerGuard;
@@ -425,7 +408,7 @@ end -- scoped chat filter helpers
 
 -- ---------------------------------------------------------------- the camera at its farthest: 50
 -- The game's Max Camera Distance slider is cameraDistanceMaxFactor, a factor of cameraDistanceMax (15 yards): its
--- top, 3.33, is 50 yards. Slim Suite sets it to 50 yards when the game starts (and zooms out to it once); turned off
+-- top, 3.33, is 50 yards. Slim Suite sets it to 50 yards when the game starts (and zooms out to it once a session); turned off
 -- in /slimsuite, the game's own setting stays.
 local MAX_CAMERA = 50;
 
@@ -446,7 +429,8 @@ function SS.Camera(zoomOut)
 		if ( ok and tonumber(v) and tonumber(v) > 0 ) then base = tonumber(v); end
 	end
 	SS.Safe(SetCVar, "cameraDistanceMaxFactor", string.format("%.4f", MAX_CAMERA / base));
-	if ( zoomOut and CameraZoomOut ) then SS.Safe(CameraZoomOut, MAX_CAMERA); end
+	-- once a session: later loading screens keep whatever zoom the player has chosen since
+	if ( zoomOut and CameraZoomOut and not SS.cameraZoomed ) then SS.cameraZoomed = true; SS.Safe(CameraZoomOut, MAX_CAMERA); end
 end
 
 function SS.ApplyGuardianFlag()
@@ -463,8 +447,6 @@ function SS.PlayDeathSound()
 	if ( not SS.DB().deathSound or not PlaySoundFile ) then return; end
 	SS.Safe(PlaySoundFile, DEATH_SOUND);
 end
-SS.PlayDeathSound = SS.PlayDeathSound;
-SS.DB = SS.DB;
 
 local deathSoundFrame = CreateFrame("Frame");
 deathSoundFrame:RegisterEvent("PLAYER_DEAD");
@@ -505,7 +487,6 @@ end
 function SS.Previewing(name)
 	return (SS.demoRunning or SS.IsEditing(name)) and true or false;
 end
-SS.IsEditing = SS.IsEditing;
 local baseSizes = {};
 local basePoints = {};
 local mutedBaseAlphas = {};
@@ -530,23 +511,11 @@ local partyNativePoints = {};                            -- party frames 2-4 as 
 local buffLayoutApplying = false;
 local actionSlotsGridApplied = false;
 local tallyFrame;
-local tallyNativeWasShown;
-local tallyNativeOverridden = false;
 local meterFrame;
-local meterNativeWasShown;
-local meterNativeOverridden = false;
 local UpdateMeter;
 local clockFrame;
-local clockNativeWasShown;
-local clockNativeOverridden = false;
 local levelButton;
-local levelNativeWasShown;
-local levelNativeOverridden = false;
 local bossFrame;
-local bossNativeWasShown;
-local bossNativeOverridden = false;
-local bannerNativeWasShown;
-local bannerNativeOverridden = false;
 local announcementFrame;
 local announcementStarted;
 local announcementDuration = 10;
@@ -558,8 +527,6 @@ local itemRow;
 local itemRowButtons = {};
 local spellRow;
 local spellRowButtons = {};
-local buildNativeWasShown;
-local buildNativeOverridden = false;
 
 -- The item deck reads the five real 1.12 jewelry equipment slots. The inventory API supplies
 -- the currently worn icon and tooltip. API slot IDs are 1-based; ammo is slot 0.
@@ -884,39 +851,9 @@ function SS.CreateSpellRow()
 end
 SS.CreateSpellRow();
 
-function SS.SetNativeBuildHidden(on)
-	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
-	local rearm = SS.PhaseChanged("hud:build");
-	if ( on and buildNativeOverridden ) then   -- asked once, and again only if the game shows it after a phase change
-		if ( rearm and type(AZS_IsHudShown) == "function" ) then
-			local ok, shown = SS.Safe(AZS_IsHudShown, "build");
-			if ( ok and SS.HudShown(shown) ) then SS.Safe(AZS_SetHudShown, "build", false); end
-		end
-		return;
-	end
-	if ( on ) then
-		local shown = true;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "build");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		buildNativeWasShown = shown;
-		if ( shown ) then
-			SS.DB().buildNativeOriginal = shown;
-			local ok = SS.Safe(AZS_SetHudShown, "build", false);
-			buildNativeOverridden = ok and true or false;
-		end
-	elseif ( buildNativeOverridden or type(SS.DB().buildNativeOriginal) == "boolean" ) then
-		local restore = SS.DB().buildNativeOriginal;
-		if ( type(restore) ~= "boolean" ) then restore = buildNativeWasShown; end
-		local ok = SS.Safe(AZS_SetHudShown, "build", restore);
-		if ( ok ) then buildNativeOverridden = false; SS.DB().buildNativeOriginal = nil; end
-	end
-end
-
 function SS.ApplyBuildRowReplacement()
 	local enabled = SS.DB().replaceBuildRows;
-	SS.SetNativeBuildHidden(enabled);
+	SS.HideNative("build", enabled);
 	if ( spellRow ) then if ( enabled ) then spellRow:Show(); else spellRow:Hide(); end end
 	if ( itemRow ) then if ( enabled ) then itemRow:Show(); else itemRow:Hide(); end end
 end
@@ -931,7 +868,7 @@ itemRowEvents:SetScript("OnEvent", function()
 end);
 -- The AZSSPELLS addon message refreshes the build rows as spells change. This slow poll catches anything the
 -- event misses, for both the spell row and the worn-jewelry row (SS.ApplyBuildRowReplacement).
-SS.Every("itemRowPoll", 2, function() SS.Safe(SS.RefreshSpellRow); SS.Safe(SS.ApplyBuildRowReplacement); end);
+SS.Every("itemRowPoll", 2, function() SS.Safe(SS.RefreshSpellRow); SS.Safe(SS.RefreshItemRow); SS.Safe(SS.ApplyBuildRowReplacement); end);
 
 local spellRowEvents = CreateFrame("Frame");
 spellRowEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
@@ -943,34 +880,6 @@ spellRowEvents:SetScript("OnEvent", function()
 	SS.Safe(SS.RefreshSpellRow);
 	SS.Safe(SS.ApplyBuildRowReplacement);
 end);
-
-function SS.SetNativeTallyHidden(on)
-	if ( type(AZS_SetHudShown) ~= "function" or tallyNativeWasShown ~= true ) then return; end
-	local rearm = SS.PhaseChanged("hud:tally");
-	if ( on and tallyNativeOverridden ) then   -- asked once, and again only if the game shows it after a phase change
-		if ( rearm and type(AZS_IsHudShown) == "function" ) then
-			local ok, shown = SS.Safe(AZS_IsHudShown, "tally");
-			if ( ok and SS.HudShown(shown) ) then SS.Safe(AZS_SetHudShown, "tally", false); end
-		end
-		return;
-	end
-	if ( on ) then
-		local shown = true;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "tally");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown ) then
-			SS.DB().tallyNativeOriginal = tallyNativeWasShown;
-			SS.Safe(AZS_SetHudShown, "tally", false);
-			tallyNativeOverridden = true;
-		end
-	elseif ( tallyNativeOverridden ) then
-		SS.Safe(AZS_SetHudShown, "tally", tallyNativeWasShown);
-		tallyNativeOverridden = false;
-		SS.DB().tallyNativeOriginal = nil;
-	end
-end
 
 function SS.FramePaddingLimit(name)
 	if ( name == "SlimSuiteClockFrame" ) then return 6; end
@@ -1031,6 +940,10 @@ function SS.DrawTally(parts)
 	local custom = SS.DB().sizes.SlimSuiteTallyFrame;
 	local fixed = type(custom) == "table" and custom.w and custom.h;
 	local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
+	local sig = (vertical and "v" or "h") .. pad .. (SS.DB().tallyBackground and "b" or "") .. (fixed and (custom.w .. "x" .. custom.h) or "");
+	for i = 1, n do sig = sig .. "|" .. parts[i][1] .. parts[i][2]; end
+	if ( tallyFrame.sig == sig ) then return; end           -- nothing it shows has changed
+	tallyFrame.sig = sig;
 	-- the text at a given size: the widest part (a column) and the whole row
 	local function Measure(size)
 		local widest, total = 0, 0;
@@ -1088,7 +1001,7 @@ function SS.DrawTally(parts)
 end
 
 function SS.UpdateTally()
- if not SS.DB().replaceTally then if tallyFrame then tallyFrame:Hide();end;SS.SetNativeTallyHidden(false);return;end
+ if not SS.DB().replaceTally then if tallyFrame then tallyFrame:Hide();end;SS.HideNative("tally", false);return;end
 	if ( not tallyFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local active = phase and phase ~= "ready";
@@ -1096,16 +1009,16 @@ function SS.UpdateTally()
 	if ( active and run ) then
 		SS.DrawTally(SS.TallyParts(run));
 		tallyFrame:Show();
-		SS.SetNativeTallyHidden(true);
+		SS.HideNative("tally", true);
 	elseif ( SS.Previewing("SlimSuiteTallyFrame") ) then
 		-- while it is placed (or in Demo Mode) it shows sample counts, so the element is there to see and move
 		SS.DrawTally(SS.TallyParts(nil, true));
 		tallyFrame:Show();
-		SS.SetNativeTallyHidden(false);
+		SS.HideNative("tally", false);
 	else
 		-- before a run there is nothing to count
 		tallyFrame:Hide();
-		SS.SetNativeTallyHidden(false);
+		SS.HideNative("tally", false);
 	end
 end
 
@@ -1129,63 +1042,10 @@ function SS.CreateTallyFrame()
 		tallyFrame.bgLeft:SetGradientAlpha("HORIZONTAL", 0, 0, 0, 0, 0, 0, 0, BAND);
 		tallyFrame.bgRight:SetGradientAlpha("HORIZONTAL", 0, 0, 0, BAND, 0, 0, 0, 0);
 	end
-	local savedOriginal = SS.DB().tallyNativeOriginal;
-	if ( savedOriginal ~= nil ) then
-		tallyNativeWasShown = savedOriginal and true or false;
-		if ( type(AZS_SetHudShown) == "function" ) then SS.Safe(AZS_SetHudShown, "tally", tallyNativeWasShown); end
-		SS.DB().tallyNativeOriginal = nil;
-	else
-		local shown;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "tally");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown == nil and GetCVar ) then shown = GetCVar("hudTally") ~= "0"; end
-		if ( shown == nil ) then shown = true; end
-		tallyNativeWasShown = shown;
-	end
 	tallyFrame:Hide();
 end
 
 SS.CreateTallyFrame();
-
-function SS.SetNativeMeterHidden(on)
-	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
-	-- the meter update runs several times a second: ask the game to hide its meter once, and again only if the game
-	-- shows it after its phase changes (a new run, say)
-	local rearm = SS.PhaseChanged("hud:meter");
-	if ( on and meterNativeOverridden ) then
-		if ( rearm and type(AZS_IsHudShown) == "function" ) then
-			local ok, shown = SS.Safe(AZS_IsHudShown, "meter");
-			if ( ok and SS.HudShown(shown) ) then SS.Safe(AZS_SetHudShown, "meter", false); end
-		end
-		return;
-	end
-	if ( on ) then
-		local shown = true;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "meter");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown ) then
-			SS.DB().meterNativeOriginal = shown;
-			local ok = SS.Safe(AZS_SetHudShown, "meter", false);
-			meterNativeOverridden = ok and true or false;
-		end
-	elseif ( meterNativeOverridden ) then
-		local restore = SS.DB().meterNativeOriginal;
-		if ( type(restore) ~= "boolean" ) then restore = meterNativeWasShown; end
-		local ok = SS.Safe(AZS_SetHudShown, "meter", restore);
-		if ( ok ) then meterNativeOverridden = false; SS.DB().meterNativeOriginal = nil; end
-	end
-end
-
-function SS.MeterNumber(value)
-	if ( type(value) ~= "number" ) then return "0"; end
-	if ( value >= 1000000 ) then return string.format("%.1fm", value / 1000000); end
-	if ( value >= 10000 ) then return string.format("%.1fk", value / 1000); end
-	return tostring(math.floor(value + 0.5));
-end
 
 function SS.CreateMeterFrame()
 	meterFrame = CreateFrame("Frame", "SlimSuiteMeterFrame", UIParent);
@@ -1194,21 +1054,6 @@ function SS.CreateMeterFrame()
 	meterFrame:SetFrameStrata("HIGH");
 	meterFrame:EnableMouse(false);
 	SlimSuiteMeter.Attach(meterFrame);
-	local savedOriginal = SS.DB().meterNativeOriginal;
-	if ( savedOriginal ~= nil ) then
-		meterNativeWasShown = savedOriginal and true or false;
-		if ( type(AZS_SetHudShown) == "function" ) then SS.Safe(AZS_SetHudShown, "meter", meterNativeWasShown); end
-		SS.DB().meterNativeOriginal = nil;
-	else
-		local shown;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "meter");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown == nil and GetCVar ) then shown = GetCVar("hudMeter") ~= "0"; end
-		if ( shown == nil ) then shown = true; end
-		meterNativeWasShown = shown;
-	end
 	meterFrame:Hide();
 end
 
@@ -1221,106 +1066,26 @@ UpdateMeter = function()
 	local editing = SS.IsEditing("SlimSuiteMeterFrame") and SS.DB().moveMeter;
 	if ( not SS.DB().moveMeter ) then
 		meterFrame:Hide();
-		if ( not setupActive ) then SS.SetNativeMeterHidden(false); end   -- the setup keeps the game's meter hidden
+		if ( not setupActive ) then SS.HideNative("meter", false); end   -- the setup keeps the game's meter hidden
 		return;
 	end
 	-- Shown before a run too, like the game's own meter (it reads "No damage yet." until the run starts).
 	-- closed with its "x": hidden for the rest of this run (the game's meter stays hidden too)
 	if ( not editing and SlimSuiteMeter.IsClosed and SlimSuiteMeter.IsClosed() ) then
-		meterFrame:Hide(); SS.SetNativeMeterHidden(true); return;
+		meterFrame:Hide(); SS.HideNative("meter", true); return;
 	end
-	SS.SetNativeMeterHidden(true);
+	SS.HideNative("meter", true);
 	meterFrame:Show();
 	SlimSuiteMeter.Draw(active, editing);
 end
 
 SS.Every("meterPoll", 0.35, function() SS.Safe(UpdateMeter); end);
 
-function SS.SetNativeClockHidden(on)
-	if ( type(AZS_SetHudShown) ~= "function" or clockNativeWasShown ~= true ) then return; end
-	if ( on ) then
-		local shown = true;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "clock");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown ) then
-			SS.DB().clockNativeOriginal = clockNativeWasShown;
-			SS.Safe(AZS_SetHudShown, "clock", false);
-			clockNativeOverridden = true;
-		end
-	elseif ( clockNativeOverridden ) then
-		SS.Safe(AZS_SetHudShown, "clock", clockNativeWasShown);
-		clockNativeOverridden = false;
-		SS.DB().clockNativeOriginal = nil;
-	end
-end
-
-function SS.SetNativeBossesHidden(on)
-	if ( type(AZS_SetHudShown) ~= "function" or bossNativeWasShown ~= true ) then return; end
-	if ( on ) then
-		local shown = true;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "bosses");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown ) then
-			SS.DB().bossNativeOriginal = bossNativeWasShown;
-			SS.Safe(AZS_SetHudShown, "bosses", false);
-			bossNativeOverridden = true;
-		end
-	elseif ( bossNativeOverridden ) then
-		SS.Safe(AZS_SetHudShown, "bosses", bossNativeWasShown);
-		bossNativeOverridden = false;
-		SS.DB().bossNativeOriginal = nil;
-	end
-end
-
-function SS.SetNativeBannersHidden(on)
-	if ( type(AZS_SetHudShown) ~= "function" or bannerNativeWasShown ~= true ) then return; end
-	if ( on ) then
-		local shown = true;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "banners");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown ) then
-			SS.DB().bannerNativeOriginal = bannerNativeWasShown;
-			SS.Safe(AZS_SetHudShown, "banners", false);
-			bannerNativeOverridden = true;
-		end
-	elseif ( bannerNativeOverridden ) then
-		SS.Safe(AZS_SetHudShown, "banners", bannerNativeWasShown);
-		bannerNativeOverridden = false;
-		SS.DB().bannerNativeOriginal = nil;
-	end
-end
-
-function SS.SetNativeLevelButtonHidden(on)
-	if ( type(AZS_SetHudShown) ~= "function" or levelNativeWasShown ~= true ) then return; end
-	if ( on ) then
-		local shown = true;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "levels");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown ) then
-			SS.DB().levelNativeOriginal = levelNativeWasShown;
-			SS.Safe(AZS_SetHudShown, "levels", false);
-			levelNativeOverridden = true;
-		end
-	elseif ( levelNativeOverridden ) then
-		SS.Safe(AZS_SetHudShown, "levels", levelNativeWasShown);
-		levelNativeOverridden = false;
-		SS.DB().levelNativeOriginal = nil;
-	end
-end
-
 function SS.UpdateLevelButton()
 	if ( not levelButton ) then return; end
 	local canReplace = type(AZS_OpenStoredLevels) == "function";
 	local replacing = SS.DB().moveLevelButton and canReplace;
-	SS.SetNativeLevelButtonHidden(replacing);
+	SS.HideNative("levels", replacing);
 	local storedCount = 0;
 	if ( type(AZS_GetStoredLevels) == "function" ) then
 		local okCount, value = SS.Safe(AZS_GetStoredLevels);
@@ -1376,64 +1141,12 @@ function SS.LayoutLevelButton()
 	b.glow:SetWidth(w * 1.24); b.glow:SetHeight(h * 1.41);
 end
 
--- AZS_SetHudShown stores native HUD visibility in the game's saved interface settings. Restore
--- every value this addon temporarily changed before a clean logout/reload, so disabling Slim Suite
--- in the AddOns screen cannot leave the game's own controls hidden on the next launch. The saved
--- originals are also kept until this point so a reload can restore them before this addon hides
--- the native controls again.
-function SS.RestoreNativeHudOnLogout()
-	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
-	local d = SS.DB();
-	local restore = {
-		{ "build", "buildNativeOriginal" },
-		{ "revive", "reviveNativeOriginal" },
-		{ "localClock", "localClockNativeOriginal" },
-		{ "tally", "tallyNativeOriginal" },
-		{ "meter", "meterNativeOriginal" },
-		{ "clock", "clockNativeOriginal" },
-		{ "bosses", "bossNativeOriginal" },
-		{ "banners", "bannerNativeOriginal" },
-		{ "levels", "levelNativeOriginal" }
-	};
-	for i = 1, table.getn(restore) do
-		local part, key = restore[i][1], restore[i][2];
-		if ( type(d[key]) == "boolean" ) then
-			local ok = SS.Safe(AZS_SetHudShown, part, d[key]);
-			if ( ok ) then d[key] = nil; end
-		end
-	end
-end
-
--- The Create* functions below run while this file loads, before WoW has loaded SlimSuiteDB, so they
--- never see an original saved by a session that crashed. Once the saved settings are in, put back any
--- native HUD element that session left hidden and remember it as the original state.
-function SS.RestoreNativeHudAfterLoad()
-	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
-	local d = SS.DB();
-	local keys = { "build", "buildNativeOriginal", "tally", "tallyNativeOriginal", "meter", "meterNativeOriginal",
-		"clock", "clockNativeOriginal", "bosses", "bossNativeOriginal", "banners", "bannerNativeOriginal",
-		"levels", "levelNativeOriginal", "revive", "reviveNativeOriginal", "localClock", "localClockNativeOriginal" };
-	for i = 1, table.getn(keys), 2 do
-		local part, key = keys[i], keys[i + 1];
-		local original = d[key];
-		if ( type(original) == "boolean" and SS.Safe(AZS_SetHudShown, part, original) ) then
-			d[key] = nil;
-			if ( part == "build" ) then buildNativeWasShown = original;
-			elseif ( part == "tally" ) then tallyNativeWasShown = original;
-			elseif ( part == "meter" ) then meterNativeWasShown = original;
-			elseif ( part == "clock" ) then clockNativeWasShown = original;
-			elseif ( part == "bosses" ) then bossNativeWasShown = original;
-			elseif ( part == "banners" ) then bannerNativeWasShown = original;
-			elseif ( part == "levels" ) then levelNativeWasShown = original;
-			elseif ( SlimSuiteWorld and SlimSuiteWorld.SetNativeOriginal ) then SlimSuiteWorld.SetNativeOriginal(part, original); end
-		end
-	end
-end
-SS.RestoreNativeHudAfterLoad = SS.RestoreNativeHudAfterLoad;
-
+-- AZS_SetHudShown stores native HUD visibility in the game's saved interface settings. Every part Slim Suite hid is
+-- put back before a clean logout or reload, so disabling Slim Suite in the AddOns screen cannot leave the game's own
+-- controls hidden on the next launch (SS.RestoreNatives, in SlimSuiteCore.lua).
 local nativeHudShutdown = CreateFrame("Frame");
 nativeHudShutdown:RegisterEvent("PLAYER_LOGOUT");
-nativeHudShutdown:SetScript("OnEvent", SS.RestoreNativeHudOnLogout);
+nativeHudShutdown:SetScript("OnEvent", function() SS.Safe(SS.RestoreNatives); end);
 
 -- The native Level Up control uses the class symbol from WoW's character-create atlas.
 -- Keep this 1.12 mapping local because CLASS_ICON_TCOORDS is not consistently global in
@@ -1458,21 +1171,6 @@ function SS.PlayerClassIconCoords()
 end
 
 function SS.CreateLevelButton()
-	local savedOriginal = SS.DB().levelNativeOriginal;
-	if ( savedOriginal ~= nil ) then
-		levelNativeWasShown = savedOriginal and true or false;
-		if ( type(AZS_SetHudShown) == "function" ) then SS.Safe(AZS_SetHudShown, "levels", levelNativeWasShown); end
-		SS.DB().levelNativeOriginal = nil;
-	else
-		local shown;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "levels");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown == nil and GetCVar ) then shown = GetCVar("hudLevels") ~= "0"; end
-		if ( shown == nil ) then shown = true; end
-		levelNativeWasShown = shown;
-	end
 	levelButton = CreateFrame("Button", "SlimSuiteStoredLevelsButton", UIParent);
 	levelButton:SetWidth(184);
 	levelButton:SetHeight(58);
@@ -1649,36 +1347,6 @@ function SS.CreateClockFrame()
 	clockFrame.zone:SetTextColor(0.85, 0.75, 0.55);
 	-- Both lines share one parent and one movement handle; they cannot be separated while repositioning.
 	SS.ApplyClockLayout();
-	local savedOriginal = SS.DB().clockNativeOriginal;
-	if ( savedOriginal ~= nil ) then
-		clockNativeWasShown = savedOriginal and true or false;
-		if ( type(AZS_SetHudShown) == "function" ) then SS.Safe(AZS_SetHudShown, "clock", clockNativeWasShown); end
-		SS.DB().clockNativeOriginal = nil;
-	else
-		local shown;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "clock");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown == nil and GetCVar ) then shown = GetCVar("hudClock") ~= "0"; end
-		if ( shown == nil ) then shown = true; end
-		clockNativeWasShown = shown;
-	end
-	local savedBossOriginal = SS.DB().bossNativeOriginal;
-	if ( savedBossOriginal ~= nil ) then
-		bossNativeWasShown = savedBossOriginal and true or false;
-		if ( type(AZS_SetHudShown) == "function" ) then SS.Safe(AZS_SetHudShown, "bosses", bossNativeWasShown); end
-		SS.DB().bossNativeOriginal = nil;
-	else
-		local shown;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "bosses");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown == nil and GetCVar ) then shown = GetCVar("hudBosses") ~= "0"; end
-		if ( shown == nil ) then shown = true; end
-		bossNativeWasShown = shown;
-	end
 	clockFrame:Hide();
 end
 
@@ -1698,6 +1366,8 @@ end
 function SS.SetGameDefaultFont(fontString, size)
 	-- Slim Suite uses WoW's standard 1.12 UI typeface throughout, including custom HUD labels.
 	local defaultFont = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
+	if ( fontString.slimFontSize == size ) then return; end   -- set already
+	fontString.slimFontSize = size;
 	local ok, result = SS.Safe(fontString.SetFont, fontString, defaultFont, size);
 	if ( not ok or result == false ) then SS.Safe(fontString.SetFont, fontString, "Fonts\\FRIZQT__.TTF", size); end
 end
@@ -1726,6 +1396,14 @@ function SS.ClampAbsoluteFrame(name, f)
 	if ( not f or SS.DB().unlocked ) then return; end
 	local saved = SS.DB().places[name];
 	if ( type(saved) == "table" and saved.relative ) then return; end
+	do   -- checked already at this place and size on this screen: nothing can have moved off it
+		local l, _, b = RootBounds(f);
+		local w, h, sw, sh = f:GetWidth(), f:GetHeight(), UIParent:GetWidth(), UIParent:GetHeight();
+		local c = f.slimClamp;
+		if ( c and l and c[1] == l and c[2] == b and c[3] == w and c[4] == h and c[5] == sw and c[6] == sh ) then return; end
+		if ( not c ) then c = {}; f.slimClamp = c; end
+		c[1], c[2], c[3], c[4], c[5], c[6] = l, b, w, h, sw, sh;
+	end
 	local minX, minY, maxOffsetX, maxOffsetY = VisualInsets(f);
 	local maxX = UIParent:GetWidth() - maxOffsetX;
 	local maxY = UIParent:GetHeight() - maxOffsetY;
@@ -1737,6 +1415,7 @@ function SS.ClampAbsoluteFrame(name, f)
 	local ny = math.max(-minY, math.min(maxY, y));
 	if ( nx ~= x or ny ~= y ) then
 		SetRootPosition(f, nx, ny);
+		f.slimClamp[1] = nil;                                -- moved: looked at once more next time
 	end
 end
 
@@ -1885,7 +1564,7 @@ function SS.ZoneText()
 end
 
 function SS.UpdateClock()
- if not SS.DB().replaceClock then if clockFrame then clockFrame:Hide();end;SS.SetNativeClockHidden(false);return;end
+ if not SS.DB().replaceClock then if clockFrame then clockFrame:Hide();end;SS.HideNative("clock", false);return;end
 	if ( not clockFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local live = phase == "ready" or phase == "playing" or phase == "choosing" or phase == "paused";
@@ -1909,11 +1588,11 @@ function SS.UpdateClock()
 		else
 			clockFrame.next:SetText("next boss in --:--");
 		end
-		SS.SetNativeClockHidden(true);
+		SS.HideNative("clock", true);
 		clockFrame.time:Show();
 		clockFrame.next:Show();
 	else
-		SS.SetNativeClockHidden(false);
+		SS.HideNative("clock", false);
 		if ( preview ) then
 			clockFrame.time:SetText("00:00");
 			clockFrame.next:SetText("next boss in --:--");
@@ -1939,7 +1618,7 @@ function SS.UpdateClock()
 end
 
 function SS.UpdateBossFrames()
- if not SS.DB().replaceEncounters then if bossFrame then bossFrame:Hide();end;SS.SetNativeBossesHidden(false);return;end
+ if not SS.DB().replaceEncounters then if bossFrame then bossFrame:Hide();end;SS.HideNative("bosses", false);return;end
 	if ( not bossFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local live = phase == "playing" or phase == "choosing" or phase == "paused";
@@ -1951,10 +1630,10 @@ function SS.UpdateBossFrames()
 		if ( height > 0 ) then
 			bossFrame:SetHeight(height);
 			SS.ClampAbsoluteFrame("SlimSuiteBossFrames", bossFrame);
-			SS.SetNativeBossesHidden(true);
+			SS.HideNative("bosses", true);
 			bossFrame:Show();
 		else
-			SS.SetNativeBossesHidden(false);
+			SS.HideNative("bosses", false);
 			bossFrame:Hide();
 		end
 	elseif ( SS.Previewing("SlimSuiteBossFrames") ) then
@@ -1967,12 +1646,12 @@ function SS.UpdateBossFrames()
 		local height = SS.UpdateEncounterRows(sample);
 		if ( height > 0 ) then bossFrame:SetHeight(height); end
 		SS.ClampAbsoluteFrame("SlimSuiteBossFrames", bossFrame);
-		SS.SetNativeBossesHidden(false);
+		SS.HideNative("bosses", false);
 		bossFrame:Show();
 	else
 		-- before a run there is nothing to show
 		for i = 1, table.getn(encounterRows) do encounterRows[i]:Hide(); end
-		SS.SetNativeBossesHidden(false);
+		SS.HideNative("bosses", false);
 		bossFrame:Hide();
 	end
 end
@@ -2010,28 +1689,13 @@ function SS.CreateAnnouncementFrame()
 	announcementFrame.text:SetNonSpaceWrap(true);
 	SS.SetGameDefaultFont(announcementFrame.text, 22);
 	announcementFrame.text:SetTextColor(0.96, 0.82, 0.52);
-	local savedOriginal = SS.DB().bannerNativeOriginal;
-	if ( savedOriginal ~= nil ) then
-		bannerNativeWasShown = savedOriginal and true or false;
-		if ( type(AZS_SetHudShown) == "function" ) then SS.Safe(AZS_SetHudShown, "banners", bannerNativeWasShown); end
-		SS.DB().bannerNativeOriginal = nil;
-	else
-		local shown;
-		if ( type(AZS_IsHudShown) == "function" ) then
-			local ok, value = SS.Safe(AZS_IsHudShown, "banners");
-			if ( ok and value ~= nil ) then shown = SS.HudShown(value); end
-		end
-		if ( shown == nil and GetCVar ) then shown = GetCVar("hudBanners") ~= "0"; end
-		if ( shown == nil ) then shown = true; end
-		bannerNativeWasShown = shown;
-	end
 	announcementFrame:Hide();
 end
 
 function SS.ShowAnnouncement(banner)
 	if ( not SS.DB().replaceBanners ) then
 		if ( announcementFrame ) then announcementFrame:Hide(); end
-		SS.SetNativeBannersHidden(false);
+		SS.HideNative("banners", false);
 		return;
 	end
 	if ( type(banner) ~= "table" ) then return; end
@@ -2050,11 +1714,11 @@ function SS.ShowAnnouncement(banner)
 	announcementFrame:SetAlpha(0);
 	announcementFrame:Show();
 	SS.ClampAbsoluteFrame("SlimSuiteAnnouncementFrame", announcementFrame);
-	SS.SetNativeBannersHidden(true);
+	SS.HideNative("banners", true);
 end
 
 function SS.UpdateAnnouncementFrame()
- if not SS.DB().replaceBanners then if announcementFrame then announcementFrame:Hide();end;SS.SetNativeBannersHidden(false);return;end
+ if not SS.DB().replaceBanners then if announcementFrame then announcementFrame:Hide();end;SS.HideNative("banners", false);return;end
 	if ( not announcementFrame ) then return; end
 	local maxWidth = math.max(40, UIParent:GetWidth() - 24);
 	if ( announcementFrame:GetWidth() > maxWidth ) then announcementFrame:SetWidth(maxWidth); end
@@ -2096,7 +1760,7 @@ function SS.RegisterAnnouncementHandler()
 	local ok = SS.Safe(AZS_RegisterBannerHandler, bannerHandler);
 	if ( ok ) then
 		bannerHandlerRegistered = true;
-		if ( bannerNativeWasShown == true and SS.DB().replaceBanners ) then SS.SetNativeBannersHidden(true); end
+		if ( SS.DB().replaceBanners ) then SS.HideNative("banners", true); end
 	end
 	return bannerHandlerRegistered;
 end
@@ -2110,7 +1774,8 @@ SS.Every("tally", 0.25, function()
 		SS.Safe(SS.UpdateAnnouncementFrame);
 		SS.Safe(SS.UpdateLevelButton);
 		SS.Safe(ApplyActionSlotGrid);
-		SS.Safe(SS.RefreshItemRow);
+		local rowPreview = SS.Previewing("SlimSuiteItemRowFrame") or SS.Previewing("SlimSuiteSpellRowFrame");
+		if ( rowPreview ~= SS.rowPreviewWas ) then SS.rowPreviewWas = rowPreview; SS.Safe(SS.RefreshItemRow); SS.Safe(SS.RefreshSpellRow); end
 		SS.Safe(SS.UpdateTooltipPreview);
 		local tooltipHandle = handles.GameTooltip;
 		if ( tooltipHandle ) then
@@ -3226,119 +2891,15 @@ function SS.RefreshToggles()
 		local sig = SS.PageSignature(page);
 		if ( page.sig ~= sig ) then page.sig = sig; SS.LayoutPage(page); end
 	end
-	if ( sizeMenu and sizeMenu:IsShown() and sizeMenu.buffsSide ) then
-		sizeMenu.buffsSide:SetText(SS.DB().buffsOnTargetSide == "above" and "Buffs: above the target" or "Buffs: below the target");
-		if ( SS.DB().buffsOnTarget ) then sizeMenu.buffsSide:Enable(); else sizeMenu.buffsSide:Disable(); end
-	end
 end
 -- the boxes are read again twice a second as well, for settings changed by a slash command or by the game
-SS.Every("toggleRefresh", 0.5, function() SS.RefreshToggles(); end);
-
--- fills the right-click menu's cross-reference rows for this element (the same settings the setup shows)
--- The feature each right-click row belongs to. Rows of one feature sit together under its name in the menu.
-SS.ROW_GROUP = {
-	["Movable? (Disables Default UI Element)"] = "Frame",
-	["Player frame look"] = "Frame",
-	["Target frame look"] = "Frame",
-	["3D portrait on the new-school frame"] = "Frame",
-	["Hide the target frame"] = "Frame",
-	["Combine with the target frame (one button)"] = "Frame",
-	["Mirror target"] = "Mirror",
-	["Same size scaling (off: keep its own size)"] = "Mirror",
-	["Buffs and debuffs"] = "Buffs",
-	["Show debuffs and DoTs on the target"] = "Buffs",
-	["Class proc meter under it"] = "Extras",
-	["Join the party frames yourself (you go first)"] = "Party",
-	["Party frames sit"] = "Party",
-	["Party layout"] = "Party",
-	["Party look"] = "Party",
-	["Show character faces"] = "Party",
-	["Hide the bar's artwork (only the spell squares stay)"] = "Action bar",
-	["Show all six buttons at all times, even empty ones"] = "Action bar",
-	["Add your racial as a 7th button"] = "Action bar",
-	["Turn the action bar vertical"] = "Action bar",
-	["Cooldown numbers on the spell squares"] = "Action bar",
-	["Square minimap (off: round)"] = "Minimap",
-	["Minimap buttons"] = "Minimap",
-	["Show caches on the minimap"] = "Minimap",
-	["Show bosses on the minimap"] = "Minimap",
-	["Show lairs and their refill timer"] = "Minimap",
-	["The game's nearest Guardian lair flag"] = "Minimap",
-	["Slim Suite's gear button"] = "Minimap",
-	["Show the local clock"] = "Clock",
-	["Detach the clock from the minimap (its own button up top)"] = "Clock",
-	["Show the zone and Heroic affixes under it"] = "Clock",
-	["Dark background"] = "Clock",
-	["24-hour time"] = "Clock",
-	["Turn the XP bar vertical"] = "XP bar",
-	["Split into 20 segments"] = "XP bar",
-	["Show boss and Guardian kills"] = "Tally",
-	["Dark band behind it"] = "Tally",
-	["Show debuffs on the bars"] = "Bosses",
-	["Join the worn-jewelry row under the build spells"] = "Jewelry row",
-	["Show heals"] = "Combat text",
-	["Crits: bigger and longer"] = "Combat text",
-	["Spell icons"] = "Combat text",
-	["Lines stay twice as long"] = "Combat text",
-};
-
-function SS.RefreshCrossRefs(name)
-	if ( not sizeMenu or not sizeMenu.xref ) then return; end
-	local rows = {};                                       -- the settings are the menu's own rows now (SU.Focus)
-	-- under the menu's own buttons: the build rows' attach button and the clock's daylight-saving button come first
-	local y = -208;
-	if ( name == "SlimSuiteSpellRowFrame" or name == "SlimSuiteLocalClockFrame" ) then y = -238; end
-	-- a sub-setting is shown only while the setting it depends on is on
-	local vis = {};
-	for i = 1, table.getn(rows) do
-		if ( not rows[i][4] or rows[i][4]() ) then table.insert(vis, rows[i]); end
-	end
-	sizeMenu.xrefHeads = sizeMenu.xrefHeads or {};
-	local heads, lastGroup = 0, nil;
-	local cbs = sizeMenu.xref;
-	local n = 0;
-	for k = 1, table.getn(vis) do
-		local e = vis[k];
-		local g = SS.ROW_GROUP[e[1]] or "";
-		if ( g ~= "" and g ~= lastGroup ) then
-			heads = heads + 1;
-			local h = sizeMenu.xrefHeads[heads];
-			if ( not h ) then h = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); sizeMenu.xrefHeads[heads] = h; end
-			h:ClearAllPoints(); h:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, y + 2);
-			h:SetText(g); h:SetTextColor(1, 0.82, 0); h:Show();
-			y = y - 18;
-		end
-		lastGroup = g ~= "" and g or lastGroup;
-		n = n + 1;
-		local cb = cbs[n];
-		if ( not cb ) then break; end
-		cb.entry = e;
-		cb.get = (not e.choice) and e[2] or nil; cb.cond = e[4];
-		cb:ClearAllPoints();
-		cb:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", (e[4] and not e.top) and 26 or 8, y);
-		cb.warn:Hide();
-		SS.RowKind(cb, e, "below");
-		y = y - 26 - (e.choice and 24 or 0);
-		cb.label:SetText((e.short or e[1]) .. (e.warn and " |cffff9933(!)|r" or ""));
-		cb:SetChecked(e[2]() and 1 or nil);
-		cb:Enable(); cb.label:SetTextColor(1, 1, 1);
-		cb:Show();
-	end
-	for i = n + 1, table.getn(cbs) do
-		local cb = cbs[i];
-		SS.RowKind(cb, nil);
-		cb.entry = nil; cb.get = nil; cb.cond = nil; cb:Hide();
-	end
-	for i = heads + 1, table.getn(sizeMenu.xrefHeads) do sizeMenu.xrefHeads[i]:Hide(); end
-	sizeMenu:SetHeight(-y + 40);   -- room for Reset and Done under the last setting
-end
+-- (only while one of those windows is open)
+SS.Every("toggleRefresh", 0.5, function()
+	local panel = getglobal("SlimSuiteSetupPanel");
+	if ( (win and win:IsShown()) or (lockPanel and lockPanel:IsShown()) or (panel and panel:IsShown()) ) then SS.RefreshToggles(); end
+end);
 
 function SS.RefreshBuffControls()
-	if ( sizeMenu and sizeMenu.buffsOn ) then
-		sizeMenu.buffsOn:SetChecked(SS.DB().buffsOnTarget and 1 or nil);
-		sizeMenu.buffsSide:SetText(SS.DB().buffsOnTargetSide == "above" and "Buffs: above the target" or "Buffs: below the target");
-		if ( SS.DB().buffsOnTarget ) then sizeMenu.buffsSide:Enable(); else sizeMenu.buffsSide:Disable(); end
-	end
 	if ( SS.DB().unlocked ) then SS.SetUnlocked(true, true); end        -- shows or hides the buff frame's own handle
 end
 
@@ -3697,77 +3258,68 @@ function SS.ToggleBuildRowsAttached()
 		SS.DB().places.SlimSuiteItemRowFrame = SS.BuildRowDefaultPlace("SlimSuiteItemRowFrame");
 	end
 	PlaceAll();
-	if ( sizeMenu and sizeMenu.attachButton ) then
-		sizeMenu.attachButton:SetText(SS.DB().buildRowsAttached and "Detach build rows" or "Attach build rows");
-	end
 end
 
--- The size & layout tools of an element's menu (width, height, scale, padding, layout, growth, hide, the build rows'
--- join, the clock's daylight saving, Reset): built once, set up for the element, and shown as a section of the
--- element's menu (SU.Focus), under its settings. Returns false when the element has no frame yet.
+-- The size & layout tools of an element's menu: width, height, scale, layout (for the elements with no layout setting
+-- of their own), buff growth, padding, hide, the clock's daylight saving and Reset. Built once, set up for the element,
+-- and shown as a section of the element's menu (SU.Focus) under its settings. Only the rows the element uses are
+-- shown, one under the other with no gaps. Returns false when the element has no frame yet.
 function SS.PrepareSizeTools(name, label)
 	name = SS.Element(name);
 	local f = getglobal(SS.Shown(name));
 	if ( not f ) then return false; end
-	if ( sizeMenu and sizeMenu.SetAlpha ) then sizeMenu:SetAlpha(1); end
 	if ( not sizeMenu ) then
 		sizeMenu = CreateFrame("Frame", nil, UIParent);
-		sizeMenu:SetWidth(206);
-		sizeMenu:SetHeight(270);
+		sizeMenu:SetWidth(206); sizeMenu:SetHeight(120);
 		sizeMenu:SetFrameStrata("DIALOG");
-		sizeMenu:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		                      tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
-		sizeMenu:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
-		sizeMenu:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+		sizeMenu.rows = {};
+		-- a row is the things on one line: each { thing, its corner, x, y from the row's top }
+		local function Row(key, parts)
+			local row = { parts = parts };
+			sizeMenu.rows[key] = row;
+			table.insert(sizeMenu.rows, row);
+			return row;
+		end
+		local function Label()
+			return sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+		end
+		-- the mouse wheel over a row's label or its - and + does what the buttons do
+		local function WheelPair(down, up)
+			local zone = CreateFrame("Frame", nil, sizeMenu);
+			zone:SetWidth(90); zone:SetHeight(25); zone:EnableMouseWheel(true);
+			local function Wheel()
+				if ( not arg1 or arg1 == 0 ) then return; end
+				local action = (arg1 > 0 and up or down):GetScript("OnClick");
+				if ( action ) then action(); end
+			end
+			zone:SetScript("OnMouseWheel", Wheel);
+			down:EnableMouseWheel(true); down:SetScript("OnMouseWheel", Wheel);
+			up:EnableMouseWheel(true); up:SetScript("OnMouseWheel", Wheel);
+			return zone;
+		end
+		local function ShowSize()
+			local t = sizeTarget and getglobal(sizeTarget);
+			if ( not t ) then return; end
+			sizeMenuWidth:SetText("Width: " .. math.floor((t:GetWidth() or 0) + 0.5));
+			sizeMenuHeight:SetText("Height: " .. math.floor((t:GetHeight() or 0) + 0.5));
+		end
+		sizeMenu.ShowSize = ShowSize;
 		sizeMenuText = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-		sizeMenuText:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 12, -10);
-		sizeMenu:SetBackdrop(nil);                           -- a section of the element's menu, not a window of its own
-		sizeMenu:SetMovable(true);
-		if ( sizeMenu.SetClampedToScreen ) then sizeMenu:SetClampedToScreen(true); end
-		sizeMenu.dragStrip = CreateFrame("Frame", nil, sizeMenu);
-		sizeMenu.dragStrip:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 4, -3);
-		sizeMenu.dragStrip:SetWidth(124); sizeMenu.dragStrip:SetHeight(20);
-		sizeMenu.dragStrip:EnableMouse(true);
-		sizeMenu.dragStrip:SetScript("OnMouseDown", function()
-			if ( arg1 == "LeftButton" ) then sizeMenu:StartMoving(); sizeMenu.dragging = true; end
-		end);
-		sizeMenu.dragStrip:SetScript("OnMouseUp", function()
-			if ( not sizeMenu.dragging ) then return; end
-			sizeMenu:StopMovingOrSizing(); sizeMenu.dragging = nil;
-			local left, bottom = sizeMenu:GetLeft(), sizeMenu:GetBottom();
-			if ( left and bottom ) then SS.DB().sizeMenuPosition = { x = left, y = bottom }; end
-		end);
-		sizeMenuWidth = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		sizeMenuWidth:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 12, -34);
-		sizeMenuHeight = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		sizeMenuHeight:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 12, -63);
-		sizeMenuScale = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		sizeMenuScale:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 12, -92);
-		sizeMenuScale:SetText("Scale %:");
-		sizeMenuScaleInput = CreateFrame("EditBox", nil, sizeMenu);
-		sizeMenuScaleInput:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 52, -89);
-		sizeMenuScaleInput:SetWidth(46); sizeMenuScaleInput:SetHeight(20);
-		sizeMenuScaleInput:SetAutoFocus(false); sizeMenuScaleInput:SetNumeric(true);
-		sizeMenuScaleInput:SetJustifyH("CENTER"); sizeMenuScaleInput:SetMaxLetters(3);
-		sizeMenuScaleInput:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-			tile = true, tileSize = 16, edgeSize = 8, insets = { left = 2, right = 2, top = 2, bottom = 2 } });
-		sizeMenuScaleInput:SetBackdropColor(0.02, 0.02, 0.03, 0.95);
-		sizeMenuScaleInput:SetBackdropBorderColor(0.55, 0.43, 0.2, 1);
+		sizeMenuText:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 12, -6);
+		sizeMenuText:SetText("Size & layout");
 		local function ResizeBy(axis, delta)
 			if ( not sizeTarget ) then return; end
 			local t = getglobal(sizeTarget);
 			if ( not t ) then return; end
 			local w, h = t:GetWidth(), t:GetHeight();
-			local effective = t.GetEffectiveScale and t:GetEffectiveScale() or 1;
-			local rootScale = UIParent:GetEffectiveScale() or 1;
-			local scaleRatio = effective / rootScale;
-			if ( scaleRatio <= 0 ) then scaleRatio = 1; end
+			local scaleRatio = RootFactor(t);
+			if ( not scaleRatio or scaleRatio <= 0 ) then scaleRatio = 1; end
 			if ( axis == "w" ) then
-					local minWidth = SS.MinSize(sizeTarget);
-					w = math.max(minWidth, math.min((UIParent:GetWidth() or 1920) / scaleRatio, w + delta));
-				else
-					local _, minHeight = SS.MinSize(sizeTarget);
-					h = math.max(minHeight, math.min((UIParent:GetHeight() or 1080) / scaleRatio, h + delta));
+				local minWidth = SS.MinSize(sizeTarget);
+				w = math.max(minWidth, math.min((UIParent:GetWidth() or 1920) / scaleRatio, w + delta));
+			else
+				local _, minHeight = SS.MinSize(sizeTarget);
+				h = math.max(minHeight, math.min((UIParent:GetHeight() or 1080) / scaleRatio, h + delta));
 			end
 			t:SetWidth(w); t:SetHeight(h);
 			if ( sizeTarget == "MainMenuBar" ) then
@@ -3789,18 +3341,27 @@ function SS.PrepareSizeTools(name, label)
 			if ( sizeTarget == "SlimSuiteClockFrame" ) then SS.ApplyClockLayout(); end
 			if ( SS.Element(sizeTarget) == "TargetFrame" ) then SS.Safe(SS.MirrorPlayer); end
 			PlaceAll();
-			sizeMenuWidth:SetText("Width: " .. math.floor(w + 0.5));
-			sizeMenuHeight:SetText("Height: " .. math.floor(h + 0.5));
+			ShowSize();
 		end
+		sizeMenuWidth = Label();
 		local narrower = K.Button(sizeMenu, "-", 30, function() ResizeBy("w", -20); end);
-		narrower:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -72, -26);
 		local wider = K.Button(sizeMenu, "+", 30, function() ResizeBy("w", 20); end);
-		wider:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -32, -26);
+		Row("width", { { WheelPair(narrower, wider), "TOPLEFT", 10, 0 }, { sizeMenuWidth, "TOPLEFT", 12, -8 }, { narrower, "TOPRIGHT", -72, 0 }, { wider, "TOPRIGHT", -32, 0 } });
+		sizeMenuHeight = Label();
 		local shorter = K.Button(sizeMenu, "-", 30, function() ResizeBy("h", -20); end);
-		shorter:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -72, -55);
 		local taller = K.Button(sizeMenu, "+", 30, function() ResizeBy("h", 20); end);
-		taller:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -32, -55);
-		sizeMenu.sizeRows = { sizeMenuWidth, sizeMenuHeight, narrower, wider, shorter, taller };
+		Row("height", { { WheelPair(shorter, taller), "TOPLEFT", 10, 0 }, { sizeMenuHeight, "TOPLEFT", 12, -8 }, { shorter, "TOPRIGHT", -72, 0 }, { taller, "TOPRIGHT", -32, 0 } });
+		sizeMenuScale = Label();
+		sizeMenuScale:SetText("Scale %:");
+		sizeMenuScaleInput = CreateFrame("EditBox", nil, sizeMenu);
+		sizeMenuScaleInput:SetWidth(46); sizeMenuScaleInput:SetHeight(20);
+		sizeMenuScaleInput:SetAutoFocus(false); sizeMenuScaleInput:SetNumeric(true);
+		sizeMenuScaleInput:SetJustifyH("CENTER"); sizeMenuScaleInput:SetMaxLetters(3);
+		sizeMenuScaleInput:SetFontObject(GameFontHighlightSmall);
+		sizeMenuScaleInput:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			tile = true, tileSize = 16, edgeSize = 8, insets = { left = 2, right = 2, top = 2, bottom = 2 } });
+		sizeMenuScaleInput:SetBackdropColor(0.02, 0.02, 0.03, 0.95);
+		sizeMenuScaleInput:SetBackdropBorderColor(0.55, 0.43, 0.2, 1);
 		local function SetScalePercent(percent)
 			if ( not sizeTarget ) then return; end
 			percent = math.max(20, math.min(200, math.floor(tonumber(percent) or 100)));   -- never so small it disappears
@@ -3809,6 +3370,7 @@ function SS.PrepareSizeTools(name, label)
 			PlaceAll();
 			sizeMenuScaleInput:SetText(tostring(percent));
 		end
+		local function ScaleNow() return math.floor((SS.DB().scales[sizeTarget] or 1) * 100 + 0.5); end
 		sizeMenuScaleInput:SetScript("OnEnterPressed", function()
 			this.cancelScaleEdit = true;
 			SetScalePercent(this:GetText());
@@ -3821,48 +3383,25 @@ function SS.PrepareSizeTools(name, label)
 		sizeMenuScaleInput:SetScript("OnEscapePressed", function()
 			this.cancelScaleEdit = true;
 			this:ClearFocus();
-			local current = math.floor((SS.DB().scales[sizeTarget] or 1) * 100 + 0.5);
-			this:SetText(tostring(current));
+			this:SetText(tostring(ScaleNow()));
 		end);
-		local scaleDown = K.Button(sizeMenu, "-", 30, function()
-			local scale = math.floor((SS.DB().scales[sizeTarget] or 1) * 100 + 0.5);
-			SetScalePercent(scale - 5);
-		end);
-		scaleDown:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -72, -84);
-		local scaleUp = K.Button(sizeMenu, "+", 30, function()
-			local scale = math.floor((SS.DB().scales[sizeTarget] or 1) * 100 + 0.5);
-			SetScalePercent(scale + 5);
-		end);
-		scaleUp:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -32, -84);
-		-- Labels and their +/- buttons share the same adjustments for wheel and clicks.
-		local function WheelPair(y, down, up)
-			local zone = CreateFrame("Frame", nil, sizeMenu);
-			zone:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, y);
-			zone:SetWidth(90); zone:SetHeight(25); zone:EnableMouseWheel(true);
-			local function Wheel()
-				if ( not arg1 or arg1 == 0 ) then return; end
-				local action = (arg1 > 0 and up or down):GetScript("OnClick");
-				if ( action ) then action(); end
-			end
-			zone:SetScript("OnMouseWheel", Wheel);
-			down:EnableMouseWheel(true); down:SetScript("OnMouseWheel", Wheel);
-			up:EnableMouseWheel(true); up:SetScript("OnMouseWheel", Wheel);
-			return zone;
-		end
-		WheelPair(-26, narrower, wider); WheelPair(-55, shorter, taller); WheelPair(-84, scaleDown, scaleUp);
-		local layout = K.Button(sizeMenu, "Switch to vertical", 138, function()
+		local scaleDown = K.Button(sizeMenu, "-", 30, function() SetScalePercent(ScaleNow() - 5); end);
+		local scaleUp = K.Button(sizeMenu, "+", 30, function() SetScalePercent(ScaleNow() + 5); end);
+		Row("scale", { { WheelPair(scaleDown, scaleUp), "TOPLEFT", 10, 0 }, { sizeMenuScale, "TOPLEFT", 12, -8 }, { sizeMenuScaleInput, "TOPLEFT", 58, -1 },
+			{ scaleDown, "TOPRIGHT", -72, 0 }, { scaleUp, "TOPRIGHT", -32, 0 } });
+		-- vertical or horizontal, for the elements that have no layout setting among their own settings above
+		local layout = K.Button(sizeMenu, "Switch to vertical", 116, function()
 			if ( not sizeTarget ) then return; end
-			SS.ToggleMovableOrientation(SS.Element(sizeTarget));   -- the party's lines turn with the party
-			local t = getglobal(sizeTarget);
-			if ( t ) then
-				sizeMenuWidth:SetText("Width: " .. math.floor(t:GetWidth() + 0.5));
-				sizeMenuHeight:SetText("Height: " .. math.floor(t:GetHeight() + 0.5));
-			end
-			local orientation = sizeTarget == "SlimSuiteTallyFrame" and (SS.DB().tallyVertical and "vertical" or "horizontal") or SS.CurrentOrientation(SS.Element(sizeTarget));
-			sizeMenu.layoutButton:SetText(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical");
+			SS.ToggleMovableOrientation(SS.Element(sizeTarget));
+			ShowSize();
+			sizeMenu.LayoutText();
 		end);
-		layout:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -116);
 		sizeMenu.layoutButton = layout;
+		sizeMenu.LayoutText = function()
+			local el = SS.Element(sizeTarget);
+			local orientation = el == "SlimSuiteTallyFrame" and (SS.DB().tallyVertical and "vertical" or "horizontal") or SS.CurrentOrientation(el);
+			layout:SetText(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical");
+		end;
 		local growth;
 		growth = K.Button(sizeMenu, "Grow down", 68, function()
 			if ( sizeTarget ~= "BuffFrame" ) then return; end
@@ -3872,45 +3411,30 @@ function SS.PrepareSizeTools(name, label)
 			SS.Safe(SS.ApplyBuffOrientation);
 			PlaceAll();
 		end);
-		growth:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -10, -116);
-		growth:Hide();
 		sizeMenu.growthButton = growth;
-		sizeMenuPadding = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		sizeMenuPadding:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 12, -148);
-		local padDown = K.Button(sizeMenu, "-", 30, function()
+		Row("layout", { { layout, "TOPLEFT", 10, 0 }, { growth, "TOPRIGHT", -10, 0 } });
+		sizeMenuPadding = Label();
+		local function Pad(by)
 			if ( not sizeTarget ) then return; end
-			SS.DB().padding[sizeTarget] = math.max(0, SS.FramePadding(sizeTarget) - 2);
+			SS.DB().padding[sizeTarget] = math.max(0, math.min(SS.FramePaddingLimit(sizeTarget), SS.FramePadding(sizeTarget) + by));
 			SS.ApplyMovablePadding(sizeTarget);
 			sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(sizeTarget));
-			local t = getglobal(sizeTarget);
-			if ( t ) then sizeMenuWidth:SetText("Width: " .. math.floor(t:GetWidth() + 0.5)); sizeMenuHeight:SetText("Height: " .. math.floor(t:GetHeight() + 0.5)); end
+			ShowSize();
+		end
+		local padDown = K.Button(sizeMenu, "-", 30, function() Pad(-2); end);
+		local padUp = K.Button(sizeMenu, "+", 30, function() Pad(2); end);
+		Row("padding", { { WheelPair(padDown, padUp), "TOPLEFT", 10, 0 }, { sizeMenuPadding, "TOPLEFT", 12, -8 }, { padDown, "TOPRIGHT", -72, 0 }, { padUp, "TOPRIGHT", -32, 0 } });
+		-- the local clock's hour for daylight saving: automatic -> forced on (+1 hour) -> forced off -> automatic
+		sizeMenu.clockDst = K.Button(sizeMenu, "Daylight saving: auto", 184, function()
+			local dst = SS.DB().localClockDST;
+			if ( dst == nil ) then SS.DB().localClockDST = 1;
+			elseif ( dst == 1 ) then SS.DB().localClockDST = 0;
+			else SS.DB().localClockDST = nil; end
+			if ( SlimSuiteWorld and SlimSuiteWorld.UpdateLocalClock ) then SlimSuiteWorld.UpdateLocalClock(); end
+			sizeMenu.ClockLabels();
 		end);
-		padDown:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -72, -142);
-		local padUp = K.Button(sizeMenu, "+", 30, function()
-			if ( not sizeTarget ) then return; end
-			SS.DB().padding[sizeTarget] = math.min(SS.FramePaddingLimit(sizeTarget), SS.FramePadding(sizeTarget) + 2);
-			SS.ApplyMovablePadding(sizeTarget);
-			sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(sizeTarget));
-			local t = getglobal(sizeTarget);
-			if ( t ) then sizeMenuWidth:SetText("Width: " .. math.floor(t:GetWidth() + 0.5)); sizeMenuHeight:SetText("Height: " .. math.floor(t:GetHeight() + 0.5)); end
-		end);
-		padUp:SetPoint("TOPRIGHT", sizeMenu, "TOPRIGHT", -32, -142);
-		sizeMenu.padDown, sizeMenu.padUp = padDown, padUp;
-		sizeMenu.paddingWheel = WheelPair(-142, padDown, padUp);
-		local muteButton = K.Button(sizeMenu, "Hide feature", 112, function()
-			if ( sizeTarget ) then SS.ToggleFeatureMute(sizeTarget); end
-		end);
-		muteButton:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -178);
-		sizeMenu.muteButton = muteButton;
-		local attachButton = K.Button(sizeMenu, "Detach item row", 184, function() SS.ToggleBuildRowsAttached(); end);
-		attachButton:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -208);
-		sizeMenu.attachButton = attachButton;
-		-- the local clock's own options: its dark box, 12- or 24-hour time, and an hour's shift for daylight saving
-		local function ClockLabels()
+		sizeMenu.ClockLabels = function()
 			local d = SS.DB();
-			sizeMenu.clockBox:SetText(d.localClockBackground == false and "Show background" or "Remove background");
-			local is24 = SlimSuiteWorld and SlimSuiteWorld.ClockIs24 and SlimSuiteWorld.ClockIs24();
-			sizeMenu.clock24:SetText(is24 and "Switch to 12-hour" or "Switch to 24-hour");
 			-- automatic unless set by hand; the text says what the clock is doing now
 			local now = SlimSuiteWorld and SlimSuiteWorld.DaylightOffset and SlimSuiteWorld.DaylightOffset() or 0;
 			if ( d.localClockDST == nil ) then
@@ -3919,90 +3443,12 @@ function SS.PrepareSizeTools(name, label)
 				local dst = tonumber(d.localClockDST) or 0;
 				sizeMenu.clockDst:SetText("Daylight saving: " .. (dst > 0 and "+1 hour" or (dst < 0 and "-1 hour" or "off")));
 			end
-		end
-		local function ClockChanged()
-			if ( SlimSuiteWorld and SlimSuiteWorld.UpdateLocalClock ) then SlimSuiteWorld.UpdateLocalClock(); end
-			ClockLabels();
-		end
-		sizeMenu.clockBox = K.Button(sizeMenu, "Remove background", 184, function()
-			SS.DB().localClockBackground = SS.DB().localClockBackground == false; ClockChanged();
+		end;
+		Row("dst", { { sizeMenu.clockDst, "TOPLEFT", 10, 0 } });
+		local muteButton = K.Button(sizeMenu, "Hide feature", 112, function()
+			if ( sizeTarget ) then SS.ToggleFeatureMute(sizeTarget); end
 		end);
-		sizeMenu.clockBox:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -208);
-		sizeMenu.clock24 = K.Button(sizeMenu, "Switch to 24-hour", 184, function()
-			local is24 = SlimSuiteWorld and SlimSuiteWorld.ClockIs24 and SlimSuiteWorld.ClockIs24();
-			SS.DB().localClock24 = not is24; ClockChanged();
-		end);
-		sizeMenu.clock24:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -236);
-		-- automatic -> forced on (+1 hour) -> forced off -> automatic
-		sizeMenu.clockDst = K.Button(sizeMenu, "Daylight saving: auto", 184, function()
-			local dst = SS.DB().localClockDST;
-			if ( dst == nil ) then SS.DB().localClockDST = 1;
-			elseif ( dst == 1 ) then SS.DB().localClockDST = 0;
-			else SS.DB().localClockDST = nil; end
-			ClockChanged();
-		end);
-		sizeMenu.clockDst:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -264);
-		sizeMenu.ClockLabels = ClockLabels;
-		-- the player frame's own option
-		sizeMenu.mirror = CreateFrame("CheckButton", nil, sizeMenu, "UICheckButtonTemplate");
-		sizeMenu.mirror:SetWidth(22); sizeMenu.mirror:SetHeight(22);
-		sizeMenu.mirror:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 8, -207);
-		sizeMenu.mirror.label = sizeMenu.mirror:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		sizeMenu.mirror.label:SetPoint("LEFT", sizeMenu.mirror, "RIGHT", 2, 1); sizeMenu.mirror.label:SetText("Mirror target |cffff9933(!)|r");
-		sizeMenu.mirror.get = function() return SS.DB().mirrorTarget; end;
-		SS.TrackToggle(sizeMenu.mirror);
-		sizeMenu.mirror:SetScript("OnClick", function() SS.SetMirrorTarget(not SS.DB().mirrorTarget); SS.RefreshToggles(); end);
-		sizeMenu.mirror:SetScript("OnEnter", function() SS.ShowWarnTip(this, SS.WARN.mirror); end);
-		sizeMenu.mirror:SetScript("OnLeave", function() SS.HideWarnTip(); end);
-		sizeMenu.mirror:Hide();
-		sizeMenu.xref = {};
-		for i = 1, 14 do
-			local cb = CreateFrame("CheckButton", nil, sizeMenu, "UICheckButtonTemplate");
-			cb:SetWidth(22); cb:SetHeight(22);
-			cb:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 8, -312 - (i - 1) * 26);
-			cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-			cb.label:SetPoint("LEFT", cb, "RIGHT", 2, 1); cb.label:SetWidth(160); cb.label:SetJustifyH("LEFT");
-			cb.warn = cb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-			cb.warn:SetPoint("TOPLEFT", cb.label, "BOTTOMLEFT", 0, -1); cb.warn:SetWidth(160); cb.warn:SetJustifyH("LEFT");
-			cb.warn:SetTextColor(1, 0.6, 0.2); cb.warn:Hide();
-			cb:SetScript("OnClick", function()
-				-- an entry is { label, get, set, condition }: the setting is flipped, whatever the box showed
-				local e = this.entry;
-				if ( e ) then SS.FlipToggle(e[2], e[3]); end
-				SS.RefreshCrossRefs(SS.sizeMenuName);
-				SS.RefreshToggles();
-			end);
-			cb:SetScript("OnEnter", function() if ( this.entry and this.entry.warn ) then SS.ShowWarnTip(this, this.entry.warn); end end);
-			cb:SetScript("OnLeave", function() SS.HideWarnTip(); end);
-			cb:Hide();
-			SS.TrackToggle(cb);
-			sizeMenu.xref[i] = cb;
-		end
-		-- indented under Mirror target; greyed out unless mirroring is on
-		sizeMenu.mirrorScale = CreateFrame("CheckButton", nil, sizeMenu, "UICheckButtonTemplate");
-		sizeMenu.mirrorScale:SetWidth(22); sizeMenu.mirrorScale:SetHeight(22);
-		sizeMenu.mirrorScale:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 26, -229);
-		sizeMenu.mirrorScale.label = sizeMenu.mirrorScale:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		sizeMenu.mirrorScale.label:SetPoint("LEFT", sizeMenu.mirrorScale, "RIGHT", 2, 1); sizeMenu.mirrorScale.label:SetText("Same size scaling");
-		sizeMenu.mirrorScale.get = function() return SS.DB().mirrorSameScale ~= false; end;
-		sizeMenu.mirrorScale.cond = function() return SS.DB().mirrorTarget; end;
-		SS.TrackToggle(sizeMenu.mirrorScale);
-		sizeMenu.mirrorScale:SetScript("OnClick", function() SS.SetMirrorSameScale(not (SS.DB().mirrorSameScale ~= false)); SS.RefreshToggles(); end);
-		sizeMenu.mirrorScale:Hide();
-		-- the target frame's and the buff frame's shared option
-		sizeMenu.buffsOn = CreateFrame("CheckButton", nil, sizeMenu, "UICheckButtonTemplate");
-		sizeMenu.buffsOn:SetWidth(22); sizeMenu.buffsOn:SetHeight(22);
-		sizeMenu.buffsOn.label = sizeMenu.buffsOn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		sizeMenu.buffsOn.label:SetPoint("LEFT", sizeMenu.buffsOn, "RIGHT", 2, 1); sizeMenu.buffsOn.label:SetText("Buffs on the target frame |cffff9933(!)|r");
-		sizeMenu.buffsOn.get = function() return SS.DB().buffsOnTarget; end;
-		SS.TrackToggle(sizeMenu.buffsOn);
-		sizeMenu.buffsOn:SetScript("OnClick", function() SS.SetBuffsOnTarget(not SS.DB().buffsOnTarget); SS.RefreshToggles(); end);
-		sizeMenu.buffsOn:SetScript("OnEnter", function() SS.ShowWarnTip(this, SS.WARN.buffsTarget); end);
-		sizeMenu.buffsOn:SetScript("OnLeave", function() SS.HideWarnTip(); end);
-		sizeMenu.buffsSide = K.Button(sizeMenu, "Buffs: below the target", 184, function()
-			SS.SetBuffsSide(SS.DB().buffsOnTargetSide == "above" and "below" or "above");
-		end);
-		sizeMenu.buffsOn:Hide(); sizeMenu.buffsSide:Hide();
+		sizeMenu.muteButton = muteButton;
 		local reset = K.Button(sizeMenu, "Reset", 62, function()
 			if ( not SS.ResetElement(sizeTarget) ) then
 				K.Print(NAME, "the original size is not available yet; try again after the frame appears.");
@@ -4010,63 +3456,49 @@ function SS.PrepareSizeTools(name, label)
 			end
 			SS.OpenSizeMenu(sizeMenu.element or sizeTarget, sizeMenu.label);
 		end);
-		reset:SetPoint("BOTTOMLEFT", sizeMenu, "BOTTOMLEFT", 10, 8);
-		sizeMenu.dragStrip:Hide();                          -- the menu itself is dragged
+		Row("last", { { muteButton, "TOPLEFT", 10, 0 }, { reset, "TOPRIGHT", -10, 0 } });
 	end
 	sizeTarget = SS.Shown(name);
 	sizeMenu.element, sizeMenu.label = name, label;
-	local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
-	sizeMenuText:SetText("Size & layout");
-	sizeMenuWidth:SetText("Width: " .. math.floor(w + 0.5));
-	sizeMenuHeight:SetText("Height: " .. math.floor(h + 0.5));
-	-- the classic player and target frames' artwork has a fixed size: width and height would only change the area you
-	-- can click, so they are resized with Scale alone (the new-school cards keep all three)
+	sizeMenu.ShowSize();
+	-- the classic player, target and party frames' and the minimap's artwork has a fixed size: width and height would
+	-- only change the area you can click, so they are resized with Scale alone (the new-school cards keep all three)
 	local fixedArt = sizeTarget == "PlayerFrame" or sizeTarget == "TargetFrame" or sizeTarget == "PartyMemberFrame1"
 		or sizeTarget == "MinimapCluster" or sizeTarget == "SlimSuiteMinimapBar";
-	for _, c in ipairs(sizeMenu.sizeRows or {}) do if ( fixedArt ) then c:Hide(); else c:Show(); end end
-	local scale = SS.DB().scales[sizeTarget] or 1;
-	sizeMenuScaleInput:SetText(tostring(math.max(20, math.min(200, math.floor(scale * 100 + 0.5)))));
-	if ( sizeMenu.layoutButton ) then
-		local canOrient = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "SlimSuiteBossFrames" or name == "SlimSuiteSpellRowFrame" or name == "SlimSuiteItemRowFrame" or name == "MainMenuBar" or name == "MainMenuExpBar" or name == "BuffFrame" or name == "PartyMemberFrame1";
-		if ( canOrient ) then
-			sizeMenu.layoutButton:Show();
-			sizeMenu.layoutButton:SetWidth(name == "BuffFrame" and 116 or 138);
-			local orientation = name == "SlimSuiteTallyFrame" and (SS.DB().tallyVertical and "vertical" or "horizontal") or SS.CurrentOrientation(name);
-			sizeMenu.layoutButton:SetText(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical");
-		else
-			sizeMenu.layoutButton:Hide();
+	local rows = sizeMenu.rows;
+	rows.width.on, rows.height.on = not fixedArt, not fixedArt and name ~= "GameTooltip";   -- a tooltip is as tall as its text
+	rows.scale.on, rows.last.on = true, true;
+	sizeMenuScaleInput:SetText(tostring(math.max(20, math.min(200, math.floor((SS.DB().scales[sizeTarget] or 1) * 100 + 0.5)))));
+	-- the other elements that turn have "vertical" among their settings, so it is not offered twice
+	rows.layout.on = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "BuffFrame";
+	if ( rows.layout.on ) then sizeMenu.LayoutText(); end
+	sizeMenu.growthButton.wanted = name == "BuffFrame";
+	if ( name == "BuffFrame" ) then sizeMenu.growthButton:SetText("Grow " .. SS.BuffGrowthDirection()); end
+	rows.padding.on = name == "SlimSuiteClockFrame" or name == "SlimSuiteBossFrames" or name == "SlimSuiteTallyFrame"
+		or name == "SlimSuiteAnnouncementFrame" or name == "BuffFrame";
+	if ( rows.padding.on ) then sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(name)); end
+	rows.dst.on = name == "SlimSuiteLocalClockFrame";
+	if ( rows.dst.on ) then sizeMenu.ClockLabels(); end
+	sizeMenu.muteButton:SetText(SS.DB().muted[sizeTarget] and "Show feature" or "Hide feature");
+	-- the rows in use, one under the other
+	local y = -24;
+	for i = 1, table.getn(rows) do
+		local row = rows[i];
+		for k = 1, table.getn(row.parts) do
+			local p = row.parts[k];
+			local thing = p[1];
+			if ( row.on and thing.wanted ~= false ) then
+				thing:ClearAllPoints();
+				thing:SetPoint(p[2], sizeMenu, p[2], p[3], y + p[4]);
+				thing:Show();
+			else
+				thing:Hide();
+			end
 		end
-		if ( sizeMenu.growthButton ) then
-			if ( name == "BuffFrame" ) then
-				sizeMenu.growthButton:Show();
-				sizeMenu.growthButton:SetText("Grow " .. SS.BuffGrowthDirection());
-			else sizeMenu.growthButton:Hide(); end
-		end
-		if ( name == "SlimSuiteSpellRowFrame" ) then
-			sizeMenu.attachButton:Show();
-			sizeMenu.attachButton:SetText(SS.DB().buildRowsAttached and "Detach build rows" or "Attach build rows");
-		else sizeMenu.attachButton:Hide(); end
-		local canPad = name == "SlimSuiteClockFrame" or name == "SlimSuiteBossFrames" or name == "SlimSuiteTallyFrame" or name == "SlimSuiteAnnouncementFrame" or name == "BuffFrame";
-		if ( canPad ) then
-			sizeMenu.paddingWheel:Show();
-			sizeMenuPadding:Show(); sizeMenu.padDown:Show(); sizeMenu.padUp:Show();
-			sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(name));
-		else
-			sizeMenuPadding:Hide(); sizeMenu.padDown:Hide(); sizeMenu.padUp:Hide();
-			sizeMenu.paddingWheel:Hide();
-		end
-		sizeMenu.muteButton:SetText(SS.DB().muted[sizeTarget] and "Show feature" or "Hide feature");
+		if ( row.on ) then y = y - 27; end
 	end
-	if ( sizeMenu.clockBox ) then
-		-- Mirror target, the buffs and the clock's background and 12/24-hour are setting rows now, as in the setup;
-		-- only the clock's daylight-saving button stays a button
-		for _, c in ipairs({ sizeMenu.mirror, sizeMenu.mirrorScale, sizeMenu.buffsOn, sizeMenu.buffsSide, sizeMenu.clockBox, sizeMenu.clock24 }) do c:Hide(); end
-		local isClock = name == "SlimSuiteLocalClockFrame";
-		sizeMenu.clockDst:ClearAllPoints(); sizeMenu.clockDst:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 10, -208);
-		if ( isClock ) then sizeMenu.clockDst:Show(); sizeMenu.ClockLabels(); else sizeMenu.clockDst:Hide(); end
-	end
+	sizeMenu:SetHeight(-y + 2);
 	SS.sizeMenuName = name;
-	SS.RefreshCrossRefs(name);
 	return true;
 end
 
@@ -4291,26 +3723,6 @@ function SS.FinishHandleMove(h, name)
 	else SS.SavePlace(name, t); SS.DB().places[name].relative = nil; SS.Place(name); end
 end
 
-function SS.BuffHandleBounds(frame)
-	local left, right, bottom, top;
-	local list = {};
-	for k, b in ipairs(SS.BuffButtons()) do list[k] = b[2]; end
-	for _, s in pairs(SS.BuffSamples()) do table.insert(list, s); end
-	for k = 1, table.getn(list) do
-		local button = list[k];
-		if ( button and button:IsShown() ) then
-			local l, r, b, t = RootBounds(button);
-			if ( l and r and b and t ) then
-				left = left and math.min(left, l) or l; right = right and math.max(right, r) or r;
-				bottom = bottom and math.min(bottom, b) or b; top = top and math.max(top, t) or t;
-			end
-		end
-	end
-	if ( left and right and bottom and top ) then return left, bottom, right - left, top - bottom; end
-	local l, r, b = RootBounds(frame);
-	return l or 0, b or 0, 32, 32;
-end
-
 -- the frame a handle sits on: its outline follows the frame (the tooltip handle also keeps itself on top)
 function SS.FollowHandle(h, name)
 	local t = getglobal(name);
@@ -4432,8 +3844,9 @@ function SS.Handle(name, label)
 	return h;
 end
 
--- one shared follower keeps every shown handle on its frame (it replaces a separate OnUpdate per handle)
-SS.Every("handleFollow", 0, function()
+-- one shared follower keeps every shown handle on its frame, 20 times a second (the one being dragged follows every
+-- frame, from its own drag step)
+SS.Every("handleFollow", 0.05, function()
 	for i = 1, table.getn(handleList) do
 		local h = handleList[i];
 		if ( h:IsShown() ) then SS.FollowHandle(h, h.handleName); end
@@ -4470,7 +3883,8 @@ end
 
 function SS.SetUnlocked(on, quiet)
 	-- The first time the mover is opened, the setup walks through the UI one element at a time instead.
-	if ( on and not quiet and not setupActive and SS.StartSetup ) then
+	-- After that it opens Edit mode (every handle, and the move panel with "Run setup again").
+	if ( on and not quiet and not setupActive and SS.StartSetup and not SS.DB().setupDone ) then
 		SS.StartSetup();
 		return;
 	end
@@ -4548,9 +3962,10 @@ function SS.HookTooltipOwner()
 		if ( self.SetClampedToScreen ) then self:SetClampedToScreen(true); end
 		-- Leave every tooltip at the game's own size until the player resizes it or moves it.
 		if ( not SS.DB().tooltipCustom and not SS.DB().unlocked ) then return; end
+		-- the chosen width; the height is whatever the text needs (a one-line tooltip stays one line tall)
 		local size = SS.DB().sizes.GameTooltip;
 		if ( type(size) ~= "table" ) then size = { w = 260, h = 140 }; end
-		self:SetWidth(size.w); self:SetHeight(size.h);
+		self:SetWidth(size.w);
 		local p = SS.DB().places.GameTooltip;
 		if ( SS.DB().unlocked and type(p) == "table" and type(p.x) == "number" and type(p.y) == "number" ) then
 			SetRootPosition(self, p.x, p.y);
@@ -4573,12 +3988,6 @@ function SS.HookTooltipOwner()
 			-- leaves the old row heights in place and lets long text paint outside the tooltip.
 			if ( type(size) == "table" and size.w ) then self:SetWidth(size.w); end
 			tooltipShowOriginal(self);
-			if ( type(size) == "table" and size.w and size.h ) then
-				-- Some game tooltips contain more wrapped rows than the saved preferred height.
-				-- Preserve their full measured height instead of letting the last row bleed out.
-				local contentHeight = self:GetHeight() or 0;
-				self:SetHeight(math.max(size.h, contentHeight));
-			end
 		end;
 	end
 end
@@ -4772,41 +4181,6 @@ function SS.BarArt(alpha)
 	end
 end
 
--- the bar's own width and its page arrows' places, kept to put back when the plain bar is turned off
-local barWidth, arrowUp, arrowDown;
-function SS.Narrow(on)
-	if ( not MainMenuBar or not ActionButton1 or not ActionButton6 ) then return; end
-	if ( not barWidth ) then
-		barWidth = MainMenuBar:GetWidth();
-		if ( ActionBarUpButton and ActionBarUpButton.GetPoint ) then arrowUp = { ActionBarUpButton:GetPoint(1) }; end
-		if ( ActionBarDownButton and ActionBarDownButton.GetPoint ) then arrowDown = { ActionBarDownButton:GetPoint(1) }; end
-	end
-	if ( on ) then
-		-- as wide as the six squares, plus room for the two page arrows on their right, as in the default bar
-		local left = ActionButton1:GetLeft() and MainMenuBar:GetLeft() and (ActionButton1:GetLeft() - MainMenuBar:GetLeft()) or 8;
-		local squares = ActionButton6:GetRight() and ActionButton1:GetLeft() and (ActionButton6:GetRight() - ActionButton1:GetLeft()) or 252;
-		MainMenuBar:SetWidth(left + squares + 34);
-		if ( ActionBarUpButton ) then
-			ActionBarUpButton:ClearAllPoints();
-			ActionBarUpButton:SetPoint("TOPLEFT", ActionButton6, "TOPRIGHT", 2, 6);
-		end
-		if ( ActionBarDownButton ) then
-			ActionBarDownButton:ClearAllPoints();
-			ActionBarDownButton:SetPoint("BOTTOMLEFT", ActionButton6, "BOTTOMRIGHT", 2, -6);
-		end
-	else
-		MainMenuBar:SetWidth(barWidth);
-		if ( ActionBarUpButton and arrowUp and arrowUp[1] ) then
-			ActionBarUpButton:ClearAllPoints();
-			ActionBarUpButton:SetPoint(arrowUp[1], arrowUp[2], arrowUp[3], arrowUp[4], arrowUp[5]);
-		end
-		if ( ActionBarDownButton and arrowDown and arrowDown[1] ) then
-			ActionBarDownButton:ClearAllPoints();
-			ActionBarDownButton:SetPoint(arrowDown[1], arrowDown[2], arrowDown[3], arrowDown[4], arrowDown[5]);
-		end
-	end
-end
-
 function SS.PlainBar(on)
 	if ( not MainMenuBar ) then return; end
 	SS.BarArt(on and 0 or 1);
@@ -4831,6 +4205,8 @@ end
 local cdText = {};
 SS.Every("cooldowns", 0.1, function()
 	local on = SS.DB().cooldowns;
+	if ( not on and not SS.cooldownsShown ) then return; end   -- off, and nothing left on the squares
+	SS.cooldownsShown = on and true or false;
 	local spells = type(AZS_SPELLS) == "table" and AZS_SPELLS or {};
 	local n = table.getn(spells);
 	for i = 1, 7 do
@@ -4878,7 +4254,7 @@ function SU.Steps()
 		{ "BuffFrame", "Buffs/Debuffs", "Your buffs and debuffs. Below, stack them in a column and choose which way they grow. Attached to the target frame, they move and scale with it instead." },
 		{ "MinimapCluster", "Minimap", "The minimap, with its pins." },
 		{ "ChatFrame1", "Chat", "The chat window, its tab and the box you type in move together." },
-		{ "GameTooltip", "Tooltip", "Where tooltips appear while the UI is unlocked, and their size." },
+		{ "GameTooltip", "Tooltip", "Where tooltips appear, and how wide they are. Each one is as tall as its own text." },
 		{ "SlimSuiteStoredLevelsButton", "Level Up", "The movable Level Up button and its store toggle.", function() return d.moveLevelButton; end },
 		{ "SlimSuiteSpellRowFrame", "Build rows", "Your build spells, with your worn jewelry joined under them.", function() return d.replaceBuildRows; end },
 		{ "SlimSuiteMeterFrame", "Damage meter", "The meter. Its corner grip resizes it any time.", function() return d.moveMeter; end },
@@ -5178,11 +4554,6 @@ function SU.ChecksFor(frame)
 	return out;
 end
 
--- the right-click menu's settings: exactly the ones the setup shows for the element (in the same order)
-function SS.CrossRefs(name)
-	return SU.ChecksFor(name);
-end
-
 -- the game's own frames and every Slim Suite frame: hidden by alpha during setup, restored when it ends
 function SU.Save(f)
 	SU.saved = SU.saved or {};
@@ -5222,7 +4593,6 @@ function SU.HideAll()
 	local keep = { [SU.panel] = true, [SU.bar] = true, [SU.glow] = true };
 	for name in pairs(SU.KEEP_VISIBLE) do local c = getglobal(name); if ( c ) then keep[c] = true; end end
 	for _, h in pairs(handles) do keep[h] = true; end
-	if ( sizeMenu ) then keep[sizeMenu] = true; end   -- the right-click menu stays usable while the setup redraws
 	local kids = { UIParent:GetChildren() };
 	for i = 1, table.getn(kids) do
 		local f = kids[i];
@@ -5545,7 +4915,7 @@ function SS.RefreshCard(f)
 		if ( unit == "target" and SS.Previewing("TargetFrame") ) then
 			local t = SU.SAMPLE_TARGET;
 			f.name:SetText(t.name); f.name:SetTextColor(0.9, 0.25, 0.25);
-			f.hp:SetMinMaxValues(0, 100); f.hp:SetValue(t.hp); f.hpText:SetText("Elite");
+			f.hp:SetMinMaxValues(0, 100); f.hp:SetValue(t.hp); f.hpText:SetText("Elite"); f.hpWas = nil;
 			f.power:SetMinMaxValues(0, 1); f.power:SetValue(0);
 			f:Show();
 		else
@@ -5553,24 +4923,25 @@ function SS.RefreshCard(f)
 		end
 		return;
 	end
-	local rgb = { 1, 1, 1 };
+	local rgb = SS.RGB.white;
 	if ( UnitIsPlayer(unit) ) then
 		local _, token = UnitClass(unit);
 		rgb = SS.ClassColor(token) or rgb;
 	elseif ( UnitIsEnemy and UnitIsEnemy("player", unit) ) then
-		rgb = { 0.9, 0.25, 0.25 };
+		rgb = SS.RGB.enemy;
 	else
-		rgb = { 0.6, 0.9, 0.3 };
+		rgb = SS.RGB.friend;
 	end
 	f.name:SetText(UnitName(unit) or ""); f.name:SetTextColor(rgb[1], rgb[2], rgb[3]);
 	local hp, hpMax = UnitHealth(unit) or 0, UnitHealthMax(unit) or 1;
 	if ( hpMax < 1 ) then hpMax = 1; end
-	f.hp:SetMinMaxValues(0, hpMax); f.hp:SetValue(hp); f.hpText:SetText(hp .. " / " .. hpMax);
+	f.hp:SetMinMaxValues(0, hpMax); f.hp:SetValue(hp);
+	if ( f.hpWas ~= hp or f.hpMaxWas ~= hpMax ) then f.hpWas, f.hpMaxWas = hp, hpMax; f.hpText:SetText(hp .. " / " .. hpMax); end
 	local pw, pwMax = UnitMana(unit) or 0, UnitManaMax(unit) or 1;
 	if ( pwMax < 1 ) then pwMax = 1; end
 	local kind = UnitPowerType(unit);
-	local pc = { 0.2, 0.4, 1 };
-	if ( kind == 1 ) then pc = { 0.9, 0.15, 0.15 }; elseif ( kind == 3 ) then pc = { 1, 0.9, 0.2 }; end
+	local pc = SS.RGB.mana;
+	if ( kind == 1 ) then pc = SS.RGB.rage; elseif ( kind == 3 ) then pc = SS.RGB.energy; end
 	f.power:SetStatusBarColor(pc[1], pc[2], pc[3]);
 	f.power:SetMinMaxValues(0, pwMax); f.power:SetValue(pw);
 	f:Show();
@@ -5585,12 +4956,13 @@ function SS.GuardTargetTooltips()
 			local f = getglobal(kind .. i);
 			if ( f and f.GetScript and not f.slimGuarded ) then
 				local original = f:GetScript("OnEnter");
-				if ( original ) then
+				-- copies made inside the loop: in the game's Lua 5.0 a loop's own variables are shared by every pass, so a
+				-- function made here must not read `i` or `lookup` themselves (it would see the loop's last values)
+				local id, find = i, lookup;
+				if ( original and find ) then
 					f.slimGuarded = true;
-					-- the icon's number is known here: not every icon has GetID
 					f:SetScript("OnEnter", function()
-						local id = i;
-						if ( UnitExists("target") and lookup("target", id) ) then original(); end
+						if ( UnitExists("target") and find("target", id) ) then original(); end
 					end);
 				end
 			end
@@ -5788,8 +5160,8 @@ function SS.UpdatePartyLines()
 			l.bar:ClearAllPoints();
 			l.bar:SetPoint("TOPLEFT", l, "TOPLEFT", faceW + 1, -1); l.bar:SetPoint("BOTTOMRIGHT", l, "BOTTOMRIGHT", -1, 1);
 			l.bar:SetMinMaxValues(0, hpMax); l.bar:SetValue(dead and 0 or hp);
-			local rgb = SS.ClassColor(class) or { 0.2, 0.75, 0.2 };
-			if ( dead ) then rgb = { 0.4, 0.4, 0.4 }; end
+			local rgb = SS.ClassColor(class) or SS.RGB.health;
+			if ( dead ) then rgb = SS.RGB.dead; end
 			l.bar:SetStatusBarColor(rgb[1] * 0.75, rgb[2] * 0.75, rgb[3] * 0.75);
 			if ( l.fontSize ~= size ) then l.fontSize = size; l.name:SetFont(font, size); end
 			l.name:SetText(name);
@@ -5912,8 +5284,8 @@ function SS.UpdatePartySelf()
 	local mp, mpMax = UnitMana("player") or 0, UnitManaMax("player") or 1;
 	if ( mpMax < 1 ) then mpMax = 1; end
 	local kind = UnitPowerType("player");
-	local pc = { 0, 0, 1 };
-	if ( kind == 1 ) then pc = { 1, 0, 0 }; elseif ( kind == 3 ) then pc = { 1, 1, 0 }; end
+	local pc = SS.RGB.classicMana;
+	if ( kind == 1 ) then pc = SS.RGB.classicRage; elseif ( kind == 3 ) then pc = SS.RGB.classicEnergy; end
 	f.mp:SetStatusBarColor(pc[1], pc[2], pc[3]);
 	f.mp:SetMinMaxValues(0, mpMax); f.mp:SetValue(mp);
 end
@@ -6091,7 +5463,8 @@ function SU.Focus(frame)
 		SU.panel.text:SetText("Click an element on the bar above to turn it on, then set its options here. Click it again to turn it off.");
 	end
 	local h = 58 + (SU.panel.text:GetHeight() or 28) + 40;
-	for i = 1, 12 do
+	for i = 1, math.max(table.getn(checks), table.getn(SU.checks)) do
+		if ( not SU.checks[i] ) then SU.checks[i] = SU.Check(SU.panel); end   -- as many rows as the element has settings
 		local cb, c = SU.checks[i], checks[i];
 		if ( c ) then
 			cb.label:SetText(c[1] .. (c.warn and " |cffff9933(!)|r" or "")); cb.get, cb.set, cb.cond = c[2], c[3], c[4];
@@ -6377,7 +5750,7 @@ function SU.Begin()
 	SU.titles = {};
 	for i = 1, table.getn(SU.elements) do SU.titles[SU.elements[i].frame] = SU.elements[i].title; end
 	SU.HideAll();
-	SS.Safe(SS.SetNativeMeterHidden, true);
+	SS.Safe(SS.HideNative, "meter", true);
 	local saved = SS.DB().enabledElements or {};
 	SU.restoring = true;
 	SU.batching = true;      -- one bar and demo refresh at the end, not one per element
@@ -6478,7 +5851,7 @@ function SU.Build()
 		b:SetHeight(18); b:SetPoint("TOPRIGHT", SU.panel, "TOPRIGHT", -8 - (4 - i) * 36, -8);
 		SU.sizes[i] = b;
 	end
-	-- the element's own questions (up to five tick boxes)
+	-- the element's own settings (more rows are made when an element needs them)
 	SU.checks = {};
 	for i = 1, 12 do SU.checks[i] = SU.Check(SU.panel); end
 	SU.panel.exit = K.Button(SU.panel, "Exit", 90, function() SS.SetupEnd(false); end);
@@ -6566,8 +5939,8 @@ function SS.SetupHide()
 	if ( SU.panel ) then SU.panel:Hide(); end
 	if ( SU.bar ) then SU.bar:Hide(); end
 	SS.Safe(SS.EndPreviewsIfDone);
-	SS.Safe(SS.SetNativeMeterHidden, false);
-	if ( SS.DB().moveMeter ) then SS.Safe(SS.SetNativeMeterHidden, true); end
+	SS.Safe(SS.HideNative, "meter", false);
+	if ( SS.DB().moveMeter ) then SS.Safe(SS.HideNative, "meter", true); end
 	if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
 end
 
@@ -6744,6 +6117,8 @@ function SS.WinBuild()
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
+			{button = "Layouts (share / paste)", onClick = function() SS.ShowLayoutWindow(); end},
+			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
 			{head="Player and target frames"},
 			{"Player frame look", function() return SS.PlayerLookChoice(); end, function(v) SS.SetPlayerLookChoice(v); end, choice = SS.PLAYER_LOOKS},
 			{"Target frame look", function() return SS.DB().targetLook == "new" and "new" or "classic"; end, function(v) SS.SetLook("TargetFrame", v); end, choice = SS.LOOK_CHOICES},
@@ -6801,13 +6176,14 @@ function SS.WinBuild()
 			{"No level-up stat bonuses in chat", function() return SS.DB().hideLevel;end,function(v) SS.DB().hideLevel=v;end},
 			{"No new spell lines in chat", function() return SS.DB().hideNewSpells;end,function(v) SS.DB().hideNewSpells=v;end},
 			{"Hide racial buff information in chat", function() return SS.DB().hideRacialInfo;end,function(v) SS.DB().hideRacialInfo=v;end},
-			{"Hide the Oogax Q opening line", function() return SS.DB().hideOpeningLine;end,function(v) SS.DB().hideOpeningLine=v;end},
-			{"Hide 'Who dares to enter my lair'", function() return SS.DB().hideLairLine;end,function(v) SS.DB().hideLairLine=v;end},
+			{"Hide the Oogax Q opening line (English game text only)", function() return SS.DB().hideOpeningLine;end,function(v) SS.DB().hideOpeningLine=v;end},
+			{"Hide 'Who dares to enter my lair' (English game text only)", function() return SS.DB().hideLairLine;end,function(v) SS.DB().hideLairLine=v;end},
 			{"Hide in-game roleplay lines from chat", function() return SS.DB().hideRP;end,function(v) SS.DB().hideRP=v;end},
 			{head="Camera and marks"},
 			{"Camera as far out as it goes (50)", function() return SS.DB().camera; end, function(v) SS.DB().camera = v; SS.Camera(v); end},
 			{"Mark pulled bosses and Guardians (Skull, X, Circle, Star)", function() return SS.DB().bossMarks; end, function(v) SS.DB().bossMarks = v; end},
 			{"   ...and Guardians and lairs before they're pulled", function() return SS.DB().prePullMarks; end, function(v) SS.DB().prePullMarks = v; end},
+			{"Raid-mark row when the mouse is over a party member (in a group)", function() return SS.DB().raidRow; end, function(v) SS.DB().raidRow = v and true or false; end},
 			{head="Minimap"},
 			{"Show caches on the minimap", function() return SS.DB().minimapCaches; end, function(v) SS.DB().minimapCaches = v; end},
 			{"Show bosses on the minimap", function() return SS.DB().minimapBosses; end, function(v) SS.DB().minimapBosses = v; end},
@@ -6853,14 +6229,13 @@ function SS.WinBuild()
 	end
 	tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -732);
-	tooltipTitle:SetText("Tooltip size");
+	tooltipTitle:SetText("Tooltip width");
 	local function AdjustTooltipSize(delta)
 		local size = SS.DB().sizes.GameTooltip;
 		if ( type(size) ~= "table" ) then size = { w = 260, h = 140 }; SS.DB().sizes.GameTooltip = size; end   -- the player's own size from now on
 		SS.DB().tooltipCustom = true;
 		size.w = math.max(160, math.min(600, size.w + delta));
-		size.h = math.max(80, math.min(500, size.h + delta));
-		if ( GameTooltip ) then GameTooltip:SetWidth(size.w); GameTooltip:SetHeight(size.h); end
+		if ( GameTooltip ) then GameTooltip:SetWidth(size.w); end
 		PlaceAll();
 	end
 	tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
@@ -6929,6 +6304,14 @@ function SS.ToggleMouseProbe()
 	K.Print(NAME, "the frame under your cursor is named next to it. /slimsuite mouse turns it off.");
 end
 
+SS.HELP = {
+	"/slim: the settings window.  /slim edit: move and size the UI (/slim lock when done).  /slim setup: the guided setup.",
+	"/slim demo: Demo Mode on or off.  /slim levelup: Slim Suite's Level Up button or the game's own.",
+	"/slim layout: share a layout as text.  /slim layout save <name>, load <name>, delete <name>, list.",
+	"/slim reset places, /slim reset all: back to where everything started.",
+	"/slim hide <words>, /slim unhide <words>, /slim hide: chat lines with those words.",
+	"/slim minimap: the gear button.  /slim errors: the error log.  /slim mouse: names the frame under the cursor.",
+};
 SLASH_SLIMSUITE1 = "/slimsuite";
 SLASH_SLIMSUITE2 = "/slim";
 SlashCmdList["SLIMSUITE"] = function(msg)
@@ -6937,7 +6320,15 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 	cmd = string.lower(cmd or "");
 	rest = string.lower(rest or "");
 	local d = SS.DB();
-	if ( cmd == "hide" and rest ~= "" ) then
+	if ( cmd == "help" or cmd == "?" ) then
+		for _, line in ipairs(SS.HELP) do K.Print(NAME, line); end
+	elseif ( cmd == "hide" and rest == "" ) then
+		if ( table.getn(d.words) == 0 ) then K.Print(NAME, "no words are hidden. /slim hide <words> hides chat lines with them.");
+		else K.Print(NAME, "hidden in chat: \"" .. table.concat(d.words, "\", \"") .. "\". /slim unhide <words> shows them again."); end
+	elseif ( cmd == "hide" ) then
+		for i = 1, table.getn(d.words) do
+			if ( d.words[i] == rest ) then K.Print(NAME, "\"" .. rest .. "\" is hidden already."); return; end
+		end
 		table.insert(d.words, rest);
 		K.Print(NAME, "chat lines with \"" .. rest .. "\" are hidden now.");
 	elseif ( cmd == "unhide" and rest ~= "" ) then
@@ -6950,10 +6341,40 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 	elseif ( cmd == "minimap" ) then
 		local shown = SS.Mini and SS.Mini.Toggle();
 		K.Print(NAME, shown and "the minimap button is back." or "the minimap button is hidden. /slimsuite minimap brings it back.");
-	elseif ( cmd == "unlock" or cmd == "move" ) then
+	elseif ( cmd == "unlock" or cmd == "move" or cmd == "edit" ) then
 		SS.SetUnlocked(true);
 	elseif ( cmd == "lock" ) then
 		SS.SetUnlocked(false);
+	elseif ( cmd == "setup" ) then
+		SS.StartSetup(true);
+	elseif ( cmd == "demo" ) then
+		SS.ToggleDemoMode();
+		K.Print(NAME, SS.demoRunning and "Demo Mode is on. /slim demo turns it off." or "Demo Mode is off.");
+	elseif ( cmd == "levelup" ) then
+		d.moveLevelButton = not d.moveLevelButton;
+		SS.Safe(SS.UpdateLevelButton); SS.RefreshToggles();
+		K.Print(NAME, d.moveLevelButton and "Slim Suite's movable Level Up button is on." or "the game's own Level Up button is back.");
+	elseif ( cmd == "reset" ) then
+		if ( rest == "all" ) then SS.ResetUI(); elseif ( rest == "places" ) then SS.ResetPlaces();
+		else K.Print(NAME, "/slim reset places puts every element back where it started; /slim reset all also resets sizes, scales and layouts."); end
+	elseif ( cmd == "layout" or cmd == "layouts" ) then
+		local _, _, action, name = string.find(rest, "^(%S*)%s*(.-)$");
+		if ( action == "save" and name ~= "" ) then
+			d.layouts[name] = SS.LayoutSnapshot();
+			K.Print(NAME, "layout \"" .. name .. "\" saved.");
+		elseif ( action == "load" and name ~= "" ) then
+			if ( type(d.layouts[name]) == "table" and string.sub(name, 1, 5) ~= "char:" ) then SS.LayoutApply(d.layouts[name]); K.Print(NAME, "layout \"" .. name .. "\" is in use.");
+			else K.Print(NAME, "there is no layout called \"" .. name .. "\". /slim layout list shows them."); end
+		elseif ( action == "delete" and name ~= "" ) then
+			if ( d.layouts[name] and string.sub(name, 1, 5) ~= "char:" ) then d.layouts[name] = nil; K.Print(NAME, "layout \"" .. name .. "\" deleted.");
+			else K.Print(NAME, "there is no layout called \"" .. name .. "\"."); end
+		elseif ( action == "list" ) then
+			local names = SS.LayoutNames();
+			K.Print(NAME, table.getn(names) > 0 and ("saved layouts: " .. table.concat(names, ", ")) or "no layouts saved yet. /slim layout save <name> saves this one.");
+		else
+			SS.ShowLayoutWindow();
+			K.Print(NAME, "/slim layout save <name>, load <name>, delete <name>, list. The window shares a layout as text.");
+		end
 	else
 		SS.Toggle();
 	end
@@ -6962,17 +6383,18 @@ end
 local loader = CreateFrame("Frame");
 loader:RegisterEvent("VARIABLES_LOADED");
 loader:RegisterEvent("PLAYER_ENTERING_WORLD");
-loader:SetScript("OnEvent", function()
+function SS.Startup(entering, loaded)
 	SS.Safe(SS.RegisterAnnouncementHandler);
 	local ok, err = SS.Safe(HookChat);
 	if ( not ok ) then K.Print(NAME, "|cffff4040the chat could not be changed:|r " .. tostring(err)); end
 	-- The editor state is a user choice, not a leftover from an earlier session. Clear legacy
 	-- unlocked saves at load; only the explicit startup option may reopen the mover after login.
-	if ( event == "VARIABLES_LOADED" ) then
+	if ( loaded ) then
 		SS.DB().unlocked = false;
-		SS.Safe(SS.RestoreNativeHudAfterLoad);
+		SS.Safe(SS.RestoreNatives);
 	end
-	SS.Safe(SS.Camera, event == "PLAYER_ENTERING_WORLD");
+	if ( entering ) then SS.Safe(SS.LayoutLogin); end        -- this character's own layout, if they are kept apart
+	SS.Safe(SS.Camera, entering);
 	SS.Safe(SS.ApplyGuardianFlag);
 	-- the frames back where they were put (the game places some of them again as it loads), and the target frame
 	if ( SS.DB().unlocked or type(SS.DB().places.MainMenuExpBar) == "table"
@@ -6982,7 +6404,8 @@ loader:SetScript("OnEvent", function()
 	SS.Safe(SS.ApplyTallyLayout, false);
 	SS.Safe(PlaceAll);
 	SS.Safe(SS.TargetFrameHidden, SS.DB().hideTarget);
-	if ( SS.DB().partyIncludesSelf ) then SS.Safe(SS.PlayerFrameHidden, true); end
+	if ( SS.DB().partyIncludesSelf ) then SS.Safe(SS.PlayerFrameHidden, true);
+	elseif ( SS.playerShow ) then SS.Safe(SS.PlayerFrameHidden, false); end
 	if ( SS.DB().plainBar ) then SS.Safe(SS.PlainBar, true); end
 	SS.Safe(ApplyMovableOrientation, "MainMenuBar");
 	SS.Safe(ApplyMovableOrientation, "MainMenuExpBar");
@@ -6993,8 +6416,198 @@ loader:SetScript("OnEvent", function()
 	SS.Safe(SS.HookTooltipOwner);
 	SS.Safe(PlaceAll);
 	SS.Safe(UpdateMeter);
-	if ( event == "PLAYER_ENTERING_WORLD" ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
+	if ( entering ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
+end
+loader:RegisterEvent("PLAYER_LOGOUT");
+loader:SetScript("OnEvent", function()
+	if ( event == "PLAYER_LOGOUT" ) then SS.Safe(SS.LayoutLogout); return; end
+	SS.Startup(event == "PLAYER_ENTERING_WORLD", event == "VARIABLES_LOADED");
 end);
+
+-- ---------------------------------------------------------------- layouts
+-- A layout is everything about where the UI sits and how it looks: places, sizes, scales, padding, layouts, hidden
+-- elements and the frame looks. Layouts are saved by name (/slim layout save <name>), loaded again, shared as one line
+-- of text (the Layouts window), and can be kept apart for each character.
+SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets" };
+SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget", "mirrorSameScale",
+	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
+	"partyFaces", "cardPortraits", "tallyVertical", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare",
+	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments" };
+function SS.CopyTable(t)
+	local out = {};
+	for k, v in pairs(t) do
+		if ( type(v) == "table" ) then out[k] = SS.CopyTable(v); else out[k] = v; end
+	end
+	return out;
+end
+function SS.LayoutSnapshot()
+	local d, out = SS.DB(), {};
+	for i = 1, table.getn(SS.LAYOUT_TABLES) do
+		local key = SS.LAYOUT_TABLES[i];
+		out[key] = SS.CopyTable(type(d[key]) == "table" and d[key] or {});
+	end
+	for i = 1, table.getn(SS.LAYOUT_KEYS) do
+		local key = SS.LAYOUT_KEYS[i];
+		out[key] = d[key];
+	end
+	return out;
+end
+-- puts a layout in place of the current one and draws everything again from it
+function SS.LayoutApply(layout, quiet)
+	if ( type(layout) ~= "table" ) then return false; end
+	if ( setupActive ) then SS.SetupEnd(true); end
+	if ( SS.demoRunning ) then SS.StopDemoMode(); end
+	local d = SS.DB();
+	for i = 1, table.getn(SS.LAYOUT_TABLES) do
+		local key = SS.LAYOUT_TABLES[i];
+		d[key] = SS.CopyTable(type(layout[key]) == "table" and layout[key] or {});
+	end
+	for i = 1, table.getn(SS.LAYOUT_KEYS) do
+		local key = SS.LAYOUT_KEYS[i];
+		d[key] = layout[key];
+	end
+	d.frameDefault = nil;
+	SS.PrepareDB(d);                                       -- anything the layout did not carry gets its default
+	if ( not quiet ) then
+		-- elements with no place in this layout go back to where they started
+		for i = 1, table.getn(MOVABLE) do
+			local name = MOVABLE[i][1];
+			local frame, points, base = getglobal(name), basePoints[name], baseSizes[name];
+			if ( frame and name ~= "GameTooltip" ) then
+				if ( points and type(d.places[name]) ~= "table" ) then
+					frame:ClearAllPoints();
+					for j = 1, table.getn(points) do local p = points[j]; frame:SetPoint(p[1], p[2], p[3], p[4], p[5]); end
+				end
+				if ( base and type(d.sizes[name]) ~= "table" ) then frame:SetWidth(base.w); frame:SetHeight(base.h); end
+				if ( frame.SetScale and type(d.scales[name]) ~= "number" ) then frame:SetScale(1); end
+			end
+		end
+		SS.Startup(false, false);
+		SS.Safe(SS.SetUnlocked, false, true);
+		SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments);
+		SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.PlainBar, d.plainBar and true or false);
+		for i = 1, table.getn(MOVABLE) do SS.Safe(ApplyFeatureMute, MOVABLE[i][1]); end
+		SS.Safe(SS.UpdateTally); SS.Safe(SS.UpdateClock); SS.Safe(SS.UpdateBossFrames); SS.Safe(SS.ApplyBuffOrientation);
+		SS.Safe(PlaceAll);
+		SS.RefreshToggles();
+	end
+	return true;
+end
+-- a layout as one line of text: "SSL1;places.PlayerFrame.x=n12.5;playerLook=sclassic;..." (n number, s text, b yes/no)
+function SS.LayoutText(layout)
+	local parts = { "SSL1" };
+	local function Add(path, v)
+		if ( type(v) == "table" ) then
+			for k, inner in pairs(v) do
+				if ( type(k) == "string" or type(k) == "number" ) then Add(path .. "." .. tostring(k), inner); end
+			end
+		elseif ( type(v) == "number" ) then table.insert(parts, path .. "=n" .. (math.floor(v * 100 + 0.5) / 100));
+		elseif ( type(v) == "boolean" ) then table.insert(parts, path .. "=b" .. (v and "1" or "0"));
+		elseif ( type(v) == "string" and not string.find(v, "[;=]") ) then table.insert(parts, path .. "=s" .. v);
+		end
+	end
+	for i = 1, table.getn(SS.LAYOUT_TABLES) do Add(SS.LAYOUT_TABLES[i], layout[SS.LAYOUT_TABLES[i]]); end
+	for i = 1, table.getn(SS.LAYOUT_KEYS) do Add(SS.LAYOUT_KEYS[i], layout[SS.LAYOUT_KEYS[i]]); end
+	return table.concat(parts, ";");
+end
+-- reads that text back; only the parts a layout is made of are taken (nil if it is not a layout)
+function SS.LayoutFromText(text)
+	text = string.gsub(tostring(text or ""), "%s+", "");
+	if ( string.sub(text, 1, 5) ~= "SSL1;" ) then return nil; end
+	local allowed = {};
+	for i = 1, table.getn(SS.LAYOUT_TABLES) do allowed[SS.LAYOUT_TABLES[i]] = "table"; end
+	for i = 1, table.getn(SS.LAYOUT_KEYS) do allowed[SS.LAYOUT_KEYS[i]] = "value"; end
+	local out, count = {}, 0;
+	for i = 1, table.getn(SS.LAYOUT_TABLES) do out[SS.LAYOUT_TABLES[i]] = {}; end
+	for path, kind, raw in string.gfind(string.sub(text, 6), "([^;=]+)=([nsb])([^;]*)") do
+		local value;
+		if ( kind == "n" ) then value = tonumber(raw); elseif ( kind == "b" ) then value = raw == "1"; else value = raw; end
+		local keys = {};
+		for key in string.gfind(path, "[^%.]+") do table.insert(keys, key); end
+		local root = keys[1];
+		if ( value ~= nil and allowed[root] == "value" and table.getn(keys) == 1 ) then
+			out[root] = value; count = count + 1;
+		elseif ( value ~= nil and allowed[root] == "table" and table.getn(keys) >= 2 and table.getn(keys) <= 4 ) then
+			local t = out[root];
+			for k = 2, table.getn(keys) - 1 do
+				if ( type(t[keys[k]]) ~= "table" ) then t[keys[k]] = {}; end
+				t = t[keys[k]];
+			end
+			t[keys[table.getn(keys)]] = value; count = count + 1;
+		end
+	end
+	if ( count == 0 ) then return nil; end
+	return out;
+end
+function SS.LayoutNames()
+	local names = {};
+	for name in pairs(SS.DB().layouts) do
+		if ( type(name) == "string" and string.sub(name, 1, 5) ~= "char:" ) then table.insert(names, name); end
+	end
+	table.sort(names);
+	return names;
+end
+-- each character's own layout: kept when that character logs out, put back when it logs in
+function SS.LayoutCharacter()
+	local who = UnitName and UnitName("player");
+	if ( type(who) ~= "string" or who == "" ) then return nil; end
+	return "char:" .. who;
+end
+function SS.LayoutLogin()
+	local d = SS.DB();
+	if ( SS.layoutLoggedIn or not d.layoutPerCharacter ) then return; end
+	local key = SS.LayoutCharacter();
+	if ( not key ) then return; end
+	SS.layoutLoggedIn = true;
+	if ( d.layoutOwner ~= key and type(d.layouts[key]) == "table" ) then SS.LayoutApply(d.layouts[key], true); end
+	d.layoutOwner = key;
+end
+function SS.LayoutLogout()
+	local d = SS.DB();
+	if ( not d.layoutPerCharacter ) then return; end
+	local key = d.layoutOwner or SS.LayoutCharacter();
+	if ( key ) then d.layouts[key] = SS.LayoutSnapshot(); end
+end
+function SS.SetLayoutPerCharacter(on)
+	local d = SS.DB();
+	d.layoutPerCharacter = on and true or false;
+	if ( on ) then d.layoutOwner = SS.LayoutCharacter(); SS.layoutLoggedIn = true; end
+end
+-- the Layouts window: the current layout as text to copy, and a place to paste one in
+function SS.ShowLayoutWindow()
+	local f = getglobal("SlimSuiteLayoutFrame");
+	if ( not f ) then
+		f = K.Window("SlimSuiteLayoutFrame", "Slim Suite layouts", 520, 250);
+		local note = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+		note:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -34); note:SetWidth(470); note:SetJustifyH("LEFT");
+		note:SetText("This is your layout as text. Copy it (Ctrl+C) to share it, or paste a layout over it (Ctrl+V) and press Use this layout. Saved layouts: /slim layout save <name>, load <name>, list, delete <name>.");
+		local scroll = CreateFrame("ScrollFrame", "SlimSuiteLayoutScroll", f, "UIPanelScrollFrameTemplate");
+		scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -78);
+		scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -42, 50);
+		local box = CreateFrame("EditBox", "SlimSuiteLayoutBox", scroll);
+		box:SetMultiLine(true); box:SetAutoFocus(false); box:SetFontObject(GameFontHighlightSmall);
+		box:SetWidth(450); box:SetMaxLetters(0);
+		box:SetScript("OnEscapePressed", function() this:ClearFocus(); end);
+		scroll:SetScrollChild(box);
+		f.box = box;
+		local use = K.Button(f, "Use this layout", 130, function()
+			local layout = SS.LayoutFromText(f.box:GetText());
+			if ( not layout ) then K.Print(NAME, "that text is not a Slim Suite layout."); return; end
+			SS.LayoutApply(layout);
+			K.Print(NAME, "the pasted layout is in use.");
+		end);
+		use:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 22, 18);
+		local mine = K.Button(f, "Show my layout", 130, function()
+			f.box:SetText(SS.LayoutText(SS.LayoutSnapshot()));
+			f.box:SetFocus(); if ( f.box.HighlightText ) then f.box:HighlightText(); end
+		end);
+		mine:SetPoint("LEFT", use, "RIGHT", 8, 0);
+	end
+	f.box:SetText(SS.LayoutText(SS.LayoutSnapshot()));
+	f:Show();
+	f.box:SetFocus(); if ( f.box.HighlightText ) then f.box:HighlightText(); end
+end
+
 local buffLayoutUpdater = CreateFrame("Frame");
 buffLayoutUpdater:RegisterEvent("UNIT_AURA");
 buffLayoutUpdater:SetScript("OnEvent", function()
@@ -7404,7 +7017,7 @@ end
 
 local function RaidWithin(f, x, y)
 	if ( not f or not f.IsShown or not f:IsShown() or (f.GetAlpha and (f:GetAlpha() or 1) < 0.05) ) then return false; end
-	local l, b, r, t = f:GetLeft(), f:GetBottom(), f:GetRight(), f:GetTop();
+	local l, r, b, t = RootBounds(f);                       -- in the screen's units, whatever the frame's scale
 	return l ~= nil and x >= l and x <= r and y >= b and y <= t;
 end
 
@@ -7446,14 +7059,18 @@ end
 SS.raidMarked = {};
 function SS.UpdateRaidMarks()
 	local list = RaidTargets();
+	local count = table.getn(list);
+	local card, classic;
 	if ( UnitExists("target") ) then
-		local card = getglobal("SlimSuiteTargetCard");
-		if ( card ) then table.insert(list, { f = card, unit = "target" }); end
-		if ( TargetFrame and not getglobal("TargetRaidTargetIcon") ) then table.insert(list, { f = TargetFrame, unit = "target" }); end
+		card = getglobal("SlimSuiteTargetCard");
+		if ( TargetFrame and not getglobal("TargetRaidTargetIcon") ) then classic = TargetFrame; end
 	end
 	local now = {};
-	for i = 1, table.getn(list) do
-		local f, unit = list[i].f, list[i].unit;
+	for i = 1, count + 2 do
+		local f, unit;
+		if ( i <= count ) then f, unit = list[i].f, list[i].unit;
+		elseif ( i == count + 1 ) then f, unit = card, "target";
+		else f, unit = classic, "target"; end
 		local index = GetRaidTargetIndex and GetRaidTargetIndex(unit);
 		if ( f and f.CreateTexture and type(index) == "number" and index >= 1 and index <= 8 ) then
 			local t = f.slimRaidMark;
@@ -7506,7 +7123,9 @@ raidPanel = BuildRaidPanel();                            -- made at load, so "ab
 SS.Every("raidIcons", 0.1, function()
 	if ( not raidPanel ) then raidPanel = BuildRaidPanel(); end
 	-- not while the UI is being placed (it would sit over the handles) or in Demo Mode
-	if ( SS.DB().unlocked or setupActive or SS.demoRunning ) then
+	-- nor when it is turned off, or alone (marks are a group's)
+	local grouped = (GetNumPartyMembers and (GetNumPartyMembers() or 0) > 0) or (GetNumRaidMembers and (GetNumRaidMembers() or 0) > 0);
+	if ( SS.DB().unlocked or setupActive or SS.demoRunning or not SS.DB().raidRow or not grouped ) then
 		if ( raidPanel:IsShown() ) then raidPanel:Hide(); raidOver = nil; end
 		return;
 	end

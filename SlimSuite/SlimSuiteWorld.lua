@@ -1,7 +1,8 @@
 -- Slim Suite: things drawn from the game's newer addon API.
 --   * World markers (0.139.2 world anchors): Skull, Cross, Circle and Star over bosses and Guardians that are already
 --     pulled, and a "!" over Guardians and lairs before they are pulled. Markers never select a target and have no
---     distance limit: off-screen ones sit at the screen edge, pointing the way.
+--     distance limit. Only what is on screen is marked: the game gives no screen place for anything off screen or
+--     behind the camera, so there is nothing to point an edge marker with.
 --   * Downed friends (0.139.2): a marker on the spot where each downed friend can be revived, on every map.
 --   * Debuffs on the movable encounter bars (0.93), a movable revive bar (0.113 / 0.115), a class proc meter under
 --     the player frame (0.105), a combat text test box (0.138), and keeping Slim Suite above the level-up and
@@ -129,7 +130,7 @@ local function SetRaidIcon(tex, index)
 	tex:SetTexCoord(col * 0.25, (col + 1) * 0.25, row * 0.25, (row + 1) * 0.25);
 end
 
--- Put a marker at a projected spot. Off-screen spots are pinned to the nearest screen edge (no distance limit).
+-- Put a marker at a projected spot. One right at the screen's edge is kept inside it, smaller and fainter.
 local function Show(p, size, alpha, text)
 	local m = pool[used];
 	local w, h = UIParent:GetWidth(), UIParent:GetHeight();
@@ -541,42 +542,10 @@ revive.text = revive.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmal
 revive.text:SetPoint("CENTER", revive.bar, "CENTER", 0, 0);
 revive:Hide();
 
--- Hide one of the game's HUD parts while a Slim Suite replacement is on, and put it back exactly as it was. The
--- original is kept in the saved settings (key) so a logout or a crash can never leave the game's part hidden.
-local natives = {};
-local function Native(part, key)
-	local n = natives[part];
-	if ( not n ) then n = { part = part, key = key }; natives[part] = n; end
-	return n;
-end
-function W.SetNativeOriginal(part, original) if ( natives[part] ) then natives[part].was = original; end end
-local function SetNativeHidden(n, on)
-	if ( not A.Has("AZS_SetHudShown") ) then return; end
-	if ( type(n.part) ~= "string" or n.part == "" ) then return; end   -- a missing name would hide the whole HUD
-	-- already hidden: ask the game again only when its phase changes, and hide its part again if it came back
-	local rearm = SS.PhaseChanged("hud:" .. n.part);
-	if ( on and n.overridden ) then
-		if ( rearm and SS.HudShown(A.Call("AZS_IsHudShown", n.part)) ) then SS.Safe(AZS_SetHudShown, n.part, false); end
-		return;
-	end
-	if ( on and not n.overridden ) then
-		local shown = A.Call("AZS_IsHudShown", n.part);
-		if ( shown == nil ) then shown = true; end
-		n.was = SS.HudShown(shown);
-		if ( n.was ) then
-			DB()[n.key] = true;
-			n.overridden = SS.Safe(AZS_SetHudShown, n.part, false);
-		end
-	elseif ( not on and n.overridden ) then
-		if ( SS.Safe(AZS_SetHudShown, n.part, n.was ~= false) ) then n.overridden = false; DB()[n.key] = nil; end
-	end
-end
-local reviveNative = Native("revive", "reviveNativeOriginal");
-
 local function UpdateRevive()
 	local d = DB();
-	if ( not d.replaceRevive ) then revive:Hide(); SetNativeHidden(reviveNative, false); return; end
-	SetNativeHidden(reviveNative, true);
+	if ( not d.replaceRevive ) then revive:Hide(); SS.HideNative("revive", false); return; end
+	SS.HideNative("revive", true);
 	local r = A.Call("AZS_GetRevive");
 	local progress, label;
 	if ( type(r) == "table" ) then
@@ -826,8 +795,7 @@ W.Clock = Clock;
 -- Pins are fixed to their spot in the world: they are placed every frame from your hero's position, so they glide
 -- with the minimap instead of stepping. A lair out of the minimap's range is simply not shown; caches and bosses out
 -- of range wait on the rim, pointing the way.
--- Which world axis is north: WoW's own convention (+x north, +y west) is used until Slim Suite has checked it against
--- the game's map position while you walk (GetPlayerMapPosition); what it finds is saved and used from then on.
+-- North is +x and west is +y, as the game's addon docs fix them.
 -- the 1.12 minimap's diameter in yards at each zoom level, outdoors and indoors
 local OUTDOOR = { [0] = 466.67, 400, 333.33, 266.67, 200, 133.33 };
 local INDOOR = { [0] = 300, 240, 180, 120, 80, 50 };
@@ -1020,6 +988,11 @@ end
 
 local pinGather = 0;
 local function UpdateMinimapPins()
+	local d = DB();
+	if ( not (d.minimapCaches or d.minimapBosses or d.minimapLairs) ) then
+		if ( pinUsed > 0 ) then for i = 1, table.getn(pins) do pins[i]:Hide(); end pinUsed = 0; end
+		return;
+	end
 	local now = GetTime();
 	pinUsed = 0;
 	local px, py, space = A.PlayerPos();
@@ -1035,7 +1008,6 @@ SS.Every("pins", 0, function() SS.Safe(UpdateMinimapPins); end, pinDriver);
 -- ---------------------------------------------------------------- movable local clock (0.136)
 -- AZS_GetLocalTime() gives the clock's text, hour, minute and format, even with the clock or minimap hidden and out of
 -- a run. While this is on, the game's own clock under the minimap is hidden with AZS_SetHudShown("localClock", false).
-local localNative = Native("localClock", "localClockNativeOriginal");
 -- It is drawn like the game's own clock: cream text in the game's font on a dark see-through box with soft edges
 -- and no border. The right-click menu can remove the box, switch between 12- and 24-hour time and shift the time an
 -- hour for daylight saving.
@@ -1122,13 +1094,13 @@ end
 
 local function UpdateLocalClock()
 	local editing = Editing("SlimSuiteLocalClockFrame");
-	if ( not DB().replaceLocalClock ) then clock:Hide(); SetNativeHidden(localNative, false); return; end
+	if ( not DB().replaceLocalClock ) then clock:Hide(); SS.HideNative("localClock", false); return; end
 	local text = LocalTimeText();
-	if ( not text and not editing ) then clock:Hide(); SetNativeHidden(localNative, false); return; end
-	SetNativeHidden(localNative, true);
+	if ( not text and not editing ) then clock:Hide(); SS.HideNative("localClock", false); return; end
+	SS.HideNative("localClock", true);
 	clock.text:SetText(text or "7:09 PM");
 	local band = DB().localClockBackground ~= false;
-	for _, t in ipairs({ clock.bg, clock.left, clock.right }) do if ( band ) then t:Show(); else t:Hide(); end end
+	if ( band ) then clock.bg:Show(); clock.left:Show(); clock.right:Show(); else clock.bg:Hide(); clock.left:Hide(); clock.right:Hide(); end
 	local custom = DB().sizes and DB().sizes.SlimSuiteLocalClockFrame;
 	local w, h = (clock.text:GetStringWidth() or 40) + 18, 20;
 	if ( type(custom) == "table" and custom.w and custom.h ) then w, h = custom.w, custom.h; end   -- the size set is the size
@@ -1159,8 +1131,8 @@ end
 -- Each of your hits floats up from the enemy it struck, stays over the spot where an enemy fell, and hides when that
 -- spot leaves your view. Text is sized by distance. Crits are bigger, pop, and stay twice as long. Positions are
 -- worked out in AZS_RegisterCombatTextFrameHandler (after the camera moves each frame) so numbers never trail behind.
--- ASSUMPTION to check against the docs: each event carries its anchor as event.anchor (or anchorId / targetAnchor),
--- and AZS_ProjectCombatTextAnchors(list) answers like AZS_ProjectWorldAnchors (x, y, onScreen, distance).
+-- Each event carries its anchor as event.anchorId; AZS_ProjectCombatTextAnchors(list) answers like
+-- AZS_ProjectWorldAnchors (x, y, onScreen, distance), matched back by anchor id (or by order if it gives none).
 local FLOAT_LIFE, FLOAT_CRIT_LIFE, FLOAT_RISE = 1.1, 2.2, 46;
 local floatLayer = CreateFrame("Frame", "SlimSuiteFloatingText", UIParent);
 floatLayer:SetAllPoints(UIParent);
@@ -1219,12 +1191,19 @@ local function DrawFloats()
 	for i = 1, n do ids[i] = floats[i].anchor; end
 	local result = A.Call("AZS_ProjectCombatTextAnchors", ids, "follow");
 	local entries = type(result) == "table" and type(result.entries) == "table" and result.entries or {};
+	-- each reply is matched to its hit by the anchor id it carries; a reply without ids is taken in the order asked
+	local byId;
+	for i = 1, table.getn(entries) do
+		local id = type(entries[i]) == "table" and entries[i].anchorId;
+		if ( id ~= nil ) then byId = byId or {}; byId[id] = entries[i]; end
+	end
 	local scale = UIParent:GetEffectiveScale() or 1;
 	local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
 	local shown = 0;
 	for i = 1, n do
 		local e = floats[i];
-		local p = entries[i];
+		local p;
+		if ( byId ) then p = byId[e.anchor]; else p = entries[i]; end
 		local x, y = p and p.x, p and p.y;
 		if ( p and p.state == "onScreen" and type(x) == "number" and type(y) == "number" ) then
 			shown = shown + 1;
@@ -1235,10 +1214,10 @@ local function DrawFloats()
 			local near = dist and math.max(0.6, math.min(1.25, 1.35 - dist / 90)) or 1;
 			local pop = (e.crit and t < 0.12) and (1.3 - t * 2.5) or 1;
 			local size = math.floor((e.crit and 22 or 14) * near * pop + 0.5);
-			f.text:SetFont(font, math.max(8, size), "OUTLINE");
+			size = math.max(8, size);
+			if ( f.fontSize ~= size ) then f.fontSize = size; f.text:SetFont(font, size, "OUTLINE"); end
 			f.text:SetText(e.crit and (e.text .. "!") or e.text);
-			if ( e.heal ) then f.text:SetTextColor(0.3, 1, 0.4);
-			elseif ( e.crit ) then f.text:SetTextColor(1, 0.82, 0.15);
+			if ( e.crit ) then f.text:SetTextColor(1, 0.82, 0.15);
 			elseif ( e.kind == "boss" or e.kind == "final" ) then f.text:SetTextColor(1, 0.6, 0.3);
 			else f.text:SetTextColor(1, 1, 1); end
 			f.icon:SetWidth(size); f.icon:SetHeight(size); f.icon:SetTexture(e.icon);
@@ -1311,7 +1290,9 @@ local function TrackKills()
 			end
 		end
 	end
-	DB().runKills = { run = key, bosses = tally.bosses, guardians = tally.guardians };
+	local saved = DB().runKills;
+	if ( type(saved) ~= "table" ) then saved = {}; DB().runKills = saved; end
+	saved.run, saved.bosses, saved.guardians = key, tally.bosses, tally.guardians;
 end
 
 -- bosses, guardians slain this run
@@ -1324,13 +1305,13 @@ end
 
 -- ---------------------------------------------------------------- tickers
 local ticker = CreateFrame("Frame");
-SS.Every("box", 0, function() SS.Safe(DrawBox); end);
+SS.Every("box", 0.05, function() SS.Safe(DrawBox); end);
 SS.Every("tracker", 0.1, function()
 	SS.Safe(TrackKills);
 	SS.Safe(UpdateTargetDebuffs);
 	SS.Safe(UpdateRevive);
 	SS.Safe(UpdateProc);
-	SS.Safe(UpdateLocalClock);
 end);
+SS.Every("localClock", 0.5, function() SS.Safe(UpdateLocalClock); end);   -- a clock that shows minutes
 ticker:RegisterEvent("PLAYER_ENTERING_WORLD");
 ticker:SetScript("OnEvent", function() SS.Safe(W.ApplyOnTop); end);

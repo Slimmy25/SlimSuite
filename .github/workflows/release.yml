@@ -38,6 +38,12 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Run the checks
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.3
+          LUA=lua5.3 sh SlimSuite/tests/run-checks.sh
+
       - name: Build the zip
         if: steps.check.outputs.skip != 'true'
         run: zip -r "SlimSuite-${{ steps.version.outputs.version }}.zip" SlimSuite -x "*.git*" "SlimSuite/tests/*"   # the tests are not part of the addon
