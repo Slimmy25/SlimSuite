@@ -115,7 +115,7 @@ local SU = upv(SS.SetupHide, "SU")
 SS.StartSetup(true); Tick(3)
 SS.SetPartySelf(true); Tick(2); SU.RefreshBar()
 local b = SU.barButtons and SU.barButtons.PlayerFrame
-check("player frame tag identifies its party parent", b and b.tag.text:GetText() == "Default" and b.tag.parentTitle == "Party frames")
+check("player frame default state identifies its party parent", b and b.states[3]:GetFontString():GetText() == "Default" and b.nameHit.parentTitle == "Party frames")
 SS.SetPartySelf(false); SS.SetupEnd(true); Tick(2)
 print("connected problems: " .. bad)
 -- you in the party: buffs start at your plate's top-left and grow to the right, wrapping into rows

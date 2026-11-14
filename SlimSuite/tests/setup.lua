@@ -35,19 +35,19 @@ local problems = 0
 for _, e in ipairs(SU.elements) do
 	local name = e.frame
 	local b = SU.barButtons[name]
-	local tag = b and b.tag
 	local before = SU.Mode(name)
-	RunScript(tag, "OnMouseUp", "LeftButton"); Tick(2)
-	flush(name .. " status cycle 1")
-	local mid = SU.Mode(name)
-	RunScript(tag, "OnMouseUp", "LeftButton"); Tick(2)
-	local third = SU.Mode(name)
-	RunScript(tag, "OnMouseUp", "LeftButton"); Tick(2)
+	local want = { "enabled", "disabled", "default" }
+	local ok = true
+	for stateIndex = 1, 3 do
+		Click(b.states[stateIndex]); Tick(2)
+		flush(name .. " set " .. want[stateIndex])
+		if SU.Mode(name) ~= want[stateIndex] then ok = false end
+	end
 	local after = SU.Mode(name)
-	local ok = mid ~= before and third ~= mid and after == before
 	if not ok then problems = problems + 1 end
-	print(string.format("%-28s %s -> %s -> %s -> %s %s", name, tostring(before), tostring(mid), tostring(third), tostring(after), ok and "" or "  <-- BAD"))
-	Click(b); Tick(3) -- open this element's detailed options
+	print(string.format("%-28s %s -> enabled -> disabled -> default %s", name, tostring(before), ok and "" or "  <-- BAD"))
+	Click(b.states[1]); Tick(2) -- options are available after enabling the movable version
+	RunScript(b.nameHit, "OnMouseUp", "RightButton"); Tick(3) -- open detailed options from the name
 	flush(name .. " open options")
 	-- the element's tick boxes while it is focused
 	local shown = {}
@@ -83,6 +83,6 @@ for _, e in ipairs(SU.elements) do
 			end
 		end
 	end
-	if SU.focus == name then Click(b); Tick(1) end
+	-- Keep the setup open for the next element; its controls remain independently selectable.
 end
 print("problems: " .. problems)

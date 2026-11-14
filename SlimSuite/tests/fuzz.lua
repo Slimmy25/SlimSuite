@@ -75,9 +75,12 @@ for step = 1, steps do
 		local before = SU.Mode(name)
 		note("status " .. name .. " (was " .. tostring(before) .. ")")
 		if not b:IsVisible() then fail("bar button hidden: " .. name) end
-		RunScript(b.tag, "OnMouseUp", "LeftButton"); Tick(2)
+		local target = before == "enabled" and "disabled" or "enabled"
+		local stateIndex = target == "enabled" and 1 or 2
+		Click(b.states[stateIndex]); Tick(2)
 		errs("status " .. name)
-		if ( SU.Mode(name) == "enabled" ) then SU.Click(b); Tick(1); end
+		if ( SU.Mode(name) ~= target ) then fail("state button did not set " .. target .. " for " .. name) end
+		if ( SU.Mode(name) == "enabled" ) then RunScript(b.nameHit, "OnMouseUp", "RightButton"); Tick(1); end
 		local still = false
 		for _, x in ipairs(SU.elements) do if x.frame == name then still = true end end
 		local after = SU.Mode(name)

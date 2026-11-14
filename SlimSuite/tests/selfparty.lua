@@ -2,14 +2,15 @@ local function upvalue(fn, want) local i = 1 while true do local n, v = debug.ge
 SU = upvalue(SS.SetupHide, "SU")
 SS.StartSetup(true); Tick(3)
 local function onBar(n) for _, e in ipairs(SU.elements) do if e.frame == n then return SU.barButtons[n]:IsVisible() end end return false end
-Click(SU.barButtons.PlayerFrame); Tick(2); Click(SU.barButtons.TargetFrame); Tick(2)
+Click(SU.barButtons.PlayerFrame.states[1]); Tick(2); Click(SU.barButtons.TargetFrame.states[1]); Tick(2)
 SS.SetMirrorTarget(true); Tick(2)
 print("before: player on", SU.on.PlayerFrame, "target on", SU.on.TargetFrame, "mirror", SS.DB().mirrorTarget)
-Click(SU.barButtons.PartyMemberFrame1); Tick(2)
+Click(SU.barButtons.PartyMemberFrame1.states[1]); Tick(2)
+RunScript(SU.barButtons.PartyMemberFrame1.nameHit, "OnMouseUp", "RightButton"); Tick(2)
 local function row(label) for i = 1, #SU.checks do if SU.checks[i]:IsVisible() and string.find(SU.checks[i].label.text, label, 1, true) then return SU.checks[i] end end end
 Click(row("Join the party frames yourself")); Tick(2)
 print("self on: player on", SU.on.PlayerFrame, "player shown", PlayerFrame.shown, "target on", SU.on.TargetFrame, "target on bar", onBar("TargetFrame"), "mirror", SS.DB().mirrorTarget, "hideTarget", SS.DB().hideTarget)
-Click(SU.barButtons.PlayerFrame); Tick(2)
+Click(SU.barButtons.PlayerFrame.states[1]); Tick(2)
 print("player clicked: self", SS.DB().partyIncludesSelf, "player on", SU.on.PlayerFrame, "player shown", PlayerFrame.shown)
 -- right-click menus show the same settings as the setup
 local sm = upvalue(SS.PrepareSizeTools, "sizeMenu")
