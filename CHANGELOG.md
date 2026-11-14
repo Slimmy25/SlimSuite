@@ -6,7 +6,7 @@ Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## 1.27
 - Added optional LEGO die death sound, hitmarker and whip-crack boss/Guardian/lair-owner kill sounds, and a Zelda-style cache-opening sound. Added an in-game preview button for each included sound so players can audition them before enabling.
-- Added optional LEGO die death sound, hitmarker and whip-crack boss/Guardian/lair-owner kill sounds, and a Zelda-style cache-opening sound. Added an in-game preview button for each included sound so players can audition them before enabling.
+- Setup rebuilds preserve party, minimap and clock choices; only selecting Default restores the game's settings. Updated the automated harness to load all addon modules and retain CVar changes.
 - New installs open directly into setup with all native and Slim Suite elements Disabled; enabling an element immediately opens its controls and exposes its move handle.
 - Added an attached Default profiles side panel with reserved slots for the profiles to be provided later.
 - Choosing Default now explicitly restores the Blizzard/Aethus element and turns its game HUD visibility setting on; the movable replacement is turned off. The Level Up default restores the native Level Up button through the game's HUD API without displaying a chat command.

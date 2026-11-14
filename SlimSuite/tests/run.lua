@@ -14,8 +14,10 @@ local function loadFile(name)
 	local ok, e = pcall(chunk)
 	if not ok then print("LOAD " .. tostring(e)) end
 end
-for _, f in ipairs({ "SlimSuiteCore.lua", "AZSKit.lua", "SlimSuiteErrors.lua", "SlimSuiteItems.lua", "SlimSuiteMeter.lua", "SlimSuite.lua", "SlimSuiteLocale.lua", "SlimSuiteDisplay.lua", "SlimSuiteFrames.lua", "SlimSuiteEdit.lua", "SlimSuiteSetup.lua", "SlimSuiteCommands.lua", "SlimSuiteWorld.lua" }) do
-	loadFile(f)
+-- Follow the actual addon manifest so new modules cannot silently disappear from the harness.
+for line in io.lines(DIR .. "SlimSuite.toc") do
+	local file = line:match("^%s*(.-%.lua)%s*$")
+	if file then loadFile(file) end
 end
 -- every error Slim Suite catches counts as a test error
 do local log = SS.LogError; SS.LogError = function(m) table.insert(ERRORS, "error: " .. tostring(m)); return log(m) end end

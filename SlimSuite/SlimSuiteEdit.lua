@@ -365,6 +365,9 @@ end
 function SS.ClockFollowsMap()
 	local d = SS.DB();
 	if ( d.replaceLocalClock ) then return; end
+	-- A square or moved map must respect the clock's explicit Default/Disabled choice.
+	local mode = d.elementModes and d.elementModes.SlimSuiteLocalClockFrame;
+	if ( mode == "default" or mode == "disabled" ) then return; end
 	SS.SetLocalClockOn(true);
 	if ( SS.Notice ) then SS.Notice("Slim Suite's clock now replaces the game's, so it stays with the map."); end
 end

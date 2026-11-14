@@ -645,18 +645,20 @@ function SU.SetMode(frame, mode, title)
 		SU.defaulting = true;
 		SU.SetOn(frame, false, title);
 		SU.defaulting = false;
-		SS.Safe(SU.RestoreNative, frame);
+		if ( not SU.restoring ) then SS.Safe(SU.RestoreNative, frame); end
 		if ( SU.NATIVE[frame] ) then SS.Safe(SU.SetMovable, frame, false); end
-		if ( frame == "TargetFrame" ) then
-			d.hideTarget = false;
-			if ( SS.UsesCard("TargetFrame") ) then SS.Safe(SS.SetLook, "TargetFrame", "classic"); end
-			SS.Safe(SS.TargetFrameHidden, false); SS.Safe(SS.ApplyNewFrames);
-		elseif ( frame == "PlayerFrame" and SS.UsesCard("PlayerFrame") ) then
-			SS.Safe(SS.SetLook, "PlayerFrame", "classic");
-		elseif ( frame == "PartyMemberFrame1" and SS.Look("PartyMemberFrame1") == "thin" ) then
-			SS.Safe(SS.SetLook, "PartyMemberFrame1", "classic");
-		elseif ( frame == "MinimapCluster" ) then
-			d.minimapSquare, d.minimapTransparent = false, false;
+		if ( not SU.restoring ) then
+			if ( frame == "TargetFrame" ) then
+				d.hideTarget = false;
+				if ( SS.UsesCard("TargetFrame") ) then SS.Safe(SS.SetLook, "TargetFrame", "classic"); end
+				SS.Safe(SS.TargetFrameHidden, false); SS.Safe(SS.ApplyNewFrames);
+			elseif ( frame == "PlayerFrame" and SS.UsesCard("PlayerFrame") ) then
+				SS.Safe(SS.SetLook, "PlayerFrame", "classic");
+			elseif ( frame == "PartyMemberFrame1" and SS.Look("PartyMemberFrame1") == "thin" ) then
+				SS.Safe(SS.SetLook, "PartyMemberFrame1", "classic");
+			elseif ( frame == "MinimapCluster" ) then
+				d.minimapSquare, d.minimapTransparent = false, false;
+			end
 		end
 		local names = { frame };
 		local companions = SU.CompanionsOf(frame);
@@ -1856,7 +1858,8 @@ function SU.Begin()
 	local saved = SS.DB().enabledElements or {};
 	local d = SS.DB();
 	local initializeDisabled = (tonumber(d.firstSetupDefaultsVersion) or 0) < 1 and not d.setupDone and (SS.firstRunSetupPending or not SS.HasPriorUISetup(d));
-	SU.restoring = false;
+	-- Rebuilding the editor restores visibility; only an explicit Default click resets settings.
+	SU.restoring = not initializeDisabled;
 	SU.batching = true;      -- one bar and demo refresh at the end, not one per element
 	SS.Safe(SU.SetGridSetting, SS.DB().showEditGrid and true or false);
 	-- A clean profile starts with every element, including Blizzard's native version, explicitly Disabled.
@@ -1872,6 +1875,7 @@ function SU.Begin()
 		if ( mode == "enabled" or mode == "disabled" ) then SS.Safe(SU.SetMode, f, mode, SU.titles[f]);
 		else SS.Safe(SU.SetMode, f, "default", SU.titles[f]); end
 	end
+	SU.restoring = false;
 	if ( initializeDisabled ) then d.firstSetupDefaultsVersion = 1; end
 	SU.batching = false;
 	-- the bar: one button per element

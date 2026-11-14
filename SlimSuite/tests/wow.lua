@@ -178,8 +178,9 @@ function UnitBuff() return nil end
 function GetCursorPosition() return 500, 400 end
 function IsShiftKeyDown() return nil end
 function IsMouseButtonDown() return nil end
-function GetCVar() return "0" end
-function SetCVar() end
+local cvars = {}
+function GetCVar(name) return cvars[name] or "0" end
+function SetCVar(name, value) cvars[name] = tostring(value) end
 function GetMouseFocus() return nil end
 function HasAction() return true end
 function PlaySoundFile() end
