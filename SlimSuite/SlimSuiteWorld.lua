@@ -434,8 +434,9 @@ function W.DrawDebuffs(row, unit, vertical, enabled)
 				b.time:SetText(left and left > 0 and (left >= 10 and tostring(math.floor(left + 0.5)) or string.format("%.1f", left)) or "");
 				b.data = { name = A.Field(db, "name", "spell"), dispel = A.Field(db, "dispel", "dispelType", "type"), stacks = stacks };
 				b:ClearAllPoints();
-				if ( vertical ) then b:SetPoint("TOP", row, "BOTTOM", 0, -2 - (n - 1) * 24);
-				else b:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", (n - 1) * 17, -2); end
+				-- Keep auras at the bar's far end, away from the name/raid-marker end.
+				if ( vertical ) then b:SetPoint("TOP", row.bar, "BOTTOM", 0, -2 - (n - 1) * 24);
+				else b:SetPoint("TOPRIGHT", row.bar, "BOTTOMRIGHT", -(n - 1) * 17, -2); end
 				b:Show();
 			end
 		end
@@ -594,7 +595,7 @@ revive:Hide();
 
 local function UpdateRevive()
 	local d = DB();
-	if ( not d.replaceRevive ) then revive:Hide(); SS.HideNative("revive", false); return; end
+	if ( not SS.FeatureEnabled("SlimSuiteReviveFrame") ) then revive:Hide(); SS.HideNative("revive", false); return; end
 	SS.HideNative("revive", true);
 	local r = A.Call("AZS_GetRevive");
 	local progress, label;
@@ -1231,7 +1232,7 @@ end
 
 local function UpdateLocalClock()
 	local editing = Editing("SlimSuiteLocalClockFrame");
-	if ( not DB().replaceLocalClock ) then clock:Hide(); SS.HideNative("localClock", false); return; end
+	if ( not SS.FeatureEnabled("SlimSuiteLocalClockFrame") ) then clock:Hide(); SS.HideNative("localClock", false); return; end
 	local text = LocalTimeText();
 	if ( not text and not editing ) then clock:Hide(); SS.HideNative("localClock", false); return; end
 	SS.HideNative("localClock", true);
@@ -1397,32 +1398,23 @@ local function CountKill(id, kind, confirmed)
 	if ( confirmed ) then BossKillSoundOnce(id); end
 end
 
--- AZS_CHESTS lists caches waiting to be opened. A cache disappearing in the same run means it was opened;
--- remember ids so unrelated full-list refreshes cannot replay the sound for an already opened cache.
-local chestSoundState = { run = nil, known = nil };
+-- The creator documents AZS_RUN.ck as caches opened. Catalog disappearance is not an open event.
+local chestSoundState = { run = nil, count = nil };
 local function TrackChestOpens()
-	local phase = A.Call("AZS_GetPhase");
-	if ( phase ~= "playing" and phase ~= "choosing" and phase ~= "paused" ) then return; end
-	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
-	local context = A.Call("AZS_GetMeterContext");
-	local runId = (run and run.run) or (type(context) == "table" and context.runId);
-	if ( runId == nil ) then return; end
-	if ( type(AZS_CHESTS) ~= "table" ) then return; end -- unavailable data does not mean every cache was opened
-	runId = tostring(runId);
-	local caches, current = A.Caches(), {};
-	for i = 1, table.getn(caches) do
-		local cache = caches[i];
-		if ( type(cache) == "table" and cache.id ~= nil ) then current[cache.id] = true; end
-	end
-	if ( chestSoundState.run == runId and chestSoundState.known ) then
-		for id in pairs(chestSoundState.known) do
-			if ( not current[id] ) then
-				if ( SS.PlayChestOpenSound ) then SS.PlayChestOpenSound(); end
-				break;
-			end
-		end
-	end
-	chestSoundState.run, chestSoundState.known = runId, current;
+ local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
+ local count = run and tonumber(run.ck);
+ if ( not count or count < 0 ) then return; end
+ local context = A.Call("AZS_GetMeterContext");
+ local runId = type(AZS_ZONE) == "table" and AZS_ZONE.run or nil;
+ runId = runId or (type(context) == "table" and context.runId);
+ if ( runId == nil ) then return; end
+ runId = tostring(runId);
+ local phase = A.Call("AZS_GetPhase");
+ local playing = phase == "playing" or phase == "choosing" or phase == "paused";
+ if ( playing and chestSoundState.run == runId and chestSoundState.count and count > chestSoundState.count ) then
+  SS.Safe(SS.PlayChestOpenSound);
+ end
+ chestSoundState.run, chestSoundState.count = runId, count;
 end
 
 local function TrackKills()

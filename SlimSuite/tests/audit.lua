@@ -172,12 +172,16 @@ hp = 50; Tick(60); check("recovered players get no low health warning", sounds =
 local chestSounds = 0
 PlaySoundFile = function(path) if path == SS.SOUND_FILES.chestOpen then chestSounds = chestSounds + 1 end end
 AZS_GetPhase = function() return "playing" end
-AZS_RUN, AZS_CHESTS = { run = "audit-cache-run" }, { { id = "cache-1" } }
+AZS_ZONE = { run = "audit-cache-run" }
+AZS_RUN, AZS_CHESTS = { ck = 0 }, { { id = "cache-1" } }
 d.chestOpenSound = true; Tick(2)
 AZS_CHESTS = nil; Tick(2)
 check("unavailable cache data cannot play an opening sound", chestSounds == 0)
 AZS_CHESTS = {}; Tick(2)
-check("confirmed catalog removal still plays the cache sound", chestSounds == 1)
+check("catalog removal does not claim a cache opened", chestSounds == 0)
+AZS_RUN.ck = 1; Tick(2)
+check("confirmed opened counter plays the cache sound", chestSounds == 1)
+Tick(2); check("same opened counter cannot replay sound", chestSounds == 1)
 check("no caught runtime errors", #ERRORS == 0)
 print("audit problems: " .. bad)
 for _, err in ipairs(ERRORS) do print(err) end

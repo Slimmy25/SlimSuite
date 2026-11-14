@@ -42,7 +42,7 @@ jobs:
       - name: Run the checks
         if: steps.check.outputs.skip != 'true'
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.3
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.3 gcc
           LUA=lua5.3 sh SlimSuite/tests/run-checks.sh
 
       - name: Build the zip

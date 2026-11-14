@@ -157,13 +157,8 @@ end
 -- one set of rules for every part (meter, clock, bosses, banners, levels, tally, build, revive, localClock). The
 -- original is kept in the saved settings (key) until it is put back, so a crash can never leave the game's part hidden;
 -- a part the player had already turned off is never touched.
-SS.NATIVE_KEYS = { build = "buildNativeOriginal", tally = "tallyNativeOriginal", meter = "meterNativeOriginal",
-	clock = "clockNativeOriginal", bosses = "bossNativeOriginal", banners = "bannerNativeOriginal",
-	levels = "levelNativeOriginal", revive = "reviveNativeOriginal", localClock = "localClockNativeOriginal" };
 local natives = {};
-local nativeElements = { build = "SlimSuiteSpellRowFrame", tally = "SlimSuiteTallyFrame", meter = "SlimSuiteMeterFrame",
-	clock = "SlimSuiteClockFrame", bosses = "SlimSuiteBossFrames", banners = "SlimSuiteAnnouncementFrame",
-	levels = "SlimSuiteStoredLevelsButton", revive = "SlimSuiteReviveFrame", localClock = "SlimSuiteLocalClockFrame" };
+local nativeElements = SS.NATIVE_ELEMENTS;
 function SS.HideNative(part, on)
 	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
 	local key = SS.NATIVE_KEYS[part];

@@ -17,10 +17,17 @@ function SS.SetNativeEnemyNameplates(on)
 	local d = SS.DB();
 	d.enemyNameplates = on and true or false;
 	if ( d.modernEnemyFrames ) then d.modernEnemyFrames = false; SS.Safe(SS.UpdateEnemyNameplates);
-	else WriteNativeNameplates(on); end
+	else WriteNativeNameplates(on); SS.Safe(SS.UpdateEnemyNameplates); end
 end
 
+local function OverlayActive()
+ local d = SS.DB();
+ return d.modernEnemyFrames or (d.enemyPlateDebuffs and ReadNativeNameplates());
+end
+local PLATE_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+ tile = true, tileSize = 16, edgeSize = 10, insets = { left=2, right=2, top=2, bottom=2 } };
 local plates, freePlates, requests, registered, plateSerial = {}, {}, {}, false, 0;
+local nativeChoiceApplied;
 local function NewPlate()
 	local f = table.remove(freePlates);
 	-- WoW frames cannot be destroyed. Reuse the entire plate, including its children.
@@ -67,6 +74,15 @@ local function UpdatePlateData(record, unit)
 		local ok, values = SS.Safe(AZS_GetDebuffs, unit.id);
 		if ( ok and type(values) == "table" ) then debuffs = values; end
 	end
+ local modern = SS.DB().modernEnemyFrames and true or false;
+ if ( f.modernStyle ~= modern ) then
+  f:SetBackdrop(modern and PLATE_BACKDROP or nil);
+  if ( modern ) then f:SetBackdropColor(0.035,0.045,0.06,0.88); f:SetBackdropBorderColor(0.42,0.68,0.95,0.9); end
+  f.modernStyle = modern;
+ end
+ if ( modern ) then f.name:Show();
+ else f.name:Hide(); f.health:Hide(); f.hpText:Hide(); f.mark:Hide(); end
+ record.visible = modern or table.getn(debuffs) > 0;
 	for i = 1, table.getn(f.dots) do
 		local dot, entry = f.dots[i], debuffs[i];
 		if ( entry and entry.icon ) then
@@ -84,7 +100,7 @@ local function ReadCatalog()
 	if ( type(AZS_GetWorldAnchors) ~= "function" ) then return; end
 	local d = SS.DB();
 	local kinds;
-	if ( d.enemyBossesOnly ) then kinds = { "boss", "finalBoss", "guardian" };
+	if ( d.enemyBossesOnly or not d.modernEnemyFrames ) then kinds = { "boss", "finalBoss", "guardian" };
 	else kinds = { "enemy", "elite", "boss", "finalBoss", "guardian" }; end
 	local q = { kinds = kinds, states = { "alive" } };
 	local current, cursor, pages, accepted = {}, nil, 0, 0;
@@ -130,7 +146,7 @@ local function ReadCatalog()
 end
 
 local function ProjectPlates()
-	if ( not SS.DB().modernEnemyFrames or type(AZS_ProjectWorldAnchors) ~= "function" ) then
+	if ( not OverlayActive() or type(AZS_ProjectWorldAnchors) ~= "function" ) then
 		for _, record in pairs(plates) do if ( record.frame ) then record.frame:Hide(); end end
 		return;
 	end
@@ -142,7 +158,7 @@ local function ProjectPlates()
 	for i = 1, table.getn(projection.entries or {}) do
 		local projected = projection.entries[i];
 		local record = plates[projected.anchorId];
-		if ( record and projected.state == "onScreen" and type(projected.x) == "number" and type(projected.y) == "number" ) then
+		if ( record and record.visible and projected.state == "onScreen" and type(projected.x) == "number" and type(projected.y) == "number" ) then
 			local scale = SS.EffectiveScale(record.frame);
 			record.frame:ClearAllPoints(); record.frame:SetPoint("BOTTOM", WorldFrame, "BOTTOMLEFT", projected.x / scale, projected.y / scale + 10); record.frame:Show();
 		end
@@ -157,22 +173,29 @@ function SS.UpdateEnemyNameplates()
 			d.enemyNameplatesOriginal = ReadNativeNameplates() and "1" or "0";
 		end
 		if ( ReadNativeNameplates() ) then WriteNativeNameplates(false); end
-		if ( not registered and type(AZS_RegisterWorldAnchorFrameHandler) == "function" ) then
-			local ok, result = SS.Safe(AZS_RegisterWorldAnchorFrameHandler, ProjectPlates);
-			registered = ok and result == true;
-		end
-		SS.Safe(ReadCatalog);
+
 	else
 		if ( d.enemyNameplatesOriginal ~= nil ) then
 			local restore = d.enemyNameplates ~= nil and (d.enemyNameplates and "1" or "0") or tostring(d.enemyNameplatesOriginal);
 			local wanted = SS.HudShown(restore);
 			if ( ReadNativeNameplates() == wanted or WriteNativeNameplates(wanted) ) then d.enemyNameplatesOriginal = nil; end
-		elseif ( d.enemyNameplates ~= nil and ReadNativeNameplates() ~= (d.enemyNameplates and true or false) ) then WriteNativeNameplates(d.enemyNameplates); end
-		if ( registered and type(AZS_UnregisterWorldAnchorFrameHandler) == "function" ) then
-			SS.Safe(AZS_UnregisterWorldAnchorFrameHandler, ProjectPlates); registered = false;
+		elseif ( d.enemyNameplates ~= nil and nativeChoiceApplied ~= d.enemyNameplates and ReadNativeNameplates() ~= (d.enemyNameplates and true or false) ) then WriteNativeNameplates(d.enemyNameplates); end
+		nativeChoiceApplied = d.enemyNameplates; -- honor subsequent native V-key changes between settings edits
+ end
+ if ( supported and OverlayActive() ) then
+		if ( not registered and type(AZS_RegisterWorldAnchorFrameHandler) == "function" ) then
+			local ok, result = SS.Safe(AZS_RegisterWorldAnchorFrameHandler, ProjectPlates);
+			registered = ok and result == true;
 		end
-		for _, record in pairs(plates) do if ( record.frame ) then record.frame:Hide(); end end
-	end
+		SS.Safe(ReadCatalog);
+ else
+  if ( registered and type(AZS_UnregisterWorldAnchorFrameHandler) == "function" ) then
+   local ok, result = SS.Safe(AZS_UnregisterWorldAnchorFrameHandler, ProjectPlates);
+   if ( ok and result == true ) then registered = false; end
+  end
+  for _, record in pairs(plates) do record.frame:Hide(); end
+ end
+
 	if ( SlimSuiteWorld and SlimSuiteWorld.ApplyOnTop ) then SS.Safe(SlimSuiteWorld.ApplyOnTop); end
 end
 
@@ -188,9 +211,9 @@ update:SetScript("OnEvent", function()
 		return;
 	end
 	if ( event == "CHAT_MSG_ADDON" and arg1 ~= "AZSUNITS" and arg1 ~= "AZSDEBUFFS" ) then return; end
-	if ( SS.DB().modernEnemyFrames ) then SS.Safe(SS.UpdateEnemyNameplates); end
+	if ( OverlayActive() ) then SS.Safe(SS.UpdateEnemyNameplates); end
 end);
-SS.Every("enemyNameplates", 0.5, function() if ( SS.DB().modernEnemyFrames ) then SS.Safe(SS.UpdateEnemyNameplates); end end);
+SS.Every("enemyNameplates", 0.5, function() SS.Safe(SS.UpdateEnemyNameplates); end);
 
 function SS.SetModernEnemyFrames(on)
 	local d = SS.DB();

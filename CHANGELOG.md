@@ -2,6 +2,17 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.32
+- Moved encounter/boss DoTs to the far end of each health bar: right-aligned underneath horizontal bars and below the bottom of vertical bars, away from raid markers.
+- Consolidated element metadata and derived native ownership, setup order, movable lists, companions and display anchors from the shared registry. Enabled/Disabled/Default governs replacement rendering and legacy checkbox transitions; old saved choices migrate without resetting onboarding.
+- Split setup into onboarding, settings controls, editor state, unit-frame rendering, setup windows and settings-window modules while preserving manifest load order and saved profiles.
+- Replaced unconditional profile polling snapshots with dirty tracking on edits, debounced saves and a logout flush.
+- Added a checksum-pinned upstream Lua 5.0.3 compilation check to CI and explicit mock API methods with geometry validation.
+- Consolidated translations into validated JSON dictionaries and generated Lua tables. Added complete Portuguese and Italian dictionaries, a language selector, translated dropdown choices and settings rows that grow for wrapped text.
+- Added optional documented boss/guardian DoT attachments for native enemy nameplates, with the same timing data as modern plates; fresh installs keep this option off.
+- Cache sounds now use the documented AZS_RUN.ck opened counter instead of disappearing cache entries. Teammate shield amounts remain unavailable without a client-provided absorb query.
+- Added architecture, native-plate, state-authority, idle-autosave, translation-completeness and text-layout regression checks.
+
 ## 1.31
 - Reviewed enemy-nameplate lifetime and projection handling: failed catalog reads cannot corrupt live records, pooled plates reuse their children, projections match anchor IDs and scale, and stale/missing projections hide immediately. Catalog failures back off instead of retrying every frame.
 - Default restores native frame scaling, buff icon anchors, party-member anchors and XP-bar parenting/orientation; opening setup no longer immediately detaches a Default XP bar again. Explicit Disabled/Default choices prevent legacy native-HUD auto-adoption.

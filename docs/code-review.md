@@ -1,27 +1,22 @@
 ## Done
 
-- Fixed enemy-nameplate corruption after interrupted catalog reads.
-- Fixed nameplate control accumulation, incorrect projection matching, scaling, and stale plates remaining visible.
-- Made Default restore native scaling, party anchors, buff layouts, and XP-bar parenting, orientation, and artwork behavior.
-- Prevented automatic HUD replacement from overriding explicit Disabled or Default choices.
-- Expanded profile settings coverage, validated imports, stabilized exports, and saved pending edits at logout.
-- Reduced repeated display calculations, unit searches, projection allocations, foreground registrations, and profile copying.
-- Kept absorb overlays inside health bars and avoided allocating them while disabled.
-- Made low-health alerts repeat while needed, respect the five-second interval, and stop after death or recovery.
-- Prevented unavailable cache data from triggering chest-opening sounds.
-- Fixed untranslated boss/Guardian labels, three missing French/German labels, and misleading version diagnostics.
-- Strengthened module-load/startup checks and corrected frame identity in the mock client.
-- Passed 30 mock-client scenarios, 10,000 randomized UI actions, and compatibility checks. Changes are saved locally in the addon checkout; they have not been published.
+- Fixed the nameplate, native restoration, profile import, absorb overlay, sound and diagnostic defects from the initial review; published those fixes as version 1.31.
+- Consolidated element metadata into a shared registry for native ownership, setup order, movable elements, feature flags, companions and display anchors.
+- Made Enabled/Disabled/Default authoritative for replacement rendering and legacy settings transitions; retained compatibility reads for older saves.
+- Split setup into focused onboarding, settings, editor, unit-frame and window modules.
+- Changed profile autosave to take snapshots after edits, with a logout flush; idle polling no longer copies layouts.
+- Tightened mock APIs and numeric geometry checks; added actual upstream Lua 5.0.3 compilation to CI.
+- Consolidated translations into validated dictionaries. English, Spanish, French, German, Portuguese and Italian each cover all 363 dictionary keys. Added language selection and translated dropdown choices.
+- Made settings rows grow for wrapped translations without shrinking the font.
+- Added optional native-nameplate boss/guardian DoT attachments using documented timing/projection data.
+- Replaced cache-disappearance sounds with the documented opened-cache counter, AZS_RUN.ck.
+- Confirmed that the documented party data lacks shield totals; teammate values remain conditional on a real client absorb API.
+- Passed 37 behavioral scenarios and 10,000 randomized UI actions. These are mock-client checks, separate from actual Lua 5.0 compilation.
+- Included the refactor and encounter-bar DoT placement changes in version 1.32.
 
 ## Still to do
 
-- Consolidate repeated element definitions into one shared registry.
-- Make Enabled/Disabled/Default the authoritative state and reduce overlapping visibility flags.
-- Split the large setup module into focused editor, settings, onboarding, and unit-frame modules.
-- Change profile autosave to run after actual edits instead of copying and comparing the layout every second.
-- Tighten API mocks and add compilation checks using an actual Lua 5.0 runtime.
-- Complete translation coverage beyond English, Spanish, French, and German; check translated text fit in-game.
-- Implement DoT overlays on native enemy nameplates using documented client data.
-- Replace chest-disappearance detection with a confirmed opening event or counter if the game exposes one.
-- Confirm party shield-data availability; teammate absorb amounts cannot be shown when the client provides no authoritative values.
-- Test in the actual game: screen-edge placement, scaling, XP artwork, minimap shapes/title/close button, party alignment, buff wrapping, and compatibility with other addons. Mock-client checks do not verify rendering.
+- Verify actual-game screen-edge placement and scaling, XP artwork, minimap shapes/title/close button, party alignment and buff wrapping.
+- Visually verify translated text fit and native-nameplate DoT alignment in real combat.
+- Test compatibility with other addons in the live client.
+- Live visual checks remain unverified because desktop control was stopped and must not interrupt the user. No documented off-screen game test mode has been established.

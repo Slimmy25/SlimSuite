@@ -3,6 +3,7 @@
 # Needs python3 and a Lua 5.3 or newer: luahbtex (LuaTeX) by default, or any other with LUA="lua5.3" sh tests/run-checks.sh
 LUA="${LUA:-luahbtex --luaonly}"
 cd "$(dirname "$0")/.." || exit 1
+sources=$(sed -n 's/\r$//; /^[^#].*\.lua$/p' SlimSuite.toc | tr '\n' ' ')
 fail=0
 run() {
   echo "== $1"
@@ -16,18 +17,20 @@ run() {
     fail=1
   fi
 }
-run "block balance"   "python3 tests/bal.py SlimSuite.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua"
-run "stale names"     "python3 tests/stale.py SlimSuite.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua"
-run "load order"      "python3 tests/order.py SlimSuite.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua"
+run "block balance"   "python3 tests/bal.py $sources"
+run "stale names"     "python3 tests/stale.py $sources"
+run "load order"      "python3 tests/order.py $sources"
+run "translation coverage" "python3 ../tools/build-locales.py --check"
 run "shared kit"      "python3 tests/kitversion.py"
-run "lua 5.0"         "python3 tests/lua50.py SlimSuiteDisplay.lua SlimSuiteCore.lua AZSKit.lua SlimSuiteErrors.lua SlimSuiteItems.lua SlimSuiteMeter.lua SlimSuite.lua SlimSuiteLocale.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua SlimSuiteWorld.lua SlimSuiteNameplates.lua"
-for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review edges display chat ready attachments audit; do
+run "lua 5.0"         "python3 tests/lua50.py $sources"
+for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review edges display chat ready attachments audit architecture; do
   run "harness: $s" "cd tests && SCENARIO=$s SEED=7 STEPS=300 $LUA run.lua"
 done
-for locale in esES frFR deDE; do
+for locale in esES frFR deDE ptBR itIT; do
   for s in audit window display; do
     run "harness: $locale/$s" "cd tests && TEST_LOCALE=$locale SCENARIO=$s SEED=7 STEPS=300 $LUA run.lua"
   done
 done
+run "actual Lua 5.0 compilation" "python3 ../tools/check-lua50.py"
 [ $fail -eq 0 ] && echo "ALL CHECKS PASSED" || echo "SOME CHECKS FAILED"
 exit $fail

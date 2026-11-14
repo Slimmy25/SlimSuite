@@ -8,17 +8,13 @@ local firstRunSetupPending = false;
 -- The game's Interface settings (Show Run Clock, Show Boss Bars ...) can be turned off by the player. A part that is
 -- off when the game loads, and that Slim Suite did not turn off itself, was turned off by the player: Slim Suite's own
 -- movable version is switched on in its place, once (turning Slim Suite's version off afterwards is respected).
-SS.NATIVE_REPLACEMENTS = {
-	clock = { "replaceClock", "Run clock", function() SS.UpdateClock(); end },
-	bosses = { "replaceEncounters", "Encounter bars", function() SS.UpdateBossFrames(); end },
-	tally = { "replaceTally", "Kills / Gold / Cache", function() SS.UpdateTally(); end },
-	build = { "replaceBuildRows", "Build rows", function() SS.ApplyBuildRowReplacement(); end },
-	banners = { "replaceBanners", "Announcements", function() SS.UpdateAnnouncementFrame(); end },
-	meter = { "moveMeter", "Damage meter", function() SS.SetMeterReplacement(true); end },
-	localClock = { "replaceLocalClock", "Local clock", function() SS.SetLocalClockOn(true); end },
-	levels = { "moveLevelButton", "Level Up button", function() SS.UpdateLevelButton(); end },
-	revive = { "replaceRevive", "Revive bar", function() end },
-};
+SS.NATIVE_REPLACEMENTS = {};
+for name, element in pairs(SS.ELEMENTS) do
+ if ( element.part and element.feature ) then
+  local frame, title = name, element.title;
+  SS.NATIVE_REPLACEMENTS[element.part] = { element.feature, title, function() SU.SetOn(frame, true, title); end };
+ end
+end
 function SS.NativeIsOff(part)
 	if ( type(AZS_IsHudShown) ~= "function" ) then return nil; end
 	local ok, v = SS.Safe(AZS_IsHudShown, part);
@@ -58,6 +54,7 @@ function SS.Startup(entering, loaded)
 		SS.DB().unlocked = false;
 		SS.Safe(SS.RestoreNatives);
 		SS.Safe(SS.AdoptHiddenNatives);
+		if ( not SS.firstRunSetupPending ) then SS.MigrateElementModes(); end
 	end
 	if ( entering ) then SS.Safe(SS.LayoutLogin); end        -- this character's own layout, if they are kept apart
 	SS.Safe(SS.Camera, entering);
@@ -311,23 +308,24 @@ function SS.ApplyDefaultProfile(name)
 	SS.DB().layouts[custom] = SS.CopyTable(preset);
 	SS.LayoutApply(SS.DB().layouts[custom]);
 	SS.activeCustomProfile = custom;
-	SS.activeCustomProfileText = SS.LayoutText(SS.LayoutSnapshot());
+	SS.profileDirty = nil;
 	local f = getglobal("SlimSuiteLayoutFrame");
 	if ( f ) then f.selectedProfile = custom; if ( f.RefreshProfiles ) then f.RefreshProfiles(); end end
 	K.Print(NAME, "read-only preset copied to \"" .. custom .. "\". Your changes are saved to that copy.");
 	return true, custom;
 end
-function SS.TrackActiveCustomProfile()
-	local name = SS.activeCustomProfile;
-	if ( not name or type(SS.DB().layouts[name]) ~= "table" ) then return; end
-	local snapshot = SS.LayoutSnapshot();
-	local text = SS.LayoutText(snapshot);
-	if ( text ~= SS.activeCustomProfileText ) then
-		SS.DB().layouts[name] = snapshot;
-		SS.activeCustomProfileText = text;
-	end
+function SS.MarkProfileDirty()
+ if ( SS.activeCustomProfile ) then SS.profileDirty = true; end
 end
-SS.Every("trackCustomProfile", 1, function() SS.Safe(SS.TrackActiveCustomProfile); end);
+function SS.TrackActiveCustomProfile()
+ local name = SS.activeCustomProfile;
+ if ( not name or type(SS.DB().layouts[name]) ~= "table" ) then SS.profileDirty = nil; return; end
+ SS.DB().layouts[name] = SS.LayoutSnapshot();
+ SS.profileDirty = nil;
+end
+SS.Every("trackCustomProfile", 0.25, function()
+ if ( SS.profileDirty ) then SS.Safe(SS.TrackActiveCustomProfile); end
+end);
 function SS.LayoutBundleText()
 	local names=SS.LayoutNames();
 	if ( table.getn(names)==0 ) then return nil; end

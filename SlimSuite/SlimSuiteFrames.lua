@@ -464,7 +464,7 @@ function SS.ZoneText()
 end
 
 function SS.UpdateClock()
-	if not SS.DB().replaceClock then if clockFrame then clockFrame:Hide();end;SS.HideNative("clock", false);return;end
+	if not SS.FeatureEnabled("SlimSuiteClockFrame") then if clockFrame then clockFrame:Hide();end;SS.HideNative("clock", false);return;end
 	if ( not clockFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local live = phase == "ready" or phase == "playing" or phase == "choosing" or phase == "paused";
@@ -523,7 +523,7 @@ function SS.UpdateClock()
 end
 
 function SS.UpdateBossFrames()
-	if not SS.DB().replaceEncounters then if bossFrame then bossFrame:Hide();end;SS.HideNative("bosses", false);return;end
+	if not SS.FeatureEnabled("SlimSuiteBossFrames") then if bossFrame then bossFrame:Hide();end;SS.HideNative("bosses", false);return;end
 	if ( not bossFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local live = phase == "playing" or phase == "choosing" or phase == "paused";
@@ -634,7 +634,7 @@ end
 
 function SS.UpdateAnnouncementFrame()
 	SyncAnnouncementNative();
-	if not SS.DB().replaceBanners then if announcementFrame then announcementFrame:Hide();end;return;end
+	if not SS.FeatureEnabled("SlimSuiteAnnouncementFrame") then if announcementFrame then announcementFrame:Hide();end;return;end
 	if ( not announcementFrame ) then return; end
 	local maxWidth = math.max(40, UIParent:GetWidth() - 24);
 	if ( announcementFrame:GetWidth() > maxWidth ) then announcementFrame:SetWidth(maxWidth); end
@@ -753,6 +753,7 @@ function SS.ClampPosition(frame, x, y)
 end
 
 function SS.SavePlace(name, f)
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
 	local p = SS.DB().places[name];
 	if ( type(p) ~= "table" ) then p = {}; SS.DB().places[name] = p; end
 	local left, right, bottom = RootBounds(f);

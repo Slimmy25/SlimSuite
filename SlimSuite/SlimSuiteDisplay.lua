@@ -15,20 +15,7 @@ SS.DISPLAY_RESOLUTIONS = {
  {1920,1200}, {2560,1600}, {2560,1080}, {3440,1440}, {5120,2160},
  {3840,1080}, {5120,1440}, {1080,1920}
 };
-SS.DISPLAY_ANCHORS = {
- PlayerFrame = { "TOPLEFT", .02, .98 }, TargetFrame = { "TOPLEFT", .165, .98 },
- PartyMemberFrame1 = { "TOPLEFT", .02, .87 },
- SlimSuitePlayerCard = { "TOPLEFT", .02, .98 }, SlimSuiteTargetCard = { "TOPLEFT", .165, .98 },
- SlimSuitePartyLines = { "TOPLEFT", .02, .87 },
- SlimSuiteBossFrames = { "TOP", .5, .92 }, SlimSuiteClockFrame = { "TOP", .5, .995 },
- BuffFrame = { "TOPRIGHT", .88, .985 }, MinimapCluster = { "TOPRIGHT", .995, .995 },
- SlimSuiteLocalClockFrame = { "TOPRIGHT", .965, .80 },
- SlimSuiteMeterFrame = { "BOTTOMLEFT", .70, 0 }, SlimSuiteStoredLevelsButton = { "CENTER", .5, .23 },
- SlimSuiteTallyFrame = { "BOTTOM", .5, .006 }, MainMenuBar = { "BOTTOM", .5, 0 },
- MainMenuExpBar = { "BOTTOM", .5, .049 }, SlimSuiteSpellRowFrame = { "TOPLEFT", .275, .38 },
- SlimSuiteItemRowFrame = { "TOPLEFT", .275, .34 }, ChatFrame1 = { "BOTTOMLEFT", .005, .17 },
- SlimSuiteAnnouncementFrame = { "CENTER", .5, .70 }, GameTooltip = { "BOTTOMRIGHT", .995, .005 }
-};
+
 local cachedContext;
 function SS.DisplayContext()
  local l, r, b, t = SS.ScreenBounds(); local w, h = math.max(1,r-l), math.max(1,t-b);
@@ -70,6 +57,7 @@ function SS.PlaceDisplayDefault(name, frame)
  return true;
 end
 function SS.ApplyRecommendedHUD()
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
  if ( not SS.DisplayContext or not SS.DISPLAY_ANCHORS ) then return false; end
  local d=SS.DB();
  d.places=type(d.places)=="table" and d.places or {};

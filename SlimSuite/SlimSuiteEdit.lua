@@ -145,8 +145,9 @@ function SS.TrackToggle(cb)
 	return cb;
 end
 function SS.FlipToggle(get, set)
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
 	if ( type(get) ~= "function" or type(set) ~= "function" ) then return; end
-	set(not (get() and true or false));
+	SS.ChangeSetting(get, set, not (get() and true or false));
 end
 -- which rows of a page are shown right now, as a string; the page is only laid out again when this changes
 function SS.PageSignature(page)
@@ -823,7 +824,7 @@ function SS.PrepareSizeTools(name, label)
 				t:SetWidth(w); t:SetHeight(h);
 			end
 			if ( sizeTarget == "BuffFrame" ) then SS.DB().buffCustomLayout = true; end   -- the icons follow the size
-			SS.DB().sizes[sizeTarget] = { w = w, h = h };
+			SS.DB().sizes[sizeTarget] = { w = w, h = h }; SS.MarkProfileDirty();
 			if ( sizeTarget == "GameTooltip" ) then SS.DB().tooltipCustom = true; end
 			if ( sizeTarget == "BuffFrame" ) then SS.Safe(SS.ApplyBuffOrientation); end
 			if ( sizeTarget == "SlimSuiteClockFrame" ) then SS.ApplyClockLayout(); end
@@ -853,7 +854,7 @@ function SS.PrepareSizeTools(name, label)
 		local function SetScalePercent(percent)
 			if ( not sizeTarget ) then return; end
 			percent = math.max(20, math.min(200, math.floor(tonumber(percent) or 100)));   -- never so small it disappears
-			SS.DB().scales[sizeTarget] = percent / 100;
+			SS.DB().scales[sizeTarget] = percent / 100; SS.MarkProfileDirty();
 			if ( SS.Element(sizeTarget) == "TargetFrame" ) then SS.Safe(SS.MirrorPlayer); end
 			PlaceAll();
 			sizeMenuScaleInput:SetText(tostring(percent));
@@ -904,7 +905,7 @@ function SS.PrepareSizeTools(name, label)
 		sizeMenuPadding = Label();
 		local function Pad(by)
 			if ( not sizeTarget ) then return; end
-			SS.DB().padding[sizeTarget] = math.max(0, math.min(SS.FramePaddingLimit(sizeTarget), SS.FramePadding(sizeTarget) + by));
+			SS.DB().padding[sizeTarget] = math.max(0, math.min(SS.FramePaddingLimit(sizeTarget), SS.FramePadding(sizeTarget) + by)); SS.MarkProfileDirty();
 			SS.ApplyMovablePadding(sizeTarget);
 			sizeMenuPadding:SetText(SS.T("Padding") .. ": " .. SS.FramePadding(sizeTarget));
 			ShowSize();
@@ -1558,6 +1559,7 @@ function SS.ResetPlaces()
 end
 
 function SS.ResetElement(name)
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
 	local frame = name and getglobal(name);
 	if ( not frame ) then return false; end
 	local d = SS.DB();
@@ -1596,6 +1598,7 @@ function SS.ResetElement(name)
 end
 
 function SS.ResetUI()
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
 	local d = SS.DB();
 	d.places, d.sizes, d.scales, d.padding, d.orientations, d.muted = {}, {}, {}, {}, {}, {};
 	d.tallyVertical, d.buffCustomLayout, d.buffGrowthDirection = true, false, "down";

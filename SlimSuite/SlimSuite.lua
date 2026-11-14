@@ -171,7 +171,7 @@ SS.DEFAULTS = {
 	bossHitmarkerSound = false, bossWhipSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
 	partyFaces = true, cardPortraits = true, targetDebuffs = true, showAbsorbs = false, moveLevelButton = false, moveMeter = false,
-	modernEnemyFrames = false, enemyBossesOnly = true, enemyPlateDebuffs = true,
+	modernEnemyFrames = false, enemyBossesOnly = true, enemyPlateDebuffs = false,
 	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
@@ -537,21 +537,7 @@ SS.Every("lowHealthAlert", 0.25, PlayLowHealthSound);
 -- ---------------------------------------------------------------- moving the UI, and the target frame
 -- Unlocked, each of these frames gets a handle over it (its name on a green panel): drag the handle and the frame
 -- follows. The current lock state and every moved position are retained in SavedVariables across /reload.
-MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "PartyMemberFrame1", "Party" }, { "SlimSuitePartyLines", "Party" },
-	{ "MinimapCluster", "Minimap" }, { "BuffFrame", "Buffs" },
-	{ "MainMenuBar", "Action bars" }, { "MainMenuExpBar", "XP bar" }, { "ChatFrame1", "Chat" },
-	{ "SlimSuiteMeterFrame", "Damage meter" },
-	{ "SlimSuiteStoredLevelsButton", "Level Up" },
-	{ "SlimSuiteClockFrame", "Run clock / Next boss" },
-	{ "SlimSuiteBossFrames", "Encounter bars" },
-	{ "SlimSuiteAnnouncementFrame", "Event announcements" },
-	{ "SlimSuiteSpellRowFrame", "Build spell row" },
-	{ "SlimSuiteItemRowFrame", "Worn rings / trinkets" },
-	{ "SlimSuiteTallyFrame", "Kills / Gold / Cache" }, { "GameTooltip", "Tooltip" },
-	{ "SlimSuiteReviveFrame", "Revive bar" },
-	{ "SlimSuiteLocalClockFrame", "Local clock" },
-	{ "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
-	{ "SlimSuiteMinimapBar", "Minimap buttons" }, { "SlimSuiteCombatTextFrame", "Combat text" } };
+MOVABLE = SS.MOVABLE;
 handles = {};
 handleList = {};
 editOnly = nil;
@@ -940,7 +926,7 @@ end
 SS.CreateSpellRow();
 
 function SS.ApplyBuildRowReplacement()
-	local enabled = SS.DB().replaceBuildRows;
+	local enabled = SS.FeatureEnabled("SlimSuiteSpellRowFrame");
 	SS.HideNative("build", enabled);
 	if ( spellRow ) then if ( enabled ) then spellRow:Show(); else spellRow:Hide(); end end
 	if ( itemRow ) then if ( enabled ) then itemRow:Show(); else itemRow:Hide(); end end
@@ -1127,7 +1113,7 @@ function SS.DrawTally(parts)
 end
 
 function SS.UpdateTally()
-	if not SS.DB().replaceTally then if tallyFrame then tallyFrame:Hide();end;SS.HideNative("tally", false);return;end
+	if not SS.FeatureEnabled("SlimSuiteTallyFrame") then if tallyFrame then tallyFrame:Hide();end;SS.HideNative("tally", false);return;end
 	if ( not tallyFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local active = phase and phase ~= "ready";
@@ -1193,7 +1179,7 @@ UpdateMeter = function()
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local active = phase and phase ~= "ready";
 	local editing = SS.IsEditing("SlimSuiteMeterFrame") and SS.DB().moveMeter;
-	if ( not SS.DB().moveMeter ) then
+	if ( not SS.FeatureEnabled("SlimSuiteMeterFrame") ) then
 		meterFrame:Hide();
 		if ( not setupActive ) then SS.HideNative("meter", false); end   -- the setup keeps the game's meter hidden
 		return;
@@ -1213,7 +1199,7 @@ SS.Every("meterPoll", 0.35, function() SS.Safe(UpdateMeter); end);
 function SS.UpdateLevelButton()
 	if ( not levelButton ) then return; end
 	local canReplace = type(AZS_OpenStoredLevels) == "function";
-	local replacing = SS.DB().moveLevelButton and canReplace;
+	local replacing = SS.FeatureEnabled("SlimSuiteStoredLevelsButton") and canReplace;
 	SS.HideNative("levels", replacing);
 	local storedCount = 0;
 	if ( type(AZS_GetStoredLevels) == "function" ) then

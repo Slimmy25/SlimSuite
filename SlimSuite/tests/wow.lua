@@ -91,7 +91,19 @@ Frame.methods = {
 	GetID = function(self) return 1 end,
 	GetNumLines = function() return 0 end,
 }
-local function look(t, k) local m = Frame.methods[k]; if m then return m end; if type(k) == "string" and string.match(k, "^[A-Z]") then return noop end; return nil end
+-- Explicit legacy methods only. A typo or unsupported modern API must not silently succeed.
+for method in string.gmatch([[AddDoubleLine AddLine AddMessage ClearFocus ClearModel EnableMouseWheel GetStatusBarColor GetStatusBarTexture GetTexture GetVerticalScroll HighlightText IsUserPlaced LockHighlight RegisterForClicks RegisterForDrag SetAllPoints SetAutoFocus SetBackdropBorderColor SetBackdropColor SetBlendMode SetCamera SetCheckedTexture SetClampedToScreen SetDesaturated SetFocus SetFont SetFontObject SetGradient SetGradientAlpha SetHighlightTexture SetID SetInventoryItem SetJustifyH SetJustifyV SetMaxLetters SetMinResize SetMovable SetMultiLine SetNonSpaceWrap SetNormalTexture SetNumeric SetOwner SetPushedTexture SetResizable SetScrollChild SetShadowColor SetShadowOffset SetSpell SetSpellBookItem SetStatusBarColor SetStatusBarTexture SetTexCoord SetTextColor SetTextInsets SetTexture SetUnit SetUnitBuff SetUnitDebuff SetUserPlaced SetVertexColor SetVerticalScroll StartMoving StartSizing StopMovingOrSizing UnlockHighlight UpdateScrollChildRect]], "%S+") do
+    if not Frame.methods[method] then Frame.methods[method] = noop end
+end
+Frame.methods.HookScript = nil -- not part of the target 1.12 API
+Frame.methods.SetBackdrop = function(self, backdrop) self.backdrop = backdrop end
+Frame.methods.SetMinMaxValues = function(self, low, high) self.minimum, self.maximum = low, high end
+Frame.methods.GetMinMaxValues = function(self) return self.minimum or 0, self.maximum or 1 end
+local function finite(v) return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge end
+Frame.methods.SetWidth = function(self, value) assert(finite(value) and value >= 0, "invalid width"); self.w = value end
+Frame.methods.SetHeight = function(self, value) assert(finite(value) and value >= 0, "invalid height"); self.h = value end
+Frame.methods.SetScale = function(self, value) assert(finite(value) and value > 0, "invalid scale"); self.scale = value end
+local function look(t, k) return Frame.methods[k] end
 Frame.meta = { __index = look }
 
 function CreateFrame(kind, name, parent, template)
@@ -138,6 +150,7 @@ for _, n in ipairs({ "PlayerFrame", "TargetFrame", "PartyMemberFrame1", "PartyMe
 	CreateFrame("Frame", n, UIParent)
 end
 Minimap = CreateFrame("Frame", "Minimap", MinimapCluster)
+Minimap.SetMaskTexture = function(self, texture) self.maskTexture = texture end
 -- the XP bar and its four border pieces, as the game makes them: 256x10 each along the bar's lower edge
 MainMenuExpBar.w, MainMenuExpBar.h = 1024, 13
 for i = 0, 3 do

@@ -51,5 +51,25 @@ check("and on your thin line", line.slimRaidMark and line.slimRaidMark.shown)
 MOCK_MARKS.player = nil; Tick(10)
 check("a cleared mark goes", not line.slimRaidMark.shown)
 SS.SetLook("PartyMemberFrame1", "classic"); SS.SetPartySelf(false); SS.SetBuffsPlace("own"); Tick(2)
+-- Encounter auras belong at the end of the health bar, clear of the raid-marker/name end.
+local originalDebuffs = rawget(_G, "AZS_GetDebuffs")
+AZS_GetDebuffs = function() return {
+    { icon = "Spell_Shadow_ShadowWordPain", remaining = 8 },
+    { icon = "Spell_Shadow_CurseOfSargeras", remaining = 5 }
+} end
+local encounter = CreateFrame("Frame", nil, UIParent)
+encounter.bar = CreateFrame("StatusBar", nil, encounter)
+encounter.bar:SetWidth(240); encounter.bar:SetHeight(12)
+SlimSuiteWorld.DrawDebuffs(encounter, { id = 1 }, false, true)
+local first, second = encounter.debuffs[1].points[1], encounter.debuffs[2].points[1]
+check("horizontal DoTs anchor to the bar's right end", first[1] == "TOPRIGHT" and first[2] == encounter.bar and first[3] == "BOTTOMRIGHT" and first[4] == 0 and first[5] < 0)
+check("horizontal DoTs grow inward from the right", second[4] < first[4] and second[5] == first[5])
+SlimSuiteWorld.DrawDebuffs(encounter, { id = 1 }, true, true)
+first, second = encounter.debuffs[1].points[1], encounter.debuffs[2].points[1]
+check("vertical DoTs anchor to the bar's bottom end", first[1] == "TOP" and first[2] == encounter.bar and first[3] == "BOTTOM" and first[4] == 0 and first[5] < 0)
+check("vertical DoTs grow downward from the bottom", second[5] < first[5])
+SlimSuiteWorld.DrawDebuffs(encounter, { id = 1 }, true, false)
+check("disabled encounter auras stay hidden", not encounter.debuffs[1]:IsShown() and not encounter.debuffs[2]:IsShown())
+rawset(_G, "AZS_GetDebuffs", originalDebuffs)
 print("marks problems: " .. bad)
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end
