@@ -4,7 +4,18 @@
 LUA="${LUA:-luahbtex --luaonly}"
 cd "$(dirname "$0")/.." || exit 1
 fail=0
-run() { echo "== $1"; out=$(eval "$2" 2>&1); echo "$out" | tail -3; echo "$out" | grep -qE "attempt to|syntax error|problems: [1-9]|<-- BAD|TICK |MISMATCH|FAIL seed" && { echo "FAILED: $1"; fail=1; }; }
+run() {
+  echo "== $1"
+  out=$(eval "$2" 2>&1)
+  status=$?
+  echo "$out" | tail -3
+  if [ "$status" -ne 0 ] || echo "$out" | grep -qE "attempt to|syntax error|problems: [1-9]|<-- BAD|TICK |MISMATCH|FAIL seed"; then
+    echo "-- full output for failed check: $1 --"
+    echo "$out"
+    echo "FAILED: $1"
+    fail=1
+  fi
+}
 run "block balance"   "python3 tests/bal.py SlimSuite.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua"
 run "stale names"     "python3 tests/stale.py SlimSuite.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua"
 run "load order"      "python3 tests/order.py SlimSuite.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua"
