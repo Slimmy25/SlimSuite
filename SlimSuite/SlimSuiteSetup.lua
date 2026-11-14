@@ -296,9 +296,7 @@ function SU.ChecksFor(frame)
 			{ "The game's nearest Guardian lair flag", short = "Guardian lair flag", function() return SS.DB().showGuardianFlag; end, function(v) SS.DB().showGuardianFlag = v and true or false; SS.ApplyGuardianFlag(); end },
 			{ "Slim Suite's gear button", short = "Gear button", function() local m = SS.DB().minimap; return not (type(m) == "table" and m.hide); end,
 				function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (type(m) == "table" and m.hide and true or false) == (v and true or false) ) then SS.Mini.Toggle(); end end end } },
-		SlimSuiteMinimapBar = { ButtonPlace(),
-			{ "Vertical", function() return SS.DB().orientations.SlimSuiteMinimapBar == "vertical"; end,
-			function(v) SS.DB().orientations.SlimSuiteMinimapBar = v and "vertical" or "horizontal"; SS.Safe(SS.LayoutMinimapBar); end } },
+		SlimSuiteMinimapBar = { ButtonPlace() },
 		SlimSuiteClockFrame = { { "Show the zone and Heroic affixes under it", short = "Zone and Heroic affixes", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
 		MainMenuExpBar = { { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
 			function(v) SU.SetVertical("MainMenuExpBar", v); SS.Safe(SS.LayoutXpSegments); end },
@@ -326,6 +324,7 @@ function SU.ChecksFor(frame)
 			{ "Vertical", function() return SS.DB().orientations.SlimSuiteBossFrames == "vertical"; end,
 			function(v) SS.DB().orientations.SlimSuiteBossFrames = v and "vertical" or "horizontal"; SS.DB().sizes.SlimSuiteBossFrames = nil; SS.Safe(SS.UpdateBossFrames); SS.Safe(PlaceAll); SU.UpdateDemo(); end } },
 		SlimSuiteTallyFrame = {
+			{ "Show map name and difficulty", function() return SS.DB().tallyContext; end, function(v) SS.DB().tallyContext = v and true or false; SS.UpdateTally(); end },
 			{ "Show boss and Guardian kills", function() return SS.DB().tallyBossKills; end, function(v) SS.DB().tallyBossKills = v; end },
 			{ "Dark band behind it", function() return SS.DB().tallyBackground; end, function(v) SS.DB().tallyBackground = v; end } },
 		SlimSuiteLocalClockFrame = {
@@ -1328,35 +1327,21 @@ function SS.ConnectedTo(frame)
 	if ( frame == "TargetFrame" and d.combineTarget ) then return "PlayerFrame", "Player frame"; end
 	return nil;
 end
-function TagLook(b, text, r, g, bl)
-	b.tag.text:SetText(text);
-	b.tag:SetBackdropColor(r * 0.4, g * 0.4, bl * 0.4, 0.95); b.tag:SetBackdropBorderColor(r, g, bl, 1);
-	b.tag:Show();
-end
 function SU.RefreshBar()
 	for frame, b in pairs(SU.barButtons or {}) do
 		local mode = SU.Mode(frame);
 		local parentFrame, parentTitle = SS.ConnectedTo(frame);
-		if ( b.tag ) then
-			b.tag.parentTitle = parentTitle;
-			b.tag.modeLabel = string.upper(string.sub(mode, 1, 1)) .. string.sub(mode, 2);
-		end
-		if ( mode == "enabled" ) then b:LockHighlight(); else b:UnlockHighlight(); end
-		if ( b.tag ) then
-			local colors = { enabled = { 0.4, 1, 0.4 }, disabled = { 1, 0.4, 0.4 }, default = { 0.7, 0.7, 0.7 } };
-			local color = colors[mode] or colors.default;
-			TagLook(b, string.upper(string.sub(mode, 1, 1)) .. string.sub(mode, 2), color[1], color[2], color[3]);
+		if ( b.nameHit ) then b.nameHit.parentTitle = parentTitle; end
+		for i = 1, table.getn(b.states or {}) do
+			local state = b.states[i];
+			if ( state.modeValue == mode ) then state:LockHighlight(); else state:UnlockHighlight(); end
 		end
 		if ( parentTitle ) then
 			if ( frame == "BuffFrame" ) then
-				local fs = b.GetFontString and b:GetFontString();
-				if ( fs ) then fs:SetText("Buffs/Debuffs"); elseif ( b.SetText ) then b:SetText("Buffs/Debuffs"); end
+				if ( b.label ) then b.label:SetText(SS.T("Buffs/Debuffs")); end
 			end
-			b:LockHighlight();
 		elseif ( frame == "BuffFrame" ) then
-			-- the name stays put; the tag under it says whether the buffs are on, or off because they sit on the player frame
-			local fs = b.GetFontString and b:GetFontString();
-			if ( fs ) then fs:SetText("Buffs/Debuffs"); elseif ( b.SetText ) then b:SetText("Buffs/Debuffs"); end
+			if ( b.label ) then b.label:SetText(SS.T("Buffs/Debuffs")); end
 		end
 	end
 end
@@ -1410,7 +1395,7 @@ function SU.Focus(frame)
 	if ( e ) then
 		SU.panel.title:SetText(SS.T and SS.T(e.title) or e.title);
 		mode = setupActive and frame and SU.Mode(frame) or nil;
-		SU.panel.text:SetText(SS.T(e.text) .. (mode and mode ~= "enabled" and "\n" .. SS.T("Choose Enabled beside the element before changing its layout or options.") or ""));
+		SU.panel.text:SetText(SS.T(e.text) .. (mode and mode ~= "enabled" and "\n" .. SS.T("Choose Enabled to use Slim Suite's movable version before changing its layout or options.") or ""));
 		-- a sub-setting shows only while the setting it depends on is on
 		local all, shown = SU.ChecksFor(frame), {};
 		for i = 1, table.getn(all) do if ( not all[i][4] or all[i][4]() ) then table.insert(shown, all[i]); end end
@@ -1714,27 +1699,32 @@ function SU.Begin()
 	local modes = SS.DB().elementModes or {};
 	SS.DB().elementModes = modes;
 	local saved = SS.DB().enabledElements or {};
+	local enableCustomDefaults = (tonumber(SS.DB().customElementsEnabledOnSetupVersion) or 0) < 1;
 	SU.restoring = false;
 	SU.batching = true;      -- one bar and demo refresh at the end, not one per element
 	SS.Safe(SU.SetGridSetting, SS.DB().showEditGrid and true or false);
-	-- Migrate prior binary selections: old enabled elements stay enabled; untouched elements stay at Blizzard defaults.
+	-- Migrate prior binary selections. On the first Toggle UI Settings visit, Slim Suite's own movable elements start
+	-- enabled so the user can arrange them immediately; native Blizzard elements remain at Default. Later visits respect
+	-- every Enabled, Disabled or Default choice the user made.
 	for i = 1, table.getn(SU.elements) do
 		local f = SU.elements[i].frame;
 		local mode = SU.Mode(f);
 		if ( modes[f] == nil and saved[f] ) then modes[f] = "enabled"; mode = "enabled"; end
+		if ( enableCustomDefaults and string.sub(f, 1, 9) == "SlimSuite" and mode == "default" ) then modes[f] = "enabled"; mode = "enabled"; end
 		if ( f == "SlimSuiteMeterFrame" and SS.DB().moveMeter ) then mode = modes[f] or "enabled"; end
 		if ( f == "PlayerFrame" and SS.DB().partyIncludesSelf ) then mode = modes[f] or "default"; end
 		if ( f == "TargetFrame" and SS.DB().hideTarget ) then mode = modes[f] or "disabled"; end
 		if ( mode == "enabled" or mode == "disabled" ) then SS.Safe(SU.SetMode, f, mode, SU.titles[f]);
 		else SS.Safe(SU.SetMode, f, "default", SU.titles[f]); end
 	end
+	if ( enableCustomDefaults ) then SS.DB().customElementsEnabledOnSetupVersion = 1; end
 	SU.batching = false;
 	-- the bar: one button per element
 	SU.barButtons = SU.barButtons or {};
 	-- a vertical list from the top left corner: one element per line, a new column when the screen runs out of height
 	local wanted, col, idx, maxIdx = {}, 0, 0, 0;
 	local maxH = (UIParent:GetHeight() or 768) - 80;
-	local COLUMN, LINE, TOP, BOTTOM = 204, 19, 26, 27;   -- compact two-column list; actions stay on its bottom edge
+	local COLUMN, LINE, TOP, BOTTOM = 310, 19, 26, 27;   -- three explicit states beside a plain name; actions stay on the bottom edge
 	maxH = maxH - TOP - BOTTOM;
 	for i = 1, table.getn(SU.elements) do
 		local e = SU.elements[i];
@@ -1742,42 +1732,49 @@ function SU.Begin()
 		wanted[name] = true;
 		local b = SU.barButtons[name];
 		if ( not b ) then
-			b = K.Button(SU.bar, e.title, 80, function() SU.Click(name); end);
+			b = CreateFrame("Frame", nil, SU.bar);
 			SU.barButtons[name] = b;
-			b.tag = CreateFrame("Frame", nil, SU.bar);
-			b.tag:SetHeight(13);
-			b.tag:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-				tile = true, tileSize = 16, edgeSize = 8, insets = { left = 2, right = 2, top = 2, bottom = 2 } });
-			b.tag:SetBackdropColor(0.1, 0.4, 0.1, 0.95);
-			b.tag:SetBackdropBorderColor(0.4, 1, 0.4, 1);
-			b.tag.text = b.tag:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-			b.tag.text:SetPoint("CENTER", b.tag, "CENTER", 0, 0); b.tag.text:SetText(SS.T("Default"));
-			b.tag:EnableMouse(true);
-			b.tag:SetScript("OnEnter", function()
+			b:SetWidth(COLUMN); b:SetHeight(LINE);
+			b.nameHit = CreateFrame("Frame", nil, b); b.nameHit:SetWidth(102); b.nameHit:SetHeight(17); b.nameHit:SetPoint("LEFT", b, "LEFT", 0, 0); b.nameHit:EnableMouse(true);
+			b.label = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+			b.label:SetPoint("LEFT", b, "LEFT", 0, 0); b.label:SetWidth(102); b.label:SetJustifyH("LEFT");
+			b.nameHit:SetScript("OnMouseUp", function()
+				if ( arg1 ~= "RightButton" ) then return; end
+				if ( setupActive ) then SU.Focus(this.ownerFrame); else SS.OpenSizeMenu(this.ownerFrame, this.elementTitle); end
+			end);
+			b.nameHit:SetScript("OnEnter", function()
 				if ( not GameTooltip ) then return; end
 				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
-				GameTooltip:AddLine("Element status: " .. (this.modeLabel or "Default"), 1, 0.82, 0.2);
+				GameTooltip:AddLine(this.elementTitle or "", 1, 0.82, 0.2);
+				GameTooltip:AddLine(SS.T("Right-click the name to open its settings."), 0.8, 0.8, 0.8, 1);
 				if ( this.parentTitle ) then GameTooltip:AddLine("Connected to: " .. this.parentTitle, 0.7, 0.85, 1); end
-				GameTooltip:AddLine("Click to cycle Default, Enabled and Disabled.", 0.8, 0.8, 0.8, 1);
 				GameTooltip:Show();
 			end);
-			b.tag:SetScript("OnMouseUp", function() if ( arg1 == "LeftButton" ) then SU.CycleMode(this.ownerFrame); end end);
-			b.tag:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
-			b.tag:Hide();
+			b.nameHit:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
+			b.states = {};
+			b.stateLabels = { "Enabled", "Disabled", "Default" };
+			local stateModes = { "enabled", "disabled", "default" };
+			for j = 1, 3 do
+				local value, label = stateModes[j], b.stateLabels[j];
+				local state = K.Button(b, SS.T(label), 64, function()
+					SU.SetMode(this.ownerFrame, this.modeValue, SU.titles and SU.titles[this.ownerFrame]);
+				end);
+				state:SetHeight(17); state.ownerFrame = name; state.modeValue = value;
+				state:SetPoint("LEFT", b, "LEFT", 105 + ((j - 1) * 67), 0);
+				b.states[j] = state;
+			end
 		end
-		local w = math.min(140, math.max(66, string.len(e.title) * 5.2 + 12));
-		b:SetWidth(w); b:SetHeight(17);
-		-- the three-state selector sits directly beside its element
-		b.tag.ownerFrame = name;
-		b.tag:SetWidth(58); b.tag:ClearAllPoints(); b.tag:SetPoint("LEFT", b, "RIGHT", 3, 0);
+		b.nameHit.ownerFrame = name; b.nameHit.elementTitle = e.title; b.label:SetText(SS.T(e.title));
+		for j = 1, table.getn(b.states) do b.states[j].ownerFrame = name; b.states[j]:SetText(SS.T(b.stateLabels[j])); end
 		-- two columns, half the elements in each (a third column only if the screen is too short for two)
 		local perCol = math.ceil(table.getn(SU.elements) / 2);
 		if ( idx > 0 and (idx >= perCol or 6 + (idx + 1) * LINE > maxH) ) then col = col + 1; idx = 0; end
-		b:ClearAllPoints(); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 6 + col * COLUMN, -6 - TOP - idx * LINE); b:Show(); b.tag:Show();
+		b:ClearAllPoints(); b:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 6 + col * COLUMN, -6 - TOP - idx * LINE); b:Show();
+		for j = 1, table.getn(b.states) do b.states[j]:Show(); end
 		if ( idx > maxIdx ) then maxIdx = idx; end
 		idx = idx + 1;
 	end
-	for name, b in pairs(SU.barButtons) do if ( not wanted[name] ) then b:Hide(); if ( b.tag ) then b.tag:Hide(); end end end
+	for name, b in pairs(SU.barButtons) do if ( not wanted[name] ) then b:Hide(); for j = 1, table.getn(b.states or {}) do b.states[j]:Hide(); end end end
 	SU.bar:SetWidth(6 + (col + 1) * COLUMN);
 	SU.bar:SetHeight((maxIdx + 1) * LINE + 12 + TOP + BOTTOM);
 	if ( SU.bar.resetAll ) then

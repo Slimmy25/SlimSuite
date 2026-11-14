@@ -175,6 +175,7 @@ SS.DEFAULTS = {
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
 	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false,
 	accessibilityLargeText = false, accessibilityReduceMotion = false,
+	tallyContext = true,
 };
 SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
 	"itemRowSeen", "chatOffsets", "words", "layouts", "enabledElements", "elementModes" };
@@ -953,16 +954,21 @@ function SS.TallyParts(run, sample)
 	return parts;
 end
 
--- The creator documents AZS_ZONE.zname and AZS_ZONE.diff (the zone's difficulty multiplier).
--- Keep the multiplier explicit; do not guess a Normal/Heroic label from an undocumented threshold.
+-- AZS_ZONE.diff is the run's difficulty multiplier. Convert the game's known tier values to their named difficulty;
+-- an unrecognized future value is left as the generic label rather than displaying a misleading multiplier.
+local TALLY_DIFFICULTIES = { [100] = "Normal", [179] = "Heroic 1", [197] = "Heroic 2", [216] = "Heroic 3", [245] = "Heroic 4", [272] = "Heroic 5" };
 function SS.TallyContext(sample)
-	if ( sample ) then return "Elwynn Forest  |  " .. SS.T("Difficulty") .. " 1.00x"; end
+	if ( not SS.DB().tallyContext ) then return ""; end
+	if ( sample ) then return "Elwynn Forest  |  " .. SS.T("Normal"); end
 	local zone = type(AZS_ZONE) == "table" and AZS_ZONE or nil;
 	local name = zone and (zone.zname or zone.name or zone.zone or zone.title) or nil;
 	if ( type(name) ~= "string" or name == "" ) then name = type(GetRealZoneText) == "function" and GetRealZoneText() or ""; end
 	local diff = zone and tonumber(zone.diff) or nil;
 	if ( type(name) ~= "string" or name == "" ) then return ""; end
-	if ( diff ) then return name .. "  |  " .. SS.T("Difficulty") .. " " .. string.format("%.2fx", diff); end
+	if ( diff ) then
+		local tier = TALLY_DIFFICULTIES[math.floor(diff * 100 + 0.5)];
+		return name .. "  |  " .. SS.T(tier or "Difficulty");
+	end
 	return name;
 end
 
@@ -986,6 +992,7 @@ function SS.DrawTally(parts)
 	local fixed = type(custom) == "table" and custom.w and custom.h;
 	local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
 	local context = SS.TallyContext(SS.Demoing("SlimSuiteTallyFrame") or SS.IsEditing("SlimSuiteTallyFrame"));
+	local hasContext = context ~= "";
 	local sig = (vertical and "v" or "h") .. pad .. (SS.DB().tallyBackground and "b" or "") .. context .. (fixed and (custom.w .. "x" .. custom.h) or "");
 	for i = 1, n do sig = sig .. "|" .. parts[i][1] .. parts[i][2]; end
 	if ( tallyFrame.sig == sig ) then return; end           -- nothing it shows has changed
@@ -1013,7 +1020,7 @@ function SS.DrawTally(parts)
 		local need = vertical and widest or total;
 		local fit = size;
 		if ( need > 0 and need > custom.w - pad * 2 ) then fit = math.floor(size * (custom.w - pad * 2) / need); end
-		if ( vertical ) then fit = math.min(fit, math.floor((custom.h - 28) / n) - 4); else fit = math.min(fit, math.floor(custom.h) - 34); end
+		if ( vertical ) then fit = math.min(fit, math.floor((custom.h - (hasContext and 28 or 14)) / n) - 4); else fit = math.min(fit, math.floor(custom.h) - (hasContext and 34 or 16)); end
 		fit = math.max(7, fit);
 		if ( fit ~= size ) then size = fit; widest, total = Measure(size); end
 		line = math.min(TALLY.LINE, size + 4);
@@ -1021,8 +1028,8 @@ function SS.DrawTally(parts)
 	for i = n + 1, table.getn(tallyFrame.labels) do tallyFrame.labels[i]:Hide(); tallyFrame.values[i]:Hide(); end
 	local width, height;
 	if ( fixed ) then width, height = custom.w, custom.h;
-	elseif ( vertical ) then width, height = widest + pad * 2, n * line + 28;
-	else width, height = total + pad * 2, 50; end
+	elseif ( vertical ) then width, height = widest + pad * 2, n * line + (hasContext and 28 or 14);
+	else width, height = total + pad * 2, hasContext and 50 or 32; end
 	tallyFrame:SetWidth(width); tallyFrame:SetHeight(height);
 	if ( not tallyFrame.context ) then
 		tallyFrame.context = tallyFrame:CreateFontString(nil, "OVERLAY");
@@ -1045,13 +1052,14 @@ function SS.DrawTally(parts)
 		local label, value = tallyFrame.labels[i], tallyFrame.values[i];
 		label:ClearAllPoints(); value:ClearAllPoints();
 		if ( vertical ) then
-			local y = -18 - (i - 1) * line;
+			local y = -(hasContext and 18 or 4) - (i - 1) * line;
 			label:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", pad, y);
 			value:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", -pad, y);
 		else
-			label:SetPoint("LEFT", tallyFrame, "LEFT", x, -26);
+			local y = -(hasContext and 26 or 8);
+			label:SetPoint("LEFT", tallyFrame, "LEFT", x, y);
 			x = x + (label:GetStringWidth() or 0) + TALLY.WORD_GAP;
-			value:SetPoint("LEFT", tallyFrame, "LEFT", x, -26);
+			value:SetPoint("LEFT", tallyFrame, "LEFT", x, y);
 			x = x + (value:GetStringWidth() or 0) + TALLY.PART_GAP;
 		end
 	end

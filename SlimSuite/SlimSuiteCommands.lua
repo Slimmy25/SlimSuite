@@ -91,7 +91,7 @@ end);
 SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes" };
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
-	"partyFaces", "cardPortraits", "tallyVertical", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare", "minimapTransparent",
+	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare", "minimapTransparent",
 	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments",
 	"encounterBarThickness", "encounterNameAlign", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion" };
 function SS.CopyTable(t)

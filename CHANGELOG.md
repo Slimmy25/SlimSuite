@@ -4,6 +4,11 @@ Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## Unreleased
 
+## 1.25
+- Toggle UI Settings enables movable Slim Suite elements by default on first use; users can set each element to Enabled, Disabled, or Default. The element name itself is non-clickable, with right-click opening its settings.
+- Kills / Gold / Cache can show or hide the map name and named difficulty (Normal or Heroic 1–5) instead of a numeric multiplier.
+- Removed the movable minimap button row's vertical/horizontal style control while retaining ring and top, bottom, left and right placement choices.
+
 ## 1.24
 - Expanded HUD profiles with named save/apply/delete, single-layout import/export, and portable bundles for all named profiles; per-character layout support remains available.
 - Added a display-aware recommended HUD preset action that repositions enabled elements using the selected aspect-ratio template while leaving Default and Disabled elements alone.
