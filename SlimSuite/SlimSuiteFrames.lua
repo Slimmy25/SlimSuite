@@ -1035,6 +1035,11 @@ SS.BuffButtons = BuffButtons;
 
 function SS.ApplyBuffOrientation()
 	if ( not BuffFrame or buffLayoutApplying ) then return; end
+	local d=SS.DB();
+	local side=d.buffsOnTarget and d.buffsOnTargetSide or d.buffsOnPlayerSide;
+	if ( d.partyIncludesSelf and (side=="left" or side=="right") ) then side="above"; end
+	local bounded=(d.buffsOnPlayer or d.buffsOnTarget) and (side=="above" or side=="below") and not (d.frameDefault and d.frameDefault.BuffFrame);
+	if ( not bounded and SS.LayoutPartyBuffs ) then SS.LayoutPartyBuffs(); end
 	local orientation = SS.CurrentOrientation("BuffFrame");
 	local attached;
 	if ( SS.Pair and SS.DB().buffsOnTarget ) then local _, target = SS.Pair(); attached = target;
@@ -1088,6 +1093,9 @@ function SS.ApplyBuffOrientation()
 		return;
 	end
 	buffLayoutApplying = true;
+	if ( attached and bounded ) then
+		buffLayoutApplying=false; SS.LayoutPartyBuffs(); return;
+	end
 	if ( (SS.DB().frameDefault and SS.DB().frameDefault.BuffFrame) or (orientation == "horizontal" and not SS.DB().buffCustomLayout) ) then
 		-- the game's own layout: its buttons go back where the game puts them
 		local prev;

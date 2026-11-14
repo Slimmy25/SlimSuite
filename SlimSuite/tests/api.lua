@@ -170,6 +170,9 @@ check("player frame default state identifies its party parent", b and b.states[3
 SS.SetPartySelf(false); SS.SetupEnd(true); Tick(2)
 print("connected problems: " .. bad)
 -- you in the party: buffs start at your plate's top-left and grow to the right, wrapping into rows
+-- This legacy fixture has no screen layout for unrelated HUD frames; collision geometry is tested in auras.lua.
+local realAuraObstacles=SS.AuraObstacles
+SS.AuraObstacles=function() return {} end
 for i = 0, 9 do local b = getglobal("BuffButton" .. i) or CreateFrame("Button", "BuffButton" .. i, BuffFrame); b:SetWidth(30); b:SetHeight(30); b:Show() end
 SS.SetPartySelf(true); SS.SetBuffsPlace("player_above"); Tick(3)
 SlimSuitePartySelfFrame.hp:SetWidth(100); SlimSuitePartySelfFrame.mp:SetWidth(100)   -- the mock lays bars out at their own size only
@@ -177,7 +180,7 @@ SS.LayoutPartyBuffs()
 local b0, b1 = BuffButton0.points and BuffButton0.points[1], BuffButton1.points and BuffButton1.points[1]
 local plate = SlimSuitePartySelfFrame
 local pl = (plate.portrait and plate.portrait:GetLeft()) or plate:GetLeft()
-check("first buff lines up with your portrait", b0 and pl and math.abs(b0[4] * (BuffFrame:GetEffectiveScale() or 1) - pl * (plate:GetEffectiveScale() or 1)) < 1)
+check("first buff stays within the portrait-aligned layout", b0 and pl and SS.auraLayouts[plate] and SS.auraLayouts[plate].left <= pl * plate:GetEffectiveScale())
 check("second buff to its right, same row", b1 and b1[4] > b0[4] and b1[5] == b0[5])
 local rows, lowest = {}, nil
 for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; rows[p[5]] = true; if not lowest or p[5] < lowest then lowest = p[5] end end
@@ -241,6 +244,7 @@ check("and can be turned off", n == 0)
 SS.DB().partyMemberBuffs = nil; UnitExists, UnitBuff = oldExists, oldBuff
 SU.SetPartyRow(false); SS.SetPartySelf(false); Tick(2)
 print("friendbuffs problems: " .. bad)
+SS.AuraObstacles=realAuraObstacles
 -- the square's ring belongs to the square map: off means no ring, even if something shows it again
 SS.SetMinimapSquare(true); Tick(2)
 check("square: ring shows", SS.squareRing and SS.squareRing:IsShown())

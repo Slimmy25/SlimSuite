@@ -2,6 +2,9 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.33
+- Attached player and party buffs now use at most two rows within their portrait-and-health-bar width, including room for duration text. Rows avoid other visible HUD frames and the screen edges; party buffs also leave the player's buff area clear. Icons that cannot fit safely stay hidden until space is available, and detaching restores their original scale and mouse behavior.
+
 ## 1.32
 - Moved encounter/boss DoTs to the far end of each health bar: right-aligned underneath horizontal bars and below the bottom of vertical bars, away from raid markers.
 - Consolidated element metadata and derived native ownership, setup order, movable lists, companions and display anchors from the shared registry. Enabled/Disabled/Default governs replacement rendering and legacy checkbox transitions; old saved choices migrate without resetting onboarding.

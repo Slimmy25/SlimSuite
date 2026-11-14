@@ -35,7 +35,16 @@ SS.SetBuffsPlace("player_above"); SS.ApplyBuffOrientation(); SS.AttachBuffs()
 point = BuffFrame.points[1]
 check("requesting attachment enables movable Buffs", setup.Mode("BuffFrame") == "enabled" and not d.frameDefault.BuffFrame and setup.on.BuffFrame)
 check("above buffs anchor to the visible portrait", point[1] == "BOTTOMLEFT" and point[2] == portrait and point[3] == "TOPLEFT")
-check("attached buffs replace the original icon layout", d.buffCustomLayout and BuffButton0.points[1][2] == BuffFrame)
-check("extra rows grow above the player instead of across it", BuffButton1.points[1][5] > 0 and BuffButton2.points[1][5] > BuffButton1.points[1][5])
+check("attached buffs replace the original icon layout", d.buffCustomLayout and BuffButton0.points[1][2] == UIParent)
+local layout = SS.auraLayouts[PlayerFrame]
+check("attached player buffs use at most two bounded rows", layout and layout.rows <= 2 and layout.right <= SS.AuraFrameBounds(PlayerFrame, portrait).right)
+local originalMaxBuffs=MAX_PLAYER_BUFFS; MAX_PLAYER_BUFFS=32
+local last=CreateFrame("Button","BuffButton32",BuffFrame)
+last:SetWidth(16); last:SetHeight(16); last:Show()
+SS.ApplyBuffOrientation()
+check("attached layout covers every available native buff slot",last.slimAuraOriginal~=nil)
+SS.SetBuffsPlace("own"); SS.ApplyBuffOrientation()
+check("detaching restores all native slots and mouse input",not last.slimAuraOriginal and last:GetScale()==1 and last:GetAlpha()==1)
+MAX_PLAYER_BUFFS=originalMaxBuffs
 print("attachment problems: " .. bad)
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end

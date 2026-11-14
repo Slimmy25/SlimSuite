@@ -3,73 +3,50 @@ if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one se
 
 -- Buffs above the party plates (yours and your friends'): they line up with the plate's portrait and fill rows to
 -- the right, each row stopping before the next party member's frame (or the plate's own right edge when the party is
--- a column). More buffs make more rows; the rows read top to bottom and the last row sits just above the plate.
-local BUFF_BUTTONS = 24;
+-- a column). At most two rows fit between the plate and the next visible element, including duration text.
 function SS.PartyBuffsActive()
 	local d = SS.DB();
 	return d.partyIncludesSelf and d.buffsOnPlayer and not d.buffsOnTarget and BuffFrame and true or false;
 end
--- the room above a plate, in screen units: left edge (the portrait's), and how wide a row may be
+-- Shared bounds exclude decorative padding and never extend into a neighboring frame.
 function SS.BuffRoom(plate, portrait, nextFrame)
-	local pl = (portrait and portrait:IsShown() and portrait:GetLeft()) or plate:GetLeft();
-	if ( not pl ) then return nil; end
-	local ps, ss = (portrait and SS.EffectiveScale(portrait)) or SS.EffectiveScale(plate), SS.EffectiveScale(plate);
-	local left = pl * ps;
-	local right = (plate:GetRight() or 0) * ss;
-	-- the row ends where the plate's health and mana bars end (the art past them is not the plate's room)
-	local name = plate.GetName and plate:GetName();
-	if ( type(name) ~= "string" ) then name = nil; end
-	local bar = plate.hp or (name and getglobal(name .. "HealthBar"));
-	local mana = plate.mp or (name and getglobal(name .. "ManaBar"));
-	local barRight = 0;
-	for _, b in ipairs({ bar, mana }) do
-		if ( b and b.GetRight and b:GetRight() ) then barRight = math.max(barRight, b:GetRight() * (SS.EffectiveScale(b))); end
-	end
-	if ( barRight > left ) then right = math.min(right, barRight); end
-	if ( nextFrame and nextFrame:IsShown() and nextFrame:GetLeft() and SS.CurrentOrientation("PartyMemberFrame1") == "horizontal" ) then
-		local nl = nextFrame:GetLeft() * (SS.EffectiveScale(nextFrame));
-		if ( nl > left ) then right = nl - 4 * ss; end
-	end
-	return left, math.max(0, right - left), (plate:GetTop() or 0) * ss;
+ local box=SS.AuraFrameBounds(plate,portrait); if ( not box ) then return nil; end
+ local right=box.right;
+ if ( nextFrame and nextFrame:IsShown() and SS.CurrentOrientation("PartyMemberFrame1")=="horizontal" ) then
+  local neighbor=SS.AuraFrameBounds(nextFrame);
+  if ( neighbor and neighbor.left>box.left ) then right=math.min(right,neighbor.left-4*SS.EffectiveScale(plate)); end
+ end
+ return box.left,math.max(0,right-box.left),box.top;
 end
--- lays out a list of shown buttons (all the same size) above a plate, rows growing down, the last row on the plate
-function SS.LayoutBuffRows(buttons, parent, plate, portrait, nextFrame)
-	local left, width, top = SS.BuffRoom(plate, portrait, nextFrame);
-	local n = table.getn(buttons);
-	if ( not left or n == 0 ) then return; end
-	local ps = SS.EffectiveScale(parent);
-	local w, h = buttons[1]:GetWidth() or 16, buttons[1]:GetHeight() or 16;
-	local gap = 2;
-	local perRow = math.max(1, math.floor((width / ps + gap) / (w + gap)));
-	local rows = math.ceil(n / perRow);
-	local baseX, baseY = left / ps, top / ps + 2;
-	for i = 1, n do
-		local row = math.floor((i - 1) / perRow);                  -- 0 is the top row
-		local col = math.mod(i - 1, perRow);
-		local b = buttons[i];
-		b:ClearAllPoints();
-		b:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", baseX + col * (w + gap), baseY + (rows - 1 - row) * (h + gap));
-	end
+function SS.LayoutBuffRows(buttons, parent, plate, portrait, nextFrame, side)
+ return SS.LayoutBoundedAuras(buttons,plate,portrait,nextFrame,side);
 end
 function SS.LayoutPartyBuffs()
 	if ( not BuffFrame ) then return; end
-	local active = SS.PartyBuffsActive();
+	local d=SS.DB();
+ local side=d.buffsOnTarget and d.buffsOnTargetSide or d.buffsOnPlayerSide;
+ if ( d.partyIncludesSelf and (side=="left" or side=="right") ) then side="above"; end
+ local active=(d.buffsOnPlayer or d.buffsOnTarget) and (side=="above" or side=="below") and not (d.frameDefault and d.frameDefault.BuffFrame);
 	if ( not active ) then
 		if ( SS.partyBuffsLaid ) then
 			SS.partyBuffsLaid = nil;
-			for i = 0, BUFF_BUTTONS - 1 do
-				local b = getglobal("BuffButton" .. i);
+			for _,entry in ipairs(SS.BuffButtons()) do
+				local b = entry[2];
 				local o = b and b.slimPartyOrig;
+    if ( b ) then SS.RestoreAuraButton(b); end
 				if ( o ) then b.slimPartyOrig = nil; b:ClearAllPoints(); if ( o[2] ) then b:SetPoint(o[1], o[2], o[3], o[4], o[5]); end end
 			end
 		end
+		SS.playerAuraBounds=nil;
+		for _,sample in pairs(SS.BuffSamples()) do SS.RestoreAuraButton(sample); end
 		return;
 	end
-	local P = SS.Pair();
+	local P,T = SS.Pair();
+	if ( d.buffsOnTarget ) then P=T; end
 	if ( not P ) then return; end
 	local shown = {};
-	for i = 0, BUFF_BUTTONS - 1 do
-		local b = getglobal("BuffButton" .. i);
+	for _,entry in ipairs(SS.BuffButtons()) do
+		local b = entry[2];
 		if ( b ) then
 			if ( not b.slimPartyOrig ) then local p, rel, rp, x, y = b:GetPoint(1); b.slimPartyOrig = { p, rel, rp, x or 0, y or 0 }; end
 			if ( b:IsShown() ) then table.insert(shown, b); end
@@ -77,10 +54,16 @@ function SS.LayoutPartyBuffs()
 	end
 	local nextFrame = getglobal("PartyMemberFrame1");
 	if ( nextFrame == P ) then nextFrame = nil; end
-	SS.LayoutBuffRows(shown, BuffFrame, P, P.portrait, nextFrame);
+	for _,sample in pairs(SS.BuffSamples()) do if ( sample:IsShown() ) then table.insert(shown,sample); end end
+ local layout=SS.LayoutBuffRows(shown,BuffFrame,P,SS.UnitPortrait(P),nextFrame,side);
+ if ( layout ) then
+  local scale=SS.EffectiveScale(BuffFrame);
+  BuffFrame:SetWidth(math.max(1,(layout.right-layout.left)/scale));
+  BuffFrame:SetHeight(math.max(1,(layout.top-layout.bottom)/scale));
+ end
 	SS.partyBuffsLaid = true;
 end
-SS.Every("partyBuffs", 0.25, function() if ( SS.PartyBuffsActive() or SS.partyBuffsLaid ) then SS.Safe(SS.LayoutPartyBuffs); end end);
+SS.Every("partyBuffs", 0.25, function() if ( SS.DB().buffsOnPlayer or SS.DB().buffsOnTarget or SS.partyBuffsLaid ) then SS.Safe(SS.LayoutPartyBuffs); end end);
 
 -- Your friends' buffs, above each friend's plate in the same way (classic plates only; "Party members' buffs" in the
 -- party's menu). The icons are Slim Suite's own, read from UnitBuff; hover one for its name.
@@ -90,6 +73,7 @@ function SS.FriendBuffsOn()
 	return d.partyMemberBuffs ~= false and SS.Look("PartyMemberFrame1") ~= "thin";
 end
 function SS.UpdateFriendBuffs()
+	SS.LayoutPartyBuffs();
 	local on = SS.FriendBuffsOn();
 	local size = SS.PartyBuffsActive() and BuffFrame and (getglobal("BuffButton0") or getglobal("BuffButton1")) or nil;
 	local icon = 16;
@@ -120,6 +104,7 @@ function SS.UpdateFriendBuffs()
 			local exists = on and f and f:IsShown() and UnitExists and UnitExists(unit);
 			for j = 1, SS.FRIEND_BUFFS do
 				local b = set[j];
+				SS.RestoreAuraButton(b);
 				local tex = exists and UnitBuff and UnitBuff(unit, j);
 				if ( tex ) then
 					b.tex:SetTexture(tex); b:SetWidth(icon); b:SetHeight(icon); b:SetScale(SS.EffectiveScale(f) / SS.EffectiveScale(UIParent));

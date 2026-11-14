@@ -23,7 +23,7 @@ run "load order"      "python3 tests/order.py $sources"
 run "translation coverage" "python3 ../tools/build-locales.py --check"
 run "shared kit"      "python3 tests/kitversion.py"
 run "lua 5.0"         "python3 tests/lua50.py $sources"
-for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review edges display chat ready attachments audit architecture; do
+for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review edges display chat ready attachments audit architecture auras; do
   run "harness: $s" "cd tests && SCENARIO=$s SEED=7 STEPS=300 $LUA run.lua"
 done
 for locale in esES frFR deDE ptBR itIT; do
