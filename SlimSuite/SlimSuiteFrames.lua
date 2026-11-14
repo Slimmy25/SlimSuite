@@ -66,7 +66,7 @@ function SS.CreateLevelButton()
 	levelButton.level:SetTextColor(1, 0.78, 0.22);
 	levelButton.text = levelButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
 	levelButton.text:SetPoint("BOTTOMLEFT", levelButton, "BOTTOMLEFT", 58, 8);
-	levelButton.text:SetText("LEVEL UP!");
+	levelButton.text:SetText(SS.T("LEVEL UP!"));
 	levelButton:SetScript("OnClick", function()
 		if ( type(AZS_OpenStoredLevels) == "function" ) then SS.Safe(AZS_OpenStoredLevels); end
 	end);
@@ -458,9 +458,9 @@ function SS.UpdateClock()
 		local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
 		if ( type(left) ~= "number" and run and type(run.nb) == "number" and run.nb >= 0 ) then left = run.nb; end
 		if ( type(left) == "number" and left >= 0 ) then
-			clockFrame.next:SetText("next boss in " .. SS.ClockText(math.ceil(left)));
+			clockFrame.next:SetText(SS.T("next boss in") .. " " .. SS.ClockText(math.ceil(left)));
 		else
-			clockFrame.next:SetText("next boss in --:--");
+			clockFrame.next:SetText(SS.T("next boss in") .. " --:--");
 		end
 		SS.HideNative("clock", true);
 		clockFrame.time:Show();
@@ -470,11 +470,11 @@ function SS.UpdateClock()
 		if ( preview and SS.Demoing("SlimSuiteClockFrame") and SS.demoClock ) then
 			-- Demo Mode: the run time counts up from a random start; the (made-up) next boss counts down and starts over
 			clockFrame.time:SetText(SS.ClockText(math.floor(SS.demoClock.run)));
-			clockFrame.next:SetText("next boss in " .. SS.ClockText(math.ceil(SS.demoClock.nextBoss)));
+			clockFrame.next:SetText(SS.T("next boss in") .. " " .. SS.ClockText(math.ceil(SS.demoClock.nextBoss)));
 			clockFrame.time:Show(); clockFrame.next:Show();
 		elseif ( preview ) then
 			clockFrame.time:SetText("00:00");
-			clockFrame.next:SetText("next boss in --:--");
+			clockFrame.next:SetText(SS.T("next boss in") .. " --:--");
 			clockFrame.time:Show();
 			clockFrame.next:Show();
 		else

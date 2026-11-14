@@ -20,11 +20,18 @@ button, revive bar or local clock), it hides the game's version with the game's 
 back on when you turn the replacement off and whenever you log out or reload, so removing or disabling Slim Suite
 leaves the game's HUD as it was. (After a crash, the next login with Slim Suite puts them back.)
 
+## Languages
+
+Slim Suite follows the game client's language automatically. The settings, setup walkthrough, edit controls, and common
+HUD labels are translated for Spanish, French, and German clients. English is used for other client languages and for
+any text that does not yet have a translation. Game-provided names and messages are left as the game supplies them.
+
 ## Source
 
 The addon files are in the `SlimSuite` folder. Edit them, then zip that folder to test your own build.
 
 - `SlimSuite.lua`: settings, chat filters, the movable UI and its replacements.
+- `SlimSuiteLocale.lua`: locale selection, translations, and English fallback.
 - `SlimSuiteWorld.lua`: features built on the game's newer addon API (world markers, downed friends, minimap pins,
   lairs, revive bar, proc meter, local clock, combat text). Its adapter section at the top is the only
   place that reads those API calls, following the game's addon docs.

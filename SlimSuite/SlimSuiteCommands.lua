@@ -240,7 +240,7 @@ function SS.ShowLayoutWindow()
 		f = K.Window("SlimSuiteLayoutFrame", "Slim Suite layouts", 520, 250);
 		local note = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		note:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -34); note:SetWidth(470); note:SetJustifyH("LEFT");
-		note:SetText("This is your layout as text. Copy it (Ctrl+C) to share it, or paste a layout over it (Ctrl+V) and press Use this layout. Saved layouts: /slim layout save <name>, load <name>, list, delete <name>.");
+		note:SetText(SS.T("This is your layout as text. Copy it (Ctrl+C) to share it, or paste a layout over it (Ctrl+V) and press Use this layout. Saved layouts: /slim layout save <name>, load <name>, list, delete <name>."));
 		local scroll = CreateFrame("ScrollFrame", "SlimSuiteLayoutScroll", f, "UIPanelScrollFrameTemplate");
 		scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -78);
 		scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -42, 50);

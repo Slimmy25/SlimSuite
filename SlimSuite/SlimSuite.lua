@@ -938,7 +938,7 @@ end
 SS.TALLY_SAMPLE = { kills = 1284, gold = 356, chest = 120, bosses = 2, guardians = 3 };
 function SS.TallyParts(run, sample)
 	if ( sample ) then run = SS.TALLY_SAMPLE; end
-	local parts = { { "Kills", SS.TallyValue(run and run.kills) } };
+	local parts = { { SS.T("Kills"), SS.TallyValue(run and run.kills) } };
 	if ( SS.DB().tallyBossKills ) then
 		local bosses, guardians;
 		if ( sample ) then bosses, guardians = run.bosses, run.guardians;
@@ -946,21 +946,21 @@ function SS.TallyParts(run, sample)
 		table.insert(parts, { "Bosses", SS.TallyValue(bosses) });
 		table.insert(parts, { "Guardians", SS.TallyValue(guardians) });
 	end
-	table.insert(parts, { "Gold", SS.TallyValue(run and run.gold) });
-	table.insert(parts, { "cache", SS.TallyValue(run and run.chest), true });   -- the game draws all of it in gold
+	table.insert(parts, { SS.T("Gold"), SS.TallyValue(run and run.gold) });
+	table.insert(parts, { SS.T("cache"), SS.TallyValue(run and run.chest), true });   -- the game draws all of it in gold
 	return parts;
 end
 
 -- The creator documents AZS_ZONE.zname and AZS_ZONE.diff (the zone's difficulty multiplier).
 -- Keep the multiplier explicit; do not guess a Normal/Heroic label from an undocumented threshold.
 function SS.TallyContext(sample)
-	if ( sample ) then return "Elwynn Forest  |  Difficulty 1.00x"; end
+	if ( sample ) then return "Elwynn Forest  |  " .. SS.T("Difficulty") .. " 1.00x"; end
 	local zone = type(AZS_ZONE) == "table" and AZS_ZONE or nil;
 	local name = zone and (zone.zname or zone.name or zone.zone or zone.title) or nil;
 	if ( type(name) ~= "string" or name == "" ) then name = type(GetRealZoneText) == "function" and GetRealZoneText() or ""; end
 	local diff = zone and tonumber(zone.diff) or nil;
 	if ( type(name) ~= "string" or name == "" ) then return ""; end
-	if ( diff ) then return name .. "  |  Difficulty " .. string.format("%.2fx", diff); end
+	if ( diff ) then return name .. "  |  " .. SS.T("Difficulty") .. " " .. string.format("%.2fx", diff); end
 	return name;
 end
 
@@ -1174,7 +1174,7 @@ function SS.UpdateLevelButton()
 	end
 	local level = type(UnitLevel) == "function" and UnitLevel("player") or nil;
 	local preview = count == 0 and SS.Previewing("SlimSuiteStoredLevelsButton");
-	levelButton.level:SetText("LEVEL " .. (level and tostring(level) or ""));
+	levelButton.level:SetText(SS.T("LEVEL") .. " " .. (level and tostring(level) or ""));
 	levelButton.count:SetText((count > 0 and tostring(count)) or (preview and "2") or "");   -- a sample count while it is placed
 	SS.Safe(SS.LayoutLevelButton);
 	-- the game's stored-level count says when there is something to spend; it is also shown while being placed

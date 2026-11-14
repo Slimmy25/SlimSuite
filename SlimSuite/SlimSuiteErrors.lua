@@ -21,7 +21,7 @@ local function Refresh()
 		local e = log[i];
 		table.insert(lines, "[" .. (e.at or "?") .. "]" .. ((e.count or 1) > 1 and (" x" .. e.count) or "") .. "  " .. (e.msg or ""));
 	end
-	if ( table.getn(lines) == 0 ) then lines[1] = "No errors logged. Errors are kept here between logins."; end
+	if ( table.getn(lines) == 0 ) then lines[1] = SS.T("No errors logged. Errors are kept here between logins."); end
 	frame.box:SetText(table.concat(lines, "\n"));
 	frame.box:SetHeight(math.max(20, (frame.box.GetHeight and frame.box:GetHeight() or 0), table.getn(lines) * 14));   -- the list scrolls to its end
 end
@@ -42,7 +42,7 @@ local function Build()
 
 	local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
 	title:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -10);
-	title:SetText("Slim Suite error log");
+	title:SetText(SS.T("Slim Suite error log"));
 
 	local scroll = CreateFrame("ScrollFrame", "SlimSuiteErrorScroll", frame, "UIPanelScrollFrameTemplate");
 	scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -40);
@@ -56,7 +56,7 @@ local function Build()
 	frame.box = box;
 
 	local clear = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate");
-	clear:SetWidth(90); clear:SetHeight(22); clear:SetText("Clear");
+	clear:SetWidth(90); clear:SetHeight(22); clear:SetText(SS.T("Clear"));
 	clear:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 12);
 	clear:SetScript("OnClick", function()
 		local log = SS.ErrorLog();
@@ -65,7 +65,7 @@ local function Build()
 	end);
 
 	local close = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate");
-	close:SetWidth(90); close:SetHeight(22); close:SetText("Close");
+	close:SetWidth(90); close:SetHeight(22); close:SetText(SS.T("Close"));
 	close:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 12);
 	close:SetScript("OnClick", function() frame:Hide(); end);
 

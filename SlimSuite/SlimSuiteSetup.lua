@@ -50,6 +50,7 @@ function SU.Steps()
 	end
 	steps = kept;
 	table.insert(steps, { title = "All set", text = "That's everything. Press Finish to lock the UI. You can move anything again with Toggle UI Settings. Done closes the list." });
+	if ( SS.TranslateRecord ) then for i=1,table.getn(steps) do SS.TranslateRecord(steps[i]); end end
 	return steps;
 end
 
@@ -93,7 +94,7 @@ SS.WARN = SU.WARN;
 SS.choiceButtons = {};
 function SS.ChoiceText(e)
 	local v = e[2] and e[2]();
-	for i = 1, table.getn(e.choice or {}) do if ( e.choice[i][2] == v ) then return e.choice[i][1]; end end
+	for i = 1, table.getn(e.choice or {}) do if ( e.choice[i][2] == v ) then return SS.T and SS.T(e.choice[i][1]) or e.choice[i][1]; end end
 	return "";
 end
 function SS.RefreshChoices()
@@ -1396,24 +1397,24 @@ function SU.Focus(frame)
 	end
 	local checks, mode = {}, nil;
 	if ( e ) then
-		SU.panel.title:SetText(e.title);
+		SU.panel.title:SetText(SS.T and SS.T(e.title) or e.title);
 		mode = setupActive and frame and SU.Mode(frame) or nil;
-		SU.panel.text:SetText(e.text .. (mode and mode ~= "enabled" and "\nChoose Enabled beside the element before changing its layout or options." or ""));
+		SU.panel.text:SetText(SS.T(e.text) .. (mode and mode ~= "enabled" and "\n" .. SS.T("Choose Enabled beside the element before changing its layout or options.") or ""));
 		-- a sub-setting shows only while the setting it depends on is on
 		local all, shown = SU.ChecksFor(frame), {};
 		for i = 1, table.getn(all) do if ( not all[i][4] or all[i][4]() ) then table.insert(shown, all[i]); end end
 		checks = shown;
 	else
-		SU.panel.title:SetText("Setup");
-		SU.panel.text:SetText("Choose Default to keep the game's normal element, Enabled to use Slim Suite's movable version, or Disabled to hide it. Select Enabled before changing its layout.");
+		SU.panel.title:SetText(SS.T("Setup"));
+		SU.panel.text:SetText(SS.T("Choose Default to keep the game's normal element, Enabled to use Slim Suite's movable version, or Disabled to hide it. Select Enabled before changing its layout."));
 	end
 	local h = 58 + (SU.panel.text:GetHeight() or 28) + 40;
 	for i = 1, math.max(table.getn(checks), table.getn(SU.checks)) do
 		if ( not SU.checks[i] ) then SU.checks[i] = SU.Check(SU.panel); end   -- as many rows as the element has settings
 		local cb, c = SU.checks[i], checks[i];
 		if ( c ) then
-			cb.label:SetText(c[1] .. (c.warn and " |cffff9933(!)|r" or "")); cb.get, cb.set, cb.cond = c[2], c[3], c[4];
-			cb.warnText = c.warn;
+			cb.label:SetText(SS.T(c[1]) .. (c.warn and " |cffff9933(!)|r" or "")); cb.get, cb.set, cb.cond = c[2], c[3], c[4];
+			cb.warnText = c.warn and SS.T(c.warn) or nil;
 			SS.RowKind(cb, c, "right");
 			cb:ClearAllPoints();
 			-- a setting that only works with another one is indented under it
@@ -1739,7 +1740,7 @@ function SU.Begin()
 			b.tag:SetBackdropColor(0.1, 0.4, 0.1, 0.95);
 			b.tag:SetBackdropBorderColor(0.4, 1, 0.4, 1);
 			b.tag.text = b.tag:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-			b.tag.text:SetPoint("CENTER", b.tag, "CENTER", 0, 0); b.tag.text:SetText("Default");
+			b.tag.text:SetPoint("CENTER", b.tag, "CENTER", 0, 0); b.tag.text:SetText(SS.T("Default"));
 			b.tag:EnableMouse(true);
 			b.tag:SetScript("OnEnter", function()
 				if ( not GameTooltip ) then return; end
@@ -1795,7 +1796,7 @@ function SU.RefreshDemoButtons()
 		end
 		if ( stillEnabled == 0 ) then SS.StopDemoMode(); return; end
 	end
-	if ( SU.bar.demoLabel ) then SU.bar.demoLabel:SetText("Demo"); end
+	if ( SU.bar.demoLabel ) then SU.bar.demoLabel:SetText(SS.T("Demo")); end
 	if ( count == 0 and not SS.demoRunning ) then SU.bar.demoOn:Disable(); else SU.bar.demoOn:Enable(); end
 	if ( SS.demoRunning ) then SU.bar.demoOn:LockHighlight(); SU.bar.demoOff:UnlockHighlight();
 	else SU.bar.demoOff:LockHighlight(); SU.bar.demoOn:UnlockHighlight(); end
@@ -1825,7 +1826,7 @@ function SU.Build()
 		local cb = CreateFrame("CheckButton", nil, SU.bar, "UICheckButtonTemplate");
 		cb:SetWidth(20); cb:SetHeight(20); cb:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", x, y);
 		cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		cb.label:SetPoint("LEFT", cb, "RIGHT", 0, 1); cb.label:SetText(label);
+		cb.label:SetPoint("LEFT", cb, "RIGHT", 0, 1); cb.label:SetText(SS.T(label));
 		cb.Refresh = function() cb:SetChecked(get() and 1 or nil); end;
 		cb.get = get;
 		SS.TrackToggle(cb);
@@ -1865,7 +1866,7 @@ function SU.Build()
 	SU.panel:Hide();
 	-- Demo Mode beside the grid: On and Off, the one that is in effect lit
 	SU.bar.demoLabel = SU.bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-	SU.bar.demoLabel:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 218, -12); SU.bar.demoLabel:SetText("Demo");
+	SU.bar.demoLabel:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 218, -12); SU.bar.demoLabel:SetText(SS.T("Demo"));
 	SU.bar.demoOn = K.Button(SU.bar, "On", 36, function() SS.StartDemoMode(); SU.RefreshDemoButtons(); end);
 	SU.bar.demoOn:SetHeight(18); SU.bar.demoOn:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 252, -9);
 	SU.bar.demoOff = K.Button(SU.bar, "Off", 36, function() SS.StopDemoMode(); SU.RefreshDemoButtons(); end);
@@ -2046,7 +2047,7 @@ function SS.Check(parent, label, y, get, set, indent)
 	cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 26 + (indent or 0), y);
 	local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
 	fs:SetPoint("LEFT", cb, "RIGHT", 4, 1);
-	fs:SetWidth(350); fs:SetHeight(28); fs:SetJustifyH("LEFT"); fs:SetText(label);
+	fs:SetWidth(350); fs:SetHeight(28); fs:SetJustifyH("LEFT"); fs:SetText(SS.T(label));
 	cb.label = fs;
 	cb:SetScript("OnShow", function() this:SetChecked(get() and 1 or nil); end);
 	cb.get = get;
@@ -2067,7 +2068,7 @@ function SS.WinBuild()
 	hero:SetPoint("TOPLEFT", win, "TOPLEFT", 20, -30);
 	K.Icon(hero.icon, "INV_Misc_Gear_02");
 	hero.heading:SetText("Slim Suite");
-	hero.line:SetText("A Swiss-army knife of useful tools and UI controls.");
+	hero.line:SetText(SS.T("A Swiss-army knife of useful tools and UI controls."));
 	local tabUi = K.Button(win, "Modifying the User Interface", 210, nil);
 	tabUi:SetPoint("TOPLEFT", win, "TOPLEFT", 20, -101);
 	local tabOther = K.Button(win, "New/Unique, But Minor Features", 210, nil);
@@ -2092,7 +2093,7 @@ function SS.WinBuild()
 			local row = entries[i];
 			if ( row.head ) then
 				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal");
-				fs:SetText(row.head); fs:SetTextColor(1, 0.82, 0);
+				fs:SetText(SS.T(row.head)); fs:SetTextColor(1, 0.82, 0);
 				table.insert(page.rows, { kind = "head", fs = fs });
 				up = nil;
 			elseif ( row.button ) then
@@ -2106,7 +2107,7 @@ function SS.WinBuild()
 				if ( row.choice ) then
 					r.kind = "choice";
 					r.fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
-					r.fs:SetText(label);
+					r.fs:SetText(SS.T(label));
 					r.b = SS.ChoiceButton(parent, 200);
 					r.b.entry = row; r.b:SetPoint("LEFT", r.fs, "RIGHT", 10, 0);
 					r.b:SetText(SS.ChoiceText(row) .. "  v");
@@ -2142,10 +2143,10 @@ function SS.WinBuild()
 	end
 	local function CheckboxRows()
 		local noteTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontNormal");
-		noteTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -8); noteTitle:SetText("Moving the game's UI");
+		noteTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -8); noteTitle:SetText(SS.T("Moving the game's UI"));
 		local note = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		note:SetPoint("TOPLEFT", noteTitle, "BOTTOMLEFT", 0, -3); note:SetWidth(390); note:SetHeight(38);
-		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetHeight(52); note:SetText("The game's own versions of these parts can't be moved. To move one, say yes below: Slim Suite swaps in its own movable copy. Each copy's other settings are in its menu: right-click it in Toggle UI Settings.");
+		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetHeight(52); note:SetText(SS.T("The game's own versions of these parts can't be moved. To move one, say yes below: Slim Suite swaps in its own movable copy. Each copy's other settings are in its menu: right-click it in Toggle UI Settings."));
 		AddRows(uiChild, {
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
@@ -2173,7 +2174,7 @@ function SS.WinBuild()
 	local function BuildOther()
 		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
 		purpose:SetPoint("TOPLEFT",otherChild,"TOPLEFT",10,-8);purpose:SetWidth(390);purpose:SetHeight(32);
-		purpose:SetJustifyH("LEFT");purpose:SetJustifyV("TOP");purpose:SetText("The goal of clearing up chat is to see your friends' chat better in multiplayer.");
+		purpose:SetJustifyH("LEFT");purpose:SetJustifyV("TOP");purpose:SetText(SS.T("The goal of clearing up chat is to see your friends' chat better in multiplayer."));
 		AddRows(otherChild, {
 			{head="Chat mods"},
 			{"No level-up stat bonuses in chat", function() return SS.DB().hideLevel;end,function(v) SS.DB().hideLevel=v;end},
@@ -2204,9 +2205,9 @@ function SS.WinBuild()
 	end
 	local function BuildAddonManager()
 		local title = addonsChild:CreateFontString(nil, "OVERLAY", "GameFontNormal");
-		title:SetPoint("TOPLEFT", addonsChild, "TOPLEFT", 8, -8); title:SetText("Enabled game addons");
+		title:SetPoint("TOPLEFT", addonsChild, "TOPLEFT", 8, -8); title:SetText(SS.T("Enabled game addons"));
 		local note = addonsChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6); note:SetText("Changes apply after reload. Uncheck to disable an addon.");
+		note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6); note:SetText(SS.T("Changes apply after reload. Uncheck to disable an addon."));
 		local n = (GetNumAddOns and GetNumAddOns()) or 0;
 		local y = -48;
 		for index = 1, n do
@@ -2233,7 +2234,7 @@ function SS.WinBuild()
 	end
 	tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -732);
-	tooltipTitle:SetText("Tooltip width");
+	tooltipTitle:SetText(SS.T("Tooltip width"));
 	local function AdjustTooltipSize(delta)
 		local size = SS.DB().sizes.GameTooltip;
 		if ( type(size) ~= "table" ) then size = { w = 260, h = 140 }; SS.DB().sizes.GameTooltip = size; end   -- the player's own size from now on

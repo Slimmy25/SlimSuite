@@ -3,10 +3,13 @@
 Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## Unreleased
+
+## 1.23
 - Automatic display layouts select among standard, ultrawide and portrait templates, keeping the reference HUD positions proportional to the viewport.
 - Element sizes follow screen height with narrower-screen density adjustments; custom size multipliers remain relative to the automatic size.
 - Custom locations saved with display bounds adapt proportionally across resolutions and restore when returning to the original display.
 - Default-state elements remain controlled by the game.
+- Slim Suite now follows the game client language for its setup, settings, edit controls, error log and common HUD labels in Spanish, French and German, with English fallback for other locales and untranslated text.
 
 ## 1.22
 - **Screen edges:** dragging, saved positions, live boundary checks and the edit grid now share measured screen bounds, including the world viewport when the UI root occupies a smaller area. Scaled elements retain their visible bounds when placed against an edge.

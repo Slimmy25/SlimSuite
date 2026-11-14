@@ -5,7 +5,7 @@
 -- AZS Stats has the same pieces in AZSStatsUI.lua and is kept to match.
 -- Lua 5.0 / 1.12 interface: scripts read `this`, `arg1`; no # operator; only the 1.12 API.
 
-local VERSION = 1;
+local VERSION = 2;
 if ( type(AZSKIT) == "table" and (AZSKIT.version or 0) >= VERSION ) then return; end
 
 local K = { version = VERSION };
@@ -26,6 +26,7 @@ end
 function K.Sound(name) if ( PlaySound ) then pcall(PlaySound, name); end end
 
 function K.Print(addon, msg)
+	if ( SS and SS.T and type(msg) == "string" ) then msg = SS.T(msg); end
 	if ( DEFAULT_CHAT_FRAME ) then DEFAULT_CHAT_FRAME:AddMessage("|cffffd100" .. addon .. "|r " .. tostring(msg)); end
 end
 
@@ -72,6 +73,7 @@ function K.Button(parent, text, width, onClick)
 	end
 	b:SetWidth(width);
 	b:SetHeight(22);
+	if ( SS and SS.T ) then text = SS.T(text); end
 	b:SetText(text);
 	if ( onClick ) then b:SetScript("OnClick", onClick); end
 	return b;
@@ -102,6 +104,7 @@ function K.Window(name, title, w, h)
 	header:SetPoint("TOP", f, "TOP", 0, 12);
 	f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal");
 	f.title:SetPoint("TOP", header, "TOP", 0, -14);
+	if ( SS and SS.T ) then title = SS.T(title); end
 	f.title:SetText(title);
 	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton");
 	close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6);

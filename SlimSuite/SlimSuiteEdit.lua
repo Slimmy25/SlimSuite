@@ -731,13 +731,13 @@ function SS.PrepareSizeTools(name, label)
 		local function ShowSize()
 			local t = sizeTarget and getglobal(sizeTarget);
 			if ( not t ) then return; end
-			sizeMenuWidth:SetText("Width: " .. math.floor((t:GetWidth() or 0) + 0.5));
-			sizeMenuHeight:SetText("Height: " .. math.floor((t:GetHeight() or 0) + 0.5));
+			sizeMenuWidth:SetText(SS.T("Width") .. ": " .. math.floor((t:GetWidth() or 0) + 0.5));
+			sizeMenuHeight:SetText(SS.T("Height") .. ": " .. math.floor((t:GetHeight() or 0) + 0.5));
 		end
 		sizeMenu.ShowSize = ShowSize;
 		sizeMenuText = sizeMenu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
 		sizeMenuText:SetPoint("TOPLEFT", sizeMenu, "TOPLEFT", 12, -6);
-		sizeMenuText:SetText("Size & layout");
+		sizeMenuText:SetText(SS.T("Size & layout"));
 		local function ResizeBy(axis, delta)
 			if ( not sizeTarget ) then return; end
 			local t = getglobal(sizeTarget);
@@ -783,7 +783,7 @@ function SS.PrepareSizeTools(name, label)
 		local taller = K.Button(sizeMenu, "+", 30, function() ResizeBy("h", 20); end);
 		Row("height", { { WheelPair(shorter, taller), "TOPLEFT", 10, 0 }, { sizeMenuHeight, "TOPLEFT", 12, -8 }, { shorter, "TOPRIGHT", -72, 0 }, { taller, "TOPRIGHT", -32, 0 } });
 		sizeMenuScale = Label();
-		sizeMenuScale:SetText("Scale %:");
+		sizeMenuScale:SetText(SS.T("Scale") .. " %:");
 		sizeMenuScaleInput = CreateFrame("EditBox", nil, sizeMenu);
 		sizeMenuScaleInput:SetWidth(46); sizeMenuScaleInput:SetHeight(20);
 		sizeMenuScaleInput:SetAutoFocus(false); sizeMenuScaleInput:SetNumeric(true);
@@ -831,14 +831,14 @@ function SS.PrepareSizeTools(name, label)
 		sizeMenu.LayoutText = function()
 			local el = SS.Element(sizeTarget);
 			local orientation = el == "SlimSuiteTallyFrame" and (SS.DB().tallyVertical and "vertical" or "horizontal") or SS.CurrentOrientation(el);
-			layout:SetText(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical");
+			layout:SetText(SS.T(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical"));
 		end;
 		local growth;
-		growth = K.Button(sizeMenu, "Grow down", 68, function()
+		growth = K.Button(sizeMenu, SS.T("Grow") .. " " .. SS.T("down"), 68, function()
 			if ( sizeTarget ~= "BuffFrame" ) then return; end
 			SS.DB().buffCustomLayout = true;
 			SS.DB().buffGrowthDirection = SS.BuffGrowthDirection() == "up" and "down" or "up";
-			growth:SetText("Grow " .. SS.BuffGrowthDirection());
+			growth:SetText(SS.T("Grow") .. " " .. SS.T(SS.BuffGrowthDirection()));
 			SS.Safe(SS.ApplyBuffOrientation);
 			PlaceAll();
 		end);
@@ -849,7 +849,7 @@ function SS.PrepareSizeTools(name, label)
 			if ( not sizeTarget ) then return; end
 			SS.DB().padding[sizeTarget] = math.max(0, math.min(SS.FramePaddingLimit(sizeTarget), SS.FramePadding(sizeTarget) + by));
 			SS.ApplyMovablePadding(sizeTarget);
-			sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(sizeTarget));
+			sizeMenuPadding:SetText(SS.T("Padding") .. ": " .. SS.FramePadding(sizeTarget));
 			ShowSize();
 		end
 		local padDown = K.Button(sizeMenu, "-", 30, function() Pad(-2); end);
@@ -869,10 +869,10 @@ function SS.PrepareSizeTools(name, label)
 			-- automatic unless set by hand; the text says what the clock is doing now
 			local now = SlimSuiteWorld and SlimSuiteWorld.DaylightOffset and SlimSuiteWorld.DaylightOffset() or 0;
 			if ( d.localClockDST == nil ) then
-				sizeMenu.clockDst:SetText("Daylight saving: auto (" .. (now > 0 and "on" or "off") .. ")");
+				sizeMenu.clockDst:SetText(SS.T("Daylight saving") .. ": " .. SS.T("auto") .. " (" .. SS.T(now > 0 and "on" or "off") .. ")");
 			else
 				local dst = tonumber(d.localClockDST) or 0;
-				sizeMenu.clockDst:SetText("Daylight saving: " .. (dst > 0 and "+1 hour" or (dst < 0 and "-1 hour" or "off")));
+				sizeMenu.clockDst:SetText(SS.T("Daylight saving") .. ": " .. SS.T(dst > 0 and "+1 hour" or (dst < 0 and "-1 hour" or "off")));
 			end
 		end;
 		Row("dst", { { sizeMenu.clockDst, "TOPLEFT", 10, 0 } });
@@ -882,7 +882,7 @@ function SS.PrepareSizeTools(name, label)
 		sizeMenu.muteButton = muteButton;
 		local reset = K.Button(sizeMenu, "Reset", 62, function()
 			if ( not SS.ResetElement(sizeTarget) ) then
-				K.Print(NAME, "the original size is not available yet; try again after the frame appears.");
+				K.Print(NAME, SS.T("the original size is not available yet; try again after the frame appears."));
 				return;
 			end
 			SS.OpenSizeMenu(sizeMenu.element or sizeTarget, sizeMenu.label);
@@ -904,13 +904,13 @@ function SS.PrepareSizeTools(name, label)
 	rows.layout.on = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "BuffFrame";
 	if ( rows.layout.on ) then sizeMenu.LayoutText(); end
 	sizeMenu.growthButton.wanted = name == "BuffFrame";
-	if ( name == "BuffFrame" ) then sizeMenu.growthButton:SetText("Grow " .. SS.BuffGrowthDirection()); end
+	if ( name == "BuffFrame" ) then sizeMenu.growthButton:SetText(SS.T("Grow") .. " " .. SS.T(SS.BuffGrowthDirection())); end
 	rows.padding.on = name == "SlimSuiteClockFrame" or name == "SlimSuiteBossFrames" or name == "SlimSuiteTallyFrame"
 		or name == "SlimSuiteAnnouncementFrame" or name == "BuffFrame";
-	if ( rows.padding.on ) then sizeMenuPadding:SetText("Padding: " .. SS.FramePadding(name)); end
+	if ( rows.padding.on ) then sizeMenuPadding:SetText(SS.T("Padding") .. ": " .. SS.FramePadding(name)); end
 	rows.dst.on = name == "SlimSuiteLocalClockFrame";
 	if ( rows.dst.on ) then sizeMenu.ClockLabels(); end
-	sizeMenu.muteButton:SetText(SS.DB().muted[sizeTarget] and "Show feature" or "Hide feature");
+	sizeMenu.muteButton:SetText(SS.T(SS.DB().muted[sizeTarget] and "Show feature" or "Hide feature"));
 	-- the rows in use, one under the other
 	local y = -24;
 	for i = 1, table.getn(rows) do
@@ -953,7 +953,7 @@ function SS.ShowLockPanel()
 		header:RegisterForDrag("LeftButton");
 		local title = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal");
 		title:SetPoint("LEFT", header, "LEFT", 7, 0);
-		title:SetText("Move UI settings — drag this header to move");
+		title:SetText(SS.T("Move UI settings — drag this header to move"));
 		header:SetScript("OnDragStart", function() lockPanel:StartMoving(); end);
 		header:SetScript("OnDragStop", function()
 			lockPanel:StopMovingOrSizing(); lockPanel.dragging = nil;
@@ -962,7 +962,7 @@ function SS.ShowLockPanel()
 		end);
 		local note = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		note:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", 10, -30);
-		note:SetText("Drag to move. Right-click for its settings, size and layout. Shift-left-click also hides/shows.");
+		note:SetText(SS.T("Drag to move. Right-click for its settings, size and layout. Shift-left-click also hides/shows."));
 		local gridCheck = CreateFrame("CheckButton", nil, lockPanel, "UICheckButtonTemplate");
 		gridCheck:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", 6, -52); gridCheck:SetWidth(22); gridCheck:SetHeight(22);
 		gridCheck:SetScript("OnShow", function() this:SetChecked(SS.DB().showEditGrid and 1 or nil); end);
@@ -970,7 +970,7 @@ function SS.ShowLockPanel()
 		SS.TrackToggle(gridCheck);
 		gridCheck:SetScript("OnClick", function() SS.DB().showEditGrid = not SS.DB().showEditGrid; if ( SS.DB().unlocked ) then ShowEditGrid(); end SS.RefreshToggles(); end);
 		local gridLabel = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		gridLabel:SetPoint("LEFT", gridCheck, "RIGHT", 0, 0); gridLabel:SetText("Grid");
+		gridLabel:SetPoint("LEFT", gridCheck, "RIGHT", 0, 0); gridLabel:SetText(SS.T("Grid"));
 		local gridSizes = {16, 32, 64, 128};
 		lockPanel.gridButtons = {};
 		for i = 1, table.getn(gridSizes) do
@@ -992,7 +992,7 @@ function SS.ShowLockPanel()
 			SS.TrackToggle(cb);
 			cb:SetScript("OnClick", function() SS.DB()[key] = not SS.DB()[key]; if ( SS.DB().unlocked ) then ShowEditGrid(); end SS.RefreshToggles(); end);
 			local label = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-			label:SetPoint("LEFT", cb, "RIGHT", 0, 0); label:SetText(labelText);
+		label:SetPoint("LEFT", cb, "RIGHT", 0, 0); label:SetText(SS.T(labelText));
 		end
 		AddGridLineToggle(8, "gridCenterVertical", "Vertical red center line");
 		AddGridLineToggle(184, "gridCenterHorizontal", "Horizontal red center line");
@@ -1003,7 +1003,7 @@ function SS.ShowLockPanel()
 		SS.TrackToggle(snap);
 		snap:SetScript("OnClick", function() SetAnchorSnap(not SS.DB().anchorSnap); SS.RefreshToggles(); end);
 		local snapLabel = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		snapLabel:SetPoint("LEFT", snap, "RIGHT", 0, 0); snapLabel:SetText("Snap nearby frames together");
+		snapLabel:SetPoint("LEFT", snap, "RIGHT", 0, 0); snapLabel:SetText(SS.T("Snap nearby frames together"));
 		local button = K.Button(lockPanel, "Done", 76, function() SS.SetUnlocked(false); end);
 		button:SetPoint("BOTTOMRIGHT", lockPanel, "BOTTOMRIGHT", -8, 7);
 		lockPanel.doneButton = button;
@@ -1027,7 +1027,7 @@ function SS.ShowLockPanel()
 			local name, label = MOVABLE[i][1], MOVABLE[i][2];
 			if ( SS.Element(name) == name ) then
 				local row = K.Button(choices, label, 208, function()
-					editOnly = SS.Shown(name); choose:SetText(label .. " ▼"); all:UnlockHighlight(); choices:Hide();
+					editOnly = SS.Shown(name); choose:SetText(SS.T(label) .. " ▼"); all:UnlockHighlight(); choices:Hide();
 					SS.HideElementMenu();
 					SS.SetUnlocked(true, true);
 				end);
@@ -1039,7 +1039,7 @@ function SS.ShowLockPanel()
 		choices:Hide();
 		choose:SetScript("OnClick", function() if ( choices:IsShown() ) then choices:Hide(); else choices:Show(); end end);
 		all = K.Button(lockPanel, "ALL?", 62, function()
-			editOnly = nil; choose:SetText("Choose element ▼"); all:LockHighlight(); choices:Hide();
+			editOnly = nil; choose:SetText(SS.T("Choose element") .. " ▼"); all:LockHighlight(); choices:Hide();
 			SS.HideElementMenu();
 			SS.SetUnlocked(true, true);
 		end);
