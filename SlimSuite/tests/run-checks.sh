@@ -21,8 +21,13 @@ run "stale names"     "python3 tests/stale.py SlimSuite.lua SlimSuiteFrames.lua 
 run "load order"      "python3 tests/order.py SlimSuite.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua"
 run "shared kit"      "python3 tests/kitversion.py"
 run "lua 5.0"         "python3 tests/lua50.py SlimSuiteDisplay.lua SlimSuiteCore.lua AZSKit.lua SlimSuiteErrors.lua SlimSuiteItems.lua SlimSuiteMeter.lua SlimSuite.lua SlimSuiteLocale.lua SlimSuiteFrames.lua SlimSuiteEdit.lua SlimSuiteSetup.lua SlimSuiteCommands.lua SlimSuiteWorld.lua SlimSuiteNameplates.lua"
-for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review edges display chat ready; do
+for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review edges display chat ready attachments audit; do
   run "harness: $s" "cd tests && SCENARIO=$s SEED=7 STEPS=300 $LUA run.lua"
+done
+for locale in esES frFR deDE; do
+  for s in audit window display; do
+    run "harness: $locale/$s" "cd tests && TEST_LOCALE=$locale SCENARIO=$s SEED=7 STEPS=300 $LUA run.lua"
+  done
 done
 [ $fail -eq 0 ] && echo "ALL CHECKS PASSED" || echo "SOME CHECKS FAILED"
 exit $fail

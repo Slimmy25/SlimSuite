@@ -47,9 +47,11 @@ function A.Id(t) return A.Field(t, "id", "unitId", "anchorId"); end
 -- second and shared by the markers and the minimap pins. Gives { list, byUnit (AZS_UNITS id), byLair (lair index) }.
 local CATALOG_QUERY = { kinds = { "boss", "finalBoss", "guardian", "elite", "guardianLair" } };
 local catalog = { at = -1, list = {}, byUnit = {}, byLair = {} };
+local catalogAttempt = -1;
 function A.Catalog(now)
-	if ( now - catalog.at < 0.1 ) then return catalog; end
+	if ( now - catalogAttempt < 0.1 ) then return catalog; end
 	if ( not A.Has("AZS_GetWorldAnchors") ) then return catalog; end
+	catalogAttempt = now;
 	local list, cursor = {}, nil;
 	for pages = 1, 32 do
 		local page = A.Call("AZS_GetWorldAnchors", CATALOG_QUERY, cursor);
@@ -57,6 +59,7 @@ function A.Catalog(now)
 		for i = 1, table.getn(page.entries) do table.insert(list, page.entries[i]); end
 		if ( not page.hasMore ) then break; end
 		cursor = page.nextCursor;
+		if ( not cursor or pages == 32 ) then return catalog; end -- never publish a partial catalog
 	end
 	local byUnit, byLair = {}, {};
 	for i = 1, table.getn(list) do
@@ -90,7 +93,7 @@ function A.Project(requests)
 		end
 		first = first + 256;
 		local result = A.Call("AZS_ProjectWorldAnchors", batch);
-		if ( type(result) == "table" and type(result.entries) == "table" ) then
+		if ( type(result) == "table" and result.frameCurrent ~= false and type(result.entries) == "table" ) then
 			for i = 1, table.getn(result.entries) do
 				local e = result.entries[i];
 				if ( e.state == "onScreen" and type(e.x) == "number" and type(e.y) == "number" ) then
@@ -552,62 +555,21 @@ local ON_TOP = { "SlimSuiteWorldMarkers", "SlimSuiteMeterFrame", "SlimSuiteStore
 	"SlimSuitePartyLines", "SlimSuitePartySelfFrame", "SlimSuiteMinimapBar", "SlimSuiteRaidIconPanel", "SlimSuiteStatCounterFrame" };
 -- Off by default: the game's cards then cover Slim Suite like the rest of the HUD. Only when the player turns the
 -- setting on are Slim Suite's frames lifted above them.
-local readyOverlay = {};
-local function IsOnTop(frame)
-	if ( not A.Has("AZS_IsOnTopOfScreens") ) then return nil; end
-	local ok, value = SS.Safe(AZS_IsOnTopOfScreens, frame);
-	if ( ok ) then return value and true or false; end
-end
-local function PutOnTop(frame, on)
-	if ( IsOnTop(frame) ~= on ) then SS.Safe(AZS_SetOnTopOfScreens, frame, on); end
+local onTopApplied, onTopAPI = {}, nil;
+local function ApplyOnTopFrame(f, on)
+	if ( f and onTopApplied[f] ~= on and SS.Safe(AZS_SetOnTopOfScreens, f, on) ) then onTopApplied[f] = on; end
 end
 function W.ApplyOnTop()
 	if ( not A.Has("AZS_SetOnTopOfScreens") ) then return; end
-	local ready = A.Call("AZS_GetPhase") == "ready";
-	local on = ready or (DB().onTopOfScreens and true or false);
-	local managed = {};
+	if ( onTopAPI ~= AZS_SetOnTopOfScreens ) then onTopApplied, onTopAPI = {}, AZS_SetOnTopOfScreens; end
+	local on = DB().onTopOfScreens and true or false;
 	for i = 1, table.getn(ON_TOP) do
 		local f = getglobal(ON_TOP[i]);
-		if ( f ) then
-			managed[f] = true; PutOnTop(f, on);
-		end
+		ApplyOnTopFrame(f, on);
 	end
 	for i = 1, 64 do
 		local f = getglobal("SlimSuiteEnemyNameplate" .. i);
-		if ( f ) then
-			managed[f] = true; PutOnTop(f, on);
-		end
-	end
-	-- Temporary registrations include the setup/menus and stock elements under Slim Suite control.
-	-- Never lift UIParent or WorldFrame: that would also lift unrelated addons and game screens.
-	local wanted = {};
-	local function Include(f)
-		local name = f and f.GetName and f:GetName();
-		if ( type(name) == "string" and name ~= "UIParent" and name ~= "WorldFrame" and not managed[f] ) then wanted[f] = true; end
-	end
-	if ( ready ) then
-		if ( UIParent and UIParent.GetChildren ) then
-			for _, f in ipairs({ UIParent:GetChildren() }) do
-				local name = f.GetName and f:GetName();
-				if ( type(name) == "string" and string.find(name, "^SlimSuite") ) then Include(f); end
-			end
-		end
-		for name, mode in pairs(DB().elementModes or {}) do
-			if ( mode == "enabled" ) then
-				Include(getglobal(SS.Shown(name)));
-				local setup = SS.ENV and SS.ENV.SU;
-				if ( setup and setup.CompanionsOf ) then
-					for _, companion in ipairs(setup.CompanionsOf(name)) do Include(getglobal(companion)); end
-				end
-			end
-		end
-	end
-	for f, previous in pairs(readyOverlay) do
-		if ( not wanted[f] ) then PutOnTop(f, previous); readyOverlay[f] = nil; end
-	end
-	for f in pairs(wanted) do
-		if ( readyOverlay[f] == nil ) then readyOverlay[f] = IsOnTop(f) or false; end
-		PutOnTop(f, true);
+		ApplyOnTopFrame(f, on);
 	end
 end
 
@@ -1445,6 +1407,7 @@ local function TrackChestOpens()
 	local context = A.Call("AZS_GetMeterContext");
 	local runId = (run and run.run) or (type(context) == "table" and context.runId);
 	if ( runId == nil ) then return; end
+	if ( type(AZS_CHESTS) ~= "table" ) then return; end -- unavailable data does not mean every cache was opened
 	runId = tostring(runId);
 	local caches, current = A.Caches(), {};
 	for i = 1, table.getn(caches) do
@@ -1539,4 +1502,3 @@ end);
 SS.Every("localClock", 0.5, function() SS.Safe(UpdateLocalClock); end);   -- a clock that shows minutes
 ticker:RegisterEvent("PLAYER_ENTERING_WORLD");
 ticker:SetScript("OnEvent", function() SS.Safe(W.ApplyOnTop); end);
-SS.Every("readyOverlay", 0.2, function() SS.Safe(W.ApplyOnTop); end);

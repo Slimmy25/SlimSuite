@@ -19,3 +19,31 @@ Minimap.zoom = 2
 this, arg1 = Minimap, 1; Minimap.scripts.OnMouseWheel(); print("wheel up ->", Minimap.zoom)
 arg1 = -1; Minimap.scripts.OnMouseWheel(); Minimap.scripts.OnMouseWheel(); print("wheel down x2 ->", Minimap.zoom)
 print(table.concat(ERRORS, "\n"))
+local bad = 0
+local function check(label, ok) if not ok then bad = bad + 1; print("MISMATCH " .. label) end end
+local zone = CreateFrame("Button", "MinimapZoneTextButton", MinimapCluster)
+zone:SetWidth(180); zone:SetHeight(20); zone:SetPoint("TOPLEFT", MinimapCluster, "TOPLEFT", 0, 0)
+local close = CreateFrame("Button", "MinimapToggleButton", MinimapCluster)
+close:SetWidth(20); close:SetHeight(20); close:SetPoint("LEFT", zone, "RIGHT", 0, 0)
+MinimapBorder = CreateFrame("Frame", "MinimapBorder", Minimap)
+MinimapBorderTop = CreateFrame("Frame", "MinimapBorderTop", MinimapCluster)
+MinimapZoneText = zone:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+MinimapZoneText:SetText("Kel'Thuzad Chamber") -- differs from GetRealZoneText's broader zone name
+Minimap.SetMaskTexture = function(self, path) self.mask = path end
+SS.DB().elementModes.MinimapCluster = "enabled"
+for i = 1, 3 do
+    for _, square in ipairs({ true, false }) do
+        Minimap:SetAlpha(0); Minimap:Hide(); MinimapCluster:SetAlpha(0); MinimapBorderTop:Hide()
+        SS.SetMinimapSquare(square); Tick(12)
+        check("enabled map remains visible: " .. tostring(square), Minimap:IsShown() and Minimap:GetAlpha() > 0 and MinimapCluster:GetAlpha() > 0)
+        check("correct shape mask: " .. tostring(square), Minimap.mask == (square and SlimSuiteMinimapMask.square or SlimSuiteMinimapMask.round))
+        check("native title stays readable and exact", zone:GetAlpha() == 1 and MinimapZoneText:GetText() == "Kel'Thuzad Chamber" and MinimapBorderTop:IsShown())
+        check("close button remains attached to native title", close.points[1][2] == zone and close.points[1][3] == "RIGHT" and not close.slimSquareOrig)
+        check("square mode does not replace the native header", not SS.squareTitle or not SS.squareTitle:IsShown())
+    end
+end
+SS.SetMinimapSquare(true); SS.SetMinimapTransparent(true); Tick(12)
+check("transparent square stays borderless between ticks", not SS.squareRing:IsShown() and not MinimapBorderTop:IsShown() and Minimap:GetAlpha() > 0)
+SS.SetMinimapTransparent(false); SS.SetMinimapSquare(false)
+check("round native border returns", MinimapBorder:IsShown() and MinimapBorderTop:IsShown())
+print("minimap problems: " .. bad)

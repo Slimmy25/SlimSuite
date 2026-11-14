@@ -29,8 +29,11 @@ SS.DISPLAY_ANCHORS = {
  SlimSuiteItemRowFrame = { "TOPLEFT", .275, .34 }, ChatFrame1 = { "BOTTOMLEFT", .005, .17 },
  SlimSuiteAnnouncementFrame = { "CENTER", .5, .70 }, GameTooltip = { "BOTTOMRIGHT", .995, .005 }
 };
+local cachedContext;
 function SS.DisplayContext()
  local l, r, b, t = SS.ScreenBounds(); local w, h = math.max(1,r-l), math.max(1,t-b);
+ -- Placement visits every element repeatedly. Recalculate template scores only after a resize.
+ if ( cachedContext and cachedContext.left==l and cachedContext.bottom==b and cachedContext.width==w and cachedContext.height==h ) then return cachedContext; end
  local best, distance;
  for _, candidate in ipairs(SS.DISPLAY_TEMPLATES) do
   local d = math.abs(math.log((w/h)/(candidate.width/candidate.height)));
@@ -41,8 +44,9 @@ function SS.DisplayContext()
   local difference=math.abs(math.log(w/resolution[1]))+math.abs(math.log(h/resolution[2]));
   if ( not score or difference<score ) then closest, score=resolution, difference; end
  end
- return { left=l, bottom=b, width=w, height=h, template=best, resolution=closest,
+ cachedContext = { left=l, bottom=b, width=w, height=h, template=best, resolution=closest,
   scale=math.min(h/1080 * best.density, w/1800) };
+ return cachedContext;
 end
 function SS.DisplayEnabled(name)
  local element=SS.Element and SS.Element(name) or name;

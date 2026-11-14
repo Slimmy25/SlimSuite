@@ -204,7 +204,21 @@ function SU.SetMovable(frame, movable)
 			local s = baseSizes[frame];
 			if ( s and f.SetWidth ) then f:SetWidth(s.w); f:SetHeight(s.h); end
 		end
+		if ( f and f.SetScale ) then f:SetScale((SS.nativeScales and SS.nativeScales[frame]) or 1); end
+		if ( frame == "PartyMemberFrame1" ) then
+			for i = 2, 4 do
+				local member, points = getglobal("PartyMemberFrame" .. i), partyNativePoints[i];
+				if ( member ) then
+					if ( points ) then
+						member:ClearAllPoints();
+						for p = 1, table.getn(points) do local a = points[p]; member:SetPoint(a[1], a[2], a[3], a[4], a[5]); end
+					end
+					member:SetScale((SS.nativeScales and SS.nativeScales["PartyMemberFrame" .. i]) or 1);
+				end
+			end
+		end
 		if ( frame == "ChatFrame1" ) then SS.Safe(SS.RestoreChatLayout, not SU.restoring); end
+		if ( frame == "MainMenuExpBar" ) then SS.Safe(SS.RestoreExperienceBar); end
 	end
 	SS.DB().places[frame] = nil;
 	if ( SS.DB().unlocked ) then SS.Safe(SS.SetUnlocked, true, true); end
@@ -461,6 +475,11 @@ function SU.RestoreNative(frame)
 		d.targetLook = "classic"; d.hideTarget = false;
 		SS.Safe(SS.TargetFrameHidden, false);
 	elseif ( frame == "PartyMemberFrame1" ) then d.partyLook = "classic";
+	elseif ( frame == "BuffFrame" ) then
+		d.buffsOnPlayer, d.buffsOnTarget, d.buffCustomLayout = false, false, false;
+		d.buffGrowthDirection = "down";
+		d.sizes.BuffFrame, d.orientations.BuffFrame, d.padding.BuffFrame = nil, nil, nil;
+		SS.Safe(SS.ApplyBuffOrientation);
 	elseif ( frame == "MinimapCluster" ) then
 		d.minimapSquare, d.minimapTransparent, d.minimapBar, d.gatherButtons = false, false, false, false;
 		SS.Safe(SS.SetMinimapBar, false, true); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar);
@@ -562,6 +581,9 @@ function SU.SetOn(frame, on, title)
 	if ( handles[hname] ) then if ( on and SS.HandleAllowed(hname) ) then handles[hname]:Show(); else handles[hname]:Hide(); end end
 	if ( frame == "MinimapCluster" and on ) then SS.Safe(SS.ApplyMinimapShape); end   -- round border or square edge
 	if ( frame == "ChatFrame1" and on ) then SS.Safe(SS.PrepareChatWindow); end
+	if ( frame == "PlayerFrame" or frame == "TargetFrame" ) then
+		SS.Safe(SS.RefreshCard, getglobal(frame == "PlayerFrame" and "SlimSuitePlayerCard" or "SlimSuiteTargetCard"));
+	end
 	if ( not SU.batching ) then
 		SU.RefreshBar(); SU.UpdateDemo();
 		if ( frame == "PlayerFrame" and SU.focus == "TargetFrame" ) then SU.Focus("TargetFrame"); end
@@ -641,7 +663,8 @@ function SU.SetMode(frame, mode, title)
 	d.elementModes[frame] = mode;
 	if ( mode == "enabled" ) then
 		SU.defaulting = false;
-		if ( frame == "ChatFrame1" and not SU.restoring and d.frameDefault ) then d.frameDefault.ChatFrame1 = nil; end
+		if ( d.frameDefault ) then d.frameDefault[frame] = nil; end
+		if ( not SU.restoring ) then d.muted[frame] = nil; d.muted[SS.Shown(frame)] = nil; end
 		SU.SetOn(frame, true, title);
 	elseif ( mode == "disabled" ) then
 		SU.defaulting = false;
@@ -687,6 +710,7 @@ function SU.SetMode(frame, mode, title)
 	-- Selecting Enabled in setup immediately selects that element and exposes its green move handle.
 	if ( not SU.batching and setupActive and mode == "enabled" ) then SU.Focus(frame); end
 	if ( frame == "ChatFrame1" ) then SS.Safe(SS.RefreshChatDock); end
+	if ( not SU.batching ) then SS.RefreshToggles(); end
 end
 
 function SU.CycleMode(frame)
@@ -911,6 +935,12 @@ function SS.RefreshCard(f)
 	if ( not f ) then return; end
 	local el = f.unit == "target" and "TargetFrame" or "PlayerFrame";
 	if ( not SS.UsesCard(el) or (el == "TargetFrame" and SS.DB().hideTarget) ) then f:Hide(); return; end
+	-- Setup restoration can reveal the old frame without changing the selected look.
+	-- Enforce exclusive ownership even when only the other unit's style changed.
+	local native = getglobal(el);
+	if ( native and native.SetAlpha ) then native:SetAlpha(0); end
+	local mode = SS.DB().elementModes and SS.DB().elementModes[el];
+	if ( mode == "disabled" or (setupActive and not SS.SetupShows(el)) ) then f:Hide(); return; end
 	SS.Safe(SS.LayoutCard, f);
 	local unit = f.unit;
 	SS.Safe(SS.UpdateCardModel, f, unit);
@@ -966,6 +996,7 @@ function SS.AbsorbAmount(unit)
 end
 function SS.UpdateAbsorbMarker(bar, unit, health, maximum)
 	if ( not bar or not unit ) then return; end
+	if ( not SS.DB().showAbsorbs and not bar.slimAbsorb ) then return; end
 	if ( not bar.slimAbsorb ) then
 		bar.slimAbsorb = bar:CreateTexture(nil, "OVERLAY");
 		bar.slimAbsorb:SetTexture("Interface\\TargetingFrame\\UI-StatusBar");
@@ -979,7 +1010,9 @@ function SS.UpdateAbsorbMarker(bar, unit, health, maximum)
 		bar.slimAbsorb:Hide(); bar.slimAbsorbText:Hide(); return;
 	end
 	local start = width * math.min(1, math.max(0, health or 0) / maximum);
-	local extent = math.max(2, width * value / maximum);
+	local extent = math.min(width, math.max(2, width * value / maximum));
+	-- Shields overlay the health bar, including at full health, without covering adjacent frames.
+	start = math.min(start, width - extent);
 	bar.slimAbsorb:ClearAllPoints();
 	bar.slimAbsorb:SetPoint("LEFT", bar, "LEFT", start, 0);
 	bar.slimAbsorb:SetWidth(extent); bar.slimAbsorb:SetHeight(bar:GetHeight() or 6);
@@ -1392,8 +1425,8 @@ function SU.UpdateDemo()
 	-- every preview is drawn on the element's own frame, with its own size, scale and layout
 	if ( SS.Previewing("PartyMemberFrame1") ) then
 		SU.PreviewParty();
-		-- locked above the player frame: place the party again now all four frames show
-		if ( SS.DB().partyLocked and SS.DB().partyLockAbove ) then SS.Safe(SS.Place, "PartyMemberFrame1"); end
+		-- Preview construction can reset the first party frame's anchors on either side of the player.
+		if ( SS.DB().partyLocked ) then SS.Safe(SS.Place, "PartyMemberFrame1"); end
 	end
 	if ( SS.Previewing("TargetFrame") and not SS.DB().hideTarget ) then SU.PreviewTarget(); end
 	SS.buffDirty = true;                                    -- the sample buffs on the real buff frame
@@ -1404,6 +1437,13 @@ end
 function SU.SetBuffsPlayer(on)
 	if ( on and SS.DB().buffsOnTarget ) then SS.Notice("Buffs on the target frame turned off: your buffs are on the player frame now."); end
 	SS.DB().buffsOnPlayer = on and true or false;
+	if ( on ) then
+		local batching = SU.batching; SU.batching = true;
+		SU.SetMode("BuffFrame", "enabled", "Buffs/Debuffs");
+		SU.batching = batching;
+		SS.DB().buffCustomLayout = true;
+		SS.Safe(SS.ApplyBuffOrientation);
+	end
 	if ( on ) then SS.DB().buffsOnTarget = false; SS.MakeMovable("BuffFrame", "they sit on the player frame"); end
 	if ( on ) then SS.Safe(SS.AttachBuffs); else SS.Safe(PlaceAll); end
 	SU.RefreshBar();
@@ -1980,7 +2020,7 @@ function SU.RefreshDemoButtons()
 		end
 		if ( stillEnabled == 0 ) then SS.StopDemoMode(); return; end
 	end
-	if ( SU.bar.demoLabel ) then SU.bar.demoLabel:SetText(SS.T("Demo (Right click element name to modify settings)")); end
+	if ( SU.bar.demoLabel ) then SU.bar.demoLabel:SetText(SS.T("Demo")); end
 	if ( count == 0 and not SS.demoRunning ) then SU.bar.demoOn:Disable(); else SU.bar.demoOn:Enable(); end
 	if ( SS.demoRunning ) then SU.bar.demoOn:LockHighlight(); SU.bar.demoOff:UnlockHighlight();
 	else SU.bar.demoOff:LockHighlight(); SU.bar.demoOn:UnlockHighlight(); end
@@ -2050,11 +2090,14 @@ function SU.Build()
 	SU.panel:Hide();
 	-- Demo Mode beside the grid: On and Off, the one that is in effect lit
 	SU.bar.demoLabel = SU.bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-	SU.bar.demoLabel:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 218, -12); SU.bar.demoLabel:SetText(SS.T("Demo (Right click element name to modify settings)"));
+	SU.bar.demoLabel:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 218, -12); SU.bar.demoLabel:SetText(SS.T("Demo"));
 	SU.bar.demoOn = K.Button(SU.bar, "On", 36, function() SS.StartDemoMode(); SU.RefreshDemoButtons(); end);
-	SU.bar.demoOn:SetHeight(18); SU.bar.demoOn:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 500, -9);
+	SU.bar.demoOn:SetHeight(18); SU.bar.demoOn:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 255, -9);
 	SU.bar.demoOff = K.Button(SU.bar, "Off", 36, function() SS.StopDemoMode(); SU.RefreshDemoButtons(); end);
-	SU.bar.demoOff:SetHeight(18); SU.bar.demoOff:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 538, -9);
+	SU.bar.demoOff:SetHeight(18); SU.bar.demoOff:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 296, -9);
+	SU.bar.demoHint = SU.bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
+	SU.bar.demoHint:SetPoint("LEFT", SU.bar.demoOff, "RIGHT", 7, 0); SU.bar.demoHint:SetWidth(280); SU.bar.demoHint:SetHeight(24);
+	SU.bar.demoHint:SetJustifyH("LEFT"); SU.bar.demoHint:SetText(SS.T("(Right click element to change settings)"));
 	SU.bar.done = K.Button(SU.bar, "Done", 90, function() SS.ConfirmSetupDone(); end);
 	SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
 	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);

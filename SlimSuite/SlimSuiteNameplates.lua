@@ -20,11 +20,12 @@ function SS.SetNativeEnemyNameplates(on)
 	else WriteNativeNameplates(on); end
 end
 
-local plates, freePlates, registered, plateSerial = {}, {}, false, 0;
-local function NewPlate(id)
+local plates, freePlates, requests, registered, plateSerial = {}, {}, {}, false, 0;
+local function NewPlate()
 	local f = table.remove(freePlates);
-	if ( f ) then f:Hide(); f:ClearAllPoints();
-	else plateSerial = plateSerial + 1; f = CreateFrame("Frame", "SlimSuiteEnemyNameplate" .. plateSerial, WorldFrame); end
+	-- WoW frames cannot be destroyed. Reuse the entire plate, including its children.
+	if ( f ) then f:Hide(); f:ClearAllPoints(); return f; end
+	plateSerial = plateSerial + 1; f = CreateFrame("Frame", "SlimSuiteEnemyNameplate" .. plateSerial, WorldFrame);
 	f:SetWidth(152); f:SetHeight(42); f:SetFrameStrata("HIGH");
 	if ( type(AZS_SetOnTopOfScreens) == "function" ) then SS.Safe(AZS_SetOnTopOfScreens, f, SS.DB().onTopOfScreens and true or false); end
 	f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -47,22 +48,12 @@ local function NewPlate(id)
 		f.dots[i] = dot; dot:Hide();
 	end
 	f:Hide();
-	plates[id] = f;
 	return f;
 end
 
-local function SpecialUnit(unitId)
-	if ( not unitId or type(AZS_UNITS) ~= "table" ) then return nil; end
-	for i = 1, table.getn(AZS_UNITS) do
-		local unit = AZS_UNITS[i];
-		if ( type(unit) == "table" and unit.id == unitId ) then return unit; end
-	end
-	return nil;
-end
-
 local function UpdatePlateData(record, unit)
-	local f = record.frame or NewPlate(record.anchorId);
-	record.frame, record.unitId = f, record.unitId;
+	local f = record.frame or NewPlate();
+	record.frame = f;
 	f.name:SetText(record.name or (unit and unit.name) or "Enemy");
 	if ( unit and tonumber(unit.hpm) and tonumber(unit.hpm) > 0 ) then
 		local hp, max = tonumber(unit.hp) or 0, tonumber(unit.hpm);
@@ -103,13 +94,12 @@ local function ReadCatalog()
 		for i = 1, table.getn(page.entries) do
 			local entry = page.entries[i];
 			if ( type(entry) == "table" and entry.anchorId and entry.state == "alive" ) then
-				local unit = SpecialUnit(entry.unitId);
 				local kind = entry.kind;
 				if ( not d.enemyBossesOnly or kind == "boss" or kind == "finalBoss" or kind == "guardian" ) then
 					if ( current[entry.anchorId] or accepted < 64 ) then
-						local record = plates[entry.anchorId] or { anchorId = entry.anchorId };
+						-- Do not mutate live records until every requested page has arrived.
+						local record = { anchorId = entry.anchorId };
 						record.name, record.kind, record.unitId = entry.name, kind, entry.unitId;
-						UpdatePlateData(record, unit);
 						if ( not current[entry.anchorId] ) then accepted = accepted + 1; end
 						current[entry.anchorId] = record;
 					end
@@ -117,9 +107,25 @@ local function ReadCatalog()
 			end
 		end
 		cursor = page.nextCursor; pages = pages + 1;
-		if ( pages > 32 ) then return; end                 -- guard against a broken cursor/API response
+		if ( page.hasMore and (not cursor or pages >= 32) and accepted < 64 ) then return; end
 	until not page.hasMore or accepted >= 64
-	for id, record in pairs(plates) do if ( not current[id] ) then record.frame:Hide(); table.insert(freePlates, record.frame); plates[id] = nil; end end
+	-- Release retired plates before allocating replacements, keeping the pool bounded at 64.
+	for id, record in pairs(plates) do
+		if ( current[id] ) then current[id].frame = record.frame;
+		else record.frame:Hide(); table.insert(freePlates, record.frame); end
+	end
+	local units = {};
+	if ( type(AZS_UNITS) == "table" ) then
+		for i = 1, table.getn(AZS_UNITS) do
+			local unit = AZS_UNITS[i];
+			if ( type(unit) == "table" and unit.id ~= nil ) then units[unit.id] = unit; end
+		end
+	end
+	requests = {};
+	for id, record in pairs(current) do
+		UpdatePlateData(record, units[record.unitId]);
+		table.insert(requests, { anchorId = id, attachment = "overhead" });
+	end
 	plates = current;
 end
 
@@ -128,16 +134,18 @@ local function ProjectPlates()
 		for _, record in pairs(plates) do if ( record.frame ) then record.frame:Hide(); end end
 		return;
 	end
-	local ids, requests = {}, {};
-	for id in pairs(plates) do table.insert(ids, id); table.insert(requests, { anchorId = id, attachment = "overhead" }); end
 	if ( table.getn(requests) == 0 ) then return; end
 	local ok, projection = SS.Safe(AZS_ProjectWorldAnchors, requests);
+	-- Missing/stale projections must not leave a nameplate floating at its last screen position.
+	for _, record in pairs(plates) do record.frame:Hide(); end
 	if ( not ok or type(projection) ~= "table" or projection.frameCurrent == false ) then return; end
 	for i = 1, table.getn(projection.entries or {}) do
-		local projected, record = projection.entries[i], plates[ids[i]];
-		if ( record and record.frame and projected.state == "onScreen" ) then
-			record.frame:ClearAllPoints(); record.frame:SetPoint("BOTTOM", WorldFrame, "BOTTOMLEFT", projected.x, projected.y + 10); record.frame:Show();
-		elseif ( record and record.frame ) then record.frame:Hide(); end
+		local projected = projection.entries[i];
+		local record = plates[projected.anchorId];
+		if ( record and projected.state == "onScreen" and type(projected.x) == "number" and type(projected.y) == "number" ) then
+			local scale = SS.EffectiveScale(record.frame);
+			record.frame:ClearAllPoints(); record.frame:SetPoint("BOTTOM", WorldFrame, "BOTTOMLEFT", projected.x / scale, projected.y / scale + 10); record.frame:Show();
+		end
 	end
 end
 
@@ -150,7 +158,8 @@ function SS.UpdateEnemyNameplates()
 		end
 		if ( ReadNativeNameplates() ) then WriteNativeNameplates(false); end
 		if ( not registered and type(AZS_RegisterWorldAnchorFrameHandler) == "function" ) then
-			SS.Safe(AZS_RegisterWorldAnchorFrameHandler, ProjectPlates); registered = true;
+			local ok, result = SS.Safe(AZS_RegisterWorldAnchorFrameHandler, ProjectPlates);
+			registered = ok and result == true;
 		end
 		SS.Safe(ReadCatalog);
 	else

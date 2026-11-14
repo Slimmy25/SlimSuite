@@ -32,26 +32,12 @@ setup.SetMode("SlimSuiteTallyFrame", "disabled", "Tally")
 AZS_GetPhase = function() return "ready" end
 SS.UpdateTally()
 check("ready does not enable disabled tally", not SlimSuiteTallyFrame:IsShown())
--- Foreground registrations cover the addon and managed native frames, with scoped restoration.
-local top, calls = {}, 0
-AZS_IsOnTopOfScreens = function(f) return top[f] and true or false end
-AZS_SetOnTopOfScreens = function(f, on) calls = calls + 1; top[f] = on and true or nil end
+-- Ready must not force foreground layering after the unsuccessful overlap workaround was removed.
+local top = {}
+AZS_SetOnTopOfScreens = function(f, on) top[f] = on end
 d.onTopOfScreens = false
-local window = CreateFrame("Frame", "SlimSuiteReadyTestWindow", UIParent)
-local other = CreateFrame("Frame", "OtherAddonOverlay", UIParent)
-top[window] = true -- an existing registration must survive leaving ready
-setup.SetMode("PlayerFrame", "enabled", "Player")
 SlimSuiteWorld.ApplyOnTop()
-check("ready lifts custom HUD and managed native frame", top[SlimSuiteClockFrame] and top[PlayerFrame])
-check("ready lifts named green move handles", top[getglobal("SlimSuiteMoveHandlePlayerFrame")])
-check("ready lifts addon windows without lifting global roots", top[window] and not top[other] and not top[UIParent] and not top[WorldFrame])
-local before = calls
-SlimSuiteWorld.ApplyOnTop()
-check("unchanged overlay state avoids repeated writes", calls == before)
-AZS_GetPhase = function() return "playing" end
-Tick(5)
-check("leaving ready restores temporary registrations", not top[PlayerFrame] and not top[getglobal("SlimSuiteMoveHandlePlayerFrame")] and top[window])
-check("card overlay preference still governs active-run HUD", not top[SlimSuiteClockFrame])
+check("ready does not force foreground layering", top[SlimSuiteClockFrame] == false and top[PlayerFrame] == nil)
 d.onTopOfScreens = true; SlimSuiteWorld.ApplyOnTop()
 check("explicit card overlay preference still works", top[SlimSuiteClockFrame])
 print("ready problems: " .. bad)

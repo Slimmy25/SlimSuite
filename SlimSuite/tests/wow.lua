@@ -56,7 +56,8 @@ Frame.methods = {
 	HookScript = noop,
 	GetParent = function(self) return self.parent end,
 	SetParent = function(self, p) self.parent = p end,
-	GetName = function(self) return self.name end,
+	-- Native frame identity does not change when addon code assigns a FontString to frame.name.
+	GetName = function(self) return self.globalName end,
 	GetChildren = function(self) return table.unpack(self.children or {}) end,
 	GetRegions = function(self) return table.unpack(self.regions or {}) end,
 	GetNumPoints = function(self) return self.points and #self.points or 1 end,
@@ -94,7 +95,7 @@ local function look(t, k) local m = Frame.methods[k]; if m then return m end; if
 Frame.meta = { __index = look }
 
 function CreateFrame(kind, name, parent, template)
-	local f = setmetatable({ kind = kind, name = name, parent = parent, shown = true, alpha = 1, w = 100, h = 20 }, Frame.meta)
+	local f = setmetatable({ kind = kind, name = name, globalName = name, parent = parent, shown = true, alpha = 1, w = 100, h = 20 }, Frame.meta)
 	if parent then parent.children = parent.children or {}; table.insert(parent.children, f) end
 	if name then _G[name] = f end
 	if kind == "Button" or kind == "CheckButton" then f.fontString = Region(f, "FontString") end
@@ -224,7 +225,7 @@ setmetatable(_G, { __index = function(t, k)
 	if string.match(k, "^AZS_") or string.match(k, "^SlimSuite") or k == "SS" or k == "SU" or k == "AZSKIT" then return nil end
 	if string.match(k, "^[A-Z]") then
 		missing[k] = true
-		local a = setmetatable({ name = k, shown = false, alpha = 1, w = 10, h = 10 }, Any.meta)
+		local a = setmetatable({ name = k, globalName = k, shown = false, alpha = 1, w = 10, h = 10 }, Any.meta)
 		rawset(t, k, a)
 		return a
 	end

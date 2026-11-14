@@ -14,7 +14,7 @@ function SS.AddonVersion()
 		local ok, value = pcall(GetAddOnMetadata, "SlimSuite", "Version");
 		if ( ok and type(value) == "string" and value ~= "" ) then return value; end
 	end
-	return "1.23";
+	return "unknown"; -- Never report an old hardcoded release as the installed version.
 end
 
 -- GetEffectiveScale is missing on a few legacy UI regions and third-party minimap controls.

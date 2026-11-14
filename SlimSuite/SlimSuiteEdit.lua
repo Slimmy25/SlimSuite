@@ -239,6 +239,13 @@ end
 SlimSuiteMinimapMask = { round = "Textures\\MinimapMask", square = "Interface\\AddOns\\SlimSuite\\textures\\MinimapSquare" };
 function SS.ApplyMinimapShape()
 	if ( not Minimap ) then return false; end
+	if ( SS.DB().elementModes.MinimapCluster == "enabled" ) then
+		Minimap:Show();
+		if ( MinimapCluster ) then
+			MinimapCluster:Show();
+			if ( not SS.DB().muted.MinimapCluster ) then MinimapCluster:SetAlpha(1); end
+		end
+	end
 	-- Capture the round map's original appearance before the square/transparent options hide either border.
 	SS.Safe(SS.ApplyMinimapTransparency);
 	local square = SS.DB().minimapSquare and true or false;
@@ -263,24 +270,23 @@ function SS.ApplyMinimapShape()
 	return ok;
 end
 
-local minimapOriginalAlpha, minimapBorderWasShown, minimapBorderTopWasShown;
+local minimapOriginalAlpha;
 function SS.ApplyMinimapTransparency()
 	if ( not Minimap ) then return; end
-	if ( minimapOriginalAlpha == nil and Minimap.GetAlpha ) then minimapOriginalAlpha = Minimap:GetAlpha() or 1; end
-	if ( minimapBorderWasShown == nil and MinimapBorder and MinimapBorder.IsShown ) then minimapBorderWasShown = MinimapBorder:IsShown(); end
-	if ( minimapBorderTopWasShown == nil and MinimapBorderTop and MinimapBorderTop.IsShown ) then minimapBorderTopWasShown = MinimapBorderTop:IsShown(); end
+	if ( minimapOriginalAlpha == nil and Minimap.GetAlpha ) then
+		local alpha = Minimap:GetAlpha(); minimapOriginalAlpha = type(alpha) == "number" and alpha > 0 and alpha or 1;
+	end
 	local transparent = SS.DB().minimapTransparent and true or false;
 	if ( Minimap.SetAlpha ) then Minimap:SetAlpha(transparent and 0.58 or (minimapOriginalAlpha or 1)); end
 	if ( MinimapBorder ) then
 		if ( transparent or SS.squareActive ) then MinimapBorder:Hide();
-		elseif ( minimapBorderWasShown ) then MinimapBorder:Show(); else MinimapBorder:Hide(); end
+		else MinimapBorder:Show(); end
 	end
 	if ( MinimapBorderTop ) then
-		if ( transparent or SS.squareActive ) then MinimapBorderTop:Hide();
-		elseif ( minimapBorderTopWasShown ) then MinimapBorderTop:Show(); else MinimapBorderTop:Hide(); end
+		if ( transparent ) then MinimapBorderTop:Hide(); else MinimapBorderTop:Show(); end
 	end
 	if ( SS.squareTitle ) then
-		if ( SS.squareActive ) then SS.squareTitle:Show(); else SS.squareTitle:Hide(); end
+		SS.squareTitle:Hide(); -- retire the replacement header; both shapes use the native title
 		if ( SS.squareTitle.bg ) then if ( transparent ) then SS.squareTitle.bg:Hide(); else SS.squareTitle.bg:Show(); end end
 		if ( SS.squareTitle.line ) then if ( transparent ) then SS.squareTitle.line:Hide(); else SS.squareTitle.line:Show(); end end
 	end
@@ -316,48 +322,17 @@ function SS.SquareFrame(on)
 		SS.squareRing = ring;
 	end
 	if ( ring ) then if ( on and not SS.DB().minimapTransparent ) then ring:Show(); else ring:Hide(); end end
-	-- A dedicated header keeps the zone name readable and puts a straight lower edge between its title and the square map.
-	local title = SS.squareTitle;
-	if ( on and not title ) then
-		title = CreateFrame("Frame", "SlimSuiteSquareMapTitle", MinimapCluster or UIParent);
-		title:SetFrameStrata("HIGH"); title:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 5);
-		title:SetHeight(16); title:SetPoint("BOTTOMLEFT", Minimap, "TOPLEFT", 0, 0); title:SetPoint("BOTTOMRIGHT", Minimap, "TOPRIGHT", 0, 0);
-		title.bg = title:CreateTexture(nil, "BACKGROUND"); title.bg:SetAllPoints(title); title.bg:SetTexture(0.02, 0.02, 0.03, 0.88);
-		title.line = title:CreateTexture(nil, "BORDER"); title.line:SetTexture(0.72, 0.55, 0.2, 1);
-		title.line:SetPoint("BOTTOMLEFT", title, "BOTTOMLEFT", 0, 0); title.line:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", 0, 0); title.line:SetHeight(1);
-		title.text = title:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-		title.text:SetPoint("LEFT", title, "LEFT", 4, 0); title.text:SetPoint("RIGHT", title, "RIGHT", -4, 0);
-		title.text:SetJustifyH("CENTER"); title.text:SetTextColor(1, 0.82, 0.32);
-		SS.squareTitle = title;
-	end
-	if ( title ) then if ( on ) then title:Show(); else title:Hide(); end end
-	-- Keep the original zone label alive over the custom title, and restore its original anchor on return to round.
+	-- Preserve the game's exact subzone name, native typeface, title plate and close button.
+	if ( SS.squareTitle ) then SS.squareTitle:Hide(); end
 	local zone = MinimapZoneTextButton;
-	if ( zone ) then
-		if ( on ) then
-			if ( not zone.slimSquareOrig ) then
-				local p, rel, rp, x, y = zone:GetPoint(1); zone.slimSquareOrig = { p, rel, rp, x or 0, y or 0 };
-				zone.slimSquareWasShown = not zone.IsShown or zone:IsShown();
-				zone.slimSquareStrata, zone.slimSquareLevel = zone:GetFrameStrata(), zone:GetFrameLevel();
-				zone.slimSquareAlpha = zone:GetAlpha() or 1;
-			end
-			zone:ClearAllPoints(); zone:SetPoint("TOPLEFT", title or Minimap, "TOPLEFT", 2, -1); zone:SetPoint("BOTTOMRIGHT", title or Minimap, "BOTTOMRIGHT", -2, 1);
-			zone:SetFrameStrata("HIGH"); zone:SetFrameLevel((title and title:GetFrameLevel() or Minimap:GetFrameLevel() or 1) + 1);
-			zone:SetAlpha(0);                               -- the custom title text is stable even when the native label glitches
-			zone:Show();
-			if ( MinimapBorderTop ) then
-				MinimapBorderTop:Hide();
-			end
-		elseif ( zone.slimSquareOrig ) then
-			local o = zone.slimSquareOrig; zone.slimSquareOrig = nil;
-			zone:ClearAllPoints(); if ( o[2] ) then zone:SetPoint(o[1], o[2], o[3], o[4], o[5]); end
-			if ( zone.slimSquareStrata ) then zone:SetFrameStrata(zone.slimSquareStrata); end
-			if ( zone.slimSquareLevel ) then zone:SetFrameLevel(zone.slimSquareLevel); end
-			zone:SetAlpha(zone.slimSquareAlpha or 1);
-			if ( zone.slimSquareWasShown ) then zone:Show(); else zone:Hide(); end
-			zone.slimSquareWasShown, zone.slimSquareStrata, zone.slimSquareLevel, zone.slimSquareAlpha = nil, nil, nil, nil;
-		end
+	if ( zone and zone.slimSquareOrig ) then
+		local o = zone.slimSquareOrig; zone.slimSquareOrig = nil;
+		zone:ClearAllPoints(); if ( o[2] ) then zone:SetPoint(o[1], o[2], o[3], o[4], o[5]); end
+		if ( zone.slimSquareStrata ) then zone:SetFrameStrata(zone.slimSquareStrata); end
+		if ( zone.slimSquareLevel ) then zone:SetFrameLevel(zone.slimSquareLevel); end
+		zone.slimSquareWasShown, zone.slimSquareStrata, zone.slimSquareLevel, zone.slimSquareAlpha = nil, nil, nil, nil;
 	end
+	if ( zone ) then zone:SetAlpha(1); zone:Show(); end
 end
 
 -- The game's own clock is made for the round map in its first place. Once the map is square or has been moved,
@@ -380,7 +355,7 @@ end
 SS.SQUARE_KNOWN = { MinimapZoomIn = true, MinimapZoomOut = true, MinimapToggleButton = true, MiniMapWorldMapButton = true,
 	WorldMapFrameMinimizeButton = true, GameTimeFrame = true, MiniMapTrackingFrame = true,
 	MiniMapMailFrame = true, MiniMapBattlefieldFrame = true, MiniMapMeetingStoneFrame = true };
-SS.SQUARE_SKIP = { MinimapPing = true };
+SS.SQUARE_SKIP = { MinimapPing = true, MinimapToggleButton = true, MinimapZoneTextButton = true };
 -- true while the square layout places the buttons (the minimap buttons' "Around the minimap" choice)
 function SS.SquareColumn()
 	return SS.squareActive and SS.MinimapButtonPlace() == "ring";
@@ -472,15 +447,11 @@ end
 -- buttons that appear later (new mail, a queue, another addon's button) join the square's column
 SS.Every("squareEdge", 1, function()
 	if ( SS.SquareColumn() ) then SS.ArrangeEdgeButtons(true); end
-	if ( SS.squareActive and SS.squareTitle and SS.squareTitle.text ) then
-		local mapName = type(GetRealZoneText) == "function" and GetRealZoneText() or nil;
-		if ( type(mapName) ~= "string" or mapName == "" ) then mapName = type(GetZoneText) == "function" and GetZoneText() or ""; end
-		SS.squareTitle.text:SetText(mapName or "");
-	end
+
 	-- the ring and the round border always match the map's real shape, whatever else showed or hid them
 	local ring = SS.squareRing;
 	if ( ring and ring:IsShown() and not SS.squareActive ) then ring:Hide(); end
-	if ( ring and not ring:IsShown() and SS.squareActive ) then ring:Show(); end
+	if ( ring and not ring:IsShown() and SS.squareActive and not SS.DB().minimapTransparent ) then ring:Show(); end
 	if ( MinimapBorder and SS.squareActive and MinimapBorder:IsShown() ) then MinimapBorder:Hide(); end
 end);
 
@@ -707,6 +678,10 @@ end
 -- independent move handle can reposition it without moving or resizing the action buttons.
 function SS.DetachExperienceBar()
 	if ( xpBarDetached or not MainMenuExpBar or not UIParent ) then return; end
+	if ( SS.DB().frameDefault and SS.DB().frameDefault.MainMenuExpBar ) then return; end
+	if ( not SS.xpNativeLayout ) then
+		SS.xpNativeLayout = { parent = MainMenuExpBar:GetParent(), strata = MainMenuExpBar:GetFrameStrata(), level = MainMenuExpBar:GetFrameLevel() };
+	end
 	local left, right, bottom = RootBounds(MainMenuExpBar);
 	local width, height = MainMenuExpBar:GetWidth(), MainMenuExpBar:GetHeight();
 	MainMenuExpBar:SetParent(UIParent);
@@ -725,6 +700,18 @@ function SS.DetachExperienceBar()
 		MainMenuExpBar:SetFrameLevel((art:GetFrameLevel() or 1) + 5);
 	end
 	xpBarDetached = true;
+end
+
+function SS.RestoreExperienceBar()
+	local xp, original = MainMenuExpBar, SS.xpNativeLayout;
+	if ( not xp ) then return; end
+	if ( original ) then
+		xp:SetParent(original.parent); xp:SetFrameStrata(original.strata); xp:SetFrameLevel(original.level);
+	end
+	xpBarDetached = nil;
+	if ( xp.SetOrientation ) then SS.Safe(xp.SetOrientation, xp, "HORIZONTAL"); end
+	if ( xp.SetClipsChildren ) then SS.Safe(xp.SetClipsChildren, xp, false); end
+	SS.Safe(SS.StyleExpBar, false); SS.Safe(SS.LayoutXpSegments);
 end
 
 -- Vertical or horizontal for a build row (spells or worn jewelry). Joined, the two rows turn together (a column of
@@ -770,7 +757,7 @@ function SS.PrepareSizeTools(name, label)
 	local f = getglobal(SS.Shown(name));
 	if ( not f ) then return false; end
 	if ( not sizeMenu ) then
-		sizeMenu = CreateFrame("Frame", "SlimSuiteElementMenu", UIParent);
+		sizeMenu = CreateFrame("Frame", nil, UIParent);
 		sizeMenu:SetWidth(206); sizeMenu:SetHeight(120);
 		sizeMenu:SetFrameStrata("DIALOG");
 		sizeMenu.rows = {};
@@ -1279,7 +1266,7 @@ function SS.Handle(name, label)
 	if ( not f ) then return nil; end
 	local h = handles[name];
 	if ( not h ) then
-		h = CreateFrame("Frame", "SlimSuiteMoveHandle" .. name, UIParent);
+		h = CreateFrame("Frame", nil, UIParent);
 		h:SetFrameStrata("DIALOG");
 		h:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 			tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });

@@ -272,6 +272,7 @@ local hud = { clock = false }
 AZS_IsHudShown = function(p) return hud[p] ~= false end
 AZS_SetHudShown = function(p, on) hud[p] = on end
 SS.DB().replaceClock = false; SS.DB().nativeAdopted = nil; SS.DB().clockNativeOriginal = nil
+SS.DB().elementModes.SlimSuiteClockFrame = nil -- legacy profile without an explicit element choice
 SS.DB().replaceTally = false
 SS.AdoptHiddenNatives()
 check("the game's run clock off: Slim Suite's is on", SS.DB().replaceClock == true)

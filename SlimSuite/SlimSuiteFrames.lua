@@ -821,7 +821,16 @@ function SS.MinSize(name)
 	return 40, 24;
 end
 
+SS.nativeScales = {};
 function SS.ApplySize(name, f)
+	if ( SS.nativeScales[name] == nil and f.GetScale ) then SS.nativeScales[name] = f:GetScale(); end
+	if ( name == "PartyMemberFrame1" ) then
+		for i = 1, 4 do
+			local memberName = "PartyMemberFrame" .. i;
+			local member = getglobal(memberName);
+			if ( member and member.GetScale and SS.nativeScales[memberName] == nil ) then SS.nativeScales[memberName] = member:GetScale(); end
+		end
+	end
 	if ( name == "ChatFrame1" and SS.CaptureChatLayout ) then SS.CaptureChatLayout(); end
 	local s = SS.DB().sizes[name];
 	if ( name == "GameTooltip" and type(s) ~= "table" ) then
@@ -975,6 +984,9 @@ function SS.ToggleFeatureMute(name)
 end
 
 function SS.CurrentOrientation(name)
+	if ( SS.DB().frameDefault and SS.DB().frameDefault[name] ) then
+		return name == "PartyMemberFrame1" and "vertical" or "horizontal";
+	end
 	if ( name == "PartyMemberFrame1" and SS.Demoing("PartyMemberFrame1") and SS.demoPartyOrient ) then return SS.demoPartyOrient; end
 	local orientation = SS.DB().orientations[name];
 	if ( orientation == "vertical" or orientation == "horizontal" ) then return orientation; end
@@ -1075,7 +1087,7 @@ function SS.ApplyBuffOrientation()
 		return;
 	end
 	buffLayoutApplying = true;
-	if ( orientation == "horizontal" and not SS.DB().buffCustomLayout ) then
+	if ( (SS.DB().frameDefault and SS.DB().frameDefault.BuffFrame) or (orientation == "horizontal" and not SS.DB().buffCustomLayout) ) then
 		-- the game's own layout: its buttons go back where the game puts them
 		local prev;
 		for k = 1, table.getn(buttons) do
@@ -1132,6 +1144,10 @@ function SS.ApplyBuffOrientation()
 		rows = math.ceil(count / columns);
 	end
 	local direction = SS.BuffGrowthDirection();
+	if ( attached ) then
+		local side = SS.DB().buffsOnTarget and SS.DB().buffsOnTargetSide or SS.DB().buffsOnPlayerSide;
+		if ( side == "above" ) then direction = "up"; end
+	end
 	local verticalOffset = direction == "up" and 1 or -1;
 	for i = 1, count do
 		local column, row;
@@ -1337,6 +1353,10 @@ function SS.LayoutXpSegments()
 	local xp = MainMenuExpBar;
 	if ( not xp ) then return; end
 	local seg = getglobal("SlimSuiteXpSegments");
+	if ( SS.DB().frameDefault and SS.DB().frameDefault.MainMenuExpBar ) then
+		if ( seg ) then seg:Hide(); end
+		return;
+	end
 	if ( not seg ) then
 		seg = CreateFrame("Frame", "SlimSuiteXpSegments", xp);
 		seg:SetAllPoints(xp);
@@ -1426,6 +1446,7 @@ function SS.StyleExpBar(on)
 end
 
 ApplyMovableOrientation = function(name)
+	if ( SS.DB().frameDefault and SS.DB().frameDefault[name] and name ~= "BuffFrame" ) then return; end
 	local orientation = SS.CurrentOrientation(name);
 	if ( name == "MainMenuBar" ) then
 		local d = SS.DB();
@@ -1618,15 +1639,21 @@ function SS.Place(name, ignoreAnchor)
 	if ( (name == "PartyMemberFrame1" or name == "SlimSuitePartyLines") and SS.Shown("PartyMemberFrame1") == name ) then
 		local lockTo = getglobal(SS.Shown("PlayerFrame")) or PlayerFrame;
 		if ( SS.DB().partyLocked and not SS.DB().partyIncludesSelf and lockTo ) then
+			local pl, pr = RootBounds(SS.UnitPortrait(lockTo));
+			local fl = RootBounds(f);
+			local il, ir = RootBounds(SS.UnitPortrait(f));
+			local ll = RootBounds(lockTo);
+			local factor = RootFactor(f) or 1;
+			local offset = (pl and pr and fl and il and ir and ll) and ((pl + pr) / 2 - ll - ((il + ir) / 2 - fl)) / factor or 0;
 			f:ClearAllPoints();
 			if ( SS.DB().partyLockAbove ) then
 				-- the whole party block (all four places, filled or not, stacked or in a row) sits just above the player
 				-- frame, so it never grows down over it when someone joins
 				local factor = RootFactor(f);
 				if ( not factor or factor <= 0 ) then factor = 1; end
-				f:SetPoint("TOPLEFT", lockTo, "TOPLEFT", 0, (6 + SS.PartyBlockDepth(f)) / factor);
+				f:SetPoint("TOPLEFT", lockTo, "TOPLEFT", offset, (6 + SS.PartyBlockDepth(f)) / factor);
 			else
-				f:SetPoint("TOPLEFT", lockTo, "BOTTOMLEFT", 0, -6);
+				f:SetPoint("TOPLEFT", lockTo, "BOTTOMLEFT", offset, -6 / factor);
 			end
 			return;
 		end
@@ -1784,6 +1811,16 @@ end
 
 -- "Buffs on the target frame": the buff frame joins the target frame, above or below it, at the target's scale, and
 -- loses its own handle while joined. It is shown in both frames' right-click menus and in the setup's steps.
+function SS.UnitPortrait(frame)
+	if ( not frame ) then return nil; end
+	local name = frame.GetName and frame:GetName();
+	local native = name == "PlayerFrame" and getglobal("PlayerPortrait") or (type(name) == "string" and getglobal(name .. "Portrait"));
+	for _, region in pairs({ frame.portrait, frame.model, native }) do
+		if ( region and region.GetLeft and type(region:GetLeft()) == "number" and (not region.IsShown or region:IsShown()) ) then return region; end
+	end
+	return frame;
+end
+
 function SS.AttachBuffs()
 	local P, T = SS.Pair();
 	local anchor = SS.DB().buffsOnTarget and T or (SS.DB().buffsOnPlayer and P) or nil;
@@ -1805,7 +1842,9 @@ function SS.AttachBuffs()
 	end
 	BuffFrame:ClearAllPoints();
 	if ( SS.DB().partyIncludesSelf and (side == "left" or side == "right") ) then side = "above"; end   -- in the party: above your plate
-	if ( side == "above" ) then BuffFrame:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT", x, 2);
+	if ( side == "above" ) then
+		local portrait = SS.DB().partyIncludesSelf and anchor or SS.UnitPortrait(anchor);
+		BuffFrame:SetPoint("BOTTOMLEFT", portrait, "TOPLEFT", portrait == anchor and x or 0, 2);
 	elseif ( side == "left" ) then BuffFrame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -4, 0);
 	elseif ( side == "right" ) then BuffFrame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 4, 0);
 	else BuffFrame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x, -2); end

@@ -45,6 +45,15 @@ for locale, values in pairs(extra) do for key, value in pairs(values) do SS.LOCA
 SS.LOCALE_TEXT.esES["Demo (Right click element name to modify settings)"] = "Demo (Clic derecho en el nombre del elemento para modificar sus ajustes)";
 SS.LOCALE_TEXT.frFR["Demo (Right click element name to modify settings)"] = "Démo (clic droit sur le nom d’un élément pour modifier ses réglages)";
 SS.LOCALE_TEXT.deDE["Demo (Right click element name to modify settings)"] = "Demo (Elementnamen rechtsklicken, um Einstellungen zu ändern)";
+SS.LOCALE_TEXT.esES["(Right click element to change settings)"] = "(Clic derecho en el elemento para cambiar ajustes)";
+SS.LOCALE_TEXT.frFR["(Right click element to change settings)"] = "(Clic droit sur un élément pour modifier ses réglages)";
+SS.LOCALE_TEXT.deDE["(Right click element to change settings)"] = "(Element rechtsklicken, um Einstellungen zu ändern)";
+SS.LOCALE_TEXT.frFR["Buffs/Debuffs on the player frame"] = "Améliorations et affaiblissements sur le cadre du joueur";
+SS.LOCALE_TEXT.deDE["Buffs/Debuffs on the player frame"] = "Stärkungs- und Schwächungseffekte am Spielerfenster";
+SS.LOCALE_TEXT.frFR["Target buffs/debuffs position"] = "Position des améliorations et affaiblissements de la cible";
+SS.LOCALE_TEXT.deDE["Target buffs/debuffs position"] = "Position der Stärkungs- und Schwächungseffekte des Ziels";
+SS.LOCALE_TEXT.frFR["The game's own layout"] = "Disposition d’origine du jeu";
+SS.LOCALE_TEXT.deDE["The game's own layout"] = "Das ursprüngliche Layout des Spiels";
 SS.LOCALE_TEXT.esES["Default profiles"] = "Perfiles predeterminados";
 SS.LOCALE_TEXT.esES["Profiles you provide will appear here."] = "Los perfiles que proporciones aparecerán aquí.";
 SS.LOCALE_TEXT.esES["Profile slot"] = "Espacio de perfil";

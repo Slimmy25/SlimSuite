@@ -2,7 +2,18 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
-## Unreleased
+## 1.31
+- Reviewed enemy-nameplate lifetime and projection handling: failed catalog reads cannot corrupt live records, pooled plates reuse their children, projections match anchor IDs and scale, and stale/missing projections hide immediately. Catalog failures back off instead of retrying every frame.
+- Default restores native frame scaling, buff icon anchors, party-member anchors and XP-bar parenting/orientation; opening setup no longer immediately detaches a Default XP bar again. Explicit Disabled/Default choices prevent legacy native-HUD auto-adoption.
+- Profiles retain additional HUD settings, minimap button placement and native-layout ownership. Exports have stable ordering; imports reject invalid types, non-finite/excessive geometry, incomplete sizes and cyclic anchors before applying.
+- Cached unchanged display-template calculations and foreground registrations; reused profile snapshots during automatic saves. Absorb overlays stay inside health bars and allocate no controls while disabled.
+- Low-health warnings repeat while health remains low, stop at death/recovery and retain the five-second minimum interval. Localized boss/Guardian tally labels and filled three missing French/German labels. Diagnostics no longer invent a stale installed version when metadata is unavailable.
+- Added code-audit regressions, localized smoke checks and fail-fast module/startup checks; corrected the mock client's frame-name identity.
+- Pending custom-profile edits flush at logout. Unavailable cache data no longer triggers a chest-opening sound.
+- Demo controls now read Demo / On / Off followed by the right-click settings hint. Both minimap shapes retain the native map title and close button; enabling the minimap restores visible map opacity instead of caching setup's hidden state.
+- Enabled immediately selects movable/custom mode and clears the old immovable flag. Attached party portraits align with the player's portrait center instead of frame padding. Selecting player buffs enables Buffs and makes above-frame rows grow upward.
+- Unit-card refreshes keep native and New-school versions mutually exclusive during setup, including when changing only Target's style. Disabled custom player/target cards cannot reappear on a timer refresh.
+- Removed the unsuccessful Move to begin foreground-layer workaround from 1.30. Enabled starting HUD values remain visible before movement.
 
 ## 1.30
 - During Move to begin, register Slim Suite HUD, setup windows, move handles, and enabled managed native elements with the game's foreground overlay API; restore temporary registrations when leaving ready. Rendering above the native prompt still requires an in-game check.

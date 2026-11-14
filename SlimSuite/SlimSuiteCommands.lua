@@ -27,12 +27,17 @@ function SS.NativeIsOff(part)
 end
 function SS.AdoptHiddenNatives()
 	local d = SS.DB();
+	if ( SS.firstRunSetupPending and not d.setupDone ) then return; end
 	d.nativeAdopted = type(d.nativeAdopted) == "table" and d.nativeAdopted or {};
 	local turned = {};
 	for part, r in pairs(SS.NATIVE_REPLACEMENTS) do
 		local key = SS.NATIVE_KEYS[part];
 		local ours = key and d[key] ~= nil;                      -- Slim Suite hid it (and has not put it back yet)
-		if ( not ours and not d.nativeAdopted[part] and SS.NativeIsOff(part) and not d[r[1]] ) then
+		local explicit;
+		for frame, nativePart in pairs(SU.NATIVE_PARTS) do
+			if ( nativePart == part and d.elementModes[frame] ~= nil ) then explicit = true; break; end
+		end
+		if ( not explicit and not ours and not d.nativeAdopted[part] and SS.NativeIsOff(part) and not d[r[1]] ) then
 			d[r[1]] = true; d.nativeAdopted[part] = true;
 			SS.Safe(r[3]);
 			table.insert(turned, r[2]);
@@ -104,13 +109,18 @@ end);
 -- A layout is everything about where the UI sits and how it looks: places, sizes, scales, padding, layouts, hidden
 -- elements and the frame looks. Layouts are saved by name (/slim layout save <name>), loaded again, shared as one line
 -- of text (the Layouts window), and can be kept apart for each character.
-SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes" };
+SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes", "frameDefault", "minimap" };
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
 	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare", "minimapTransparent",
 	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments", "showAbsorbs",
 	"enemyNameplates", "modernEnemyFrames", "enemyBossesOnly", "enemyPlateDebuffs",
-	"encounterBarThickness", "encounterNameAlign", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion" };
+	"encounterBarThickness", "encounterNameAlign", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion",
+	"targetAuraSide", "targetDebuffs", "clockDetached", "showEmptyActionSlots", "cooldowns",
+	"partyMemberBuffs", "localClock24", "localClockBackground", "showGuardianFlag",
+	"tallyBossKills", "tallyBackground", "zoneLine", "encounterDebuffs", "procMeter",
+	"minimapCaches", "minimapBosses", "minimapLairs", "combatTextBox", "ctHeals", "ctCrits", "ctIcons", "ctLong", "ctPop",
+	"replaceClock", "replaceEncounters", "replaceTally", "replaceBanners", "replaceBuildRows", "replaceRevive", "replaceLocalClock", "moveLevelButton", "moveMeter" };
 function SS.CopyTable(t)
 	local out = {};
 	for k, v in pairs(t) do
@@ -145,14 +155,20 @@ function SS.LayoutApply(layout, quiet)
 		local key = SS.LAYOUT_KEYS[i];
 		d[key] = layout[key];
 	end
-	d.frameDefault = nil;
 	SS.PrepareDB(d);                                       -- anything the layout did not carry gets its default
+	-- Older profile strings omitted this derived native-layout state.
+	for frame, mode in pairs(d.elementModes) do
+		if ( SU and SU.NATIVE[frame] ) then d.frameDefault[frame] = mode == "default" and true or nil; end
+	end
+	for frame, native in pairs(d.frameDefault) do
+		if ( native and SU and SU.NATIVE[frame] ) then SS.Safe(SU.SetMovable, frame, false); end
+	end
 	if ( not quiet ) then
 		-- elements with no place in this layout go back to where they started
 		for i = 1, table.getn(MOVABLE) do
 			local name = MOVABLE[i][1];
 			local frame, points, base = getglobal(name), basePoints[name], baseSizes[name];
-			if ( frame and name ~= "GameTooltip" ) then
+			if ( frame and name ~= "GameTooltip" and not d.frameDefault[name] ) then
 				if ( points and type(d.places[name]) ~= "table" ) then
 					frame:ClearAllPoints();
 					for j = 1, table.getn(points) do local p = points[j]; frame:SetPoint(p[1], p[2], p[3], p[4], p[5]); end
@@ -164,6 +180,7 @@ function SS.LayoutApply(layout, quiet)
 		SS.Startup(false, false);
 		SS.Safe(SS.SetUnlocked, false, true);
 		SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments);
+		if ( SS.Mini ) then SS.Safe(SS.Mini.Place); end
 		SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.PlainBar, d.plainBar and true or false);
 		for i = 1, table.getn(MOVABLE) do SS.Safe(ApplyFeatureMute, MOVABLE[i][1]); end
 		SS.Safe(SS.UpdateTally); SS.Safe(SS.UpdateClock); SS.Safe(SS.UpdateBossFrames); SS.Safe(SS.ApplyBuffOrientation);
@@ -187,10 +204,46 @@ function SS.LayoutText(layout)
 	end
 	for i = 1, table.getn(SS.LAYOUT_TABLES) do Add(SS.LAYOUT_TABLES[i], layout[SS.LAYOUT_TABLES[i]]); end
 	for i = 1, table.getn(SS.LAYOUT_KEYS) do Add(SS.LAYOUT_KEYS[i], layout[SS.LAYOUT_KEYS[i]]); end
+	-- A stable order makes exports comparable and avoids false changes in automatic profile saves.
+	table.remove(parts, 1); table.sort(parts); table.insert(parts, 1, "SSL1");
 	return table.concat(parts, ";");
 end
--- reads that text back; only the parts a layout is made of are taken (nil if it is not a layout)
+local layoutStrings = { playerLook=true, targetLook=true, partyLook=true, buffsOnTargetSide=true,
+	buffsOnPlayerSide=true, buffGrowthDirection=true, gatherSide=true, encounterBarThickness=true,
+	encounterNameAlign=true, targetAuraSide=true };
+local function ValidLayoutLeaf(root, keys, value)
+	local depth = table.getn(keys);
+	if ( depth == 1 ) then return type(value) == (layoutStrings[root] and "string" or "boolean"); end
+	if ( root == "elementModes" ) then return depth == 2 and (value == "enabled" or value == "disabled" or value == "default"); end
+	if ( root == "orientations" ) then return depth == 2 and (value == "horizontal" or value == "vertical"); end
+	if ( root == "muted" or root == "enabledElements" or root == "frameDefault" ) then return depth == 2 and type(value) == "boolean"; end
+	if ( root == "scales" or root == "padding" ) then return depth == 2 and type(value) == "number" and (root == "scales" and value > 0 and value <= 10 or root == "padding" and value >= 0 and value <= 1000); end
+	if ( root == "sizes" ) then return depth == 3 and (keys[3] == "w" or keys[3] == "h") and type(value) == "number" and value > 0 and value <= 100000; end
+	if ( root == "minimap" ) then
+		if ( depth ~= 2 ) then return false; end
+		if ( keys[2] == "hide" or keys[2] == "detached" ) then return type(value) == "boolean"; end
+		return (keys[2] == "angle" or keys[2] == "x" or keys[2] == "y") and type(value) == "number" and math.abs(value) <= 10000000;
+	end
+	if ( root == "places" or root == "chatOffsets" ) then
+		local field = keys[3];
+		if ( depth == 4 and field == "screen" ) then
+			local key = keys[4];
+			return type(value) == "number" and ((key == "width" or key == "height") and value > 0 or key == "left" or key == "bottom");
+		end
+		if ( depth ~= 3 ) then return false; end
+		if ( field == "displayDefault" ) then return type(value) == "boolean"; end
+		if ( field == "coordinateSpace" ) then return value == "uiParent"; end
+		if ( field == "relative" ) then return type(value) == "string" and value ~= keys[2]; end
+		if ( field == "point" or field == "relativePoint" ) then
+			return type(value) == "string" and (value == "CENTER" or value == "TOP" or value == "BOTTOM" or value == "LEFT" or value == "RIGHT" or value == "TOPLEFT" or value == "TOPRIGHT" or value == "BOTTOMLEFT" or value == "BOTTOMRIGHT");
+		end
+		return (field == "x" or field == "y" or field == "dx" or field == "dy") and type(value) == "number" and math.abs(value) <= 10000000;
+	end
+	return false;
+end
+-- Read only the profile schema, rejecting wrong types before they can reach native frame APIs.
 function SS.LayoutFromText(text)
+	if ( type(text) ~= "string" or string.len(text) > 500000 ) then return nil; end
 	text = string.gsub(tostring(text or ""), "%s+", "");
 	if ( string.sub(text, 1, 5) ~= "SSL1;" ) then return nil; end
 	local allowed = {};
@@ -201,9 +254,11 @@ function SS.LayoutFromText(text)
 	for path, kind, raw in string.gfind(string.sub(text, 6), "([^;=]+)=([nsb])([^;]*)") do
 		local value;
 		if ( kind == "n" ) then value = tonumber(raw); elseif ( kind == "b" ) then value = raw == "1"; else value = raw; end
+		if ( (kind == "n" and (not value or value ~= value or value == math.huge or value == -math.huge)) or (kind == "b" and raw ~= "0" and raw ~= "1") ) then return nil; end
 		local keys = {};
 		for key in string.gfind(path, "[^%.]+") do table.insert(keys, key); end
 		local root = keys[1];
+		if ( allowed[root] and not ValidLayoutLeaf(root, keys, value) ) then return nil; end
 		if ( value ~= nil and allowed[root] == "value" and table.getn(keys) == 1 ) then
 			out[root] = value; count = count + 1;
 		elseif ( value ~= nil and allowed[root] == "table" and table.getn(keys) >= 2 and table.getn(keys) <= 4 ) then
@@ -216,6 +271,15 @@ function SS.LayoutFromText(text)
 		end
 	end
 	if ( count == 0 ) then return nil; end
+	for _, size in pairs(out.sizes) do if ( not size.w or not size.h ) then return nil; end end
+	-- Native SetPoint rejects indirect self-anchors too.
+	for name in pairs(out.places) do
+		local seen, current = {}, name;
+		while ( current and out.places[current] ) do
+			if ( seen[current] ) then return nil; end
+			seen[current] = true; current = out.places[current].relative;
+		end
+	end
 	return out;
 end
 function SS.LayoutNames()
@@ -256,9 +320,10 @@ end
 function SS.TrackActiveCustomProfile()
 	local name = SS.activeCustomProfile;
 	if ( not name or type(SS.DB().layouts[name]) ~= "table" ) then return; end
-	local text = SS.LayoutText(SS.LayoutSnapshot());
+	local snapshot = SS.LayoutSnapshot();
+	local text = SS.LayoutText(snapshot);
 	if ( text ~= SS.activeCustomProfileText ) then
-		SS.DB().layouts[name] = SS.LayoutSnapshot();
+		SS.DB().layouts[name] = snapshot;
 		SS.activeCustomProfileText = text;
 	end
 end
@@ -311,6 +376,7 @@ function SS.LayoutLogin()
 	d.layoutOwner = key;
 end
 function SS.LayoutLogout()
+	SS.Safe(SS.TrackActiveCustomProfile); -- Flush edits made since the last one-second autosave tick.
 	local d = SS.DB();
 	if ( not d.layoutPerCharacter ) then return; end
 	local key = d.layoutOwner or SS.LayoutCharacter();

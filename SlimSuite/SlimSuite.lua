@@ -516,7 +516,8 @@ local lowHealthLastPlayed = -10;
 local function PlayLowHealthSound()
 	if ( not SS.DB().lowHealthSound or not UnitHealth or not UnitHealthMax or not PlaySoundFile ) then return; end
 	local maximum = UnitHealthMax("player") or 0;
-	if ( maximum <= 0 or (UnitHealth("player") or maximum) / maximum > 0.30 ) then return; end
+	local health = UnitHealth("player") or maximum;
+	if ( maximum <= 0 or health <= 0 or health / maximum > 0.30 or (UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")) ) then return; end
 	local now = GetTime and GetTime() or 0;
 	if ( now - lowHealthLastPlayed < 5 ) then return; end
 	lowHealthLastPlayed = now;
@@ -529,6 +530,8 @@ lowHealthEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
 lowHealthEvents:SetScript("OnEvent", function()
 	if ( event == "PLAYER_ENTERING_WORLD" or arg1 == "player" ) then SS.Safe(PlayLowHealthSound); end
 end);
+-- Health can remain low without another UNIT_HEALTH event. Repeat gently until it recovers.
+SS.Every("lowHealthAlert", 0.25, PlayLowHealthSound);
 
 
 -- ---------------------------------------------------------------- moving the UI, and the target frame
@@ -999,8 +1002,8 @@ function SS.TallyParts(run, sample, ready)
 		if ( sample ) then bosses, guardians = run.bosses, run.guardians;
 		elseif ( ready ) then bosses, guardians = 0, 0;
 		elseif ( run and SlimSuiteWorld and SlimSuiteWorld.RunKills ) then bosses, guardians = SlimSuiteWorld.RunKills(); end
-		table.insert(parts, { "Bosses", SS.TallyValue(bosses) });
-		table.insert(parts, { "Guardians", SS.TallyValue(guardians) });
+		table.insert(parts, { SS.T("Bosses"), SS.TallyValue(bosses) });
+		table.insert(parts, { SS.T("Guardians"), SS.TallyValue(guardians) });
 	end
 	table.insert(parts, { SS.T("Gold"), SS.TallyValue(run and run.gold) });
 	table.insert(parts, { SS.T("cache"), SS.TallyValue(run and run.chest), true });   -- the game draws all of it in gold
