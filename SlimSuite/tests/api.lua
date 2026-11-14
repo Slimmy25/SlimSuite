@@ -115,7 +115,7 @@ local SU = upv(SS.SetupHide, "SU")
 SS.StartSetup(true); Tick(3)
 SS.SetPartySelf(true); Tick(2); SU.RefreshBar()
 local b = SU.barButtons and SU.barButtons.PlayerFrame
-check("player frame default state identifies its party parent", b and b.states[3]:GetFontString():GetText() == "Default" and b.nameHit.parentTitle == "Party frames")
+check("player frame default state identifies its party parent", b and b.states[3].text == "Default" and b.nameHit.parentTitle == "Party frames")
 SS.SetPartySelf(false); SS.SetupEnd(true); Tick(2)
 print("connected problems: " .. bad)
 -- you in the party: buffs start at your plate's top-left and grow to the right, wrapping into rows
@@ -221,6 +221,7 @@ local hud = { clock = false }
 AZS_IsHudShown = function(p) return hud[p] ~= false end
 AZS_SetHudShown = function(p, on) hud[p] = on end
 SS.DB().replaceClock = false; SS.DB().nativeAdopted = nil; SS.DB().clockNativeOriginal = nil
+SS.DB().replaceTally = false
 SS.AdoptHiddenNatives()
 check("the game's run clock off: Slim Suite's is on", SS.DB().replaceClock == true)
 check("parts still shown are left alone", not SS.DB().replaceTally)
