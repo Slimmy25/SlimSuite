@@ -4,6 +4,13 @@ Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## Unreleased
 
+## 1.24
+- Expanded HUD profiles with named save/apply/delete, single-layout import/export, and portable bundles for all named profiles; per-character layout support remains available.
+- Added a display-aware recommended HUD preset action that repositions enabled elements using the selected aspect-ratio template while leaving Default and Disabled elements alone.
+- Added encounter bar thickness and name-alignment controls, plus accessibility settings for high contrast, larger encounter names, and reduced floating-text motion.
+- Added a diagnostics and compatibility view with addon/game versions, detected display template, saved profile count, and relevant Azeroth Survivors API availability.
+- Slim Suite's patch version now appears in Settings, diagnostics, and the minimap-button tooltip.
+
 ## 1.23
 - Automatic display layouts select among standard, ultrawide and portrait templates, keeping the reference HUD positions proportional to the viewport.
 - Element sizes follow screen height with narrower-screen density adjustments; custom size multipliers remain relative to the automatic size.

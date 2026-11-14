@@ -9,6 +9,14 @@
 SS = SS or {};
 local MAX_ENTRIES = 200;
 
+function SS.AddonVersion()
+	if ( GetAddOnMetadata ) then
+		local ok, value = pcall(GetAddOnMetadata, "SlimSuite", "Version");
+		if ( ok and type(value) == "string" and value ~= "" ) then return value; end
+	end
+	return "1.23";
+end
+
 -- GetEffectiveScale is missing on a few legacy UI regions and third-party minimap controls.
 -- Use it when available, then reconstruct the inherited scale from the frame tree.
 function SS.EffectiveScale(frame, seen)

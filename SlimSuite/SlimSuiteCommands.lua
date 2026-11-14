@@ -92,7 +92,8 @@ SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "mu
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
 	"partyFaces", "cardPortraits", "tallyVertical", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare", "minimapTransparent",
-	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments" };
+	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments",
+	"encounterBarThickness", "encounterNameAlign", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion" };
 function SS.CopyTable(t)
 	local out = {};
 	for k, v in pairs(t) do
@@ -207,6 +208,38 @@ function SS.LayoutNames()
 	table.sort(names);
 	return names;
 end
+function SS.LayoutBundleText()
+	local names=SS.LayoutNames();
+	if ( table.getn(names)==0 ) then return nil; end
+	local parts={"SSP1"};
+	for i=1,table.getn(names) do
+		local name=names[i];
+		if ( not string.find(name,"\n",1,true) and type(SS.DB().layouts[name])=="table" ) then
+			table.insert(parts,name); table.insert(parts,SS.LayoutText(SS.DB().layouts[name]));
+		end
+	end
+	return table.concat(parts,"\n");
+end
+function SS.LayoutBundleFromText(text)
+	text=tostring(text or "");
+	text=string.gsub(text,"\r\n","\n"); text=string.gsub(text,"\r","\n");
+	if ( string.len(text)>500000 or string.sub(text,1,5)~="SSP1\n" ) then return nil; end
+	local imported,cursor={},6;
+	while ( cursor<=string.len(text) ) do
+		local nameEnd=string.find(text,"\n",cursor,true);
+		if ( not nameEnd ) then return nil; end
+		local name=string.sub(text,cursor,nameEnd-1);
+		local dataStart=nameEnd+1;
+		local dataEnd=string.find(text,"\n",dataStart,true) or (string.len(text)+1);
+		local serialized=string.sub(text,dataStart,dataEnd-1);
+		local layout=SS.LayoutFromText(serialized);
+		if ( name=="" or string.sub(name,1,5)=="char:" or not layout ) then return nil; end
+		imported[name]=layout;
+		cursor=dataEnd+1;
+	end
+	if ( next(imported)==nil ) then return nil; end
+	return imported;
+end
 -- each character's own layout: kept when that character logs out, put back when it logs in
 function SS.LayoutCharacter()
 	local who = UnitName and UnitName("player");
@@ -237,35 +270,140 @@ end
 function SS.ShowLayoutWindow()
 	local f = getglobal("SlimSuiteLayoutFrame");
 	if ( not f ) then
-		f = K.Window("SlimSuiteLayoutFrame", "Slim Suite layouts", 520, 250);
+		f = K.Window("SlimSuiteLayoutFrame", "Profiles & import/export", 650, 430);
 		local note = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		note:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -34); note:SetWidth(470); note:SetJustifyH("LEFT");
-		note:SetText(SS.T("This is your layout as text. Copy it (Ctrl+C) to share it, or paste a layout over it (Ctrl+V) and press Use this layout. Saved layouts: /slim layout save <name>, load <name>, list, delete <name>."));
+		note:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -36); note:SetWidth(600); note:SetJustifyH("LEFT");
+		note:SetText(SS.T("Save named HUD profiles, apply one later, or copy a layout string to share it. Per-character layouts can be enabled in Settings."));
+		local profileTitle=f:CreateFontString(nil,"OVERLAY","GameFontNormal");
+		profileTitle:SetPoint("TOPLEFT",f,"TOPLEFT",24,-68); profileTitle:SetText(SS.T("Saved profiles"));
+		f.profileName=CreateFrame("EditBox","SlimSuiteProfileName",f);
+		f.profileName:SetPoint("TOPLEFT",f,"TOPLEFT",24,-90); f.profileName:SetWidth(165); f.profileName:SetHeight(22);
+		f.profileName:SetAutoFocus(false); f.profileName:SetFontObject(GameFontHighlightSmall); f.profileName:SetMaxLetters(32);
+		f.profileName:SetTextInsets(5,5,2,2); f.profileName:SetBackdrop({bgFile="Interface\\Tooltips\\UI-Tooltip-Background",edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",tile=true,tileSize=16,edgeSize=12,insets={left=3,right=3,top=3,bottom=3}});
+		f.profileName:SetBackdropColor(0.03,0.03,0.05,1);
+		f.profileName:SetScript("OnEscapePressed",function() this:ClearFocus(); end);
 		local scroll = CreateFrame("ScrollFrame", "SlimSuiteLayoutScroll", f, "UIPanelScrollFrameTemplate");
-		scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -78);
-		scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -42, 50);
+		scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 212, -68);
+		scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -40, 65);
 		local box = CreateFrame("EditBox", "SlimSuiteLayoutBox", scroll);
 		box:SetMultiLine(true); box:SetAutoFocus(false); box:SetFontObject(GameFontHighlightSmall);
-		box:SetWidth(450); box:SetMaxLetters(0);
+		box:SetWidth(390); box:SetHeight(700); box:SetMaxLetters(0);
 		box:SetScript("OnEscapePressed", function() this:ClearFocus(); end);
 		scroll:SetScrollChild(box);
 		f.box = box;
-		local use = K.Button(f, "Use this layout", 130, function()
-			local layout = SS.LayoutFromText(f.box:GetText());
-			if ( not layout ) then K.Print(NAME, "that text is not a Slim Suite layout."); return; end
+		local profileScroll=CreateFrame("ScrollFrame","SlimSuiteProfileScroll",f,"UIPanelScrollFrameTemplate");
+		profileScroll:SetPoint("TOPLEFT",f,"TOPLEFT",24,-164); profileScroll:SetPoint("BOTTOMRIGHT",f,"BOTTOMLEFT",194,62);
+		local profileChild=CreateFrame("Frame",nil,profileScroll); profileChild:SetWidth(160); profileChild:SetHeight(20); profileScroll:SetScrollChild(profileChild);
+		f.profileButtons={};
+		f.RefreshProfiles=function()
+			for i=1,table.getn(f.profileButtons) do f.profileButtons[i]:Hide(); end
+			local names=SS.LayoutNames();
+			for i=1,table.getn(names) do
+				local name=names[i]; local b=f.profileButtons[i];
+				if ( not b ) then b=K.Button(profileChild,"",158,function()
+					f.selectedProfile=this.profileName;
+					f.profileName:SetText(this.profileName);
+					f.box:SetText(SS.LayoutText(SS.DB().layouts[this.profileName]));
+				end); f.profileButtons[i]=b; end
+				b.profileName=name; b:SetText(name); b:ClearAllPoints(); b:SetPoint("TOPLEFT",profileChild,"TOPLEFT",0,-((i-1)*23)); b:Show();
+			end
+			profileChild:SetHeight(math.max(20,table.getn(names)*23));
+			if ( profileScroll.UpdateScrollChildRect ) then profileScroll:UpdateScrollChildRect(); end
+		end;
+		local save=K.Button(f,"Save current as profile",158,function()
+			local name=string.gsub(f.profileName:GetText() or "","^%s*(.-)%s*$","%1");
+			if ( name=="" or string.sub(name,1,5)=="char:" ) then K.Print(NAME,"enter a profile name (char: names are reserved). "); return; end
+			SS.DB().layouts[name]=SS.LayoutSnapshot(); f.selectedProfile=name; f.box:SetText(SS.LayoutText(SS.DB().layouts[name])); f.RefreshProfiles();
+			K.Print(NAME,"profile \""..name.."\" saved.");
+		end);
+		save:SetPoint("TOPLEFT",f,"TOPLEFT",26,-115);
+		local exportAll=K.Button(f,"Export all profiles",158,function()
+			local bundle=SS.LayoutBundleText();
+			if ( not bundle ) then K.Print(NAME,"there are no named profiles to export yet."); return; end
+			f.box:SetText(bundle); f.box:SetFocus(); if ( f.box.HighlightText ) then f.box:HighlightText(); end
+		end);
+		exportAll:SetPoint("TOPLEFT",f,"TOPLEFT",26,-139);
+		local apply=K.Button(f,"Apply selected",112,function()
+			local name=f.selectedProfile;
+			if ( not name or type(SS.DB().layouts[name])~="table" ) then K.Print(NAME,"select a saved profile first."); return; end
+			SS.LayoutApply(SS.DB().layouts[name]); K.Print(NAME,"profile \""..name.."\" applied.");
+		end);
+		apply:SetPoint("BOTTOMLEFT",f,"BOTTOMLEFT",24,20);
+		local del=K.Button(f,"Delete",72,function()
+			local name=f.selectedProfile;
+			if ( name and SS.DB().layouts[name] ) then SS.DB().layouts[name]=nil; f.selectedProfile=nil; f.RefreshProfiles(); f.box:SetText(""); K.Print(NAME,"profile deleted."); end
+		end);
+		del:SetPoint("LEFT",apply,"RIGHT",6,0);
+		local export=K.Button(f,"Export current",105,function()
+			f.box:SetText(SS.LayoutText(SS.LayoutSnapshot())); f.box:SetFocus(); if ( f.box.HighlightText ) then f.box:HighlightText(); end
+		end);
+		export:SetPoint("LEFT",del,"RIGHT",6,0);
+		local exportSelected=K.Button(f,"Export selected",104,function()
+			local name=f.selectedProfile;
+			if ( not name or type(SS.DB().layouts[name])~="table" ) then K.Print(NAME,"select a saved profile first."); return; end
+			f.box:SetText(SS.LayoutText(SS.DB().layouts[name])); f.box:SetFocus(); if ( f.box.HighlightText ) then f.box:HighlightText(); end
+		end);
+		exportSelected:SetPoint("LEFT",export,"RIGHT",6,0);
+		local use=K.Button(f,"Import / apply",120,function()
+			local bundle=SS.LayoutBundleFromText(f.box:GetText());
+			if ( bundle ) then
+				for name,layout in pairs(bundle) do SS.DB().layouts[name]=layout; end
+				f.RefreshProfiles(); K.Print(NAME,"the imported profile bundle is saved. Select a profile to apply it."); return;
+			end
+			local layout=SS.LayoutFromText(f.box:GetText());
+			if ( not layout ) then K.Print(NAME,"that text is not a Slim Suite layout."); return; end
 			SS.LayoutApply(layout);
-			K.Print(NAME, "the pasted layout is in use.");
+			local name=string.gsub(f.profileName:GetText() or "","^%s*(.-)%s*$","%1");
+			if ( name~="" and string.sub(name,1,5)~="char:" ) then SS.DB().layouts[name]=layout; f.selectedProfile=name; f.RefreshProfiles(); K.Print(NAME,"layout imported, applied and saved as profile \""..name.."\".");
+			else K.Print(NAME,"the imported layout is now in use. Enter a profile name and import again to save it."); end
 		end);
-		use:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 22, 18);
-		local mine = K.Button(f, "Show my layout", 130, function()
-			f.box:SetText(SS.LayoutText(SS.LayoutSnapshot()));
-			f.box:SetFocus(); if ( f.box.HighlightText ) then f.box:HighlightText(); end
-		end);
-		mine:SetPoint("LEFT", use, "RIGHT", 8, 0);
+		use:SetPoint("BOTTOMRIGHT",f,"BOTTOMRIGHT",-24,20);
 	end
-	f.box:SetText(SS.LayoutText(SS.LayoutSnapshot()));
+	f.RefreshProfiles();
+	if ( f.selectedProfile and SS.DB().layouts[f.selectedProfile] ) then f.box:SetText(SS.LayoutText(SS.DB().layouts[f.selectedProfile]));
+	else f.box:SetText(SS.LayoutText(SS.LayoutSnapshot())); end
 	f:Show();
-	f.box:SetFocus(); if ( f.box.HighlightText ) then f.box:HighlightText(); end
+end
+
+function SS.ShowDiagnosticsWindow()
+	local f=getglobal("SlimSuiteDiagnosticsFrame");
+	if ( not f ) then
+		f=K.Window("SlimSuiteDiagnosticsFrame","Diagnostics & compatibility",500,390);
+		local scroll=CreateFrame("ScrollFrame","SlimSuiteDiagnosticsScroll",f,"UIPanelScrollFrameTemplate");
+		scroll:SetPoint("TOPLEFT",f,"TOPLEFT",22,-42); scroll:SetPoint("BOTTOMRIGHT",f,"BOTTOMRIGHT",-40,54);
+		local box=CreateFrame("EditBox","SlimSuiteDiagnosticsText",scroll); box:SetMultiLine(true); box:SetAutoFocus(false); box:SetFontObject(GameFontHighlightSmall); box:SetWidth(425); box:SetHeight(360); box:SetMaxLetters(0); box:SetScript("OnEscapePressed",function() this:ClearFocus(); end); scroll:SetScrollChild(box); f.box=box;
+		local refresh=K.Button(f,"Refresh",90,function() SS.RefreshDiagnostics(); end); refresh:SetPoint("BOTTOMLEFT",f,"BOTTOMLEFT",24,18);
+		local errors=K.Button(f,"Error log",90,function() SS.ShowErrors(); end); errors:SetPoint("LEFT",refresh,"RIGHT",8,0);
+		local close=K.Button(f,"Close",90,function() f:Hide(); end); close:SetPoint("BOTTOMRIGHT",f,"BOTTOMRIGHT",-24,18);
+	end
+	SS.RefreshDiagnostics(); f:Show();
+end
+function SS.RefreshDiagnostics()
+	local f=getglobal("SlimSuiteDiagnosticsFrame"); if ( not f or not f.box ) then return; end
+	local game,build,buildDate,interface="unknown","unknown","unknown","unknown";
+	if ( GetBuildInfo ) then local ok,a,b,c,d=pcall(GetBuildInfo); if ( ok ) then game,build,buildDate,interface=a or game,b or build,c or buildDate,d or interface; end end
+	local locale=GetLocale and GetLocale() or "unknown";
+	local display=SS.DisplayContext and SS.DisplayContext();
+	local names=SS.LayoutNames and SS.LayoutNames() or {};
+	local function status(ok) return ok and SS.T("Available") or SS.T("Not detected (related integration may be unavailable)"); end
+	local lines={
+		SS.T("Slim Suite version:").." "..SS.AddonVersion(),
+		SS.T("Addon interface:").." 11200",
+		SS.T("Game client:").." "..tostring(game).."  |  "..SS.T("build").." "..tostring(build).."  |  "..SS.T("interface").." "..tostring(interface),
+		SS.T("Client locale:").." "..tostring(locale),
+		SS.T("Detected HUD template:").." "..tostring(display and display.template.id or "unknown").."  |  "..SS.T("screen").." "..tostring(display and (display.resolution[1].."x"..display.resolution[2]) or "unknown"),
+		SS.T("Saved named profiles:").." "..tostring(table.getn(names)).."  |  "..SS.T("per-character:").." "..(SS.DB().layoutPerCharacter and SS.T("on") or SS.T("off")),
+		"",
+		SS.T("Azeroth Survivors compatibility"),
+		SS.T("Run phase API (AZS_GetPhase):").." "..status(type(AZS_GetPhase)=="function"),
+		SS.T("Encounter data (AZS_UNITS):").." "..status(type(AZS_UNITS)=="table"),
+		SS.T("Damage meter snapshot (AZS_GetMeterSnapshot):").." "..status(type(AZS_GetMeterSnapshot)=="function"),
+		SS.T("Floating combat-text projection (AZS_ProjectCombatTextAnchors):").." "..status(type(AZS_ProjectCombatTextAnchors)=="function"),
+		SS.T("Combat-text event hook (AZS_RegisterCombatTextFrameHandler):").." "..status(type(AZS_RegisterCombatTextFrameHandler)=="function"),
+		"",
+		SS.T("This view reports detected client and game hooks. Missing optional hooks do not necessarily prevent Slim Suite's core HUD features from working."),
+	};
+	f.box:SetText(table.concat(lines,"\n"));
 end
 
 buffLayoutUpdater = CreateFrame("Frame");
@@ -508,6 +646,7 @@ okMini, errMini = SS.Safe(function()
 		click = function() SS.Toggle(); end,
 		tooltip = function(tt)
 			tt:AddLine(NAME);
+			tt:AddLine(SS.T("Addon version") .. " " .. SS.AddonVersion(), 0.95, 0.76, 0.3);
 			tt:AddLine("Gameplay helpers and UI controls.", 1, 1, 1);
 			tt:AddLine(" ");
 			tt:AddLine("Click: the settings. /slimsuite minimap hides this button.", 0.6, 0.6, 0.6);

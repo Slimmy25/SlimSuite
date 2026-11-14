@@ -173,6 +173,8 @@ SS.DEFAULTS = {
 	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
+	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false,
+	accessibilityLargeText = false, accessibilityReduceMotion = false,
 };
 SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
 	"itemRowSeen", "chatOffsets", "words", "layouts", "enabledElements", "elementModes" };

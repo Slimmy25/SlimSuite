@@ -46,6 +46,10 @@ function SS.DisplayContext()
 end
 function SS.DisplayEnabled(name)
  local element=SS.Element and SS.Element(name) or name;
+ if ( element == "GameTooltip" ) then
+  local d=SS.DB();
+  return (d.tooltipCustom or (d.elementModes and d.elementModes.GameTooltip=="enabled")) and true or false;
+ end
  return SU and SU.Mode and SU.Mode(element)=="enabled";
 end
 function SS.DisplayElementScale(name, base)
@@ -60,6 +64,42 @@ function SS.PlaceDisplayDefault(name, frame)
  frame:ClearAllPoints();
  frame:SetPoint(a[1], UIParent, "BOTTOMLEFT", (c.left+c.width*a[2])/f, (c.bottom+c.height*a[3])/f);
  return true;
+end
+function SS.ApplyRecommendedHUD()
+ if ( not SS.DisplayContext or not SS.DISPLAY_ANCHORS ) then return false; end
+ local d=SS.DB();
+ d.places=type(d.places)=="table" and d.places or {};
+ local applied, appliedElements=0, {};
+ for name in pairs(SS.DISPLAY_ANCHORS) do
+  if ( SS.DisplayEnabled(name) ) then
+   d.places[name]={ displayDefault=true };
+   local element=SS.Element and SS.Element(name) or name;
+   if ( not appliedElements[element] ) then appliedElements[element]=true; applied=applied+1; end
+  end
+ end
+ local context=SS.DisplayContext();
+ d.recommendedHudTemplate=context.template.id;
+ if ( PlaceAll ) then SS.Safe(PlaceAll); end
+ return applied, context;
+end
+function SS.ShowHUDRecommendation()
+ local f=getglobal("SlimSuiteHUDRecommendationFrame");
+ if ( not f ) then
+  f=K.Window("SlimSuiteHUDRecommendationFrame", "Recommended HUD preset", 430, 220);
+  f.note=f:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
+  f.note:SetPoint("TOPLEFT",f,"TOPLEFT",24,-48); f.note:SetWidth(380); f.note:SetHeight(78);
+  f.note:SetJustifyH("LEFT"); f.note:SetJustifyV("TOP");
+  local apply=K.Button(f,"Apply recommended positions",210,function()
+   local count, context=SS.ApplyRecommendedHUD();
+   f.note:SetText(string.format(SS.T("Applied %s preset for %sx%s. Repositioned %d enabled elements; Default and Disabled elements stayed in place. Save a profile first if you want an easy way back."),context.template.id,context.resolution[1],context.resolution[2],count));
+  end);
+  apply:SetPoint("BOTTOMLEFT",f,"BOTTOMLEFT",24,20);
+  local profiles=K.Button(f,"Profiles & import/export",170,function() f:Hide(); SS.ShowLayoutWindow(); end);
+  profiles:SetPoint("LEFT",apply,"RIGHT",8,0);
+ end
+ local context=SS.DisplayContext();
+ f.note:SetText(string.format(SS.T("Recommended HUD preset for this display: %s at %sx%s. Positions stay proportional to the reference HUD and sizes continue to follow screen height. Applying changes positions only for Enabled elements."),context.template.id,context.resolution[1],context.resolution[2]));
+ f:Show();
 end
 -- A resize is coalesced by this shared ticker. Dragging never triggers a rebuild.
 local previous;

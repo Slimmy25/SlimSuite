@@ -224,6 +224,13 @@ function SS.EncounterVertical()
 	return SS.DB().orientations.SlimSuiteBossFrames == "vertical";
 end
 
+function SS.EncounterBarThickness()
+	local value = SS.DB().encounterBarThickness;
+	if ( value == "compact" ) then return 8; end
+	if ( value == "thick" ) then return 16; end
+	return 12;
+end
+
 function SS.SetGameDefaultFont(fontString, size)
 	-- Slim Suite uses WoW's standard 1.12 UI typeface throughout, including custom HUD labels.
 	local defaultFont = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
@@ -331,6 +338,7 @@ function SS.UpdateEncounterRows(list)
 	local padding = SS.FramePadding("SlimSuiteBossFrames");
 	local gap = (vertical and 10 or 8) + padding;
 	local configured = SS.DB().sizes.SlimSuiteBossFrames;
+	local barThickness = SS.EncounterBarThickness();
 	-- Match the default boss target-frame scale shown in the reference: a readable, substantial
 	-- nameplate and health bar rather than a tiny floating strip. Cards still distribute evenly
 	-- when several enemies are active.
@@ -348,14 +356,18 @@ function SS.UpdateEncounterRows(list)
 	local cardWidth = math.max(minCardWidth, (frameWidth - (padding * 2) - ((across - 1) * gap)) / across);
 	frameWidth = across * cardWidth + ((across - 1) * gap) + (padding * 2);
 	local frameHeight = type(configured) == "table" and configured.h or (vertical and 252 or (count * 48));
-	local minimumHeight = vertical and cardMinH or math.max(count * 42 + padding * 2, cardMinH);
+	local minimumHeight = vertical and cardMinH or math.max(count * (24 + padding + barThickness + 4) + padding * 2, cardMinH);
 	frameHeight = math.max(minimumHeight, frameHeight);
 	bossFrame:SetWidth(frameWidth);
 	bossFrame:SetHeight(frameHeight);
 	local rowHeight = vertical and math.max(58, frameHeight - (padding * 2)) or math.max(42, (frameHeight - (padding * 2)) / count);
 	-- the rows are laid out again only when what decides their places changes (the bosses, their kinds, the size or
 	-- layout); otherwise only health and debuffs are drawn
-	local sig = (vertical and "v" or "h") .. padding .. "|" .. cardWidth .. "|" .. rowHeight;
+	local d = SS.DB();
+	local nameAlign = d.encounterNameAlign == "left" and "LEFT" or (d.encounterNameAlign == "right" and "RIGHT" or "CENTER");
+	local largeNames = d.accessibilityLargeText and true or false;
+	local highContrast = d.accessibilityContrast and true or false;
+	local sig = (vertical and "v" or "h") .. padding .. "|" .. cardWidth .. "|" .. rowHeight .. "|" .. nameAlign .. "|" .. barThickness .. "|" .. tostring(largeNames);
 	for i = 1, count do sig = sig .. "|" .. tostring(list[i].name) .. tostring(list[i].kind); end
 	local relayout = bossFrame.sig ~= sig;
 	bossFrame.sig = sig;
@@ -372,26 +384,27 @@ function SS.UpdateEncounterRows(list)
 		row:SetPoint("TOPLEFT", bossFrame, "TOPLEFT", vertical and (padding + ((i - 1) * (cardWidth + gap))) or padding, -(padding + (vertical and 0 or ((i - 1) * rowHeight))));
 		row.name:SetText(unit.name);
 		if ( vertical ) then
-			SS.SetGameDefaultFont(row.name, 8.5);
+			SS.SetGameDefaultFont(row.name, largeNames and 10.5 or 8.5);
 			local barTopOffset = 34 + padding;
 			-- Match the narrow, evenly spaced columns in the reference. Each boss name stays above its own bar.
 			row.name:SetWidth(cardWidth);
 			row.name:SetHeight(30);
+			row.name:SetJustifyH(nameAlign);
 			row.name:SetPoint("TOP", row, "TOP", 0, -(2 + padding));
 			if ( row.bar.SetOrientation ) then SS.Safe(row.bar.SetOrientation, row.bar, "VERTICAL"); end
-			row.bar:SetWidth(math.max(10, cardWidth - (padding * 2)));
+			row.bar:SetWidth(barThickness);
 			row.bar:SetHeight(math.max(18, rowHeight - barTopOffset - padding));
 			row.bar:SetPoint("TOP", row, "TOP", 0, -barTopOffset);
 		else
-			SS.SetGameDefaultFont(row.name, 14);
+			SS.SetGameDefaultFont(row.name, largeNames and 16 or 14);
 			row.name:SetWidth(cardWidth - 8 - (padding * 2));
 			row.name:SetHeight(22);
-			row.name:SetJustifyH("CENTER");
+			row.name:SetJustifyH(nameAlign);
 			row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 4 + padding, -(2 + padding));
 			if ( row.bar.SetOrientation ) then SS.Safe(row.bar.SetOrientation, row.bar, "HORIZONTAL"); end
 			local width = math.max(20, cardWidth - 8 - (padding * 2));
 			row.bar:SetWidth(unit.kind == "guardian" and math.max(20, width * 0.78) or width);
-			row.bar:SetHeight(12);
+			row.bar:SetHeight(barThickness);
 			row.bar:SetPoint("TOPLEFT", row, "TOPLEFT", 4 + padding, -(24 + padding));
 		end
 		end
@@ -402,10 +415,23 @@ function SS.UpdateEncounterRows(list)
 			SlimSuiteWorld.SetRaidIcon(row.mark, mark);
 			row.mark:ClearAllPoints();
 			if ( vertical ) then row.mark:SetPoint("BOTTOM", row.name, "TOP", 0, 0);
-			else row.mark:SetPoint("LEFT", row, "LEFT", 4 + padding, -(2 + padding) - 11); end
+			else
+				-- Keep the horizontal marker completely above the health bar. The previous center-relative
+				-- offset placed its lower half over the bar, especially on short rows.
+				row.mark:SetPoint("BOTTOMLEFT", row, "TOPLEFT", 4 + padding, -(23 + padding));
+			end
 			row.mark:Show();
 		else row.mark:Hide(); end
 		local health = math.max(0, math.min(1, unit.hp / unit.hpm));
+		if ( highContrast ) then
+			row.bar:SetStatusBarColor(1, 0.82, 0.12, 1);
+			row.bar.background:SetVertexColor(0.01, 0.01, 0.04, 1);
+			row.name:SetTextColor(1, 1, 1);
+		else
+			row.bar:SetStatusBarColor(0.9, 0.06, 0.025, 1);
+			row.bar.background:SetVertexColor(0.04, 0.015, 0.01, 0.9);
+			row.name:SetTextColor(1, 0.22, 0.16);
+		end
 		row.bar:SetMinMaxValues(0, 1);
 		row.bar:SetValue(health);
 		if ( SlimSuiteWorld and SlimSuiteWorld.DrawDebuffs ) then

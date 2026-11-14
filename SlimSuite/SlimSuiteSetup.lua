@@ -313,6 +313,16 @@ function SU.ChecksFor(frame)
 			{ "Party members' buffs above them", function() return SS.DB().partyMemberBuffs ~= false; end, function(v) SS.DB().partyMemberBuffs = v and true or false; SS.Safe(SS.UpdateFriendBuffs); end, short = "Friends' buffs" },
 			SelfParty(), YouIn(BuffsPlace()), YouIn(ProcMeter()), PartyPlace() },
 		SlimSuiteBossFrames = { { "Show debuffs on the bars", function() return SS.DB().encounterDebuffs; end, function(v) SS.DB().encounterDebuffs = v; end },
+			{ "Health bar thickness", function() return SS.DB().encounterBarThickness or "standard"; end,
+			function(v) SS.DB().encounterBarThickness = v; SS.Safe(SS.UpdateBossFrames); end,
+			choice = { { "Compact", "compact" }, { "Standard", "standard" }, { "Thick", "thick" } } },
+			{ "Name alignment", function() return SS.DB().encounterNameAlign or "center"; end,
+			function(v) SS.DB().encounterNameAlign = v; SS.Safe(SS.UpdateBossFrames); end,
+			choice = { { "Left", "left" }, { "Center", "center" }, { "Right", "right" } } },
+			{ "High-contrast bars", function() return SS.DB().accessibilityContrast; end,
+			function(v) SS.DB().accessibilityContrast = v and true or false; SS.Safe(SS.UpdateBossFrames); end },
+			{ "Larger encounter names", function() return SS.DB().accessibilityLargeText; end,
+			function(v) SS.DB().accessibilityLargeText = v and true or false; SS.Safe(SS.UpdateBossFrames); end },
 			{ "Vertical", function() return SS.DB().orientations.SlimSuiteBossFrames == "vertical"; end,
 			function(v) SS.DB().orientations.SlimSuiteBossFrames = v and "vertical" or "horizontal"; SS.DB().sizes.SlimSuiteBossFrames = nil; SS.Safe(SS.UpdateBossFrames); SS.Safe(PlaceAll); SU.UpdateDemo(); end } },
 		SlimSuiteTallyFrame = {
@@ -329,7 +339,8 @@ function SU.ChecksFor(frame)
 			{ "Crits: bigger and longer", function() return SS.DB().ctCrits ~= false; end, function(v) SS.DB().ctCrits = v and true or false; end },
 			{ "Spell icons", function() return SS.DB().ctIcons ~= false; end, function(v) SS.DB().ctIcons = v and true or false; end },
 			{ "Lines stay twice as long", function() return SS.DB().ctLong ~= false; end, function(v) SS.DB().ctLong = v and true or false; end },
-			{ "Crits and your biggest hits grow and fall away", short = "Big hits grow and fall", function() return SS.DB().ctPop ~= false; end, function(v) SS.DB().ctPop = v and true or false; end } },
+			{ "Crits and your biggest hits grow and fall away", short = "Big hits grow and fall", function() return SS.DB().ctPop ~= false; end, function(v) SS.DB().ctPop = v and true or false; end },
+			{ "Reduce floating-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end } },
 	};
 	local out = {};
 	-- "Movable?" belongs to the game's own frame: not offered while a card or the thin lines show the element
@@ -2069,6 +2080,8 @@ function SS.WinBuild()
 	K.Icon(hero.icon, "INV_Misc_Gear_02");
 	hero.heading:SetText("Slim Suite");
 	hero.line:SetText(SS.T("A Swiss-army knife of useful tools and UI controls."));
+	hero.version=hero:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
+	hero.version:SetPoint("TOPRIGHT",hero,"TOPRIGHT",-9,-8); hero.version:SetText("v"..SS.AddonVersion()); hero.version:SetTextColor(0.95,0.76,0.3);
 	local tabUi = K.Button(win, "Modifying the User Interface", 210, nil);
 	tabUi:SetPoint("TOPLEFT", win, "TOPLEFT", 20, -101);
 	local tabOther = K.Button(win, "New/Unique, But Minor Features", 210, nil);
@@ -2151,7 +2164,9 @@ function SS.WinBuild()
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
-			{button = "Layouts (share / paste)", onClick = function() SS.ShowLayoutWindow(); end},
+			{button = "Profiles & import/export", onClick = function() SS.ShowLayoutWindow(); end},
+			{button = "Recommended HUD preset", onClick = function() SS.ShowHUDRecommendation(); end},
+			{button = "Diagnostics & compatibility", onClick = function() SS.ShowDiagnosticsWindow(); end},
 			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
 			{head="Make the game's UI movable"},
 			{"Replace Default Level Up with Movable Version?", function() return SS.DB().moveLevelButton; end, function(v) SS.DB().moveLevelButton = v; SS.Safe(SS.UpdateLevelButton); end},
@@ -2201,6 +2216,12 @@ function SS.WinBuild()
 			{"Mark where a downed friend can be revived", function() return SS.DB().deathMarks; end, function(v) SS.DB().deathMarks = v; end},
 			{"Play a sound when you or a teammate dies", function() return SS.DB().deathSound; end, function(v) SS.DB().deathSound = v; end},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
+			{head="Accessibility"},
+			{"High-contrast encounter bars", function() return SS.DB().accessibilityContrast; end, function(v) SS.DB().accessibilityContrast = v and true or false; SS.Safe(SS.UpdateBossFrames); end},
+			{"Larger encounter names", function() return SS.DB().accessibilityLargeText; end, function(v) SS.DB().accessibilityLargeText = v and true or false; SS.Safe(SS.UpdateBossFrames); end},
+			{"Reduce floating combat-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end},
+			{head="Support"},
+			{button = "View diagnostics & compatibility", onClick = function() SS.ShowDiagnosticsWindow(); end},
 		}, -48, function(y) otherLastY = y; PlaceAddons(); end);
 	end
 	local function BuildAddonManager()
@@ -2312,7 +2333,8 @@ end
 SS.HELP = {
 	"/slim: the settings window.  /slim edit: move and size the UI (/slim lock when done).  /slim setup: the guided setup.",
 	"/slim demo: Demo Mode on or off.  /slim levelup: Slim Suite's Level Up button or the game's own.",
-	"/slim layout: share a layout as text.  /slim layout save <name>, load <name>, delete <name>, list.",
+	"/slim layout: manage named profiles and import/export layouts.  /slim layout save <name>, load <name>, delete <name>, list.",
+	"/slim hud: recommended positions for this display.  /slim diagnostics: client and game compatibility details.",
 	"/slim reset places, /slim reset all: back to where everything started.",
 	"/slim hide <words>, /slim unhide <words>, /slim hide: chat lines with those words.",
 	"/slim minimap: the gear button.  /slim errors: the error log.  /slim mouse: names the frame under the cursor.",
@@ -2341,6 +2363,10 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		K.Print(NAME, "chat lines with \"" .. rest .. "\" are shown again.");
 	elseif ( cmd == "errors" ) then
 		SS.ShowErrors();
+	elseif ( cmd == "diagnostics" or cmd == "compatibility" ) then
+		SS.ShowDiagnosticsWindow();
+	elseif ( cmd == "hud" or cmd == "recommend" ) then
+		SS.ShowHUDRecommendation();
 	elseif ( cmd == "mouse" ) then
 		SS.ToggleMouseProbe();
 	elseif ( cmd == "minimap" ) then

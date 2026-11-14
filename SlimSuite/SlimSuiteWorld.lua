@@ -734,7 +734,7 @@ local function MarkBig(e)
 	local best = 0;
 	for i = 1, table.getn(recentBest) do if ( recentBest[i] > best ) then best = recentBest[i]; end end
 	local top = table.getn(recentBest) >= 5 and e.amount >= best;
-	if ( (e.crit or top) and CTOn("ctPop") ) then
+	if ( (e.crit or top) and CTOn("ctPop") and not DB().accessibilityReduceMotion ) then
 		local normal = box.normalAvg or e.amount;
 		e.pop = math.max(1, math.min(4, e.amount / math.max(1, normal)));   -- 1 = a normal-sized hit, 4 = four times or more
 	end
@@ -1344,7 +1344,8 @@ local function DrawFloats()
 			local t = (now - e.born) / life;
 			local dist = tonumber(p.playerDistance);
 			local near = dist and math.max(0.6, math.min(1.25, 1.35 - dist / 90)) or 1;
-			local pop = (e.crit and t < 0.12) and (1.3 - t * 2.5) or 1;
+			local reduceMotion = DB().accessibilityReduceMotion and true or false;
+			local pop = (not reduceMotion and e.crit and t < 0.12) and (1.3 - t * 2.5) or 1;
 			local size = math.floor((e.crit and 22 or 14) * near * pop + 0.5);
 			size = math.max(8, size);
 			if ( f.fontSize ~= size ) then f.fontSize = size; f.text:SetFont(font, size, "OUTLINE"); end
@@ -1354,7 +1355,7 @@ local function DrawFloats()
 			else f.text:SetTextColor(1, 1, 1); end
 			f.icon:SetWidth(size); f.icon:SetHeight(size); f.icon:SetTexture(e.icon);
 			f:ClearAllPoints();
-			f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale + e.drift, y / scale + 20 + t * FLOAT_RISE * near);
+			f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale + (reduceMotion and 0 or e.drift), y / scale + 20 + (reduceMotion and 0 or t * FLOAT_RISE * near));
 			f:SetAlpha(t > 0.7 and math.max(0, (1 - t) / 0.3) or 1);
 			f:Show();
 		end
