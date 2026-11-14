@@ -397,6 +397,7 @@ end
 -- hide everything that is not the setup's own: the game's UI, Slim Suite's frames, the minimap and its buttons and pins
 function SU.HideAll()
 	local keep = { [SU.panel] = true, [SU.bar] = true, [SU.glow] = true };
+	if ( SU.confirmDone ) then keep[SU.confirmDone] = true; end
 	for name in pairs(SU.KEEP_VISIBLE) do local c = getglobal(name); if ( c ) then keep[c] = true; end end
 	for _, h in pairs(handles) do keep[h] = true; end
 	local kids = { UIParent:GetChildren() };
@@ -2207,6 +2208,7 @@ function SS.ConfirmSetupDone()
 	if ( not SU.confirmDone ) then
 		local f = K.Window("SlimSuiteSetupConfirmation", "Finish setup", 380, 150);
 		SU.confirmDone = f;
+		f:SetFrameStrata("FULLSCREEN_DIALOG");
 		local text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
 		text:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -38); text:SetWidth(340); text:SetHeight(60);
 		text:SetText(SS.T("Have you added everything you want? To add more use /slim setup"));
@@ -2218,6 +2220,7 @@ function SS.ConfirmSetupDone()
 		back:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 18, 14);
 	end
 	SU.confirmDone:Show();
+	SU.confirmDone:SetAlpha(1);
 end
 
 function SS.SetupEnd(finished)

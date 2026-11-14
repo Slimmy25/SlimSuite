@@ -4,6 +4,9 @@ Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## Unreleased
 
+## 1.29
+- Kept the setup completion confirmation visible above the element menu. Mirror Target now calculates equal outer screen margins using the actual screen bounds.
+
 ## 1.28
 - Disabled native HUD elements now remain hidden when their replacement updates. Fresh-install setup starts with both versions disabled, ready for a preset or manual setup. Done asks for confirmation and explains how to reopen setup with /slim setup.
 - Reworked chat layout handling around the native dock: the real shared edit box keeps both width anchors, docked windows and controls scale together, setup preserves the selected tab, and Default restores native geometry and scaling. Disabled and muted states now cover the docked group and restore the input box correctly.

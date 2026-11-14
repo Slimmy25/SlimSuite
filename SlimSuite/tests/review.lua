@@ -46,6 +46,8 @@ check("afterwards: the element list again", SU.bar:IsVisible() and not (SlimSuit
 check("grid and Done are on the list", SU.grid:GetParent() == SU.bar and SU.bar.done:IsVisible())
 Click(SU.bar.done); Tick(2)
 check("Done asks before closing setup", SU.bar:IsVisible() and SU.confirmDone:IsVisible())
+SU.HideAll(); Tick(2)
+check("setup hiding keeps confirmation visible", SU.confirmDone:IsVisible() and SU.confirmDone:GetAlpha() > 0)
 Click(SU.confirmDone.back); Tick(1)
 check("Back keeps setup open", SU.bar:IsVisible() and not SU.confirmDone:IsVisible())
 Click(SU.bar.done); Click(SU.confirmDone.confirm); Tick(2)

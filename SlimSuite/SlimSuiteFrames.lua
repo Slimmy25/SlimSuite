@@ -1757,7 +1757,8 @@ function SS.MirrorFrames(from, to)
 	if ( not l or not t ) then return; end
 	local factor = RootFactor(to);
 	local tw, th = (to:GetWidth() or 0) * factor, (to:GetHeight() or 0) * factor;
-	local x = UIParent:GetWidth() - l - tw;
+	local screenLeft, screenRight = SS.ScreenBounds();
+	local x = screenLeft + screenRight - l - tw;
 	local y = (b + t) / 2 - th / 2;
 	if ( to.SetUserPlaced ) then SS.UserPlace(to); end
 	SetRootPosition(to, x, y);
