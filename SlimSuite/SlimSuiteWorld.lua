@@ -185,7 +185,10 @@ W.BOSS_ICONS = BOSS_ICONS;
 function W.MarkFor(id)
 	if ( id == nil ) then return nil; end
 	if ( type(id) == "number" and id < 0 and id >= -4 ) then return BOSS_ICONS[-id]; end
-	return assigned[id];
+	if ( type(AZS_TARGET)=="table" and AZS_TARGET.id==id and type(GetRaidTargetIndex)=="function" ) then
+  local mark=GetRaidTargetIndex("target"); if ( type(mark)=="number" and mark>=1 and mark<=8 ) then return mark; end
+ end
+ return assigned[id];
 end
 W.SetRaidIcon = function(tex, index) SetRaidIcon(tex, index); end
 
@@ -731,7 +734,7 @@ local function IconFor(event)
 end
 
 -- Big hits: a crit, or a hit as big as the best of the last few, leaves the list and "pops": it grows to the right and
--- slowly falls away, off the screen if it gets that far. How big it grows, how far right it goes and how long it hangs
+-- falls away only inside its editable rectangle. How big it grows, how far right it goes and how long it hangs
 -- before falling all depend on how big it is next to your normal hits (the running average of your non-crit damage).
 local recentBest = {};                                     -- the biggest damage of the last 20 hits
 local function MarkBig(e)
@@ -755,7 +758,7 @@ box.pops = {};
 local function PopLine(i)
 	local p = box.pops[i];
 	if ( p ) then return p; end
-	p = CreateFrame("Frame", nil, UIParent);
+	p = CreateFrame("Frame", nil, box);
 	p:SetFrameStrata("HIGH"); p:SetWidth(260); p:SetHeight(20);
 	p.icon = p:CreateTexture(nil, "ARTWORK"); p.icon:SetPoint("LEFT", p, "LEFT", 0, 0); p.icon:SetWidth(15); p.icon:SetHeight(15);
 	p.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
@@ -765,10 +768,20 @@ local function PopLine(i)
 	box.pops[i] = p;
 	return p;
 end
+-- WoW 1.12 does not clip children: fit the actual glyphs before showing a line.
+function SS.FitCombatText(text,value,width)
+	value=string.gsub(tostring(value or ""),"[\r\n\t]"," ");
+	text:SetText(value);
+	while ( (text:GetStringWidth() or 0)>math.max(0,width) and string.len(value)>0 ) do
+		local cut=string.len(value);
+		while ( cut>1 and string.byte(value,cut)>=128 and string.byte(value,cut)<192 ) do cut=cut-1; end
+		value=string.sub(value,1,cut-1); text:SetText(value);
+	end
+end
 local function DrawPops(now)
 	local n = 0;
 	local list = box.popList or {};
-	local screenBottom = -((UIParent:GetHeight() or 768) + 60);
+	local width,height=box:GetWidth() or 260,box:GetHeight() or 220;
 	for i = table.getn(list), 1, -1 do
 		local e = list[i];
 		local r = e.pop;
@@ -779,17 +792,19 @@ local function DrawPops(now)
 		local x = 14 + age * (8 + 5 * r);                    -- a slow drift keeps repeated hits easy to read
 		local hang = 0.4 + 0.35 * r;                         -- it holds before it falls
 		local fall = age > hang and (age - hang) * (age - hang) * (120 / r) or 0;   -- bigger ones fall more slowly
-		local top = (box:GetTop() or 400) - (UIParent:GetTop() or 768);
-		if ( age > life or top - 6 - fall < screenBottom or n >= POP_LIMIT ) then
+		local available=(width-x-8)/scale;
+		if ( age > life or 8+fall+22*scale>height-8 or available<30 or n >= POP_LIMIT ) then
 			table.remove(list, i);
 		else
 			n = n + 1;
 			local p = PopLine(n);
-			p:SetScale((SS.EffectiveScale(box)) / (SS.EffectiveScale(UIParent)) * scale);
+			p:SetScale(scale);
 			p:ClearAllPoints();
-			p:SetPoint("TOPLEFT", UIParent, "TOPLEFT", ((box:GetLeft() or 0) + x) / scale, (top - 6 - fall) / scale);
+			p:SetPoint("TOPLEFT", box, "TOPLEFT", x/scale, (-8-fall)/scale);
+			p:SetWidth(available);
+			p.text:SetHeight(16);
 			p.icon:SetTexture(e.icon or nil); p.icon:SetWidth(e.icon and 15 or 0);
-			p.text:SetText((e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name);
+			SS.FitCombatText(p.text,(e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name,available-(e.icon and 23 or 8));
 			if ( e.crit ) then p.text:SetTextColor(1, 0.85, 0.2); else p.text:SetTextColor(1, 0.55, 0.25); end
 			local fade = life - age < 0.6 and math.max(0, (life - age) / 0.6) or 1;
 			p:SetAlpha(fade);
@@ -830,11 +845,11 @@ local function DrawBox()
 	local editing = Editing("SlimSuiteCombatTextFrame");
 	local demo = SS.Demoing("SlimSuiteCombatTextFrame");   -- Demo Mode samples only this enabled element
 	local now = GetTime();
-	if ( not d.combatTextBox and not editing and not demo ) then box:Hide(); box.popList = {}; DrawPops(now); return; end
+	if ( (not d.combatTextBox or (SS.CombatLogVisible and not SS.CombatLogVisible())) and not editing and not demo ) then box:Hide(); box.popList = {}; DrawPops(now); return; end
 	DrawPops(now);
 	local list = box.entries;
 	-- nothing to show (no hits yet): the box stays out of the way unless it is being placed
-	if ( table.getn(list) == 0 and not editing and not demo ) then box:Hide(); return; end
+	if ( table.getn(list) == 0 and table.getn(box.popList or {}) == 0 and not editing and not demo ) then box:Hide(); return; end
 	box:Show();
 	if ( editing and table.getn(list) == 0 ) then
 		list = { { born = now, crit = true, amount = 1234, name = "Crit example", icon = "Interface\\Icons\\Spell_Fire_Fireball02" },
@@ -849,6 +864,8 @@ local function DrawBox()
 	for i = 1, table.getn(list) do
 		local e = list[i];
 		local h = e.crit and 24 or 15;
+		local lineWidth=(box:GetWidth() or 260)-(e.crit and 32 or 14);
+		if ( lineWidth<20 ) then break; end
 		if ( n >= MAX_LINES or y - h < bottom ) then break; end
 		n = n + 1;
 		local l = BoxLine(n);
@@ -858,10 +875,11 @@ local function DrawBox()
 		if ( age > life - FADE ) then alpha = math.max(0, (life - age) / FADE); end
 		l:ClearAllPoints();
 		l:SetPoint("TOPLEFT", box, "TOPLEFT", e.crit and 26 or 8, y);
-		l:SetWidth((box:GetWidth() or 260) - (e.crit and 30 or 12)); l:SetHeight(h);
+		l:SetWidth(lineWidth); l:SetHeight(h);
 		l.icon:SetWidth(e.icon and (h - 2) or 0); l.icon:SetHeight(h - 2); l.icon:SetTexture(e.icon or nil);
-		l.text:SetFontObject(e.crit and NumberFontNormalLarge or GameFontHighlightSmall);
-		l.text:SetText((e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name);
+		l.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",e.crit and 16 or 11,"OUTLINE");
+		l.text:SetHeight(h-4);
+		SS.FitCombatText(l.text,(e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name,math.max(0,l:GetWidth()-(e.icon and h+4 or 6)));
 		if ( e.heal ) then l.text:SetTextColor(0.3, 1, 0.4);
 		elseif ( e.crit ) then l.text:SetTextColor(1, 0.85, 0.2);
 		else l.text:SetTextColor(1, 1, 1); end
@@ -870,6 +888,7 @@ local function DrawBox()
 		y = y - h - 1;
 	end
 	for i = n + 1, table.getn(box.lines) do box.lines[i]:Hide(); end
+	if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(box); end
 end
 
 -- ---------------------------------------------------------------- lairs and their refill timer
@@ -953,7 +972,8 @@ end
 local hero = { at = 0, vx = 0, vy = 0 };
 function A.PlayerPos()
 	local p = A.Call("AZS_GetPlayerPosition");
-	if ( type(p) == "table" and type(p.x) == "number" and type(p.y) == "number" ) then return p.x, p.y, p.spaceId; end
+	if ( type(p) == "table" and type(p.x) == "number" and type(p.y) == "number" ) then A.playerPosition=p; return p.x, p.y, p.spaceId; end
+	A.playerPosition=nil;
 	if ( A.Has("AZS_GetPlayerPosition") ) then return nil; end   -- not ready (a loading screen): no pins this frame
 	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
 	if ( not run or type(run.px) ~= "number" or type(run.py) ~= "number" ) then return nil; end
@@ -970,7 +990,13 @@ function A.PlayerPos()
 end
 -- the same coordinate space as yours (an entry without one, from an old build, is taken as yours)
 local function SameSpace(entry, space)
-	return space == nil or type(entry) ~= "table" or entry.spaceId == nil or entry.spaceId == space;
+ if ( type(entry)~="table" ) then return true; end
+ local position=type(space)=="table" and space or A.playerPosition;
+ if ( position ) then
+  for _,key in ipairs({"spaceId","mapId","runId"}) do if ( entry[key]~=nil and entry[key]~=position[key] ) then return false; end end
+  return true;
+ end
+ return space==nil or entry.spaceId==nil or entry.spaceId==space;
 end
 
 -- north and west in yards from a world offset: the docs fix the axes (+x north, +y west), and the 1.12 minimap keeps
@@ -1039,13 +1065,14 @@ local function PlacePin(px, py, t)
 	local radius = (Minimap:GetWidth() or 140) / 2;
 	local dist = math.sqrt(north * north + west * west);
 	local dx, dy = -west / yards * radius, north / yards * radius;
-	local outside = dist > yards * 0.94;
-	if ( outside and not t.rim ) then return nil; end
-	local p = Pin();
-	if ( outside and dist > 0 ) then
-		local k = (radius - 6) / math.sqrt(dx * dx + dy * dy);
-		dx, dy = dx * k, dy * k;
-	end
+	local edge=(t.size or 13)/2+2;
+	local halfH=(Minimap:GetHeight() or 140)/2;
+	local ry=halfH-edge; local rx=radius-edge;
+	if ( rx<=0 or ry<=0 ) then return nil; end
+	dy=north/yards*halfH;
+	local outside=SS.squareActive and (math.abs(dx)>rx or math.abs(dy)>ry) or (not SS.squareActive and (dx*dx/(rx*rx)+dy*dy/(ry*ry)>1));
+	if ( outside ) then return nil; end
+	local p=Pin();
 	local size = outside and t.size * 0.8 or t.size;
 	p:SetWidth(size); p:SetHeight(size);
 	p:SetAlpha((t.alpha or 1) * (outside and 0.7 or 1));
@@ -1055,7 +1082,11 @@ local function PlacePin(px, py, t)
 	if ( t.raid ) then SetRaidIcon(p.icon, t.raid); elseif ( t.crop ) then p.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93); else p.icon:SetTexCoord(0, 1, 0, 1); end
 	p.icon:SetVertexColor(t.r or 1, t.g or 1, t.b or 1);
 	if ( p.icon.SetDesaturated ) then p.icon:SetDesaturated(t.grey and 1 or nil); end
-	p.label:SetText(outside and "" or (t.label or ""));
+	p.label:ClearAllPoints();
+	local cross=SS.squareActive and radius or math.sqrt(math.max(0,(radius-2)*(radius-2)-(math.abs(dy)+6)*(math.abs(dy)+6)));
+	local room=cross+math.abs(dx)-edge-3;
+	if ( dx>0 ) then p.label:SetPoint("RIGHT",p,"LEFT",-2,0); else p.label:SetPoint("LEFT",p,"RIGHT",2,0); end
+	p.label:SetText(t.label or ""); SS.FitText(p.label,math.max(0,room),7,12,t.label or "");
 	p.tip, p.sub, p.dist = t.tip, t.sub, dist;
 	p:Show();
 	return p;
@@ -1063,34 +1094,35 @@ end
 
 -- What to pin is gathered ten times a second; pins are placed every frame.
 local targets = {};
-local function GatherPins(space)
-	targets = {};
-	local d = DB();
+local function GatherPins(space, options)
+	local result = {};
+	local d = options or DB();
 	local phase = A.Call("AZS_GetPhase");
-	local inRun = phase == nil or phase == "playing" or phase == "choosing" or phase == "paused";
+	local inRun = phase == nil or phase == "playing" or phase == "choosing" or phase == "paused" or phase == "ready";
 	if ( SS.Demoing("MinimapCluster") and Minimap and type(W.demoPins) == "table" ) then
 		-- Demo Mode: sample caches sitting still and sample bosses (with their marks) walking about, around you
-		for i = 1, table.getn(W.demoPins) do table.insert(targets, W.demoPins[i]); end
-		return;
+		for i = 1, table.getn(W.demoPins) do table.insert(result, W.demoPins[i]); end
+		return result;
 	end
-	if ( not Minimap or not inRun ) then return; end
+	if ( not Minimap or not inRun ) then return result; end
 	if ( d.minimapCaches ) then
 		local caches = A.Caches();
 		for i = 1, table.getn(caches) do
 			local c = caches[i];
 			local x, y = A.Pos(c);
 			if ( x and SameSpace(c, space) ) then
-				table.insert(targets, { x = x, y = y, size = 13, rim = true, crop = true, texture = "Interface\\Icons\\INV_Box_02", tip = "Cache" });
+				table.insert(result, { x = x, y = y, size = 13, crop = true, texture = "Interface\\Icons\\INV_Box_02", tip = SS.T("Cache"), category = "cache", grey = phase=="ready", alpha = phase=="ready" and .45 or 1, sub = phase=="ready" and SS.T("Not yet available") or nil });
 			end
 		end
 	end
-	if ( d.minimapLairs ) then
+	if ( d.minimapLairs or (not options and SS.CustomGuardianFlag()) ) then
 		local lairs = W.LairInfo(GetTime());
 		for i = 1, table.getn(lairs) do
 			local l = lairs[i];
 			local x, y = A.Pos(l.entry);
-			if ( x and SameSpace(l.entry, space) ) then
-				local t = { x = x, y = y, size = l.flagged and 13 or 11, texture = PRE_PULL_ICON, tip = l.name };
+			if ( x and (d.minimapLairs or l.flagged) and SameSpace(l.entry, space) ) then
+				local mark=W.MarkFor(l.id);
+				local t = { x = x, y = y, size = l.flagged and 13 or 11, texture = mark and RAID_ICONS or PRE_PULL_ICON, tip = l.name, category = "lair", raid = mark, label = mark and l.name or nil };
 				if ( l.state == "awake" ) then
 					t.r, t.g, t.b, t.sub = 1, 0.3, 0.25, "Awake: its Guardian is fighting";
 				elseif ( l.state == "empty" ) then
@@ -1101,7 +1133,7 @@ local function GatherPins(space)
 					t.sub = "Asleep: its Guardian waits";
 				end
 				if ( l.flagged ) then t.sub = t.sub .. "\n(the game's red flag points here)"; end
-				table.insert(targets, t);
+				table.insert(result, t);
 			end
 		end
 	end
@@ -1115,18 +1147,22 @@ local function GatherPins(space)
 				local a = type(b) == "table" and b.id ~= nil and cat.byUnit[b.id] or nil;
 				if ( a and a.positionAvailable and SameSpace(a, space) ) then
 					-- the boss's own marker icon when it has one, else a skull
-					table.insert(targets, { x = a.x, y = a.y, size = 15, rim = true, texture = RAID_ICONS,
-						raid = assigned[b.id] or 8, tip = b.name or "Boss" });
+					table.insert(result, { x = a.x, y = a.y, size = 15, texture = RAID_ICONS,
+						raid = W.MarkFor(b.id) or 8, tip = b.name or "Boss", label = b.name or "Boss", category = "boss", grey = phase=="ready", alpha = phase=="ready" and .45 or 1, sub = phase=="ready" and SS.T("Not yet available") or nil });
 				end
 			end
 		end
 	end
+ return result;
 end
 
-local pinGather = 0;
+W.PointsOfInterest=GatherPins;
+
+local pinGather = 0; local pinIdentity;
 local function UpdateMinimapPins()
 	local d = DB();
-	if ( not (d.minimapCaches or d.minimapBosses or d.minimapLairs or SS.Demoing("MinimapCluster")) ) then
+	SS.ApplyGuardianFlag();
+	if ( not (d.minimapCaches or d.minimapBosses or d.minimapLairs or SS.CustomGuardianFlag() or SS.Demoing("MinimapCluster")) ) then
 		if ( pinUsed > 0 ) then for i = 1, table.getn(pins) do pins[i]:Hide(); end pinUsed = 0; end
 		return;
 	end
@@ -1134,7 +1170,9 @@ local function UpdateMinimapPins()
 	pinUsed = 0;
 	local px, py, space = A.PlayerPos();
 	if ( SS.Demoing("MinimapCluster") and not px ) then px, py = 0, 0; end   -- Demo Mode samples use the player's map centre
-	if ( now >= pinGather ) then pinGather = now + 0.1; GatherPins(space); end
+	local position=A.playerPosition;
+	local identity=tostring(space)..":"..tostring(position and position.runId)..":"..tostring(position and position.mapId);
+	if ( now >= pinGather or identity~=pinIdentity ) then pinIdentity=identity; pinGather = now + 0.1; targets=GatherPins(position or space); end
 	if ( px and Minimap and Minimap:IsVisible() ) then
 		for i = 1, table.getn(targets) do PlacePin(px, py, targets[i]); end
 	end
@@ -1285,7 +1323,10 @@ local function FloatAnchor(event)
 end
 
 local function OnFloatEvent(event)
-	if ( not DB().floatingText or type(event) ~= "table" or event.kind ~= "damage" or type(event.amount) ~= "number" ) then return; end
+	if ( not (SS.WorldTextEnabled and SS.WorldTextEnabled() or DB().floatingText) or type(event) ~= "table" or event.kind ~= "damage" or type(event.amount) ~= "number" ) then return; end
+	local mode=SS.WorldTextMode and SS.WorldTextMode() or "all";
+	local kind=event.targetUnitId~=nil and SS.UnitKind(event.targetUnitId) or nil;
+	if ( mode=="bosses" and kind~="boss" and kind~="final" ) then return; end
 	local anchor = FloatAnchor(event);
 	if ( not anchor ) then return; end
 	local now = GetTime();
@@ -1314,14 +1355,15 @@ end
 
 local floatIds, floatById, NONE = {}, {}, {};
 local function DrawFloats()
-	if ( DB().floatingText and SlimSuiteMeter and SlimSuiteMeter.Drain ) then SS.Safe(SlimSuiteMeter.Drain); end
+	if ( (SS.WorldTextEnabled and SS.WorldTextEnabled() or DB().floatingText) and SlimSuiteMeter and SlimSuiteMeter.Drain ) then SS.Safe(SlimSuiteMeter.Drain); end
 	local now = GetTime();
+	local mode=SS.WorldTextMode and SS.WorldTextMode() or "all";
 	for i = table.getn(floats), 1, -1 do
 		local e = floats[i];
-		if ( now - e.born > (e.crit and FLOAT_CRIT_LIFE or FLOAT_LIFE) ) then table.remove(floats, i); end
+		if ( now - e.born > (e.crit and FLOAT_CRIT_LIFE or FLOAT_LIFE) or (mode=="bosses" and e.kind~="boss" and e.kind~="final") ) then table.remove(floats, i); end
 	end
 	local n = table.getn(floats);
-	if ( n == 0 or not DB().floatingText ) then
+	if ( n == 0 or not (SS.WorldTextEnabled and SS.WorldTextEnabled() or DB().floatingText) ) then
 		for i = 1, table.getn(floatPool) do floatPool[i]:Hide(); end
 		return;
 	end
@@ -1359,7 +1401,7 @@ local function DrawFloats()
 			local size = math.floor((e.crit and 22 or 14) * near * pop + 0.5);
 			size = math.max(8, size);
 			if ( f.fontSize ~= size ) then f.fontSize = size; f.text:SetFont(font, size, "OUTLINE"); end
-			f.text:SetText(e.crit and (e.text .. "!") or e.text);
+			f.text:SetText(SS.WorldTextMode and SS.WorldTextMode()=="iconsCrits" and not e.crit and "" or (e.crit and (e.text .. "!") or e.text));
 			if ( e.crit ) then f.text:SetTextColor(1, 0.82, 0.15);
 			elseif ( e.kind == "boss" or e.kind == "final" ) then f.text:SetTextColor(1, 0.6, 0.3);
 			else f.text:SetTextColor(1, 1, 1); end

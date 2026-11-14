@@ -74,7 +74,7 @@ for step = 1, steps do
 		local b = SU.barButtons[name]
 		local before = SU.Mode(name)
 		note("status " .. name .. " (was " .. tostring(before) .. ")")
-		if not b:IsVisible() then fail("bar button hidden: " .. name) end
+		if b:IsVisible() then fail("legacy element row is still visible: " .. name) end
 		local target = before == "enabled" and "disabled" or "enabled"
 		local stateIndex = target == "enabled" and 1 or 2
 		Click(b.states[stateIndex]); Tick(2)
@@ -130,7 +130,7 @@ for step = 1, steps do
 			if (cb.checked and true or false) ~= want then fail("stale box '" .. tostring(cb.label and cb.label.text) .. "' shows " .. tostring(not want)) end
 		end
 	end
-	if not SU.panel:IsVisible() then fail("setup panel hidden") ; SU.Focus(SU.focus) end
+	if SU.focus and not SU.panel:IsVisible() then fail("focused settings panel hidden") ; SU.Focus(SU.focus) end
 	if not SU.bar:IsVisible() then fail("setup bar hidden") end
 end
 -- invisible frames that still catch the mouse above the setup's own layer

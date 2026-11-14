@@ -1,7 +1,16 @@
 local bad = 0
 local function check(label, ok) if not ok then bad = bad + 1; print("MISMATCH " .. label) end end
 local setup, d = SS.ENV.SU, SS.DB()
+SS.firstRunSetupPending=true; d.setupDone=nil; d.firstSetupDefaultsVersion=nil
 SS.StartSetup(true)
+for _,element in ipairs(setup.elements or {}) do
+ check("fresh install enables custom element: "..element.frame,setup.Mode(element.frame)==(SS.ELEMENTS[element.frame].optional and "disabled" or "enabled"))
+end
+check("fresh install uses enabled defaults revision",d.firstSetupDefaultsVersion==2)
+SS.SetupEnd(true)
+setup.SetMode("SlimSuiteCombatTextFrame","disabled","Combat text")
+SS.StartSetup(true)
+check("returning editor preserves disabled choices",setup.Mode("SlimSuiteCombatTextFrame")=="disabled")
 for frame in pairs(setup.NATIVE) do
     setup.SetMode(frame, "default", frame)
     check("Default gives native placement control: " .. frame, d.frameDefault[frame])

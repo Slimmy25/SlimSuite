@@ -27,10 +27,10 @@ SS.ELEMENTS = {
 	GameTooltip = {},
 	SlimSuiteCombatTextFrame = {},
 	SlimSuiteItemRowFrame = {},
-	SlimSuiteMinimapBar = {},
 	SlimSuitePartyLines = {},
 	SlimSuitePlayerCard = {},
-	SlimSuiteStatCounterFrame = {},
+	SlimSuiteStatCounterFrame = { feature = "statCounter" },
+	SlimSuiteCompassFrame = { feature = "compassOn", optional = true, title = "Compass", text = "Bearings to known bosses, lairs and caches. Choose a rail or free markers." },
 	SlimSuiteTargetCard = {},
 };
 SS.NATIVE_KEYS, SS.NATIVE_ELEMENTS, SS.NATIVE_FRAMES, SS.NATIVE_PARTS = {}, {}, {}, {};
@@ -58,7 +58,7 @@ SS.MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "Part
 	{ "SlimSuiteReviveFrame", "Revive bar" },
 	{ "SlimSuiteLocalClockFrame", "Local clock" },
 	{ "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
-	{ "SlimSuiteMinimapBar", "Minimap buttons" }, { "SlimSuiteCombatTextFrame", "Combat text" } };
+	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" } };
 SS.ELEMENTS["PlayerFrame"].label = "Player";
 SS.ELEMENTS["TargetFrame"].label = "Target";
 SS.ELEMENTS["PartyMemberFrame1"].label = "Party";
@@ -81,9 +81,9 @@ SS.ELEMENTS["SlimSuiteReviveFrame"].label = "Revive bar";
 SS.ELEMENTS["SlimSuiteLocalClockFrame"].label = "Local clock";
 SS.ELEMENTS["SlimSuitePlayerCard"].label = "Player (new style)";
 SS.ELEMENTS["SlimSuiteTargetCard"].label = "Target (new style)";
-SS.ELEMENTS["SlimSuiteMinimapBar"].label = "Minimap buttons";
 SS.ELEMENTS["SlimSuiteCombatTextFrame"].label = "Combat text";
-SS.SETUP_ORDER = { "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip", "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteTallyFrame", "SlimSuiteAnnouncementFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame", "SlimSuiteMinimapBar", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame" };
+SS.ELEMENTS["SlimSuiteStatCounterFrame"].label = "Stats";
+SS.SETUP_ORDER = { "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip", "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteTallyFrame", "SlimSuiteAnnouncementFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteCompassFrame" };
 SS.ELEMENTS["PlayerFrame"].title = "Unit frame"; SS.ELEMENTS["PlayerFrame"].text = "Your hero's frame: health, power and level. Drag the green handle to place it; its size and scale are below.";
 SS.ELEMENTS["PartyMemberFrame1"].title = "Party frames"; SS.ELEMENTS["PartyMemberFrame1"].text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Choose a column or a row, face plates or thin lines, and whether you join them.";
 SS.ELEMENTS["MainMenuBar"].title = "Action bar"; SS.ELEMENTS["MainMenuBar"].text = "Your spells. Drag to place it; its size, and turning it upright, are below.";
@@ -102,9 +102,8 @@ SS.ELEMENTS["SlimSuiteTallyFrame"].title = "Kills / Gold / Cache"; SS.ELEMENTS["
 SS.ELEMENTS["SlimSuiteAnnouncementFrame"].title = "Announcements"; SS.ELEMENTS["SlimSuiteAnnouncementFrame"].text = "Where event announcements appear.";
 SS.ELEMENTS["SlimSuiteReviveFrame"].title = "Revive bar"; SS.ELEMENTS["SlimSuiteReviveFrame"].text = "The bar shown while you bring a friend back.";
 SS.ELEMENTS["SlimSuiteLocalClockFrame"].title = "Local clock"; SS.ELEMENTS["SlimSuiteLocalClockFrame"].text = "Your real-world clock: 12/24-hour, its background and daylight saving are below.";
-SS.ELEMENTS["SlimSuiteMinimapBar"].title = "Button row (optional)"; SS.ELEMENTS["SlimSuiteMinimapBar"].text = "Optional: takes every minimap button and the day/night moon off the map into one row you can drag anywhere. Off, the buttons stay on the map's ring.";
 SS.ELEMENTS["SlimSuiteCombatTextFrame"].title = "Combat text"; SS.ELEMENTS["SlimSuiteCombatTextFrame"].text = "Your newest hits and heals, each with its spell icon. Crits stand out.";
-SS.ELEMENTS["SlimSuiteStatCounterFrame"].title = "Stat counter [WIP]"; SS.ELEMENTS["SlimSuiteStatCounterFrame"].text = "A placeholder for a future run-stat counter. [WIP]";
+SS.ELEMENTS["SlimSuiteStatCounterFrame"].title = "Stats"; SS.ELEMENTS["SlimSuiteStatCounterFrame"].text = "Live character stats, health, shields, racial and active buffs.";
 SS.ELEMENTS["SlimSuiteStoredLevelsButton"].feature = "moveLevelButton";
 SS.ELEMENTS["SlimSuiteSpellRowFrame"].feature = "replaceBuildRows";
 SS.ELEMENTS["SlimSuiteClockFrame"].feature = "replaceClock";
@@ -114,7 +113,6 @@ SS.ELEMENTS["SlimSuiteAnnouncementFrame"].feature = "replaceBanners";
 SS.ELEMENTS["SlimSuiteReviveFrame"].feature = "replaceRevive";
 SS.ELEMENTS["SlimSuiteCombatTextFrame"].feature = "combatTextBox";
 SS.ELEMENTS["SlimSuiteLocalClockFrame"].feature = "replaceLocalClock";
-SS.ELEMENTS["SlimSuiteMinimapBar"].feature = "minimapBar";
 SS.ELEMENTS["SlimSuiteMeterFrame"].feature = "moveMeter";
 SS.ELEMENTS["SlimSuitePlayerCard"].owner = "PlayerFrame";
 SS.ELEMENTS["SlimSuiteTargetCard"].owner = "TargetFrame";

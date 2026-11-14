@@ -106,11 +106,11 @@ end);
 -- A layout is everything about where the UI sits and how it looks: places, sizes, scales, padding, layouts, hidden
 -- elements and the frame looks. Layouts are saved by name (/slim layout save <name>), loaded again, shared as one line
 -- of text (the Layouts window), and can be kept apart for each character.
-SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes", "frameDefault", "minimap" };
+SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes", "frameDefault", "minimap", "statHidden" };
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
-	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare", "minimapTransparent",
-	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments", "showAbsorbs",
+	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "matchBuildSizes", "hideBuildSpells", "hideBuildItems", "xpHideBorder", "statCounter", "statDisplayMode", "clockContextAbove", "worldCombatMode", "keepCombatLog", "cardEdgeHUD", "compassOn", "compassStyle", "compassBosses", "compassLairs", "compassCaches", "minimapSquare", "minimapTransparent",
+	"tooltipCustom", "plainBar", "showRacialAbility", "xpSegments", "showAbsorbs",
 	"enemyNameplates", "modernEnemyFrames", "enemyBossesOnly", "enemyPlateDebuffs",
 	"encounterBarThickness", "encounterNameAlign", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion",
 	"targetAuraSide", "targetDebuffs", "clockDetached", "showEmptyActionSlots", "cooldowns",
@@ -205,15 +205,15 @@ function SS.LayoutText(layout)
 	table.remove(parts, 1); table.sort(parts); table.insert(parts, 1, "SSL1");
 	return table.concat(parts, ";");
 end
-local layoutStrings = { playerLook=true, targetLook=true, partyLook=true, buffsOnTargetSide=true,
-	buffsOnPlayerSide=true, buffGrowthDirection=true, gatherSide=true, encounterBarThickness=true,
+local layoutStrings = { worldCombatMode=true, compassStyle=true, statDisplayMode=true, playerLook=true, targetLook=true, partyLook=true, buffsOnTargetSide=true,
+	buffsOnPlayerSide=true, buffGrowthDirection=true, encounterBarThickness=true,
 	encounterNameAlign=true, targetAuraSide=true };
 local function ValidLayoutLeaf(root, keys, value)
 	local depth = table.getn(keys);
 	if ( depth == 1 ) then return type(value) == (layoutStrings[root] and "string" or "boolean"); end
 	if ( root == "elementModes" ) then return depth == 2 and (value == "enabled" or value == "disabled" or value == "default"); end
 	if ( root == "orientations" ) then return depth == 2 and (value == "horizontal" or value == "vertical"); end
-	if ( root == "muted" or root == "enabledElements" or root == "frameDefault" ) then return depth == 2 and type(value) == "boolean"; end
+	if ( root == "muted" or root == "enabledElements" or root == "frameDefault" or root == "statHidden" ) then return depth == 2 and type(value) == "boolean"; end
 	if ( root == "scales" or root == "padding" ) then return depth == 2 and type(value) == "number" and (root == "scales" and value > 0 and value <= 10 or root == "padding" and value >= 0 and value <= 1000); end
 	if ( root == "sizes" ) then return depth == 3 and (keys[3] == "w" or keys[3] == "h") and type(value) == "number" and value > 0 and value <= 100000; end
 	if ( root == "minimap" ) then
@@ -545,226 +545,42 @@ SS.Every("buffLayout", 0.1, function()
 end);
 SS.Safe(HookChat);                                          -- right away too, so lines printed while loading are caught
 
--- Gather the minimap buttons: Slim Suite's own button and the small named buttons other addons put on the minimap
--- are lined up in one column or row on the chosen side. Each one's old anchor is kept so it goes back on release.
-function SS.GatherRelease(f)
-	if ( f.slimOrig ) then
-		local o = f.slimOrig;
-		f.slimOrig = nil;
-		f:ClearAllPoints();
-		if ( o[2] ) then f:SetPoint(o[1], o[2], o[3], o[4], o[5]); else f:SetPoint("CENTER", UIParent, "CENTER"); end
-	end
-end
-
-function SS.LayoutGather()
-	if ( not Minimap ) then return; end
-	local d = SS.DB();
-	local ours = SS.Mini;
-	local want, wantSet = {}, {};
-	if ( d.gatherButtons ) then
-		local ourShown = ours and not (d.minimap and d.minimap.hide);
-		if ( ourShown ) then table.insert(want, ours); wantSet[ours] = true; end
-		if ( ours ) then if ( ourShown ) then ours:Show(); else ours:Hide(); end end
-		local kids = { Minimap:GetChildren() };
-		for i = 1, table.getn(kids) do
-			local f = kids[i];
-			local name = f and f.GetName and f:GetName();
-			if ( name and f ~= ours and f.IsShown and f:IsShown() and string.sub(name, 1, 7) ~= "Minimap"
-				and string.sub(name, 1, 9) ~= "SlimSuite" and string.sub(name, 1, 10) ~= "MiniMapTra" ) then
-				local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
-				if ( w > 0 and w <= 40 and h > 0 and h <= 40 ) then table.insert(want, f); wantSet[f] = true; end
-			end
-		end
-	end
-	-- release everything gathered last time that is not gathered now
-	local old = SlimSuiteGatheredList or {};
-	for i = 1, table.getn(old) do if ( not wantSet[old[i]] ) then SS.GatherRelease(old[i]); end end
-	-- line the wanted ones up on the chosen side, centred on the minimap
-	local side = d.gatherSide or "left";
-	local n = table.getn(want);
-	local W, H = Minimap:GetWidth() or 140, Minimap:GetHeight() or 140;
-	local gap, edge = 36, 22;
-	for i = 1, n do
-		local f = want[i];
-		if ( not f.slimOrig ) then
-			local p, rel, rp, x, y = f:GetPoint(1);
-			f.slimOrig = { p, rel, rp, x or 0, y or 0 };
-		end
-		local off = (i - 1 - (n - 1) / 2) * gap;
-		local dx, dy = 0, 0;
-		if ( side == "left" ) then dx, dy = -(W / 2 + edge), off;
-		elseif ( side == "right" ) then dx, dy = W / 2 + edge, off;
-		elseif ( side == "above" ) then dx, dy = off, H / 2 + edge;
-		else dx, dy = off, -(H / 2 + edge); end
-		f:ClearAllPoints();
-		f:SetPoint("CENTER", Minimap, "CENTER", dx, dy);
-	end
-	if ( ours and not wantSet[ours] and ours.Place ) then SS.Safe(ours.Place); end   -- back to its own spot
-	SlimSuiteGatheredList = want;
-end
-
--- "Minimap buttons": one choice for where the buttons around the minimap go
-SS.MINIMAP_BUTTON_PLACES = { { "Around the minimap", "ring" }, { "Gathered above it", "above" }, { "Gathered below it", "below" },
-	{ "Gathered to its left", "left" }, { "Gathered to its right", "right" }, { "In their own movable row", "row" } };
-function SS.MinimapButtonPlace()
-	local d = SS.DB();
-	if ( d.minimapBar ) then return "row"; end
-	if ( d.gatherButtons ) then return d.gatherSide or "left"; end
-	return "ring";
-end
-function SS.SetMinimapButtonPlace(v)
-	local d = SS.DB();
-	-- This choice is also exposed under the minimap. Keep the row's element status in
-	-- sync, or a setup refresh can restore its previous Enabled state over the new place.
-	if ( SU and SU.Mode and SU.SetMode ) then
-		local mode = SU.Mode("SlimSuiteMinimapBar");
-		if ( v == "row" and mode ~= "enabled" ) then
-			SU.SetMode("SlimSuiteMinimapBar", "enabled", "Button row");
-		elseif ( v ~= "row" and mode == "enabled" ) then
-			SU.SetMode("SlimSuiteMinimapBar", "default", "Button row");
-		end
-	end
-	if ( v == "row" ) then
-		if ( not d.minimapBar ) then SS.SetMinimapBar(true, true); end
-	elseif ( v == "ring" ) then
-		if ( d.minimapBar ) then SS.SetMinimapBar(false, true); end
-		if ( d.gatherButtons ) then SS.SetGather(false, nil, true); end
-	else
-		if ( d.minimapBar ) then SS.SetMinimapBar(false, true); end
-		SS.SetGather(true, v, true);
-	end
-end
--- the setting as a menu row, in the setup, the right-click menus and the settings window
-function SS.MinimapButtonsEntry()
-	return { "Minimap buttons", function() return SS.MinimapButtonPlace(); end, function(v) SS.SetMinimapButtonPlace(v); end,
-		choice = SS.MINIMAP_BUTTON_PLACES, xref = true, short = "Minimap buttons" };
-end
-
-function SS.SetGather(on, side, quiet)
-	SS.DB().gatherButtons = on and true or false;
-	if ( side ) then SS.DB().gatherButtons = true; SS.DB().gatherSide = side; end
-	if ( SS.DB().gatherButtons and SS.DB().minimapBar ) then   -- the newest choice wins: the row lets its buttons go
-		if ( not quiet ) then SS.Notice("The minimap buttons' own row turned off: they are gathered by the minimap now."); end
-		SS.DB().minimapBar = false; SS.Safe(SS.LayoutMinimapBar); SU.Rebuild();
-	end
-	SS.Safe(SS.LayoutGather);
-end
-
--- "Minimap buttons in their own row": the small buttons around the minimap (other addons', Slim Suite's gear, the
--- game's tracking, mail, battleground and meeting-stone icons) and the day/night moon line up in one movable row.
--- The zoom buttons stay on the map. Turning it off puts every button back where it was (round or square).
-SS.BAR_BLIZZARD = { "GameTimeFrame", "MiniMapTrackingFrame", "MiniMapMailFrame", "MiniMapBattlefieldFrame", "MiniMapMeetingStoneFrame" };
+-- Compatibility cleanup for retired minimap-button collectors. No buttons are collected,
+-- sorted or reparented by Slim Suite; older callers only release previously owned buttons.
 SlimSuiteMinimapBarList = {};
-do
-	local bar = CreateFrame("Frame", "SlimSuiteMinimapBar", UIParent);
-	bar:SetWidth(44); bar:SetHeight(44);
-	bar:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -210);   -- under the minimap until it is moved
-	bar:SetFrameStrata("BACKGROUND");
-	bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
-	bar:SetBackdropColor(0, 0, 0, 0.55);
-	bar:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8);
-	bar:Hide();
+function SS.GatherRelease(f)
+ if ( not f or not f.slimOrig ) then return; end
+ local o=f.slimOrig; f.slimOrig=nil; f:ClearAllPoints();
+ if ( o[2] ) then f:SetPoint(o[1],o[2],o[3],o[4],o[5]); end
 end
-
--- a button leaving the row goes back to the frame it belonged to (the minimap) and its old place
 function SS.ReleaseFromBar(f)
-	if ( not f or not f.slimBarOrig ) then return; end
-	local o = f.slimBarOrig;
-	f.slimBarOrig = nil;
-	if ( f.slimBarParent and f.SetParent ) then f:SetParent(f.slimBarParent); end
-	if ( f.slimBarStrata and f.SetFrameStrata ) then f:SetFrameStrata(f.slimBarStrata); end
-	f.slimBarParent, f.slimBarStrata = nil, nil;
-	if ( f.SetAlpha ) then f:SetAlpha(1); end
-	if ( f == SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); return; end
-	f:ClearAllPoints();
-	if ( o[2] ) then f:SetPoint(o[1], o[2], o[3], o[4], o[5]); end
+ if ( not f or not f.slimBarOrig ) then return; end
+ local o=f.slimBarOrig; f.slimBarOrig=nil;
+ if ( f.slimBarParent and f.SetParent ) then f:SetParent(f.slimBarParent); end
+ if ( f.slimBarStrata and f.SetFrameStrata ) then f:SetFrameStrata(f.slimBarStrata); end
+ f.slimBarParent,f.slimBarStrata=nil,nil;
+ f:ClearAllPoints(); if ( o[2] ) then f:SetPoint(o[1],o[2],o[3],o[4],o[5]); end
 end
-
+function SS.LayoutGather()
+ local d=SS.DB(); d.gatherButtons=false; d.gatherSide=nil;
+ for _,f in ipairs(SlimSuiteGatheredList or {}) do SS.GatherRelease(f); end
+ SlimSuiteGatheredList={};
+end
 function SS.LayoutMinimapBar()
-	local bar = getglobal("SlimSuiteMinimapBar");
-	if ( not bar or not Minimap ) then return; end
-	local d = SS.DB();
-	local list = SlimSuiteMinimapBarList;
-	if ( not d.minimapBar ) then
-		for i = 1, table.getn(list) do SS.ReleaseFromBar(list[i]); end
-		SlimSuiteMinimapBarList = {};
-		bar:Hide();
-		return;
-	end
-	-- who belongs: the ones already in the row, Slim Suite's gear, the game's icons, and other addons' buttons found
-	-- around the minimap's edge (small, named, and out at the rim, so the map's own pins are never taken)
-	local inBar = {};
-	for i = 1, table.getn(list) do inBar[list[i]] = true; end
-	local function Add(f) if ( f and not inBar[f] ) then table.insert(list, f); inBar[f] = true; end end
-	if ( SS.Mini ) then Add(SS.Mini); end
-	for _, n in ipairs(SS.BAR_BLIZZARD) do Add(getglobal(n)); end
-	local mx, my = Minimap:GetCenter();
-	local ms = SS.EffectiveScale(Minimap);
-	local half = (Minimap:GetWidth() or 140) * ms / 2;
-	local kids = { Minimap:GetChildren() };
-	for i = 1, table.getn(kids) do
-		local f = kids[i];
-		local name = f and f.GetName and f:GetName();
-		if ( name and mx and string.sub(name, 1, 7) ~= "Minimap" and string.sub(name, 1, 7) ~= "MiniMap" and string.sub(name, 1, 9) ~= "SlimSuite" ) then
-			local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
-			local fx, fy = f:GetCenter();
-			if ( w >= 18 and w <= 40 and h >= 18 and h <= 40 and fx ) then
-				local fs = SS.EffectiveScale(f);
-				local dx, dy = fx * fs - mx * ms, fy * fs - my * ms;
-				if ( math.sqrt(dx * dx + dy * dy) >= half * 0.9 ) then Add(f); end
-			end
-		end
-	end
-	SlimSuiteMinimapBarList = list;
-	-- the row takes each button over (so hiding or scaling the minimap no longer touches them, and they scale with the
-	-- row) and lines them up; a hidden one (mail with no mail) takes no place until it shows
-	local vertical = d.orientations and d.orientations.SlimSuiteMinimapBar == "vertical";
-	local slot, pad, n = 34, 5, 0;
-	for i = 1, table.getn(list) do
-		local f = list[i];
-		if ( not f.slimBarOrig ) then
-			local p, rel, rp, x, y = f:GetPoint(1);
-			f.slimBarOrig = { p, rel, rp, x or 0, y or 0 };
-			f.slimBarParent = f.GetParent and f:GetParent();
-			f.slimBarStrata = f.GetFrameStrata and f:GetFrameStrata();
-			if ( f.SetParent ) then f:SetParent(bar); end
-			if ( f.SetFrameStrata ) then f:SetFrameStrata("MEDIUM"); end   -- above the row's dark background
-		end
-		local wanted = f:IsShown();
-		if ( f == SS.Mini ) then
-			wanted = not (d.minimap and d.minimap.hide);
-			if ( wanted ) then f:Show(); else f:Hide(); end
-		end
-		if ( wanted ) then
-			-- the setup hides the minimap's buttons by making them see-through; in the row they must be seen again
-			if ( f.SetAlpha ) then f:SetAlpha(1); end
-			if ( f.SetFrameLevel and bar.GetFrameLevel ) then f:SetFrameLevel((bar:GetFrameLevel() or 1) + 2); end
-			local own = (f.GetScale and f:GetScale()) or 1;
-			local along = pad + slot / 2 + n * slot;
-			f:ClearAllPoints();
-			if ( vertical ) then f:SetPoint("CENTER", bar, "TOP", 0, -along / own);
-			else f:SetPoint("CENTER", bar, "LEFT", along / own, 0); end
-			n = n + 1;
-		end
-	end
-	local length = math.max(1, n) * slot + pad * 2;
-	if ( vertical ) then bar:SetWidth(slot + pad * 2); bar:SetHeight(length);
-	else bar:SetWidth(length); bar:SetHeight(slot + pad * 2); end
-	if ( not setupActive ) then bar:Show(); end
+ local d=SS.DB(); d.minimapBar=false;
+ for _,key in ipairs({"elementModes","enabledElements","places","sizes","scales","orientations","muted","frameDefault"}) do
+  if ( type(d[key])=="table" ) then d[key].SlimSuiteMinimapBar=nil; end
+ end
+ for _,f in ipairs(SlimSuiteMinimapBarList) do SS.ReleaseFromBar(f); end
+ SlimSuiteMinimapBarList={};
+ local bar=getglobal("SlimSuiteMinimapBar"); if ( bar ) then bar:Hide(); end
+ SS.LayoutGather();
+ if ( SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); end
 end
-SS.Every("minimapBar", 1, function() if ( SS.DB().minimapBar ) then SS.LayoutMinimapBar(); end end);   -- late buttons, new mail
-
-function SS.SetMinimapBar(on, quiet)
-	SS.DB().minimapBar = on and true or false;
-	if ( on and SS.DB().gatherButtons ) then   -- the newest choice wins
-		if ( not quiet ) then SS.Notice("Gather the minimap buttons turned off: they are in their own row now."); end
-		SS.DB().gatherButtons = false; SS.Safe(SS.LayoutGather);
-	end
-	SS.Safe(SS.LayoutMinimapBar);
-	if ( not on ) then SS.Safe(SS.ApplyMinimapShape); end   -- the returned buttons follow the round or square edge
-	if ( not SU.batching ) then SU.Rebuild(); end            -- the row gets (or loses) its own button up top
-end
+function SS.MinimapButtonPlace() return "ring"; end
+function SS.SetMinimapButtonPlace() SS.LayoutMinimapBar(); end
+function SS.SetGather() SS.LayoutMinimapBar(); end
+function SS.SetMinimapBar() SS.LayoutMinimapBar(); end
 
 -- the minimap button: a gear, at the left of the minimap (AZS Stats' is at the bottom, AZS Handbook's at the top
 -- left)
@@ -808,7 +624,7 @@ if ( SS.Mini and SS.Mini.Place ) then
 	local mini, ringPlace = SS.Mini, SS.Mini.Place;
 	local function Docked()
 		local m = SS.DB().minimap;
-		return SS.DB().minimapBar;
+		return false;
 	end
 	mini.Place = function()
 		if ( Docked() ) then
@@ -846,10 +662,7 @@ if ( SS.Mini and SS.Mini.Place ) then
 		local d = SS.DB();
 		if ( d.minimap and d.minimap.hide ) then mini:Hide(); return; end
 		mini:SetAlpha(1);
-		if ( d.minimapBar ) then
-			mini:Show();
-		elseif ( d.gatherButtons ) then SS.LayoutGather();
-		else SS.Safe(mini.Place); end
+		SS.Safe(mini.Place);
 	end, Minimap);
 end
 

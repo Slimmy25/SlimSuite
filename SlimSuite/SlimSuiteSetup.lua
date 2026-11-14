@@ -56,6 +56,11 @@ function SS.HideElementMenu()
 end
 
 function SU.Focus(frame)
+ if ( not frame and setupActive ) then
+  SU.focus=nil; if ( SU.panel ) then SU.panel:Hide(); end
+  if ( SU.glow ) then SU.glow:Hide(); end
+  return;
+ end
 	SU.focus = frame;
 	local e;
 	for i = 1, table.getn(SU.elements or {}) do if ( SU.elements[i].frame == frame ) then e = SU.elements[i]; end end
@@ -354,6 +359,7 @@ end
 function SU.PlaceProfiles()
 	local panel = SU.bar and SU.bar.profilePanel;
 	if ( not panel ) then return; end
+	panel:Hide();
 	local left = SU.bar:GetLeft() or 0;
 	local width = SU.bar:GetWidth() or 0;
 	local profileWidth = panel:GetWidth() or 0;
@@ -389,16 +395,16 @@ function SU.Begin()
 	SS.DB().elementModes = modes;
 	local saved = SS.DB().enabledElements or {};
 	local d = SS.DB();
-	local initializeDisabled = (tonumber(d.firstSetupDefaultsVersion) or 0) < 1 and not d.setupDone and (SS.firstRunSetupPending or not SS.HasPriorUISetup(d));
+	local initializeEnabled = (tonumber(d.firstSetupDefaultsVersion) or 0) < 2 and not d.setupDone and (SS.firstRunSetupPending or not SS.HasPriorUISetup(d));
 	-- Rebuilding the editor restores visibility; only an explicit Default click resets settings.
-	SU.restoring = not initializeDisabled;
+	SU.restoring = not initializeEnabled;
 	SU.batching = true;      -- one bar and demo refresh at the end, not one per element
 	SS.Safe(SU.SetGridSetting, SS.DB().showEditGrid and true or false);
-	-- A clean profile starts with every element, including Blizzard's native version, explicitly Disabled.
+	-- A clean profile starts with every movable replacement enabled at its addon defaults.
 	-- Profiles that already chose modes keep those choices and their existing migration data.
 	for i = 1, table.getn(SU.elements) do
 		local f = SU.elements[i].frame;
-		if ( initializeDisabled ) then modes[f] = "disabled"; end
+		if ( initializeEnabled ) then modes[f] = SS.ELEMENTS[f].optional and "disabled" or "enabled"; end
 		local mode = SU.Mode(f);
 		if ( modes[f] == nil and saved[f] ) then modes[f] = "enabled"; mode = "enabled"; end
 		if ( f == "SlimSuiteMeterFrame" and SS.DB().moveMeter ) then mode = modes[f] or "enabled"; end
@@ -408,7 +414,7 @@ function SU.Begin()
 		else SS.Safe(SU.SetMode, f, "default", SU.titles[f]); end
 	end
 	SU.restoring = false;
-	if ( initializeDisabled ) then d.firstSetupDefaultsVersion = 1; end
+	if ( initializeEnabled ) then d.firstSetupDefaultsVersion = 2; end
 	SU.batching = false;
 	-- the bar: one button per element
 	SU.barButtons = SU.barButtons or {};
@@ -475,8 +481,14 @@ function SU.Begin()
 		idx = idx + 1;
 	end
 	for name, b in pairs(SU.barButtons) do if ( not wanted[name] ) then b:Hide(); for j = 1, table.getn(b.states or {}) do b.states[j]:Hide(); end end end
-	SU.bar:SetWidth(6 + (col + 1) * COLUMN);
-	SU.bar:SetHeight((maxIdx + 1) * LINE + 12 + TOP + BOTTOM);
+	-- The former element selector is no longer presented. Keep its mode controls private for
+	-- compatibility with older callers; all editing is through the actual green handles.
+	for _,b in pairs(SU.barButtons) do b:Hide(); end
+	SU.bar:SetWidth(344);
+	SU.bar:SetHeight(94);
+	SU.bar.demoHint:ClearAllPoints();
+	SU.bar.demoHint:SetPoint("TOPLEFT",SU.bar,"TOPLEFT",10,-34);
+	SU.bar.demoHint:SetWidth(324); SU.bar.demoHint:SetHeight(22);
 	SU.PlaceProfiles();
 	if ( SU.bar.resetAll ) then
 		SU.bar.resetAll:ClearAllPoints(); SU.bar.resetAll:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -104, 7);
@@ -670,6 +682,11 @@ function SS.SetupRescue(err)
 	K.Print(NAME, "the setup hit a problem and closed; your UI is back as it was. /slim errors shows what happened.");
 end
 function SS.StartSetup(fromStart)
+	local d=SS.DB();
+	if ( d.vanillaUI ) then
+		d.vanillaUI=false; d.setupDone=nil; d.firstSetupDefaultsVersion=nil;
+		SS.firstRunSetupPending=true;
+	end
 	setupActive = true;
 	local ok, err = pcall(SU.Begin);
 	if ( not ok ) then SS.SetupRescue(err); end
@@ -735,7 +752,7 @@ function SS.ConfirmSetupDone()
 		f:SetFrameStrata("FULLSCREEN_DIALOG");
 		local text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
 		text:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -38); text:SetWidth(340); text:SetHeight(60);
-		text:SetText(SS.T("Have you added everything you want? To add more use /slim setup"));
+		text:SetText(SS.T("Finished arranging your UI? Reopen the editor with /slim setup."));
 		local confirm = K.Button(f, "Confirm", 110, function() f:Hide(); SS.SetupEnd(true); end);
 		f.confirm = confirm;
 		confirm:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -18, 14);

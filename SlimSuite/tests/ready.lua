@@ -40,5 +40,27 @@ SlimSuiteWorld.ApplyOnTop()
 check("ready does not force foreground layering", top[SlimSuiteClockFrame] == false and top[PlayerFrame] == nil)
 d.onTopOfScreens = true; SlimSuiteWorld.ApplyOnTop()
 check("explicit card overlay preference still works", top[SlimSuiteClockFrame])
+-- Animated hits must be local to the editable box and expire before crossing its bottom.
+setup.SetMode("SlimSuiteCombatTextFrame","enabled","Combat text")
+d.combatTextBox=true
+local box=SlimSuiteCombatTextFrame
+box:SetWidth(200); box:SetHeight(100)
+box.entries={}; box.popList={{born=GetTime(),pop=1,amount=100,name="A very long spell name that must fit inside the box",crit=true}}
+Tick(1)
+local pop=box.pops[1]
+check("popups belong to combat box",pop and pop:GetParent()==box)
+check("popup anchors follow the movable box",pop and pop.points[1][2]==box)
+if pop then check("popup text fits available width",pop.text:GetStringWidth()<=pop:GetWidth()-4) end
+box.popList={{born=GetTime()-2,pop=1,amount=100,name="Expired at box edge"}}
+Tick(1)
+check("falling hits expire at box bottom",#box.popList==0)
+d.tallyContext=true; d.tallyVertical=false; d.sizes.SlimSuiteTallyFrame=nil
+SS.DrawTally(SS.TallyParts({kills=1,gold=2,chest=3}))
+local tally=SlimSuiteTallyFrame
+check("horizontal counters use top-relative placement",tally.labels[1].points[1][1]=="TOPLEFT")
+check("context and counters form a compact block",tally:GetHeight()<=40)
+for _,label in ipairs(tally.labels) do
+ if label:IsShown() then local point=label.points[1]; check("counter baseline stays inside green box",-point[5]+19<=tally:GetHeight()) end
+end
 print("ready problems: " .. bad)
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end

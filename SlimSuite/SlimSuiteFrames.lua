@@ -37,8 +37,12 @@ function SS.CreateLevelButton()
 	levelButton:SetFrameStrata("MEDIUM");
 	levelButton:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
-	levelButton:SetBackdropColor(0.13, 0.055, 0.025, 0.98);
+	levelButton:SetBackdropColor(0.055, 0.035, 0.025, 0.96);
 	levelButton:SetBackdropBorderColor(0.82, 0.61, 0.24, 1);
+	levelButton.panel = levelButton:CreateTexture(nil,"BACKGROUND");
+	levelButton.panel:SetPoint("TOPLEFT",levelButton,"TOPLEFT",3,-3); levelButton.panel:SetPoint("BOTTOMRIGHT",levelButton,"BOTTOMRIGHT",-3,3);
+	levelButton.panel:SetTexture(.12,.055,.025,.9);
+	if ( levelButton.panel.SetGradient ) then levelButton.panel:SetGradient("VERTICAL",.045,.025,.015,.20,.09,.035); end
 	levelButton:EnableMouse(true);
 	-- Keep a faint gold halo behind the button, like the game's own level-up control.
 	-- This is a region of the button itself, so it follows saved position, scale, and hover growth.
@@ -71,82 +75,22 @@ function SS.CreateLevelButton()
 		if ( type(AZS_OpenStoredLevels) == "function" ) then SS.Safe(AZS_OpenStoredLevels); end
 	end);
 	levelButton.count = levelButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-	levelButton.count:SetPoint("TOPRIGHT", levelButton.classIcon, "TOPRIGHT", 7, 7);
+	levelButton.count:SetPoint("TOPRIGHT", levelButton.classIcon, "TOPRIGHT", -2, -2);
 	levelButton.count:SetTextColor(1, 0.78, 0.18);
-	local function LevelButtonBaseScale()
-		local base = type(SS.DB().scales.SlimSuiteStoredLevelsButton) == "number" and SS.DB().scales.SlimSuiteStoredLevelsButton or 1;
-		return SS.DisplayElementScale and SS.DisplayElementScale("SlimSuiteStoredLevelsButton", base) or base;
-	end
-	local function CaptureLevelButtonPoints()
-		local points = {};
-		for i = 1, levelButton:GetNumPoints() do
-			local point, relative, relativePoint, x, y = levelButton:GetPoint(i);
-			points[i] = { point, relative, relativePoint, x, y };
-		end
-		return points;
-	end
-	local function RestoreLevelButtonPoints(points)
-		levelButton:ClearAllPoints();
-		for i = 1, table.getn(points or {}) do
-			local p = points[i]; levelButton:SetPoint(p[1], p[2], p[3], p[4], p[5]);
-		end
-	end
-	local function GrowLevelButtonInPlace()
-		-- SetScale grows from the frame's anchor, which made the button appear to slide away
-		-- from its resting location. Preserve its visual center while the hover scale changes.
-		if ( not levelButton.hoverPoints ) then levelButton.hoverPoints = CaptureLevelButtonPoints(); end
-		local left, right, bottom, top = RootBounds(levelButton);
-		if ( not left or not right or not bottom or not top ) then return; end
-		local centerX, centerY = (left + right) / 2, (bottom + top) / 2;
-		levelButton:SetScale(LevelButtonBaseScale() * 1.06);
-		local newLeft, newRight, newBottom, newTop = RootBounds(levelButton);
-		if ( newLeft and newRight and newBottom and newTop ) then
-			SetRootPosition(levelButton, centerX - (newRight - newLeft) / 2, centerY - (newTop - newBottom) / 2);
-		end
-	end
-	local function RestoreLevelButtonAfterHover()
-		levelButton:SetScale(LevelButtonBaseScale());
-		if ( levelButton.hoverPoints ) then
-			RestoreLevelButtonPoints(levelButton.hoverPoints);
-			levelButton.hoverPoints = nil;
-		end
-	end
 	levelButton:SetScript("OnEnter", function()
-		GrowLevelButtonInPlace();
+		-- Highlight inside the existing rectangle; do not move or enlarge the button.
 		levelButton.glow:SetAlpha(0.24);
 	end);
 	levelButton:SetScript("OnLeave", function()
-		RestoreLevelButtonAfterHover();
 		levelButton.glow:SetAlpha(0.16);
 	end);
 	levelButton:SetScript("OnHide", function()
-		RestoreLevelButtonAfterHover();
 		levelButton.glow:SetAlpha(0.16);
 	end);
 	-- Above the default action bar, centered near the bottom as in the supplied reference.
 	levelButton:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 190);
 	levelButton:Hide();
-	-- A tiny toggle to the right of the button: store level-ups or take them as they come (AZS_SetStoringLevels).
-	-- It is its own frame, anchored to the button: it shows in a run while there are points to spend (a choice open, or
-	-- levels stored) and while the button is being placed.
-	local store = CreateFrame("CheckButton", "SlimSuiteStoreLevelsToggle", UIParent, "UICheckButtonTemplate");
-	store:SetWidth(20); store:SetHeight(20);
-	store:SetPoint("LEFT", levelButton, "RIGHT", 2, 0);
-	store:SetFrameStrata("MEDIUM");
-	store:SetScript("OnClick", function()
-		if ( type(AZS_SetStoringLevels) == "function" ) then SS.Safe(AZS_SetStoringLevels, this:GetChecked() and true or false); end
-		SS.Safe(SS.UpdateLevelButton);
-	end);
-	store:SetScript("OnEnter", function()
-		if ( not GameTooltip ) then return; end
-		GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
-		GameTooltip:AddLine("Store level-ups", 1, 0.82, 0);
-		GameTooltip:AddLine(this:GetChecked() and "On: level-ups wait here until you spend them." or "Off: level-up choices open as soon as you level.", 1, 1, 1, 1);
-		GameTooltip:Show();
-	end);
-	store:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
-	store:Hide();
-	levelButton.store = store;
+
 end
 
 function SS.ClockText(seconds)
@@ -156,33 +100,33 @@ function SS.ClockText(seconds)
 end
 
 function SS.ApplyClockLayout()
-	if ( not clockFrame or not clockFrame.time or not clockFrame.next ) then return; end
-	local orientation = SS.DB().orientations.SlimSuiteClockFrame;
-	if ( orientation ~= "horizontal" ) then orientation = "vertical"; end
-	local padding = SS.FramePadding("SlimSuiteClockFrame");
-	if ( orientation == "vertical" ) then
-		clockFrame.time:ClearAllPoints();
-		clockFrame.time:SetPoint("TOP", clockFrame, "TOP", 0, -padding);
-		clockFrame.timeW = math.max(10, clockFrame:GetWidth() - (padding * 2));
-		clockFrame.nextW = clockFrame.timeW;
-		clockFrame.time:SetWidth(clockFrame.timeW);
-		clockFrame.time:SetJustifyH("CENTER");
-		clockFrame.next:ClearAllPoints();
-		clockFrame.next:SetPoint("TOP", clockFrame.time, "BOTTOM", 0, -(2 + padding));
-		clockFrame.next:SetWidth(clockFrame.nextW);
-		clockFrame.next:SetJustifyH("CENTER");
-	else
-		clockFrame.time:ClearAllPoints();
-		clockFrame.time:SetPoint("LEFT", clockFrame, "LEFT", 4 + padding, 0);
-		clockFrame.timeW = math.max(30, (clockFrame:GetWidth() - (padding * 2)) * 0.34);
-		clockFrame.nextW = math.max(10, clockFrame:GetWidth() - (4 + padding) * 2 - clockFrame.timeW - (8 + padding));
-		clockFrame.time:SetWidth(clockFrame.timeW);
-		clockFrame.time:SetJustifyH("RIGHT");
-		clockFrame.next:ClearAllPoints();
-		clockFrame.next:SetPoint("LEFT", clockFrame.time, "RIGHT", 8 + padding, 0);
-		clockFrame.next:SetPoint("RIGHT", clockFrame, "RIGHT", -(4 + padding), 0);
-		clockFrame.next:SetJustifyH("LEFT");
-	end
+ if ( not clockFrame or not clockFrame.time or not clockFrame.next or not clockFrame.zone ) then return; end
+ local d=SS.DB(); local vertical=d.orientations.SlimSuiteClockFrame~="horizontal";
+ local w,h=clockFrame:GetWidth(),clockFrame:GetHeight(); local pad=math.min(4+SS.FramePadding("SlimSuiteClockFrame"),w/8,h/8);
+ local context=d.zoneLine and 14 or 0; local gap=context>0 and 2 or 0;
+ local above=d.clockContextAbove~=false;
+ local contentTop=pad+(above and context+gap or 0);
+ local contentHeight=math.max(1,h-pad*2-context-gap);
+ local line=vertical and math.max(1,(contentHeight-2)/2) or contentHeight;
+ clockFrame.zone:ClearAllPoints(); clockFrame.zone:SetWidth(math.max(1,w-pad*2)); clockFrame.zone:SetHeight(14);
+ if ( above ) then clockFrame.zone:SetPoint("TOP",clockFrame,"TOP",0,-pad);
+ else clockFrame.zone:SetPoint("BOTTOM",clockFrame,"BOTTOM",0,pad); end
+ clockFrame.time:ClearAllPoints(); clockFrame.next:ClearAllPoints();
+ clockFrame.timeH,clockFrame.nextH=line,line;
+ if ( vertical ) then
+  clockFrame.timeW,clockFrame.nextW=w-pad*2,w-pad*2;
+  clockFrame.time:SetPoint("TOP",clockFrame,"TOP",0,-contentTop);
+  clockFrame.next:SetPoint("TOP",clockFrame,"TOP",0,-contentTop-line-2);
+  clockFrame.time:SetJustifyH("CENTER"); clockFrame.next:SetJustifyH("CENTER");
+ else
+  clockFrame.timeW=math.max(1,(w-pad*2)*.34);
+  clockFrame.nextW=math.max(1,w-pad*2-clockFrame.timeW-8);
+  clockFrame.time:SetPoint("TOPLEFT",clockFrame,"TOPLEFT",pad,-contentTop);
+  clockFrame.next:SetPoint("TOPRIGHT",clockFrame,"TOPRIGHT",-pad,-contentTop);
+  clockFrame.time:SetJustifyH("RIGHT"); clockFrame.next:SetJustifyH("LEFT");
+ end
+ clockFrame.time:SetWidth(clockFrame.timeW); clockFrame.time:SetHeight(line);
+ clockFrame.next:SetWidth(clockFrame.nextW); clockFrame.next:SetHeight(line);
 end
 
 function SS.CreateClockFrame()
@@ -510,12 +454,14 @@ function SS.UpdateClock()
 	end
 	if ( clockFrame.zone ) then
 		-- the sample zone line only while the clock is being placed or in Demo Mode; otherwise only the game's own
-		local zone = SS.DB().zoneLine and (SS.ZoneText() or (SS.Previewing("SlimSuiteClockFrame") and "Scholomance  -  Sanguine, Explosive")) or nil;
+		local zone = SS.DB().zoneLine and SS.LocationContext(SS.Previewing("SlimSuiteClockFrame")) or nil;
 		if ( zone and (showClock or preview) ) then clockFrame.zone:SetText(zone); clockFrame.zone:Show(); else clockFrame.zone:Hide(); end
 	end
-	SS.FitText(clockFrame.time, clockFrame.timeW);
-	SS.FitText(clockFrame.next, clockFrame.nextW);
-	if ( clockFrame.zone ) then SS.FitText(clockFrame.zone, math.max(clockFrame:GetWidth() or 0, 60)); end
+	SS.ApplyClockLayout();
+	SS.FitText(clockFrame.time, clockFrame.timeW,7,clockFrame.timeH);
+	SS.FitText(clockFrame.next, clockFrame.nextW,7,clockFrame.nextH);
+	if ( clockFrame.zone ) then SS.FitText(clockFrame.zone, math.max(1,(clockFrame:GetWidth() or 0)-8),7,14); end
+	if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(clockFrame); end
 	if ( showClock or preview ) then
 		clockFrame:Show();
 		SS.ClampAbsoluteFrame("SlimSuiteClockFrame", clockFrame);
@@ -795,14 +741,18 @@ end
 function SS.MinSize(name)
 	local vertical = SS.CurrentOrientation(name) == "vertical";
 	if ( name == "SlimSuiteClockFrame" ) then
-		if ( vertical ) then return 90, 36 + SS.FramePadding(name) * 3; end
-		return 200, 24;
+		if ( vertical ) then return 90, (SS.DB().zoneLine and 54 or 36) + SS.FramePadding(name) * 3; end
+		return 200, SS.DB().zoneLine and 42 or 24;
 	elseif ( name == "SlimSuiteItemRowFrame" ) then
 		if ( vertical ) then return 36, 76; end
 		return 76, 24;
 	elseif ( name == "SlimSuiteSpellRowFrame" ) then
 		if ( vertical ) then return 36, 92; end
 		return 92, 24;
+	elseif ( name == "SlimSuiteCompassFrame" ) then
+		return 160,80;
+	elseif ( name == "SlimSuiteStatCounterFrame" ) then
+		return 120,54;
 	elseif ( name == "SlimSuiteMeterFrame" ) then
 		return 210, 110;                                   -- the same as the meter's own corner grip
 	elseif ( name == "GameTooltip" ) then
@@ -838,6 +788,7 @@ function SS.ApplySize(name, f)
 		s = { w = 260, h = 140 };
 	end
 	if ( type(s) == "table" and s.w and s.h and s.w > 0 and s.h > 0 ) then
+		local mw,mh=SS.MinSize(name); s.w,s.h=math.max(s.w,mw),math.max(s.h,mh);
 		f:SetWidth(s.w);
 		f:SetHeight(s.h);
 	end
@@ -1302,7 +1253,7 @@ SS.Safe(SS.CaptureXpArt);
 -- true while Slim Suite's copies draw the border (the bar is Slim Suite's to move); upright needs the copies turned
 function SS.XpArtShown()
 	local xp, pieces = MainMenuExpBar, SS.xpArt.pieces;
-	if ( not xp or not pieces or not xpBarDetached ) then return false; end
+	if ( SS.DB().xpHideBorder or not xp or not pieces or not xpBarDetached ) then return false; end
 	if ( SS.DB().orientations.MainMenuExpBar == "vertical" and SS.xpArt.noTurn ) then return false; end
 	return true;
 end
@@ -1411,7 +1362,7 @@ function SS.StyleExpBar(on)
 	local copies = SS.XpArtShown();
 	for i = 0, 3 do
 		local t = getglobal("MainMenuXPBarTexture" .. i);
-		if ( t and t.SetAlpha ) then t:SetAlpha((on or copies) and 0 or 1); end
+		if ( t and t.SetAlpha ) then t:SetAlpha((on or copies or SS.DB().xpHideBorder) and 0 or 1); end
 	end
 	for _, n in ipairs({ "ExhaustionTick", "ExhaustionLevelFillBar" }) do
 		local f = getglobal(n);
@@ -1436,7 +1387,7 @@ function SS.StyleExpBar(on)
 			xpStyle.border:EnableMouse(false);
 		end
 		xpStyle.bg:Show();
-		if ( copies ) then xpStyle.border:Hide(); else xpStyle.border:Show(); end   -- the game's border when it can turn
+		if ( copies or SS.DB().xpHideBorder ) then xpStyle.border:Hide(); else xpStyle.border:Show(); end   -- the game's border when it can turn
 		xpStyle.border:SetFrameLevel((xp:GetFrameLevel() or 1) + 2);
 		if ( xp.SetStatusBarTexture ) then xp:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar"); end
 		-- keep the game's own XP text readable on the narrow bar
@@ -1718,7 +1669,10 @@ PlaceAll = function()
 	for i = 1, table.getn(MOVABLE) do
 		local name = MOVABLE[i][1];
 		local frame = getglobal(name);
-		if ( frame ) then SS.Safe(SS.ClampToClient, name, frame); end
+		if ( frame ) then
+			SS.Safe(SS.ClampToClient,name,frame);
+			if ( SS.EnforceElementBounds ) then SS.Safe(SS.EnforceElementBounds,frame,SS.DB().vanillaUI or (SS.DB().frameDefault and SS.DB().frameDefault[name])); end
+		end
 	end
 	if ( SS.DB().mirrorTarget ) then SS.Safe(SS.MirrorTarget); end
 	if ( SS.DB().buffsOnTarget or SS.DB().buffsOnPlayer ) then SS.Safe(SS.AttachBuffs); end

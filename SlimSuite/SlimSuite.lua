@@ -63,23 +63,18 @@ function SS.Notice(text)
 end
 -- Shrinks a font string's font until its text fits the width (its normal size when it fits): used where the player can
 -- make an element smaller than its text. The smallest size is minSize (7 by default).
-function SS.FitText(fs, width, minSize)
-	if ( not fs or not fs.GetFont or not fs.SetFont or not width ) then return; end
-	if ( not fs.slimBase ) then
-		local font, size, flags = fs:GetFont();
-		if ( not font ) then return; end
-		fs.slimBase = { font, size or 12, flags };
-	end
-	local b = fs.slimBase;
-	local text = fs.GetText and fs:GetText() or "";
-	if ( fs.slimFitText == text and fs.slimFitWidth == width and fs.slimFitMin == minSize ) then return; end   -- already fitted
-	fs.slimFitText, fs.slimFitWidth, fs.slimFitMin = text, width, minSize;
-	local size = b[2];
-	fs:SetFont(b[1], size, b[3]);
-	while ( size > (minSize or 7) and (fs:GetStringWidth() or 0) > width ) do
-		size = size - 1;
-		fs:SetFont(b[1], size, b[3]);
-	end
+function SS.FitText(fs, width, minSize, height, fullText)
+ if ( not fs or not fs.GetFont or not fs.SetFont or not width ) then return; end
+ if ( not fs.slimBase ) then local font,size,flags=fs:GetFont(); if ( not font ) then return; end; fs.slimBase={font,size or 12,flags}; end
+ local text=fullText or (fs.GetText and fs:GetText()) or "";
+ if ( not fullText and fs.slimOverflowShown==text ) then text=fs.slimOverflowSource or text; end
+ local b=fs.slimBase; local size=b[2];
+ if ( height ) then size=math.min(size,math.max(1,height-2)); end
+ fs:SetFont(b[1],size,b[3]); fs:SetText(text);
+ local smallest=math.min(size,minSize or 7);
+ while ( size>smallest and (fs:GetStringWidth() or 0)>math.max(0,width-2) ) do size=size-1; fs:SetFont(b[1],size,b[3]); end
+ if ( SS.FitCombatText ) then SS.FitCombatText(fs,text,math.max(0,width-2)); end
+ fs.slimOverflowSource=text; fs.slimOverflowShown=fs:GetText();
 end
 
 -- a small warning box beside a control, for the right-click menu's own Mirror and Buffs boxes
@@ -165,7 +160,7 @@ SS.DEFAULTS = {
 	replaceClock = false, replaceEncounters = false, replaceTally = false, replaceBanners = false,
 	camera = true, plainBar = false, cooldowns = false, bossMarks = true, deathMarks = true, prePullMarks = false,
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
-	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, replaceLocalClock = false,
+	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
 	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, lowHealthSound = false,
 	bossHitmarkerSound = false, bossWhipSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
@@ -180,7 +175,7 @@ SS.DEFAULTS = {
 	tallyContext = true,
 };
 SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
-	"itemRowSeen", "chatOffsets", "words", "layouts", "enabledElements", "elementModes" };
+	"itemRowSeen", "statHidden", "chatOffsets", "words", "layouts", "enabledElements", "elementModes" };
 function SS.PrepareDB(d)
 	for key, value in pairs(SS.DEFAULTS) do if ( d[key] == nil ) then d[key] = value; end end
 	for i = 1, table.getn(SS.DEFAULT_TABLES) do
@@ -461,10 +456,27 @@ function SS.Camera(zoomOut)
 	if ( zoomOut and CameraZoomOut and not SS.cameraZoomed ) then SS.cameraZoomed = true; SS.Safe(CameraZoomOut, MAX_CAMERA); end
 end
 
+function SS.CustomGuardianFlag()
+ local d=SS.DB();
+ return not d.vanillaUI and d.showGuardianFlag and (SS.FeatureEnabled("MinimapCluster") or d.minimapLairs or d.minimapBosses or d.minimapCaches);
+end
+function SS.RestoreGuardianFlag()
+ local d=SS.DB();
+ if ( d.guardianFlagNativeOriginal~=nil and type(AZS_SetHudShown)=="function" ) then
+  SS.Safe(AZS_SetHudShown,"flag",d.guardianFlagNativeOriginal); d.guardianFlagNativeOriginal=nil;
+ end
+end
 function SS.ApplyGuardianFlag()
-	if ( type(AZS_SetHudShown) == "function" ) then
-		SS.Safe(AZS_SetHudShown, "flag", SS.DB().showGuardianFlag and true or false);
-	end
+ if ( type(AZS_SetHudShown)~="function" ) then return; end
+ local d=SS.DB();
+ if ( d.vanillaUI ) then SS.RestoreGuardianFlag(); return; end
+ local custom=SS.CustomGuardianFlag();
+ if ( custom and d.guardianFlagNativeOriginal==nil ) then
+  if ( type(AZS_IsHudShown)=="function" ) then d.guardianFlagNativeOriginal=SS.HudShown(AZS_IsHudShown("flag")); else d.guardianFlagNativeOriginal=true; end
+ end
+ local desired=d.showGuardianFlag and not custom and true or false;
+ if ( type(AZS_IsHudShown)~="function" or SS.HudShown(AZS_IsHudShown("flag"))~=desired ) then SS.Safe(AZS_SetHudShown,"flag",desired); end
+ if ( not custom ) then d.guardianFlagNativeOriginal=nil; end
 end
 
 -- ---------------------------------------------------------------- the death sound
@@ -747,7 +759,7 @@ function SS.RefreshItemRow()
 		end
 	end
 	SS.LayoutItemRow();
-	if ( d.replaceBuildRows ) then itemRow:Show(); else itemRow:Hide(); end
+	if ( d.replaceBuildRows and not d.hideBuildItems ) then itemRow:Show(); else itemRow:Hide(); end
 	if ( SS.IsEditing("SlimSuiteItemRowFrame") and d.replaceBuildRows and handles.SlimSuiteItemRowFrame ) then handles.SlimSuiteItemRowFrame:Show(); end
 end
 
@@ -873,7 +885,7 @@ function SS.RefreshSpellRow()
 		if ( iconLoaded or SS.Previewing("SlimSuiteSpellRowFrame") ) then button:Show(); else button:Hide(); end
 	end
 	SS.LayoutSpellRow();
-	if ( SS.DB().replaceBuildRows ) then spellRow:Show(); else spellRow:Hide(); end
+	if ( SS.DB().replaceBuildRows and not SS.DB().hideBuildSpells ) then spellRow:Show(); else spellRow:Hide(); end
 	if ( SS.IsEditing("SlimSuiteSpellRowFrame") and SS.DB().replaceBuildRows and handles.SlimSuiteSpellRowFrame ) then handles.SlimSuiteSpellRowFrame:Show(); end
 end
 
@@ -908,13 +920,12 @@ function SS.CreateSpellRow()
 				local _, slot = SS.SpellTextureById(tonumber(this.spell.spell));
 				this.spellBookSlot = slot;
 			end
+			if ( SS.ShowBuildSpellTooltip and SS.ShowBuildSpellTooltip(this) ) then return; end
 			if ( this.spellBookSlot and GameTooltip.SetSpellBookItem ) then GameTooltip:SetSpellBookItem(this.spellBookSlot, BOOKTYPE_SPELL or "spell"); GameTooltip:Show();
 			elseif ( this.spellBookSlot and GameTooltip.SetSpell ) then GameTooltip:SetSpell(this.spellBookSlot, BOOKTYPE_SPELL or "spell"); GameTooltip:Show();   -- the 1.12 call
 			elseif ( this.spell.key or this.sourceName ) then
 				GameTooltip:AddLine(tostring(this.sourceName or this.spell.key));
-				if ( this.spell.rank ) then GameTooltip:AddLine("Rank " .. tostring(this.spell.rank), 1, 0.82, 0); end
-				if ( this.spell.spell ) then GameTooltip:AddLine("Spell ID: " .. tostring(this.spell.spell), 0.7, 0.7, 0.7); end
-				if ( type(this.spell.cdmax) == "number" and this.spell.cdmax > 0 ) then GameTooltip:AddLine("Cooldown: " .. tostring(this.spell.cdmax) .. " sec", 0.7, 0.7, 0.7); end
+				GameTooltip:AddLine(SS.T("Spell description unavailable on this client."),0.7,0.7,0.7,1);
 				GameTooltip:Show();
 			end
 		end);
@@ -928,8 +939,8 @@ SS.CreateSpellRow();
 function SS.ApplyBuildRowReplacement()
 	local enabled = SS.FeatureEnabled("SlimSuiteSpellRowFrame");
 	SS.HideNative("build", enabled);
-	if ( spellRow ) then if ( enabled ) then spellRow:Show(); else spellRow:Hide(); end end
-	if ( itemRow ) then if ( enabled ) then itemRow:Show(); else itemRow:Hide(); end end
+	if ( spellRow ) then if ( enabled and not SS.DB().hideBuildSpells ) then spellRow:Show(); else spellRow:Hide(); end end
+	if ( itemRow ) then if ( enabled and not SS.DB().hideBuildItems ) then itemRow:Show(); else itemRow:Hide(); end end
 end
 SS.ApplyBuildRowReplacement();
 
@@ -999,8 +1010,7 @@ end
 -- AZS_ZONE.diff is the run's difficulty multiplier. Convert the game's known tier values to their named difficulty;
 -- an unrecognized future value is left as the generic label rather than displaying a misleading multiplier.
 local TALLY_DIFFICULTIES = { [100] = "Normal", [179] = "Heroic 1", [197] = "Heroic 2", [216] = "Heroic 3", [245] = "Heroic 4", [272] = "Heroic 5" };
-function SS.TallyContext(sample)
-	if ( not SS.DB().tallyContext ) then return ""; end
+function SS.LocationContext(sample)
 	if ( sample ) then return "Elwynn Forest  |  " .. SS.T("Normal"); end
 	local zone = type(AZS_ZONE) == "table" and AZS_ZONE or nil;
 	local name = zone and (zone.zname or zone.name or zone.zone or zone.title) or nil;
@@ -1012,6 +1022,11 @@ function SS.TallyContext(sample)
 		return name .. "  |  " .. SS.T(tier or "Difficulty");
 	end
 	return name;
+end
+
+function SS.TallyContext(sample)
+ if ( not SS.DB().tallyContext ) then return ""; end
+ return SS.LocationContext(sample);
 end
 
 function SS.TallyString(list, i, justify)
@@ -1070,9 +1085,12 @@ function SS.DrawTally(parts)
 	for i = n + 1, table.getn(tallyFrame.labels) do tallyFrame.labels[i]:Hide(); tallyFrame.values[i]:Hide(); end
 	local width, height;
 	if ( fixed ) then width, height = custom.w, custom.h;
-	elseif ( vertical ) then width, height = widest + pad * 2, n * line + (hasContext and 28 or 14);
-	else width, height = total + pad * 2, hasContext and 50 or 32; end
+	elseif ( vertical ) then width, height = widest + pad * 2, n * line + (hasContext and 24 or 8);
+	else width, height = total + pad * 2, size + (hasContext and 24 or 8); end
+	height=math.max(height,(vertical and n*line or size)+(hasContext and 24 or 8));
+	width=math.max(width,(vertical and widest or total)+pad*2);
 	tallyFrame:SetWidth(width); tallyFrame:SetHeight(height);
+	if ( fixed ) then custom.w,custom.h=width,height; end
 	if ( not tallyFrame.context ) then
 		tallyFrame.context = tallyFrame:CreateFontString(nil, "OVERLAY");
 		tallyFrame.context:SetJustifyH("CENTER"); tallyFrame.context:SetJustifyV("MIDDLE");
@@ -1085,6 +1103,7 @@ function SS.DrawTally(parts)
 		contextSize = math.max(7, math.floor(contextSize * contextWidth / tallyFrame.context:GetStringWidth()));
 		tallyFrame.context:SetFont(font, contextSize);
 	end
+	SS.FitText(tallyFrame.context,width-10,7,14);
 	tallyFrame.context:ClearAllPoints(); tallyFrame.context:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", 3, -2);
 	tallyFrame.context:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", -3, -2); tallyFrame.context:SetHeight(14);
 	tallyFrame.context:SetTextColor(0.95, 0.78, 0.35);
@@ -1098,10 +1117,10 @@ function SS.DrawTally(parts)
 			label:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", pad, y);
 			value:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", -pad, y);
 		else
-			local y = -(hasContext and 26 or 8);
-			label:SetPoint("LEFT", tallyFrame, "LEFT", x, y);
+			local y = -(hasContext and 20 or 4);
+			label:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", x, y);
 			x = x + (label:GetStringWidth() or 0) + TALLY.WORD_GAP;
-			value:SetPoint("LEFT", tallyFrame, "LEFT", x, y);
+			value:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", x, y);
 			x = x + (value:GetStringWidth() or 0) + TALLY.PART_GAP;
 		end
 	end
@@ -1110,6 +1129,7 @@ function SS.DrawTally(parts)
 	local fade = math.min(14, width / 4);
 	tallyFrame.bgLeft:SetWidth(fade); tallyFrame.bgRight:SetWidth(fade);
 	for _, t in ipairs({ tallyFrame.bg, tallyFrame.bgLeft, tallyFrame.bgRight }) do if ( band ) then t:Show(); else t:Hide(); end end
+	if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(tallyFrame); end
 end
 
 function SS.UpdateTally()
@@ -1206,20 +1226,7 @@ function SS.UpdateLevelButton()
 		local okCount, value = SS.Safe(AZS_GetStoredLevels);
 		if ( okCount and type(value) == "number" ) then storedCount = math.max(0, math.floor(value)); end
 	end
-	if ( levelButton.store ) then
-		local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
-		local inRun = phase == "playing" or phase == "choosing" or phase == "paused";
-		-- points to spend: a level-up choice is open, or levels are already stored; otherwise the toggle is off the screen
-		local hasPoints = phase == "choosing" or storedCount > 0;
-		if ( replacing and type(AZS_SetStoringLevels) == "function" and ((inRun and hasPoints) or SS.Previewing("SlimSuiteStoredLevelsButton")) ) then
-			local ok, storing = false, nil;
-			if ( type(AZS_IsStoringLevels) == "function" ) then ok, storing = SS.Safe(AZS_IsStoringLevels); end
-			levelButton.store:SetChecked((ok and storing) and 1 or nil);
-			levelButton.store:Show();
-		else
-			levelButton.store:Hide();
-		end
-	end
+
 	if ( not replacing ) then levelButton:Hide(); return; end
 	local count = 0;
 	if ( type(AZS_GetStoredLevels) == "function" ) then

@@ -120,7 +120,7 @@ function SS.WinBuild()
 				table.insert(page.rows, { kind = "head", fs = fs });
 				up = nil;
 			elseif ( row.button ) then
-				local b = K.Button(parent, row.button, 150, row.onClick);
+				local b = K.Button(parent, SS.T(row.button), row.width or 150, row.onClick);
 				table.insert(page.rows, { kind = "button", b = b });
 				up = nil;
 			else
@@ -148,15 +148,13 @@ function SS.WinBuild()
 		SS.LayoutPage(page);
 		return page;
 	end
-	local tooltipTitle, tooltipSmaller, tooltipLarger, reset, resetAll, addonsTab, uiLastY, otherLastY;
+	local reset, resetAll, addonsTab, uiLastY, otherLastY;
 	-- the tooltip-size and reset controls sit under the last row of the UI page
 	local function PlaceTail()
-		if ( not tooltipTitle or not uiLastY ) then return; end
-		local y0 = uiLastY - 14;
-		tooltipTitle:ClearAllPoints(); tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, y0);
-		tooltipSmaller:ClearAllPoints(); tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, y0 - 18);
-		reset:ClearAllPoints(); reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, y0 - 52);
-		uiChild:SetHeight(-(y0 - 52) + 44);
+		if ( not reset or not uiLastY ) then return; end
+		local y0=uiLastY-14;
+		reset:ClearAllPoints(); reset:SetPoint("TOPLEFT",uiChild,"TOPLEFT",10,y0);
+		uiChild:SetHeight(-y0+44);
 	end
 	-- the Manage Addons button sits under the last row of the Other page
 	local function PlaceAddons()
@@ -169,31 +167,21 @@ function SS.WinBuild()
 		noteTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -8); noteTitle:SetText(SS.T("Moving the game's UI"));
 		local note = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		note:SetPoint("TOPLEFT", noteTitle, "BOTTOMLEFT", 0, -3); note:SetWidth(390); note:SetHeight(38);
-		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetHeight(52); note:SetText(SS.T("The game's own versions of these parts can't be moved. To move one, say yes below: Slim Suite swaps in its own movable copy. Each copy's other settings are in its menu: right-click it in Toggle UI Settings."));
+		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetHeight(52); note:SetText(SS.T("Slim Suite replaces the game HUD automatically. Use Toggle UI Settings to arrange it, or Go back to vanilla to restore the original interface."));
 		AddRows(uiChild, {
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
+			{button = "Go back to vanilla", width = 280, onClick = function() SS.GoBackToVanilla(); end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
 			{button = "Profiles & import/export", onClick = function() SS.ShowLayoutWindow(); end},
 			{button = "Recommended HUD preset", onClick = function() SS.ShowHUDRecommendation(); end},
 			{button = "Diagnostics & compatibility", onClick = function() SS.ShowDiagnosticsWindow(); end},
 			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
-			{head="Make the game's UI movable"},
-			{"Replace Default Level Up with Movable Version?", function() return SS.DB().moveLevelButton; end, function(v) SS.DB().moveLevelButton = v; SS.Safe(SS.UpdateLevelButton); end},
-			{"Replace Default Build Rows with Movable Versions?", function() return SS.DB().replaceBuildRows; end, function(v) SS.DB().replaceBuildRows = v; SS.ApplyBuildRowReplacement(); end},
-			{"Replace Default Damage Meter with Movable Version?", function() return SS.DB().moveMeter; end, function(v) SS.SetMeterReplacement(v); end},
-			{"Replace Default Run Clock with Movable Version?", function() return SS.DB().replaceClock;end,function(v) SS.DB().replaceClock=v;SS.UpdateClock();end},
-			{"Replace Default Encounter Bars with Movable Versions?", function() return SS.DB().replaceEncounters;end,function(v) SS.DB().replaceEncounters=v;SS.UpdateBossFrames();end},
-			{"Replace Default Kills / Gold / Cache with Movable Version?", function() return SS.DB().replaceTally;end,function(v) SS.DB().replaceTally=v;SS.UpdateTally();end},
-			{"Replace Default Announcements with Movable Version?", function() return SS.DB().replaceBanners;end,function(v) SS.DB().replaceBanners=v;SS.UpdateAnnouncementFrame();end},
-			{"Replace Default Revive Bar with Movable Version?", function() return SS.DB().replaceRevive; end, function(v) SS.DB().replaceRevive = v; end},
-			{"Replace Default Local Clock with Movable Version?", function() return SS.DB().replaceLocalClock; end, function(v) SS.SetLocalClockOn(v); end},
-			{"Replace Default Action Bar Art with Plain Version?", function() return SS.DB().plainBar; end, function(v) SS.DB().plainBar = v; SS.PlainBar(v); end},
-			{"Replace Default Combat Text with Movable Box?", function() return SS.DB().combatTextBox; end, function(v) SU.FEATURES.SlimSuiteCombatTextFrame(v and true or false); if ( SS.DB().unlocked ) then SS.SetUnlocked(true, true); end SU.Rebuild(); end},
-			{"Replace Default Minimap Buttons with a Movable Row? (optional)", function() return SS.DB().minimapBar; end, function(v) SS.SetMinimapBar(v); end},
 			{head="Everywhere"},
+			{"Compass",function() return SS.DB().compassOn; end,function(v) SU.SetMode("SlimSuiteCompassFrame",v and "enabled" or "disabled","Compass"); end},
 			{"Show green absorb amounts on player and party frames (when the client exposes them)", function() return SS.DB().showAbsorbs; end, function(v) SS.DB().showAbsorbs = v and true or false; SS.Safe(SS.UpdateAbsorbMarkers); end},
-			{"Floating combat text over enemies (Slim Suite's own)", function() return SS.DB().floatingText; end, function(v) SS.DB().floatingText = v; end},
+			SS.WorldCombatEntry(),
+			{"Build and stats beside card choices",function() return SS.DB().cardEdgeHUD~=false; end,function(v) SS.DB().cardEdgeHUD=v; end},
 			{"Show Slim Suite above the level-up and new-item cards", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -86, function(y) uiLastY = y; PlaceTail(); end);
 	end
@@ -230,7 +218,6 @@ function SS.WinBuild()
 			{"Show the game's nearest Guardian lair flag on minimap", function() return SS.DB().showGuardianFlag; end, function(v) SS.DB().showGuardianFlag = v; SS.ApplyGuardianFlag(); end},
 			{"Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end},
 			{"Transparent minimap (round or square, no borders)", function() return SS.DB().minimapTransparent; end, function(v) SS.SetMinimapTransparent(v); end},
-			SS.MinimapButtonsEntry(),
 			{"Minimap button", function() local m = SS.DB().minimap; return not (m and m.hide); end, function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (m and m.hide and true or false) == v ) then SS.Mini.Toggle(); end end end},
 			{head="Deaths and spells"},
 			{"Mark where a downed friend can be revived", function() return SS.DB().deathMarks; end, function(v) SS.DB().deathMarks = v; end},
@@ -284,21 +271,6 @@ function SS.WinBuild()
 		local errors = K.Button(win, "Error log", 120, function() SS.ShowErrors(); end);
 		errors:SetPoint("BOTTOMLEFT", win, "BOTTOMLEFT", 198, 17);
 	end
-	tooltipTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-	tooltipTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -732);
-	tooltipTitle:SetText(SS.T("Tooltip width"));
-	local function AdjustTooltipSize(delta)
-		local size = SS.DB().sizes.GameTooltip;
-		if ( type(size) ~= "table" ) then size = { w = 260, h = 140 }; SS.DB().sizes.GameTooltip = size; end   -- the player's own size from now on
-		SS.DB().tooltipCustom = true;
-		size.w = math.max(160, math.min(600, size.w + delta));
-		if ( GameTooltip ) then GameTooltip:SetWidth(size.w); end
-		PlaceAll();
-	end
-	tooltipSmaller = K.Button(uiChild, "Smaller", 82, function() AdjustTooltipSize(-20); end);
-	tooltipSmaller:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -750);
-	tooltipLarger = K.Button(uiChild, "Larger", 82, function() AdjustTooltipSize(20); end);
-	tooltipLarger:SetPoint("LEFT", tooltipSmaller, "RIGHT", 6, 0);
 	reset = K.Button(uiChild, "Reset positions", 140, function() SS.ResetPlaces(); end);
 	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -784);
 	resetAll = K.Button(uiChild, "Reset all UI", 126, function() SS.ResetUI(); end);

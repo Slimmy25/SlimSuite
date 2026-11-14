@@ -258,12 +258,34 @@ check("the button row is off by default", SS.DEFAULTS.minimapBar == false)
 local gear = SlimSuiteMinimapButton
 gear:SetAlpha(0)                                       -- as the setup's sweep leaves it
 SS.SetMinimapBar(true, true); SS.LayoutMinimapBar()
-check("buttons in the row can be seen", gear:GetAlpha() == 1)
+check("retired collection cannot be enabled", not SS.DB().minimapBar and not getglobal("SlimSuiteMinimapBar"))
 SS.SetMinimapBar(false, true); Tick(2)
 local p = gear.points and gear.points[1]
 check("the gear goes back to the ring", p and p[2] == Minimap)
 gear:Hide(); Tick(12, 0.1)
 check("a hidden gear is restored to the ring", gear:IsShown() and gear.points and gear.points[1] and gear.points[1][2] == Minimap)
+for _,square in ipairs({false,true}) do
+ SS.SetMinimapSquare(square)
+ SS.DB().gatherButtons=true; SS.DB().gatherSide="above"; SS.DB().minimapBar=true
+ SS.DB().elementModes.SlimSuiteMinimapBar="enabled"
+ SS.DB().enabledElements.SlimSuiteMinimapBar=true
+ SS.LayoutMinimapBar()
+ check("saved collection choices are retired for either shape",not SS.DB().gatherButtons and not SS.DB().gatherSide and not SS.DB().minimapBar and not SS.DB().elementModes.SlimSuiteMinimapBar and not SS.DB().enabledElements.SlimSuiteMinimapBar)
+ for _,place in ipairs({"above","below","left","right","row"}) do
+  SS.SetMinimapButtonPlace(place)
+  check("legacy placement calls remain on the ring",SS.MinimapButtonPlace()=="ring" and not SS.DB().minimapBar and not SS.DB().gatherButtons)
+ end
+end
+local collected=CreateFrame("Button",nil,UIParent)
+collected.slimBarOrig={"CENTER",Minimap,"CENTER",10,20}
+collected.slimBarParent=Minimap
+SlimSuiteMinimapBarList={collected}
+SS.LayoutMinimapBar()
+check("previously collected buttons regain their parent and anchor",collected:GetParent()==Minimap and collected.points[1][2]==Minimap and not collected.slimBarOrig)
+check("collection element is absent from setup registry",not SS.ELEMENTS.SlimSuiteMinimapBar)
+for _,entry in ipairs(SS.ENV.SU.ChecksFor("MinimapCluster")) do
+ check("minimap settings have no collection control",entry[1]~="Minimap buttons")
+end
 print("corral problems: " .. bad)
 -- encounter bars as rows: the frame (and its green handle) is one bar wide, not one bar per boss
 SS.DB().replaceEncounters = true; SS.DB().orientations.SlimSuiteBossFrames = "horizontal"

@@ -2,6 +2,26 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.34
+- Combat log mode now suppresses native CombatDamage numbers and restores the original setting on exit/logout. Added native-number retention, all-enemy icons/critical hits, and boss-only damage modes, with an optional accompanying log.
+- Build hover uses exact spell hyperlinks or matching real spellbook descriptions before an explicit unavailable message. Pregame cooldown labels read the actual starting spell/racial payload and show reported remaining time or the full interval without a fake countdown.
+- Removed minimap rim clamping: points stay at reported world positions and disappear outside range. Bosses use their raid icons and names. Known pregame positions are dimmed; absent future coordinates are never fabricated.
+- Added an optional rail/free-marker compass with Boss, Lair and Chest filters. Docked Build along the lower screen edge and Stats at the upper-right during card choices, with on-top tooltips and exact anchor restoration.
+- Lowered only the square minimap body beneath its native title; the round-map anchors restore unchanged. Refined the stored-level button with a restrained interior glow, bronze gradient and contained count, without hover enlargement.
+- Added shared region containment for movable elements and text truncation after minimum-font fitting. Tiny saved sizes respect element minimums; fitted tally dimensions are retained across later placement passes.
+- Reserved explicit icon and glyph space for combat rows and popups, sanitized multiline hit names, and suppressed overflow at the same bounds used by green handles.
+- Made Stats start at the damage meter’s 230 × 170 size, with internal scrolling, per-stat visibility grouped in its right-click menu, and live combined or pre-run Default + Bonus display.
+- Added optional placement of the run-clock location and Normal/Heroic label above the time; either position stays inside the clock frame.
+- Added corner-drag resizing for movable HUD elements, with persisted scales and linked build-row sizing. Split spell and jewelry rows now have independent visibility and optional matched icon sizes.
+- Replaced the stats placeholder with live documented character-pane totals, current/max HP and aggregate shield, racial information, and active buff timers. Item, spell and racial bonuses are not added twice.
+- Removed the redundant tooltip-width footer and stored-level checkbox. Stored levels follow the game setting; the addon no longer changes it. Added an XP-border visibility option for either orientation.
+- Removed the optional replacement switches from UI settings. Added Go back to vanilla directly below Toggle UI Settings to reset positions, restore all native HUD parts (including stored level-ups), disable custom HUD replacements and overlays, and lock the editor. Reopening the editor explicitly resumes the custom HUD.
+- Removed minimap button gathering, directional sorting and the independent movable collection box for both map shapes. Saved collection settings are retired, and buttons stay around the minimap.
+- Fresh installs enable all managed custom HUD elements at their default positions, replacing the corresponding game UI. Existing saved layouts retain their choices.
+- Replaced the visible element-state list and preset sidecar with a compact grid, Demo On/Off, Reset All and Done panel. Right-click green move boxes for individual settings.
+- Confined combat-text popups and their text to the movable combat box; falling hits expire at its edges rather than the screen bottom.
+- Removed the extra gap beneath the cache location/difficulty heading and kept horizontal counters inside the element bounds.
+
 ## 1.33
 - Attached player and party buffs now use at most two rows within their portrait-and-health-bar width, including room for duration text. Rows avoid other visible HUD frames and the screen edges; party buffs also leave the player's buff area clear. Icons that cannot fit safely stay hidden until space is available, and detaching restores their original scale and mouse behavior.
 

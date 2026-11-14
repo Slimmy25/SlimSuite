@@ -56,8 +56,9 @@ end
 
 -- turn an element on or off: its frame (and the frames that move with it) and its handle
 SU.FEATURES = {
+	SlimSuiteCompassFrame = function(v) SS.DB().compassOn=v; if ( SS.UpdateCompass ) then SS.UpdateCompass(); end end,
 	SlimSuiteStatCounterFrame = function(v)
-		if ( v and setupActive ) then SU.statCounterPlaceholder:Show(); else SU.statCounterPlaceholder:Hide(); end
+		SS.DB().statCounter=v and true or false; if ( SS.UpdateStats ) then SS.UpdateStats(); else SU.statCounterPlaceholder:Hide(); end
 	end,
 	SlimSuiteStoredLevelsButton = function(v) SS.DB().moveLevelButton = v; SS.UpdateLevelButton(); end,
 	SlimSuiteSpellRowFrame = function(v) SS.DB().replaceBuildRows = v; SS.ApplyBuildRowReplacement(); end,
@@ -66,13 +67,12 @@ SU.FEATURES = {
 	SlimSuiteTallyFrame = function(v) SS.DB().replaceTally = v; SS.UpdateTally(); end,
 	SlimSuiteAnnouncementFrame = function(v) SS.DB().replaceBanners = v; SS.UpdateAnnouncementFrame(); end,
 	SlimSuiteReviveFrame = function(v) SS.DB().replaceRevive = v; end,
-	SlimSuiteCombatTextFrame = function(v) SS.DB().combatTextBox = v; end,
+	SlimSuiteCombatTextFrame = function(v) SS.DB().combatTextBox = v; if ( SS.SyncNativeDamageNumbers ) then SS.SyncNativeDamageNumbers(); end end,
 	SlimSuiteLocalClockFrame = function(v)
 		if ( v ) then SS.DB().replaceLocalClock = true;
 		else SS.DB().replaceLocalClock = false; SS.DB().clockDetached = false; end
 		SS.Safe(SlimSuiteWorld.UpdateLocalClock);
 	end,
-	SlimSuiteMinimapBar = function(v) SS.SetMinimapBar(v, true); end,
 };
 
 -- A setup element's Default state means the original Blizzard/Aethus element is active and Slim Suite's
@@ -359,3 +359,34 @@ end
 
 -- How far the party block reaches down from the first party frame's top, in UIParent units: all four party frames,
 -- shown or not (a hidden frame keeps its place), and the setup's sample cards while they are on screen.
+
+-- One explicit escape hatch: restore the game's HUD, not an empty Disabled layout.
+function SS.GoBackToVanilla()
+ if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
+ SS.StopDemoMode();
+ if ( setupActive ) then SS.SetupEnd(true); end
+ SS.SetUnlocked(false,true);
+ local d=SS.DB();
+ SS.ResetUI();
+ d.vanillaUI=true; d.setupDone=true; d.firstSetupDefaultsVersion=2;
+ for _,key in ipairs({"plainBar","xpHideBorder","xpSegments","cooldowns","showRacialAbility","showEmptyActionSlots","floatingText","procMeter","showAbsorbs","targetDebuffs","partyMemberBuffs","minimapCaches","minimapBosses","minimapLairs","showGuardianFlag","showEditGrid","anchorSnap","onTopOfScreens","bossMarks","deathMarks","prePullMarks","raidRow","zoneLine","tallyContext","tallyBossKills","accessibilityContrast","accessibilityLargeText","accessibilityReduceMotion","enemyPlateDebuffs"}) do d[key]=false; end
+ d.enemyNameplates=nil;
+ SS.SetModernEnemyFrames(false);
+ d.partyLocked,d.partyLockAbove,d.combineTarget,d.mirrorTarget=false,false,false,false;
+ d.buffsOnPlayer,d.buffsOnTarget=false,false;
+ d.places,d.sizes,d.scales,d.padding,d.orientations,d.muted={},{},{},{},{},{};
+ d.enabledElements={};
+ SU.batching=true; SU.restoring=false;
+ for _,name in ipairs(SS.SETUP_ORDER) do SU.SetMode(name,"default",SS.ELEMENTS[name].title); end
+ SU.batching=false;
+ SS.ApplyElementModes();
+ for _,name in ipairs(SS.SETUP_ORDER) do SS.Safe(SU.RestoreNative,name); end
+ SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.ApplyGuardianFlag);
+ SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.ApplyBuffOrientation);
+ SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.UpdateEnemyNameplates);
+ SS.Safe(ShowEditGrid); SS.Safe(ApplyActionSlotGrid);
+ if ( SlimSuiteWorld and SlimSuiteWorld.ApplyOnTop ) then SS.Safe(SlimSuiteWorld.ApplyOnTop); end
+ SS.SetUnlocked(false,true); SS.RefreshToggles();
+ if ( SS.RestoreNativeDamageNumbers ) then SS.RestoreNativeDamageNumbers(); end
+ if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
+end

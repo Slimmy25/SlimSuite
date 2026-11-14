@@ -235,6 +235,19 @@ function SS.ApplyMinimapShape()
 	-- Capture the round map's original appearance before the square/transparent options hide either border.
 	SS.Safe(SS.ApplyMinimapTransparency);
 	local square = SS.DB().minimapSquare and true or false;
+	if ( square and not SS.squareMapPoints and Minimap:GetNumPoints()>0 ) then
+		SS.squareMapPoints={};
+		for i=1,Minimap:GetNumPoints() do
+			local a,b,c,x,y=Minimap:GetPoint(i); SS.squareMapPoints[i]={a,b,c,x or 0,y or 0};
+		end
+		Minimap:ClearAllPoints();
+		for _,p in ipairs(SS.squareMapPoints) do Minimap:SetPoint(p[1],p[2],p[3],p[4],p[5]-6); end
+	elseif ( not square and SS.squareMapPoints ) then
+		Minimap:ClearAllPoints();
+		for _,p in ipairs(SS.squareMapPoints) do Minimap:SetPoint(p[1],p[2],p[3],p[4],p[5]); end
+		SS.squareMapPoints=nil;
+	end
+
 	local ok = false;
 	if ( Minimap.SetMaskTexture ) then
 		ok = SS.Safe(Minimap.SetMaskTexture, Minimap, square and SlimSuiteMinimapMask.square or SlimSuiteMinimapMask.round);
@@ -709,6 +722,7 @@ function SS.SetBuildOrientation(name, vertical)
 		SS.DB().sizes[rows[i]] = nil;
 	end
 	SS.LayoutSpellRow(); SS.LayoutItemRow();
+	if ( SS.MatchBuildRowSizes ) then SS.MatchBuildRowSizes(name); end
 	if ( SS.DB().buildRowsAttached ) then SS.DB().places.SlimSuiteItemRowFrame = SS.BuildRowDefaultPlace("SlimSuiteItemRowFrame"); end
 	SS.Safe(PlaceAll);
 end
@@ -810,6 +824,7 @@ function SS.PrepareSizeTools(name, label)
 			end
 			if ( sizeTarget == "BuffFrame" ) then SS.DB().buffCustomLayout = true; end   -- the icons follow the size
 			SS.DB().sizes[sizeTarget] = { w = w, h = h }; SS.MarkProfileDirty();
+			if ( SS.MatchBuildRowSizes ) then SS.MatchBuildRowSizes(sizeTarget); end
 			if ( sizeTarget == "GameTooltip" ) then SS.DB().tooltipCustom = true; end
 			if ( sizeTarget == "BuffFrame" ) then SS.Safe(SS.ApplyBuffOrientation); end
 			if ( sizeTarget == "SlimSuiteClockFrame" ) then SS.ApplyClockLayout(); end
@@ -840,6 +855,7 @@ function SS.PrepareSizeTools(name, label)
 			if ( not sizeTarget ) then return; end
 			percent = math.max(20, math.min(200, math.floor(tonumber(percent) or 100)));   -- never so small it disappears
 			SS.DB().scales[sizeTarget] = percent / 100; SS.MarkProfileDirty();
+			if ( SS.MatchBuildRowSizes ) then SS.MatchBuildRowSizes(sizeTarget); end
 			if ( SS.Element(sizeTarget) == "TargetFrame" ) then SS.Safe(SS.MirrorPlayer); end
 			PlaceAll();
 			sizeMenuScaleInput:SetText(tostring(percent));
@@ -1319,6 +1335,7 @@ function SS.Handle(name, label)
 		table.insert(handleList, h);   -- the shared follower below keeps every shown handle on its frame
 		handles[name] = h;
 	end
+	if ( SS.AddResizeGrip ) then SS.AddResizeGrip(h,name); end
 	return h;
 end
 
@@ -1337,7 +1354,7 @@ end);
 function SS.AvailableElements()
 	local d = SS.DB();
 	local off = {
-		SlimSuiteStoredLevelsButton = d.moveLevelButton, SlimSuiteSpellRowFrame = d.replaceBuildRows, SlimSuiteItemRowFrame = d.replaceBuildRows,
+		SlimSuiteStoredLevelsButton = d.moveLevelButton, SlimSuiteSpellRowFrame = d.replaceBuildRows and not d.hideBuildSpells, SlimSuiteItemRowFrame = d.replaceBuildRows and not d.hideBuildItems,
 		SlimSuiteMeterFrame = d.moveMeter, SlimSuiteClockFrame = d.replaceClock, SlimSuiteBossFrames = d.replaceEncounters,
 		SlimSuiteTallyFrame = d.replaceTally, SlimSuiteAnnouncementFrame = d.replaceBanners, SlimSuiteReviveFrame = d.replaceRevive,
 		SlimSuiteLocalClockFrame = d.replaceLocalClock and d.clockDetached, SlimSuiteCombatTextFrame = d.combatTextBox and true or false, SlimSuiteMinimapBar = d.minimapBar and true or false,
@@ -1587,6 +1604,7 @@ function SS.ResetUI()
 	local d = SS.DB();
 	d.places, d.sizes, d.scales, d.padding, d.orientations, d.muted = {}, {}, {}, {}, {}, {};
 	d.tallyVertical, d.buffCustomLayout, d.buffGrowthDirection = true, false, "down";
+	d.xpHideBorder,d.hideBuildSpells,d.hideBuildItems,d.matchBuildSizes=false,false,false,false;
 	d.tooltipCustom = nil;
 	d.buildRowsAttached = true;
 	d.places.SlimSuiteSpellRowFrame = SS.BuildRowDefaultPlace("SlimSuiteSpellRowFrame");

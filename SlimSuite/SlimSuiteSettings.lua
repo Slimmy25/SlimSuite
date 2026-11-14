@@ -247,9 +247,11 @@ function SU.ChecksFor(frame)
 		function(v) SS.SetLocalClockOn(v); end, short = "Show the local clock", xref = true }; end
 	local function DetachClock() return { "Detach the clock from the minimap (its own button up top)", function() return SS.DB().clockDetached; end,
 		function(v) SS.SetClockDetached(v); end, function() return SS.DB().replaceLocalClock; end, short = "Detach from minimap", xref = true }; end
-	local function ButtonPlace() return SS.MinimapButtonsEntry(); end
 	local function VerticalRow(name) return { "Vertical (off: horizontal)", function() return SS.CurrentOrientation(name) == "vertical"; end,
 		function(v) SS.SetBuildOrientation(name, v); end, short = "Vertical", xref = true }; end
+	local function MatchRows() return { "Match build row sizes", function() return SS.DB().matchBuildSizes; end, function(v) SS.DB().matchBuildSizes=v; if ( v ) then SS.MatchBuildRowSizes("SlimSuiteSpellRowFrame"); PlaceAll(); end end }; end
+	local function ShowSpells() return { "Show build spells", function() return not SS.DB().hideBuildSpells; end, function(v) SS.DB().hideBuildSpells=not v; SS.ApplyBuildRowReplacement(); end }; end
+	local function ShowItems() return { "Show worn items", function() return not SS.DB().hideBuildItems; end, function(v) SS.DB().hideBuildItems=not v; SS.ApplyBuildRowReplacement(); end }; end
 	local function JoinRows() return { "Join the worn-jewelry row under the build spells", function() return SS.DB().buildRowsAttached; end,
 		function(v) if ( (v and true or false) ~= (SS.DB().buildRowsAttached and true or false) ) then SS.ToggleBuildRowsAttached(); end end, short = "Join the jewelry row", xref = true }; end
 	local list = {
@@ -267,16 +269,14 @@ function SU.ChecksFor(frame)
 		MinimapCluster = { { "Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end },
 			{ "Transparent minimap (round or square, no borders)", function() return SS.DB().minimapTransparent; end, function(v) SS.SetMinimapTransparent(v); end },
 			ShowClock(), DetachClock(),
-			ButtonPlace(),
 			{ "Show caches on the minimap", short = "Caches", function() return SS.DB().minimapCaches; end, function(v) SS.DB().minimapCaches = v and true or false; end },
 			{ "Show bosses on the minimap", short = "Bosses", function() return SS.DB().minimapBosses; end, function(v) SS.DB().minimapBosses = v and true or false; end },
 			{ "Show lairs and their refill timer", short = "Lairs", function() return SS.DB().minimapLairs; end, function(v) SS.DB().minimapLairs = v and true or false; end },
 			{ "The game's nearest Guardian lair flag", short = "Guardian lair flag", function() return SS.DB().showGuardianFlag; end, function(v) SS.DB().showGuardianFlag = v and true or false; SS.ApplyGuardianFlag(); end },
 			{ "Slim Suite's gear button", short = "Gear button", function() local m = SS.DB().minimap; return not (type(m) == "table" and m.hide); end,
 				function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (type(m) == "table" and m.hide and true or false) == (v and true or false) ) then SS.Mini.Toggle(); end end end } },
-		SlimSuiteMinimapBar = { ButtonPlace() },
-		SlimSuiteClockFrame = { { "Show the zone and Heroic affixes under it", short = "Zone and Heroic affixes", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
-		MainMenuExpBar = { { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
+		SlimSuiteClockFrame = { { "Location and difficulty above the clock", function() return SS.DB().clockContextAbove~=false; end, function(v) SS.DB().clockContextAbove=v; SS.ApplyClockLayout(); SS.UpdateClock(); end }, { "Show location and difficulty", short = "Zone and Heroic affixes", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
+		MainMenuExpBar = { { "Hide XP bar border", function() return SS.DB().xpHideBorder; end, function(v) SS.DB().xpHideBorder=v; SS.StyleExpBar(SS.CurrentOrientation("MainMenuExpBar")=="vertical"); end }, { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
 			function(v) SU.SetVertical("MainMenuExpBar", v); SS.Safe(SS.LayoutXpSegments); end },
 			{ "Split into 20 segments", function() return SS.DB().xpSegments ~= false; end,
 			function(v) SS.DB().xpSegments = v and true or false; SS.Safe(SS.LayoutXpSegments); end, xref = true, short = "Split into 20 segments" } },
@@ -309,9 +309,16 @@ function SU.ChecksFor(frame)
 			{ "Dark background", function() return SS.DB().localClockBackground ~= false; end, function(v) SS.DB().localClockBackground = v; end },
 			{ "24-hour time", function() return SlimSuiteWorld and SlimSuiteWorld.ClockIs24 and SlimSuiteWorld.ClockIs24(); end, function(v) SS.DB().localClock24 = v; end },
 			ShowClock(), DetachClock() },
-		SlimSuiteSpellRowFrame = { VerticalRow("SlimSuiteSpellRowFrame"), JoinRows() },
-		SlimSuiteItemRowFrame = { VerticalRow("SlimSuiteItemRowFrame"), JoinRows() },
-		SlimSuiteCombatTextFrame = {
+		SlimSuiteSpellRowFrame = { VerticalRow("SlimSuiteSpellRowFrame"), JoinRows(), MatchRows(), ShowSpells(), ShowItems() },
+		SlimSuiteItemRowFrame = { VerticalRow("SlimSuiteItemRowFrame"), JoinRows(), MatchRows(), ShowSpells(), ShowItems() },
+		SlimSuiteCompassFrame = {
+ {"Compass style",function() return SS.DB().compassStyle or "rail"; end,function(v) SS.DB().compassStyle=v; SS.UpdateCompass(); end,choice={{"Compass rail","rail"},{"Free markers","free"}}},
+ {"Show bosses",function() return SS.DB().compassBosses~=false; end,function(v) SS.DB().compassBosses=v; end},
+ {"Show lairs",function() return SS.DB().compassLairs~=false; end,function(v) SS.DB().compassLairs=v; end},
+ {"Show chests",function() return SS.DB().compassCaches~=false; end,function(v) SS.DB().compassCaches=v; end} },
+ SlimSuiteCombatTextFrame = {
+			SS.WorldCombatEntry and SS.WorldCombatEntry() or nil,
+			{ "Keep combat log with world numbers", function() return SS.DB().keepCombatLog; end, function(v) SS.DB().keepCombatLog=v; end },
 			{ "Show heals", function() return SS.DB().ctHeals ~= false; end, function(v) SS.DB().ctHeals = v and true or false; end },
 			{ "Crits: bigger and longer", function() return SS.DB().ctCrits ~= false; end, function(v) SS.DB().ctCrits = v and true or false; end },
 			{ "Spell icons", function() return SS.DB().ctIcons ~= false; end, function(v) SS.DB().ctIcons = v and true or false; end },
@@ -319,6 +326,7 @@ function SU.ChecksFor(frame)
 			{ "Crits and your biggest hits grow and fall away", short = "Big hits grow and fall", function() return SS.DB().ctPop ~= false; end, function(v) SS.DB().ctPop = v and true or false; end },
 			{ "Reduce floating-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end } },
 	};
+	if ( frame=="SlimSuiteStatCounterFrame" and SS.StatSettings ) then list[frame]=SS.StatSettings(); end
 	local out = {};
 	-- "Movable?" belongs to the game's own frame: not offered while a card or the thin lines show the element
 	if ( frame and SU.NATIVE[frame] and SS.Shown(frame) == frame ) then

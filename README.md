@@ -10,7 +10,11 @@ Made by **Slimjim**, Slim Suite combines a customizable HUD with combat tools, c
 
 Slim Suite's UI settings let you build your interface piece by piece. Start with your player frame, add the party frames, move your action bar, then decide what else belongs on your screen.
 
-On a **fresh installation**, setup opens with the managed HUD elements disabled, including their original game versions. You choose which elements to bring back and which versions to use. Existing saved setups are preserved.
+On a **fresh installation**, every managed HUD element starts enabled in its default location. Slim Suite takes over the corresponding game elements so you can move and customize them straight away. Existing saved setups are preserved.
+
+To restore the game’s original interface, use **Go back to vanilla** directly beneath **Toggle UI Settings**. This resets element positions, restores native HUD parts including stored level-ups, and disables Slim Suite’s UI replacements and overlays. Opening the editor again resumes the custom HUD.
+
+The compact editor contains grid controls, Demo On/Off, Reset All, and Done. Drag the green boxes to arrange your HUD; right-click a box to open that element’s settings.
 
 Every element has three clear choices:
 
@@ -22,17 +26,17 @@ Every element has three clear choices:
 
 **To build your layout:**
 
-1. Open `/slim setup` and select **Enabled** beside an element.
-2. Drag its green box to put it where you want it.
-3. **Right-click the element's name** for its appearance, size, scale, and other available options.
-4. Add the next element when you're ready. Use **Demo** to preview the elements you've enabled with sample activity.
+1. Open `/slim setup`. All custom elements are ready to move on a new installation.
+2. Drag its green box to move it, or hold and drag its lower-right grip to resize it.
+3. **Right-click the element's green box** for its appearance, size, scale, and other available options.
+4. Use **Demo** to preview the enabled elements with sample activity.
 5. Press **Done** and confirm when your layout is ready. Reopen setup whenever you want to change it.
 
 ### Make the HUD yours
 
 - **Player, target, and party frames:** keep classic portraits or use cleaner custom frames. Mirror the target frame, arrange the party in a row or column, or include yourself in the party list.
 - **Buffs and debuffs:** attach your buffs around the player frame, choose the target's aura position, and show teammates' buffs above their frames.
-- **Action and build bars:** keep or hide the action bar artwork, turn supported bars vertically, add cooldown numbers, and optionally show your racial ability. Keep build spells and equipped jewelry joined together or separate them.
+- **Action and build bars:** keep or hide the action bar artwork, turn supported bars vertically, add cooldown numbers, and optionally show your racial ability. Keep build spells and equipped jewelry joined together or separate them; hide either row and choose independent or matched icon sizes.
 - **The rest of your HUD:** position the XP bar, chat, tooltips, damage meter, encounter bars, run clock, announcements, stored level-up button, revive bar, and local clock.
 - **Kills, gold, and cache cost:** use a vertical or horizontal tally, with optional map name, named difficulty, and boss/Guardian kill counts.
 - **Placement tools:** use the alignment grid, center guides, and optional snapping. Resolution-aware sizing and recommended HUD positions give you a starting point for different screen shapes.
@@ -60,9 +64,21 @@ Save named profiles, keep separate layouts for different characters, and import 
 - Add cache, boss, and lair pins to the minimap, including lair refill timers and the nearest-Guardian-lair flag.
 - Use the extended camera-distance option for a wider view.
 
+### Live stats
+
+The Stats element starts at 230 × 170, matching the default damage meter, and scrolls inside its own box. Its right-click menu lets you toggle individual stats by category and choose a combined total or **Default + Bonus** measured from the pre-run starting values. If no starting values were captured, it shows the live total. It displays the client’s character-pane totals, current/max HP with shields in parentheses, racial information, and active buff timers. It updates as the game reports item, spell and temporary-effect changes. It does not estimate undocumented bonuses or count gear and racial effects twice.
+
+### World feedback and navigation
+
+Combat-log mode hides the game’s damage numbers by default. Its World damage display setting can retain native numbers, show spell icons with crit numbers over all enemies, or show normal and crit damage on bosses only. You can keep the log alongside a world display.
+
+The optional **Compass** offers a marked rail or free-standing arrow markers, with separate Boss, Lair and Chest filters. Minimap points use real world positions and disappear outside the visible range rather than sliding around its rim. Pregame previews appear only where the client already supplies a position; future-boss schedules do not expose spawn coordinates.
+
+Build and Stats can remain above card-selection screens, docked at the viewport edges. Their tooltips stay usable there, and leaving the selection restores their earlier anchors.
+
 ### A minimap that fits your layout
 
-Choose a **round or square minimap**, with an optional transparent, borderless appearance. Keep buttons around the map or gather them above, below, left, or right. A separate movable button row is also available.
+Choose a **round or square minimap**, with an optional transparent, borderless appearance. Buttons stay around the map; Slim Suite does not collect them into directional groups or a separate box.
 
 The local clock supports 12-hour or 24-hour time, a background toggle, and placement attached to or separate from the minimap.
 

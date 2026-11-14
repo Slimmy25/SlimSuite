@@ -44,7 +44,7 @@ SS.SetupEnd(true); Tick(2)
 SS.SetUnlocked(true); Tick(2)
 check("afterwards: the element list again", SU.bar:IsVisible() and not (SlimSuiteMovePanel and SlimSuiteMovePanel:IsVisible()))
 check("grid and Done are on the list", SU.grid:GetParent() == SU.bar and SU.bar.done:IsVisible())
-check("Demo controls precede the settings hint", SU.bar.demoLabel:GetText() == "Demo" and SU.bar.demoOn.points[1][4] < SU.bar.demoOff.points[1][4] and SU.bar.demoHint.points[1][2] == SU.bar.demoOff)
+check("Demo controls precede the settings hint", SU.bar.demoLabel:GetText() == "Demo" and SU.bar.demoOn.points[1][4] < SU.bar.demoOff.points[1][4] and SU.bar.demoHint.points[1][2] == SU.bar)
 Click(SU.bar.done); Tick(2)
 check("Done asks before closing setup", SU.bar:IsVisible() and SU.confirmDone:IsVisible())
 SU.HideAll(); Tick(2)
@@ -115,7 +115,7 @@ print("list problems: " .. bad)
 local cols = {}
 for _, b in pairs(SU.barButtons) do if b:IsShown() then local p = b.points[1]; cols[p[4]] = true end end
 local nc = 0; for _ in pairs(cols) do nc = nc + 1 end
-check("element list in two columns", nc == 2)
+check("compact editor has no visible element rows", nc == 0 and SU.bar:GetHeight()==94)
 check("element list can be dragged", SU.bar.movable or (SU.bar.IsMovable and SU.bar:IsMovable()) or SU.bar:GetScript("OnDragStart") ~= nil)
 print("listcols problems: " .. bad)
 -- Demo On/Off beside the grid; the list stays while the demo runs
