@@ -1804,7 +1804,7 @@ function SU.RefreshDemoButtons()
 		end
 		if ( stillEnabled == 0 ) then SS.StopDemoMode(); return; end
 	end
-	if ( SU.bar.demoLabel ) then SU.bar.demoLabel:SetText(SS.T("Demo")); end
+	if ( SU.bar.demoLabel ) then SU.bar.demoLabel:SetText(SS.T("Demo (Right click element name to modify settings)")); end
 	if ( count == 0 and not SS.demoRunning ) then SU.bar.demoOn:Disable(); else SU.bar.demoOn:Enable(); end
 	if ( SS.demoRunning ) then SU.bar.demoOn:LockHighlight(); SU.bar.demoOff:UnlockHighlight();
 	else SU.bar.demoOff:LockHighlight(); SU.bar.demoOn:UnlockHighlight(); end
@@ -1874,11 +1874,11 @@ function SU.Build()
 	SU.panel:Hide();
 	-- Demo Mode beside the grid: On and Off, the one that is in effect lit
 	SU.bar.demoLabel = SU.bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-	SU.bar.demoLabel:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 218, -12); SU.bar.demoLabel:SetText(SS.T("Demo"));
+	SU.bar.demoLabel:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 218, -12); SU.bar.demoLabel:SetText(SS.T("Demo (Right click element name to modify settings)"));
 	SU.bar.demoOn = K.Button(SU.bar, "On", 36, function() SS.StartDemoMode(); SU.RefreshDemoButtons(); end);
-	SU.bar.demoOn:SetHeight(18); SU.bar.demoOn:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 252, -9);
+	SU.bar.demoOn:SetHeight(18); SU.bar.demoOn:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 500, -9);
 	SU.bar.demoOff = K.Button(SU.bar, "Off", 36, function() SS.StopDemoMode(); SU.RefreshDemoButtons(); end);
-	SU.bar.demoOff:SetHeight(18); SU.bar.demoOff:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 290, -9);
+	SU.bar.demoOff:SetHeight(18); SU.bar.demoOff:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 538, -9);
 	SU.bar.done = K.Button(SU.bar, "Done", 90, function() SS.SetupEnd(true); end);
 	SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
 	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);

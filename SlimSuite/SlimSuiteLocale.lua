@@ -42,6 +42,9 @@ local extra = {
  }
 };
 for locale, values in pairs(extra) do for key, value in pairs(values) do SS.LOCALE_TEXT[locale][key] = value; end end
+SS.LOCALE_TEXT.esES["Demo (Right click element name to modify settings)"] = "Demo (Clic derecho en el nombre del elemento para modificar sus ajustes)";
+SS.LOCALE_TEXT.frFR["Demo (Right click element name to modify settings)"] = "Démo (clic droit sur le nom d’un élément pour modifier ses réglages)";
+SS.LOCALE_TEXT.deDE["Demo (Right click element name to modify settings)"] = "Demo (Elementnamen rechtsklicken, um Einstellungen zu ändern)";
 local labels = {
  {"Target frame", "Marco del objetivo", "Cadre de la cible", "Zielfenster"}, {"Player frame look", "Apariencia del marco del jugador", "Apparence du cadre du joueur", "Spielerfenster-Design"}, {"Target frame look", "Apariencia del marco del objetivo", "Apparence du cadre de la cible", "Zielfenster-Design"}, {"3D portrait on the new-school frame", "Retrato 3D en el marco moderno", "Portrait 3D sur le cadre moderne", "3D-Porträt im modernen Fenster"},
  {"Player buffs position", "Posición de beneficios del jugador", "Position des améliorations du joueur", "Position der Spieler-Buffs"}, {"Buffs and debuffs", "Beneficios y perjuicios", "Améliorations et affaiblissements", "Stärkungen und Schwächungen"}, {"Target buffs/debuffs", "Beneficios/perjuicios del objetivo", "Améliorations/affaiblissements de la cible", "Ziel-Stärkungen/Schwächungen"}, {"Join the party yourself (you go first)", "Unirte al grupo (vas primero)", "Rejoindre le groupe (vous passez en premier)", "Der Gruppe selbst beitreten (du zuerst)"},

@@ -4,6 +4,9 @@ Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## Unreleased
 
+## 1.26
+- Added a parenthetical hint beside Demo explaining that right-clicking an element name opens its settings.
+
 ## 1.25
 - Toggle UI Settings enables movable Slim Suite elements by default on first use; users can set each element to Enabled, Disabled, or Default. The element name itself is non-clickable, with right-click opening its settings.
 - Kills / Gold / Cache can show or hide the map name and named difficulty (Normal or Heroic 1–5) instead of a numeric multiplier.
