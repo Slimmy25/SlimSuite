@@ -1,19 +1,23 @@
--- Optional enemy nameplates. Native plates are controlled through the standard 1.12 CVar;
+-- Optional enemy nameplates. Native plates use the same functions/state as 1.12's nameplate key binding;
 -- the modern overlay uses the game's documented world-anchor projection and AZS_UNITS data.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 
-local NAMEPLATE_CVAR = "nameplateShowEnemies";
 local function ReadNativeNameplates()
-	if ( not GetCVar ) then return true; end
-	local ok, value = SS.Safe(GetCVar, NAMEPLATE_CVAR);
-	if ( not ok or value == nil ) then return true; end
-	return SS.HudShown(value);
+	return NAMEPLATES_ON and true or false;
+end
+local function WriteNativeNameplates(on)
+	local change = HideNameplates;
+	if ( on ) then change = ShowNameplates; end
+	if ( type(change) ~= "function" ) then return false; end
+	local ok = SS.Safe(change);
+	if ( ok ) then NAMEPLATES_ON = on and 1 or nil; end
+	return ok;
 end
 function SS.SetNativeEnemyNameplates(on)
 	local d = SS.DB();
 	d.enemyNameplates = on and true or false;
 	if ( d.modernEnemyFrames ) then d.modernEnemyFrames = false; SS.Safe(SS.UpdateEnemyNameplates);
-	elseif ( SetCVar ) then SS.Safe(SetCVar, NAMEPLATE_CVAR, on and "1" or "0"); end
+	else WriteNativeNameplates(on); end
 end
 
 local plates, freePlates, registered, plateSerial = {}, {}, false, 0;
@@ -141,22 +145,20 @@ function SS.UpdateEnemyNameplates()
 	local d = SS.DB();
 	local supported = type(AZS_GetWorldAnchors) == "function" and type(AZS_ProjectWorldAnchors) == "function" and type(AZS_RegisterWorldAnchorFrameHandler) == "function";
 	if ( d.modernEnemyFrames and supported ) then
-		if ( not d.enemyNameplatesOriginal and GetCVar ) then
-			local ok, value = SS.Safe(GetCVar, NAMEPLATE_CVAR);
-			if ( ok and value ~= nil ) then d.enemyNameplatesOriginal = tostring(value); end
+		if ( d.enemyNameplatesOriginal == nil ) then
+			d.enemyNameplatesOriginal = ReadNativeNameplates() and "1" or "0";
 		end
-		if ( SetCVar and ReadNativeNameplates() ) then SS.Safe(SetCVar, NAMEPLATE_CVAR, "0"); end
+		if ( ReadNativeNameplates() ) then WriteNativeNameplates(false); end
 		if ( not registered and type(AZS_RegisterWorldAnchorFrameHandler) == "function" ) then
 			SS.Safe(AZS_RegisterWorldAnchorFrameHandler, ProjectPlates); registered = true;
 		end
 		SS.Safe(ReadCatalog);
 	else
-		if ( d.enemyNameplatesOriginal ~= nil and SetCVar ) then
+		if ( d.enemyNameplatesOriginal ~= nil ) then
 			local restore = d.enemyNameplates ~= nil and (d.enemyNameplates and "1" or "0") or tostring(d.enemyNameplatesOriginal);
-			if ( GetCVar ) then local ok, value = SS.Safe(GetCVar, NAMEPLATE_CVAR); if ( ok and tostring(value) ~= restore ) then SS.Safe(SetCVar, NAMEPLATE_CVAR, restore); end
-			else SS.Safe(SetCVar, NAMEPLATE_CVAR, restore); end
-			d.enemyNameplatesOriginal = nil;
-		elseif ( d.enemyNameplates ~= nil and SetCVar ) then SS.Safe(SetCVar, NAMEPLATE_CVAR, d.enemyNameplates and "1" or "0"); end
+			local wanted = SS.HudShown(restore);
+			if ( ReadNativeNameplates() == wanted or WriteNativeNameplates(wanted) ) then d.enemyNameplatesOriginal = nil; end
+		elseif ( d.enemyNameplates ~= nil and ReadNativeNameplates() ~= (d.enemyNameplates and true or false) ) then WriteNativeNameplates(d.enemyNameplates); end
 		if ( registered and type(AZS_UnregisterWorldAnchorFrameHandler) == "function" ) then
 			SS.Safe(AZS_UnregisterWorldAnchorFrameHandler, ProjectPlates); registered = false;
 		end
@@ -170,9 +172,9 @@ update:RegisterEvent("PLAYER_ENTERING_WORLD"); update:RegisterEvent("PLAYER_LOGO
 update:SetScript("OnEvent", function()
 	if ( event == "PLAYER_LOGOUT" ) then
 		local d = SS.DB();
-		if ( d.modernEnemyFrames and d.enemyNameplatesOriginal ~= nil and SetCVar ) then
+		if ( d.modernEnemyFrames and d.enemyNameplatesOriginal ~= nil ) then
 			local value = d.enemyNameplates ~= nil and (d.enemyNameplates and "1" or "0") or tostring(d.enemyNameplatesOriginal);
-			SS.Safe(SetCVar, NAMEPLATE_CVAR, value);
+			WriteNativeNameplates(SS.HudShown(value));
 		end
 		return;
 	end

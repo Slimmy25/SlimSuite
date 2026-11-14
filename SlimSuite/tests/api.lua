@@ -7,6 +7,38 @@ local scaleRoot = { GetScale = function() return 0.8 end };
 local scaleChild = { parent = scaleRoot, GetScale = function() return 1.25 end,
 	GetParent = function(self) return self.parent end };
 check("effective scale falls back through parents", math.abs(SS.EffectiveScale(scaleChild) - 1) < 0.001)
+do
+	local legacyPlate = { GetLeft = function() return 20 end, GetRight = function() return 100 end,
+		GetTop = function() return 60 end, GetScale = function() return 2 end }
+	local legacyPortrait = { IsShown = function() return true end, GetLeft = function() return 15 end,
+		GetScale = function() return 0.5 end, GetParent = function() return legacyPlate end }
+	local left, width, top = SS.BuffRoom(legacyPlate, legacyPortrait)
+	check("buff room accepts frames and textures without GetEffectiveScale", left == 15 and width == 185 and top == 120)
+end
+-- The original 1.12 client has show/hide APIs and NAMEPLATES_ON, not the modern nameplate CVar.
+do
+	local d = SS.DB()
+	local savedPreference, savedModern, savedOriginal, savedOn = d.enemyNameplates, d.modernEnemyFrames, d.enemyNameplatesOriginal, NAMEPLATES_ON
+	local savedCatalog, savedProject, savedRegister, savedUnregister = AZS_GetWorldAnchors, AZS_ProjectWorldAnchors, AZS_RegisterWorldAnchorFrameHandler, AZS_UnregisterWorldAnchorFrameHandler
+	AZS_GetWorldAnchors = function() return { entries = {}, hasMore = false } end
+	AZS_ProjectWorldAnchors = function() return { entries = {} } end
+	AZS_RegisterWorldAnchorFrameHandler = function() end
+	AZS_UnregisterWorldAnchorFrameHandler = function() end
+	d.modernEnemyFrames, d.enemyNameplatesOriginal = false, nil
+	SS.SetNativeEnemyNameplates(true)
+	check("native nameplate enable uses legacy API", NAMEPLATES_VISIBLE and NAMEPLATES_ON == 1 and SS.NativeEnemyNameplatesEnabled())
+	SS.SetModernEnemyFrames(true)
+	check("modern plates temporarily hide native plates", not NAMEPLATES_VISIBLE and not NAMEPLATES_ON and d.enemyNameplatesOriginal == "1")
+	SS.SetModernEnemyFrames(false)
+	check("leaving modern plates restores native plates", NAMEPLATES_VISIBLE and NAMEPLATES_ON == 1 and d.enemyNameplatesOriginal == nil)
+	SS.SetNativeEnemyNameplates(false)
+	check("native nameplate disable uses legacy API", not NAMEPLATES_VISIBLE and not NAMEPLATES_ON and not SS.NativeEnemyNameplatesEnabled())
+	SS.SetModernEnemyFrames(true); SS.SetModernEnemyFrames(false)
+	check("previously hidden native plates stay hidden", not NAMEPLATES_VISIBLE and not NAMEPLATES_ON)
+	SS.SetNativeEnemyNameplates(savedOn and true or false)
+	d.enemyNameplates, d.modernEnemyFrames, d.enemyNameplatesOriginal = savedPreference, savedModern, savedOriginal
+	AZS_GetWorldAnchors, AZS_ProjectWorldAnchors, AZS_RegisterWorldAnchorFrameHandler, AZS_UnregisterWorldAnchorFrameHandler = savedCatalog, savedProject, savedRegister, savedUnregister
+end
 local oldLeft, oldBottom = UIParent.GetLeft, UIParent.GetBottom
 UIParent.GetLeft = function() return 100 end; UIParent.GetBottom = function() return 80 end
 SS.ENV.SetRootPosition(SlimSuiteClockFrame, 140, 110)
@@ -94,6 +126,25 @@ SS.HideNative("localClock", true)
 check("hiding a HUD part", shown.localClock == false)
 SS.RestoreNatives()
 check("restoring it", shown.localClock ~= false)
+
+-- Announcements have distinct Enabled/Disabled/Default semantics, including incoming events.
+do
+	local setup = SS.ENV.SU
+	setup.SetMode("SlimSuiteAnnouncementFrame", "enabled", "Announcements")
+	check("enabling announcements immediately hides native banners", shown.banners == false)
+	SS.ShowAnnouncement({ id = "visibility-enabled", text = "Enabled banner" })
+	check("enabled announcements display the custom banner", SlimSuiteAnnouncementFrame:IsShown())
+	setup.SetMode("SlimSuiteAnnouncementFrame", "disabled", "Announcements")
+	SS.UpdateAnnouncementFrame()
+	check("disabled announcements hide both versions", shown.banners == false and not SlimSuiteAnnouncementFrame:IsShown())
+	SS.ShowAnnouncement({ id = "visibility-disabled", text = "Hidden banner" })
+	check("incoming announcements cannot restore disabled banners", shown.banners == false and not SlimSuiteAnnouncementFrame:IsShown())
+	SS.StartSetup(true); Tick(2); SS.SetupEnd(true); Tick(2)
+	check("disabled announcements remain hidden after setup exits", shown.banners == false and not SlimSuiteAnnouncementFrame:IsShown())
+	setup.SetMode("SlimSuiteAnnouncementFrame", "default", "Announcements")
+	SS.ShowAnnouncement({ id = "visibility-default", text = "Native banner" })
+	check("default announcements restore only the native version", shown.banners == true and not SlimSuiteAnnouncementFrame:IsShown())
+end
 
 AZS_UNITS = nil; AZS_RUN = nil
 print("api problems: " .. bad)

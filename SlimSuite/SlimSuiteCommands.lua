@@ -61,7 +61,9 @@ function SS.Startup(entering, loaded)
 	if ( SS.DB().unlocked or type(SS.DB().places.MainMenuExpBar) == "table"
 		or type(SS.DB().sizes.MainMenuExpBar) == "table" or type(SS.DB().scales.MainMenuExpBar) == "number"
 		or SS.DB().orientations.MainMenuExpBar ~= nil ) then SS.Safe(SS.DetachExperienceBar); end
-	if ( type(SS.DB().places.ChatFrame1) == "table" ) then SS.Safe(SS.PrepareChatWindow); end
+	if ( SS.DB().elementModes.ChatFrame1 == "default" ) then
+		SS.Safe(SS.RestoreChatLayout, false);
+	elseif ( SS.ChatIsCustom and SS.ChatIsCustom() ) then SS.Safe(SS.PrepareChatWindow); end
 	SS.Safe(SS.ApplyTallyLayout, false);
 	SS.Safe(PlaceAll);
 	SS.Safe(SS.TargetFrameHidden, SS.DB().hideTarget);
@@ -80,6 +82,7 @@ function SS.Startup(entering, loaded)
 	SS.Safe(SS.UpdateEnemyNameplates);
 	if ( entering ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
 	SS.Safe(SS.ApplyElementModes);
+	SS.Safe(SS.RefreshChatDock);
 end
 loader:RegisterEvent("PLAYER_LOGOUT");
 loader:SetScript("OnEvent", function()

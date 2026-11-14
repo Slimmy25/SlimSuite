@@ -204,6 +204,7 @@ function SU.SetMovable(frame, movable)
 			local s = baseSizes[frame];
 			if ( s and f.SetWidth ) then f:SetWidth(s.w); f:SetHeight(s.h); end
 		end
+		if ( frame == "ChatFrame1" ) then SS.Safe(SS.RestoreChatLayout, not SU.restoring); end
 	end
 	SS.DB().places[frame] = nil;
 	if ( SS.DB().unlocked ) then SS.Safe(SS.SetUnlocked, true, true); end
@@ -386,7 +387,7 @@ SU.FORCE_HIDE = { "SlimSuiteMeterFrame", "SlimSuiteTallyFrame", "SlimSuiteClockF
 -- so do the game's error popup, menus and confirmation dialogs, and Slim Suite's own tools. Hidden, these came back
 -- invisible but still catching clicks, which stopped any further changes.
 SU.KEEP_VISIBLE = { ScriptErrors = true, SlimSuiteErrorFrame = true, SlimSuiteMouseProbe = true, ItemRefTooltip = true,
-	UIErrorsFrame = true, SlimSuiteWarnTip = true };
+	UIErrorsFrame = true, SlimSuiteWarnTip = true, ChatFrameEditBox = true, ChatFrameMenuButton = true };
 for i = 1, 3 do SU.KEEP_VISIBLE["DropDownList" .. i] = true; end
 for i = 1, 4 do SU.KEEP_VISIBLE["StaticPopup" .. i] = true; end
 for i = 1, 7 do
@@ -482,6 +483,8 @@ function SU.SetOn(frame, on, title)
 	-- the same goes for every replacement: its element in the list is its on/off switch
 	local feature = SU.FEATURES[frame];
 	if ( feature and not SU.restoring ) then SS.Safe(feature, on and true or false); end
+	local nativePart = SU.NATIVE_PARTS[frame];
+	if ( nativePart ) then SS.Safe(SS.HideNative, nativePart, on or SS.DB().elementModes[frame] == "disabled"); end
 	-- the target frame element is the same switch as "Hide the target frame": off here is off in the game too
 	if ( frame == "TargetFrame" and not SU.restoring and not SU.defaulting and (SS.DB().hideTarget and true or false) == (on and true or false) ) then
 		SS.DB().hideTarget = not on;
@@ -543,7 +546,7 @@ function SU.SetOn(frame, on, title)
 				if ( fname == "TargetFrame" and not SS.DB().hideTarget and f.Show ) then f:Show(); end
 				local p = f:GetParent();                     -- a hidden parent would hide the element too
 				while ( p and p ~= UIParent and p.SetAlpha ) do SU.Save(p); p:SetAlpha(SU.saved[p]); p = p:GetParent(); end
-			elseif ( not SU.defaulting and not SU.KEEP_VISIBLE[fname] ) then
+			elseif ( not SU.defaulting and frame ~= "ChatFrame1" and not SU.KEEP_VISIBLE[fname] ) then
 				f:SetAlpha(0);
 			end
 		end
@@ -557,6 +560,7 @@ function SU.SetOn(frame, on, title)
 	if ( on and not handles[hname] and title ) then SS.Safe(SS.Handle, hname, title); end
 	if ( handles[hname] ) then if ( on and SS.HandleAllowed(hname) ) then handles[hname]:Show(); else handles[hname]:Hide(); end end
 	if ( frame == "MinimapCluster" and on ) then SS.Safe(SS.ApplyMinimapShape); end   -- round border or square edge
+	if ( frame == "ChatFrame1" and on ) then SS.Safe(SS.PrepareChatWindow); end
 	if ( not SU.batching ) then
 		SU.RefreshBar(); SU.UpdateDemo();
 		if ( frame == "PlayerFrame" and SU.focus == "TargetFrame" ) then SU.Focus("TargetFrame"); end
@@ -636,6 +640,7 @@ function SU.SetMode(frame, mode, title)
 	d.elementModes[frame] = mode;
 	if ( mode == "enabled" ) then
 		SU.defaulting = false;
+		if ( frame == "ChatFrame1" and not SU.restoring and d.frameDefault ) then d.frameDefault.ChatFrame1 = nil; end
 		SU.SetOn(frame, true, title);
 	elseif ( mode == "disabled" ) then
 		SU.defaulting = false;
@@ -680,6 +685,7 @@ function SU.SetMode(frame, mode, title)
 	if ( not SU.batching ) then SU.RefreshBar(); SU.UpdateDemo(); SU.RefreshDemoButtons(); end
 	-- Selecting Enabled in setup immediately selects that element and exposes its green move handle.
 	if ( not SU.batching and setupActive and mode == "enabled" ) then SU.Focus(frame); end
+	if ( frame == "ChatFrame1" ) then SS.Safe(SS.RefreshChatDock); end
 end
 
 function SU.CycleMode(frame)
@@ -2048,7 +2054,7 @@ function SU.Build()
 	SU.bar.demoOn:SetHeight(18); SU.bar.demoOn:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 500, -9);
 	SU.bar.demoOff = K.Button(SU.bar, "Off", 36, function() SS.StopDemoMode(); SU.RefreshDemoButtons(); end);
 	SU.bar.demoOff:SetHeight(18); SU.bar.demoOff:SetPoint("TOPLEFT", SU.bar, "TOPLEFT", 538, -9);
-	SU.bar.done = K.Button(SU.bar, "Done", 90, function() SS.SetupEnd(true); end);
+	SU.bar.done = K.Button(SU.bar, "Done", 90, function() SS.ConfirmSetupDone(); end);
 	SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
 	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);
 	SU.bar.resetAll:SetPoint("RIGHT", SU.bar.done, "LEFT", -6, 0);
@@ -2160,6 +2166,7 @@ end
 
 -- the frames that come with an element in the setup (the party's depend on its look)
 function SU.CompanionsOf(frame)
+	if ( frame == "ChatFrame1" and SS.ChatCompanions ) then return SS.ChatCompanions(); end
 	if ( frame == "PartyMemberFrame1" ) then
 		if ( SS.Look("PartyMemberFrame1") == "thin" ) then return {}; end   -- the thin lines are one frame, you included
 		return { "PartyMemberFrame2", "PartyMemberFrame3", "PartyMemberFrame4", "SlimSuitePartySelfFrame" };
@@ -2189,13 +2196,32 @@ function SS.SetupHide()
 	if ( SU.panel ) then SU.panel:Hide(); end
 	if ( SU.bar ) then SU.bar:Hide(); end
 	SS.Safe(SS.EndPreviewsIfDone);
+	SS.Safe(SS.RefreshChatDock);
 	SS.Safe(SS.HideNative, "meter", false);
 	if ( SS.DB().moveMeter ) then SS.Safe(SS.HideNative, "meter", true); end
 	if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
 end
 
 -- Exit: the UI stays unlocked for moving. Complete: the UI is locked.
+function SS.ConfirmSetupDone()
+	if ( not SU.confirmDone ) then
+		local f = K.Window("SlimSuiteSetupConfirmation", "Finish setup", 380, 150);
+		SU.confirmDone = f;
+		local text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
+		text:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -38); text:SetWidth(340); text:SetHeight(60);
+		text:SetText(SS.T("Have you added everything you want? To add more use /slim setup"));
+		local confirm = K.Button(f, "Confirm", 110, function() f:Hide(); SS.SetupEnd(true); end);
+		f.confirm = confirm;
+		confirm:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -18, 14);
+		local back = K.Button(f, "Back", 110, function() f:Hide(); end);
+		f.back = back;
+		back:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 18, 14);
+	end
+	SU.confirmDone:Show();
+end
+
 function SS.SetupEnd(finished)
+	if ( SU.confirmDone ) then SU.confirmDone:Hide(); end
 	SS.DB().setupDone = true;
 	local ok, err = pcall(SS.SetupHide);
 	if ( not ok ) then SS.SetupRescue(err); return; end

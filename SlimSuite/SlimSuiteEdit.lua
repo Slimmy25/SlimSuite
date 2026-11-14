@@ -583,57 +583,124 @@ function SS.ApplyMovablePadding(name)
 end
 
 
--- The main chat window is docked by default, with its tab and edit box as separate frames. Undock it for custom
--- placement, then anchor those two companions to the message frame so one green handle moves the whole chat window.
+-- Keep the native dock intact: it owns tab selection and which message window is visible.
+-- General establishes the tab baseline; other docked tabs share it even after a native dock refresh.
+local chatDockHooked = false;
+local chatOriginals = {};
+function SS.ChatIsCustom()
+	local d = SS.DB();
+	local mode = d.elementModes and d.elementModes.ChatFrame1;
+	if ( mode == "default" or mode == "disabled" or (d.frameDefault and d.frameDefault.ChatFrame1) ) then return false; end
+	local place = d.places.ChatFrame1;
+	return mode == "enabled" or d.unlocked or (type(place) == "table" and not place.displayDefault);
+end
+local function ChatInput()
+	return (ChatFrame1 and ChatFrame1.editBox) or getglobal("ChatFrameEditBox") or getglobal("ChatFrame1EditBox");
+end
+local function EachDockedChat(fn)
+	if ( type(DOCKED_CHAT_FRAMES) == "table" and table.getn(DOCKED_CHAT_FRAMES) > 0 ) then
+		for i = 1, table.getn(DOCKED_CHAT_FRAMES) do fn(DOCKED_CHAT_FRAMES[i]); end
+	else
+		for i = 2, (NUM_CHAT_WINDOWS or 7) do local f = getglobal("ChatFrame" .. i); if ( f and f.isDocked ) then fn(f); end end
+	end
+end
+function SS.ChatCompanions()
+	local out, seen = {}, {};
+	local function Add(f)
+		local name = f and f.GetName and f:GetName();
+		if ( type(name) == "string" and name ~= "ChatFrame1" and not seen[name] ) then seen[name] = true; table.insert(out, name); end
+	end
+	Add(ChatFrame1Tab); Add(ChatInput()); Add(getglobal("ChatFrameMenuButton"));
+	EachDockedChat(function(f)
+		if ( f and f ~= ChatFrame1 and f.isDocked and f.GetName ) then Add(f); Add(getglobal(f:GetName() .. "Tab")); end
+	end);
+	return out;
+end
+function SS.CaptureChatLayout()
+	if ( not SS.ChatIsCustom() ) then return; end
+	local names = SS.ChatCompanions(); table.insert(names, "ChatFrame1");
+	for i = 1, table.getn(names) do
+		local f = getglobal(names[i]);
+		if ( f and not chatOriginals[f] ) then
+			local original = { points = {}, scale = f.GetScale and f:GetScale() or 1 };
+			for p = 1, (f.GetNumPoints and f:GetNumPoints() or 0) do
+				local point, relative, relativePoint, x, y = f:GetPoint(p);
+				original.points[p] = { point, relative, relativePoint, x, y };
+			end
+			if ( f == ChatFrame1 ) then
+				original.w, original.h = f:GetWidth(), f:GetHeight();
+				original.userPlaced = f.IsUserPlaced and f:IsUserPlaced() and true or false;
+			end
+			chatOriginals[f] = original;
+		end
+	end
+end
+function SS.SyncChatLayout()
+	local chat, first = ChatFrame1, ChatFrame1Tab;
+	if ( chat and first and SS.ChatIsCustom() ) then
+		SS.CaptureChatLayout();
+		local scale = SS.EffectiveScale(chat);
+		local function MatchScale(f)
+			if ( f and f.SetScale and f.GetParent ) then f:SetScale(scale / SS.EffectiveScale(f:GetParent())); end
+		end
+		MatchScale(first);
+		first:ClearAllPoints(); first:SetPoint("BOTTOMLEFT", getglobal("ChatFrame1Background") or chat, "TOPLEFT", 2, 0);
+		local previous = first;
+		EachDockedChat(function(f)
+			if ( f and f ~= chat and f.isDocked and f.GetName ) then
+				MatchScale(f);
+				f:ClearAllPoints(); f:SetPoint("TOPLEFT", chat, "TOPLEFT", 0, 0); f:SetPoint("BOTTOMRIGHT", chat, "BOTTOMRIGHT", 0, 0);
+				local tab = getglobal(f:GetName() .. "Tab"); MatchScale(tab);
+				if ( tab and tab.IsShown and tab:IsShown() ) then
+					tab:ClearAllPoints(); tab:SetPoint("BOTTOMLEFT", previous, "BOTTOMRIGHT", 0, 0); previous = tab;
+				end
+			end
+		end);
+		local input = ChatInput(); MatchScale(input);
+		if ( input and input.SetPoint ) then
+			-- The original 1.12 edit box has two anchors: preserve its width as chat resizes.
+			input:ClearAllPoints(); input:SetPoint("TOPLEFT", chat, "BOTTOMLEFT", -5, -2); input:SetPoint("TOPRIGHT", chat, "BOTTOMRIGHT", 5, -2);
+		end
+		MatchScale(getglobal("ChatFrameMenuButton"));
+		SS.UserPlace(chat); -- otherwise the native dock-position updater can move it back
+	end
+	SS.Safe(ApplyFeatureMute, "ChatFrame1");
+end
+function SS.RefreshChatDock()
+	if ( type(FCF_DockUpdate) == "function" ) then SS.Safe(FCF_DockUpdate); end
+	SS.SyncChatLayout();
+end
+function SS.RestoreChatLayout(clearSaved)
+	local current = { [ChatFrame1] = true };
+	for _, name in ipairs(SS.ChatCompanions()) do current[getglobal(name)] = true; end
+	for f, original in pairs(chatOriginals) do
+		if ( current[f] ) then
+			f:ClearAllPoints();
+			for _, p in ipairs(original.points) do f:SetPoint(p[1], p[2], p[3], p[4], p[5]); end
+			if ( f.SetScale ) then f:SetScale(original.scale); end
+			if ( f == ChatFrame1 ) then
+				f:SetWidth(original.w); f:SetHeight(original.h);
+				if ( f.SetUserPlaced ) then f:SetUserPlaced(original.userPlaced); end
+			end
+		end
+	end
+	chatOriginals = {};
+	if ( clearSaved ) then
+		local d = SS.DB(); d.sizes.ChatFrame1, d.scales.ChatFrame1 = nil, nil;
+		d.muted.ChatFrame1 = nil;
+		d.chatOffsets.ChatFrame1Tab, d.chatOffsets.ChatFrame1EditBox = nil, nil;
+	end
+	SS.RefreshChatDock();
+end
 function SS.PrepareChatWindow()
-	local chat = ChatFrame1;
-	if ( not chat ) then return; end
-	if ( chat.isDocked and FCF_UnDockFrame ) then
-		SS.Safe(FCF_UnDockFrame, chat);
-		if ( FCF_SetLocked ) then SS.Safe(FCF_SetLocked, chat, false); end
+	if ( not ChatFrame1 or not SS.ChatIsCustom() ) then return; end
+	SS.CaptureChatLayout();
+	if ( not chatDockHooked and type(FCF_DockUpdate) == "function" ) then
+		local original = FCF_DockUpdate;
+		FCF_DockUpdate = function() original(); SS.Safe(SS.SyncChatLayout); end;
+		chatDockHooked = true;
 	end
-	local chatLeft, chatBottom = chat:GetLeft(), chat:GetBottom();
-	if ( not chatLeft or not chatBottom ) then return; end
-	local parts = { { "ChatFrame1Tab", ChatFrame1Tab }, { "ChatFrame1EditBox", chat.editBox or getglobal("ChatFrame1EditBox") } };
-	for i = 1, table.getn(parts) do
-		local name, part = parts[i][1], parts[i][2];
-		local offset = SS.DB().chatOffsets[name];
-		if ( part and type(offset) ~= "table" ) then
-			local left, bottom = part:GetLeft(), part:GetBottom();
-			if ( left and bottom ) then
-				offset = { x = left - chatLeft, y = bottom - chatBottom };
-				SS.DB().chatOffsets[name] = offset;
-			end
-		end
-		if ( part and type(offset) == "table" and type(offset.x) == "number" and type(offset.y) == "number" ) then
-			part:ClearAllPoints();
-			part:SetPoint("BOTTOMLEFT", chat, "BOTTOMLEFT", offset.x, offset.y);
-		end
-	end
-	-- the chat windows that stay docked (Combat Log, ...) open where the main window is now, not at its old place
-	for i = 2, (NUM_CHAT_WINDOWS or 7) do
-		local cf = getglobal("ChatFrame" .. i);
-		if ( cf and cf.isDocked and cf.SetPoint ) then
-			cf:ClearAllPoints();
-			cf:SetPoint("TOPLEFT", chat, "TOPLEFT", 0, 0);
-			cf:SetPoint("BOTTOMRIGHT", chat, "BOTTOMRIGHT", 0, 0);
-		end
-	end
-	-- the other chat tabs (Combat, Trade, ...) sit in a row beside the General tab, on the same line
-	local general = SS.DB().chatOffsets["ChatFrame1Tab"];
-	if ( type(general) == "table" and type(general.x) == "number" and type(general.y) == "number" ) then
-		local x = general.x;
-		local tab1 = getglobal("ChatFrame1Tab");
-		x = x + (tab1 and tab1.GetWidth and (tab1:GetWidth() or 60) or 60) - 4;
-		for i = 2, 7 do
-			local tab = getglobal("ChatFrame" .. i .. "Tab");
-			if ( tab and tab.SetPoint and tab.IsShown and tab:IsShown() ) then
-				tab:ClearAllPoints();
-				tab:SetPoint("BOTTOMLEFT", chat, "BOTTOMLEFT", x, general.y);
-				x = x + (tab:GetWidth() or 60) - 4;
-			end
-		end
-	end
+	SS.RefreshChatDock();
 end
 
 -- The native XP bar is anchored to MainMenuBar. Reparent it while preserving its on-screen bounds so its

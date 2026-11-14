@@ -59,8 +59,11 @@ Frame.methods = {
 	GetName = function(self) return self.name end,
 	GetChildren = function(self) return table.unpack(self.children or {}) end,
 	GetRegions = function(self) return table.unpack(self.regions or {}) end,
-	GetNumPoints = function(self) return 1 end,
-	GetPoint = function(self) return "CENTER", UIParent, "CENTER", 0, 0 end,
+	GetNumPoints = function(self) return self.points and #self.points or 1 end,
+	GetPoint = function(self, index)
+		if self.points then local p = self.points[index or 1]; if p then return table.unpack(p) end; return nil end
+		return "CENTER", UIParent, "CENTER", 0, 0
+	end,
 	CreateTexture = function(self) local t = Region(self, "Texture"); self.regions = self.regions or {}; table.insert(self.regions, t); return t end,
 	CreateFontString = function(self) local t = Region(self, "FontString"); self.regions = self.regions or {}; table.insert(self.regions, t); return t end,
 	SetText = function(self, t) self.text = t end, GetText = function(self) return self.text end,
@@ -129,7 +132,7 @@ end
 UIParent = CreateFrame("Frame", "UIParent"); UIParent.w, UIParent.h = 1024, 768
 WorldFrame = CreateFrame("Frame", "WorldFrame")
 for _, n in ipairs({ "PlayerFrame", "TargetFrame", "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3", "PartyMemberFrame4",
-	"MinimapCluster", "BuffFrame", "MainMenuBar", "MainMenuExpBar", "ChatFrame1", "ChatFrame1Tab", "ChatFrame1EditBox",
+	"MinimapCluster", "BuffFrame", "MainMenuBar", "MainMenuExpBar", "ChatFrame1", "ChatFrame1Tab", "ChatFrame1EditBox", "ChatFrameEditBox", "ChatFrameMenuButton",
 	"GameTimeFrame", "MainMenuBarArtFrame", "UIErrorsFrame", "GameTooltip", "ScriptErrors", "DropDownList1", "ItemRefTooltip" }) do
 	CreateFrame("Frame", n, UIParent)
 end
@@ -149,6 +152,10 @@ for i = 1, 4 do
 	CreateFrame("Frame", "PartyMemberFrame" .. i .. "Portrait", _G["PartyMemberFrame" .. i])
 end
 DEFAULT_CHAT_FRAME = ChatFrame1
+ChatFrame1.editBox = ChatFrameEditBox
+ChatFrameEditBox:ClearAllPoints()
+ChatFrameEditBox:SetPoint("TOPLEFT", ChatFrame1, "BOTTOMLEFT", -5, -2)
+ChatFrameEditBox:SetPoint("TOPRIGHT", ChatFrame1, "BOTTOMRIGHT", 5, -2)
 STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
 MAX_PLAYER_BUFFS = 16
 NUM_CHAT_WINDOWS = 7
@@ -179,8 +186,17 @@ function GetCursorPosition() return 500, 400 end
 function IsShiftKeyDown() return nil end
 function IsMouseButtonDown() return nil end
 local cvars = {}
-function GetCVar(name) return cvars[name] or "0" end
-function SetCVar(name, value) cvars[name] = tostring(value) end
+function GetCVar(name)
+	assert(name ~= "nameplateShowEnemies", "Couldn't find CVar named 'nameplateShowEnemies'")
+	return cvars[name] or "0"
+end
+function SetCVar(name, value)
+	assert(name ~= "nameplateShowEnemies", "Couldn't find CVar named 'nameplateShowEnemies'")
+	cvars[name] = tostring(value)
+end
+NAMEPLATES_VISIBLE = false
+function ShowNameplates() NAMEPLATES_VISIBLE = true end
+function HideNameplates() NAMEPLATES_VISIBLE = false end
 function GetMouseFocus() return nil end
 function HasAction() return true end
 function PlaySoundFile() end
@@ -204,6 +220,7 @@ Any.meta = { __call = function() return nil end, __index = look }
 local missing = {}
 setmetatable(_G, { __index = function(t, k)
 	if type(k) ~= "string" then return nil end
+	if k == "NAMEPLATES_ON" then return nil end -- nil is the real 1.12 "hidden" state
 	if string.match(k, "^AZS_") or string.match(k, "^SlimSuite") or k == "SS" or k == "SU" or k == "AZSKIT" then return nil end
 	if string.match(k, "^[A-Z]") then
 		missing[k] = true

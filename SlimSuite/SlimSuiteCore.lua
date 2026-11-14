@@ -161,10 +161,15 @@ SS.NATIVE_KEYS = { build = "buildNativeOriginal", tally = "tallyNativeOriginal",
 	clock = "clockNativeOriginal", bosses = "bossNativeOriginal", banners = "bannerNativeOriginal",
 	levels = "levelNativeOriginal", revive = "reviveNativeOriginal", localClock = "localClockNativeOriginal" };
 local natives = {};
+local nativeElements = { build = "SlimSuiteSpellRowFrame", tally = "SlimSuiteTallyFrame", meter = "SlimSuiteMeterFrame",
+	clock = "SlimSuiteClockFrame", bosses = "SlimSuiteBossFrames", banners = "SlimSuiteAnnouncementFrame",
+	levels = "SlimSuiteStoredLevelsButton", revive = "SlimSuiteReviveFrame", localClock = "SlimSuiteLocalClockFrame" };
 function SS.HideNative(part, on)
 	if ( type(AZS_SetHudShown) ~= "function" ) then return; end
 	local key = SS.NATIVE_KEYS[part];
 	if ( not key ) then return; end                        -- a missing name would hide the whole HUD
+	local modes = SS.DB().elementModes;
+	if ( modes and modes[nativeElements[part]] == "disabled" ) then on = true; end
 	local n = natives[part];
 	if ( not n ) then n = {}; natives[part] = n; end
 	-- already hidden: ask the game again only when its phase changes, and hide its part again if it came back

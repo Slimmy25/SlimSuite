@@ -600,10 +600,17 @@ function SS.CreateAnnouncementFrame()
 	announcementFrame:Hide();
 end
 
+local function SyncAnnouncementNative()
+	local d = SS.DB();
+	-- Disabled hides both versions; Default alone gives the native announcements back.
+	local disabled = d.elementModes and d.elementModes.SlimSuiteAnnouncementFrame == "disabled";
+	SS.HideNative("banners", d.replaceBanners or disabled);
+end
+
 function SS.ShowAnnouncement(banner)
+	SyncAnnouncementNative();
 	if ( not SS.DB().replaceBanners ) then
 		if ( announcementFrame ) then announcementFrame:Hide(); end
-		SS.HideNative("banners", false);
 		return;
 	end
 	if ( type(banner) ~= "table" ) then return; end
@@ -626,7 +633,8 @@ function SS.ShowAnnouncement(banner)
 end
 
 function SS.UpdateAnnouncementFrame()
-	if not SS.DB().replaceBanners then if announcementFrame then announcementFrame:Hide();end;SS.HideNative("banners", false);return;end
+	SyncAnnouncementNative();
+	if not SS.DB().replaceBanners then if announcementFrame then announcementFrame:Hide();end;return;end
 	if ( not announcementFrame ) then return; end
 	local maxWidth = math.max(40, UIParent:GetWidth() - 24);
 	if ( announcementFrame:GetWidth() > maxWidth ) then announcementFrame:SetWidth(maxWidth); end
@@ -668,7 +676,7 @@ function SS.RegisterAnnouncementHandler()
 	local ok = SS.Safe(AZS_RegisterBannerHandler, bannerHandler);
 	if ( ok ) then
 		bannerHandlerRegistered = true;
-		if ( SS.DB().replaceBanners ) then SS.HideNative("banners", true); end
+		SyncAnnouncementNative();
 	end
 	return bannerHandlerRegistered;
 end
@@ -814,6 +822,7 @@ function SS.MinSize(name)
 end
 
 function SS.ApplySize(name, f)
+	if ( name == "ChatFrame1" and SS.CaptureChatLayout ) then SS.CaptureChatLayout(); end
 	local s = SS.DB().sizes[name];
 	if ( name == "GameTooltip" and type(s) ~= "table" ) then
 		s = { w = 260, h = 140 };
@@ -834,6 +843,7 @@ function SS.ApplySize(name, f)
 			for i = 1, 4 do local party = getglobal("PartyMemberFrame" .. i); if ( party and party.SetScale ) then party:SetScale(scale); end end
 		elseif ( f.SetScale ) then f:SetScale(scale); end
 	end
+	if ( name == "ChatFrame1" and SS.SyncChatLayout ) then SS.SyncChatLayout(); end
 end
 
 -- Include visible child frames in edge clamping. Some Blizzard bars draw their buttons a few
@@ -912,10 +922,11 @@ ApplyFeatureMute = function(name)
 		for i = 2, 4 do SS.CollectFeatureFrames(getglobal("PartyMemberFrame" .. i), list, seen, 0); end
 		SS.CollectFeatureFrames(getglobal("SlimSuitePartySelfFrame"), list, seen, 0);
 	elseif ( name == "ChatFrame1" ) then
-		SS.CollectFeatureFrames(getglobal("ChatFrame1Tab"), list, seen, 0);
-		SS.CollectFeatureFrames(getglobal("ChatFrame1EditBox"), list, seen, 0);
+		local companions = SS.ChatCompanions and SS.ChatCompanions() or { "ChatFrame1Tab", "ChatFrameEditBox", "ChatFrame1EditBox" };
+		for _, companion in ipairs(companions) do SS.CollectFeatureFrames(getglobal(companion), list, seen, 0); end
 	end
 	local muted = SS.DB().muted[name] and true or false;
+	if ( name == "ChatFrame1" and not setupActive and SS.DB().elementModes.ChatFrame1 == "disabled" ) then muted = true; end
 	for i = 1, table.getn(list) do
 		local target = list[i];
 		if ( target and target.GetAlpha and target.SetAlpha ) then
@@ -1575,6 +1586,7 @@ function SS.Place(name, ignoreAnchor)
 	local f = getglobal(name);
 	local p = SS.DB().places[name];
 	if ( not f ) then return; end
+	if ( name == "ChatFrame1" and SS.ChatIsCustom and not SS.ChatIsCustom() ) then return; end
 	if ( SS.DB().frameDefault and SS.DB().frameDefault[name] ) then return; end   -- "Default": the game's own placement
 	if ( (name == "SlimSuiteSpellRowFrame" and type(p) ~= "table") or (name == "SlimSuiteItemRowFrame" and
 		(type(p) ~= "table" or (SS.BuildRowsJoined(name) and p.relative ~= "SlimSuiteSpellRowFrame"))) ) then

@@ -4,6 +4,13 @@ Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## Unreleased
 
+## 1.28
+- Disabled native HUD elements now remain hidden when their replacement updates. Fresh-install setup starts with both versions disabled, ready for a preset or manual setup. Done asks for confirmation and explains how to reopen setup with /slim setup.
+- Reworked chat layout handling around the native dock: the real shared edit box keeps both width anchors, docked windows and controls scale together, setup preserves the selected tab, and Default restores native geometry and scaling. Disabled and muted states now cover the docked group and restore the input box correctly.
+- General and Combat Log tabs share a baseline above the chat window and remain aligned after native dock updates; separately undocked chat tabs keep their own position.
+- Announcements Disabled now hides both the game and Slim Suite versions; Enabled immediately hides the original, and Default restores it. Incoming banners and setup exit preserve the selected visibility.
+- Native enemy-nameplate controls use the original 1.12 show/hide functions instead of the unsupported nameplateShowEnemies CVar. Regression checks cover nameplate restoration and buff layout without GetEffectiveScale.
+
 ## 1.27
 - Added optional LEGO die death sound, hitmarker and whip-crack boss/Guardian/lair-owner kill sounds, and a Zelda-style cache-opening sound. Added an in-game preview button for each included sound so players can audition them before enabling.
 - Setup rebuilds preserve party, minimap and clock choices; only selecting Default restores the game's settings. Updated the automated harness to load all addon modules and retain CVar changes.
