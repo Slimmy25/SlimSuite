@@ -4,6 +4,10 @@ Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## Unreleased
 
+## 1.30
+- During Move to begin, register Slim Suite HUD, setup windows, move handles, and enabled managed native elements with the game's foreground overlay API; restore temporary registrations when leaving ready. Rendering above the native prompt still requires an in-game check.
+- Enabled Kills / Gold / Cache is visible at Move to begin with starting values, and the ready timer stays at 00:00. Event-driven elements remain hidden when empty outside setup or Demo Mode.
+
 ## 1.29
 - Kept the setup completion confirmation visible above the element menu. Mirror Target now calculates equal outer screen margins using the actual screen bounds.
 

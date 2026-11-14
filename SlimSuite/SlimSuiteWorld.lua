@@ -552,22 +552,62 @@ local ON_TOP = { "SlimSuiteWorldMarkers", "SlimSuiteMeterFrame", "SlimSuiteStore
 	"SlimSuitePartyLines", "SlimSuitePartySelfFrame", "SlimSuiteMinimapBar", "SlimSuiteRaidIconPanel", "SlimSuiteStatCounterFrame" };
 -- Off by default: the game's cards then cover Slim Suite like the rest of the HUD. Only when the player turns the
 -- setting on are Slim Suite's frames lifted above them.
+local readyOverlay = {};
+local function IsOnTop(frame)
+	if ( not A.Has("AZS_IsOnTopOfScreens") ) then return nil; end
+	local ok, value = SS.Safe(AZS_IsOnTopOfScreens, frame);
+	if ( ok ) then return value and true or false; end
+end
+local function PutOnTop(frame, on)
+	if ( IsOnTop(frame) ~= on ) then SS.Safe(AZS_SetOnTopOfScreens, frame, on); end
+end
 function W.ApplyOnTop()
 	if ( not A.Has("AZS_SetOnTopOfScreens") ) then return; end
-	local on = DB().onTopOfScreens and true or false;
+	local ready = A.Call("AZS_GetPhase") == "ready";
+	local on = ready or (DB().onTopOfScreens and true or false);
+	local managed = {};
 	for i = 1, table.getn(ON_TOP) do
 		local f = getglobal(ON_TOP[i]);
 		if ( f ) then
-			local ok = SS.Safe(AZS_SetOnTopOfScreens, f, on);
-			if ( not ok and on ) then SS.Safe(AZS_SetOnTopOfScreens, f); end
+			managed[f] = true; PutOnTop(f, on);
 		end
 	end
 	for i = 1, 64 do
 		local f = getglobal("SlimSuiteEnemyNameplate" .. i);
 		if ( f ) then
-			local ok = SS.Safe(AZS_SetOnTopOfScreens, f, on);
-			if ( not ok and on ) then SS.Safe(AZS_SetOnTopOfScreens, f); end
+			managed[f] = true; PutOnTop(f, on);
 		end
+	end
+	-- Temporary registrations include the setup/menus and stock elements under Slim Suite control.
+	-- Never lift UIParent or WorldFrame: that would also lift unrelated addons and game screens.
+	local wanted = {};
+	local function Include(f)
+		local name = f and f.GetName and f:GetName();
+		if ( type(name) == "string" and name ~= "UIParent" and name ~= "WorldFrame" and not managed[f] ) then wanted[f] = true; end
+	end
+	if ( ready ) then
+		if ( UIParent and UIParent.GetChildren ) then
+			for _, f in ipairs({ UIParent:GetChildren() }) do
+				local name = f.GetName and f:GetName();
+				if ( type(name) == "string" and string.find(name, "^SlimSuite") ) then Include(f); end
+			end
+		end
+		for name, mode in pairs(DB().elementModes or {}) do
+			if ( mode == "enabled" ) then
+				Include(getglobal(SS.Shown(name)));
+				local setup = SS.ENV and SS.ENV.SU;
+				if ( setup and setup.CompanionsOf ) then
+					for _, companion in ipairs(setup.CompanionsOf(name)) do Include(getglobal(companion)); end
+				end
+			end
+		end
+	end
+	for f, previous in pairs(readyOverlay) do
+		if ( not wanted[f] ) then PutOnTop(f, previous); readyOverlay[f] = nil; end
+	end
+	for f in pairs(wanted) do
+		if ( readyOverlay[f] == nil ) then readyOverlay[f] = IsOnTop(f) or false; end
+		PutOnTop(f, true);
 	end
 end
 
@@ -1499,3 +1539,4 @@ end);
 SS.Every("localClock", 0.5, function() SS.Safe(UpdateLocalClock); end);   -- a clock that shows minutes
 ticker:RegisterEvent("PLAYER_ENTERING_WORLD");
 ticker:SetScript("OnEvent", function() SS.Safe(W.ApplyOnTop); end);
+SS.Every("readyOverlay", 0.2, function() SS.Safe(W.ApplyOnTop); end);

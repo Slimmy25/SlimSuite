@@ -473,7 +473,7 @@ function SS.UpdateClock()
 	local preview = not showClock;
 	if ( showClock ) then
 		local elapsed = type(AZS_GetRunTime) == "function" and AZS_GetRunTime() or nil;
-		if ( phase == "ready" and type(elapsed) ~= "number" ) then elapsed = 0; end
+		if ( phase == "ready" ) then elapsed = 0; end
 		clockFrame.time:SetText(SS.ClockText(elapsed));
 		local upcoming = {};
 		if ( type(AZS_GetUpcomingBosses) == "function" ) then

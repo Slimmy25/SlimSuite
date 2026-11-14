@@ -991,12 +991,13 @@ function SS.TallyValue(value)
 end
 
 SS.TALLY_SAMPLE = { kills = 1284, gold = 356, chest = 120, bosses = 2, guardians = 3 };
-function SS.TallyParts(run, sample)
+function SS.TallyParts(run, sample, ready)
 	if ( sample ) then run = SS.TALLY_SAMPLE; end
 	local parts = { { SS.T("Kills"), SS.TallyValue(run and run.kills) } };
 	if ( SS.DB().tallyBossKills ) then
 		local bosses, guardians;
 		if ( sample ) then bosses, guardians = run.bosses, run.guardians;
+		elseif ( ready ) then bosses, guardians = 0, 0;
 		elseif ( run and SlimSuiteWorld and SlimSuiteWorld.RunKills ) then bosses, guardians = SlimSuiteWorld.RunKills(); end
 		table.insert(parts, { "Bosses", SS.TallyValue(bosses) });
 		table.insert(parts, { "Guardians", SS.TallyValue(guardians) });
@@ -1128,8 +1129,10 @@ function SS.UpdateTally()
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local active = phase and phase ~= "ready";
 	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
-	if ( active and run ) then
-		SS.DrawTally(SS.TallyParts(run));
+	local ready = phase == "ready";
+	if ( ready ) then run = { kills = run and run.kills or 0, gold = run and run.gold or 0, chest = run and run.chest }; end
+	if ( (active or ready) and run ) then
+		SS.DrawTally(SS.TallyParts(run, false, ready));
 		tallyFrame:Show();
 		SS.HideNative("tally", true);
 	elseif ( SS.Previewing("SlimSuiteTallyFrame") ) then

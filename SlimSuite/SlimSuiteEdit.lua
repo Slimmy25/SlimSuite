@@ -770,7 +770,7 @@ function SS.PrepareSizeTools(name, label)
 	local f = getglobal(SS.Shown(name));
 	if ( not f ) then return false; end
 	if ( not sizeMenu ) then
-		sizeMenu = CreateFrame("Frame", nil, UIParent);
+		sizeMenu = CreateFrame("Frame", "SlimSuiteElementMenu", UIParent);
 		sizeMenu:SetWidth(206); sizeMenu:SetHeight(120);
 		sizeMenu:SetFrameStrata("DIALOG");
 		sizeMenu.rows = {};
@@ -1279,7 +1279,7 @@ function SS.Handle(name, label)
 	if ( not f ) then return nil; end
 	local h = handles[name];
 	if ( not h ) then
-		h = CreateFrame("Frame", nil, UIParent);
+		h = CreateFrame("Frame", "SlimSuiteMoveHandle" .. name, UIParent);
 		h:SetFrameStrata("DIALOG");
 		h:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 			tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
