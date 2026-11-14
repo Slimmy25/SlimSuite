@@ -9,6 +9,13 @@ if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one se
 -- picks the setup up at the same step next time; "Skip setup" or finishing it ends it for good, and the move
 -- panel's "Run setup again" starts it over.
 SU = {};                                           -- the setup's panel, outline and steps
+local statCounterPlaceholder = CreateFrame("Frame", "SlimSuiteStatCounterFrame", UIParent);
+statCounterPlaceholder:SetWidth(150); statCounterPlaceholder:SetHeight(28);
+statCounterPlaceholder:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+statCounterPlaceholder:SetBackdropColor(0.04, 0.035, 0.07, 0.9); statCounterPlaceholder:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+statCounterPlaceholder.label = statCounterPlaceholder:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
+statCounterPlaceholder.label:SetPoint("CENTER", statCounterPlaceholder, "CENTER"); statCounterPlaceholder.label:SetText("Stat counter [WIP]");
+statCounterPlaceholder:Hide();
 
 function SU.Steps()
 	local d = SS.DB();
@@ -38,6 +45,7 @@ function SU.Steps()
 		{ "SlimSuiteLocalClockFrame", "Local clock", "Your real-world clock: 12/24-hour, its background and daylight saving are below.", function() return d.replaceLocalClock and d.clockDetached; end },
 		{ "SlimSuiteMinimapBar", "Button row (optional)", "Optional: takes every minimap button and the day/night moon off the map into one row you can drag anywhere. Off, the buttons stay on the map's ring.", function() return d.minimapBar; end },
 		{ "SlimSuiteCombatTextFrame", "Combat text", "Your newest hits and heals, each with its spell icon. Crits stand out.", function() return d.combatTextBox; end },
+		{ "SlimSuiteStatCounterFrame", "Stat counter [WIP]", "A placeholder for a future run-stat counter. [WIP]" },
 	};
 	for i = 1, table.getn(rest) do
 		local r = rest[i];
@@ -372,7 +380,7 @@ end
 SU.FORCE_HIDE = { "SlimSuiteMeterFrame", "SlimSuiteTallyFrame", "SlimSuiteClockFrame", "SlimSuiteLocalClockFrame",
 	"SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteReviveFrame", "SlimSuiteCombatTextFrame",
 	"SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteProcMeter", "SlimSuiteStoredLevelsButton",
-	"SlimSuiteStoreLevelsToggle", "SlimSuiteWorldMarkers", "SlimSuiteFloatingText", "SlimSuiteMovePanel", "GameTimeFrame" };
+	"SlimSuiteStoreLevelsToggle", "SlimSuiteWorldMarkers", "SlimSuiteFloatingText", "SlimSuiteMovePanel", "SlimSuiteStatCounterFrame", "GameTimeFrame" };
 
 -- the chat windows, their tabs and their input boxes stay visible and usable during setup, so you can always type;
 -- so do the game's error popup, menus and confirmation dialogs, and Slim Suite's own tools. Hidden, these came back
@@ -407,6 +415,9 @@ end
 
 -- turn an element on or off: its frame (and the frames that move with it) and its handle
 SU.FEATURES = {
+	SlimSuiteStatCounterFrame = function(v)
+		if ( v and setupActive ) then statCounterPlaceholder:Show(); else statCounterPlaceholder:Hide(); end
+	end,
 	SlimSuiteStoredLevelsButton = function(v) SS.DB().moveLevelButton = v; SS.UpdateLevelButton(); end,
 	SlimSuiteSpellRowFrame = function(v) SS.DB().replaceBuildRows = v; SS.ApplyBuildRowReplacement(); end,
 	SlimSuiteClockFrame = function(v) SS.DB().replaceClock = v; SS.UpdateClock(); end,
@@ -422,6 +433,43 @@ SU.FEATURES = {
 	end,
 	SlimSuiteMinimapBar = function(v) SS.SetMinimapBar(v, true); end,
 };
+
+-- A setup element's Default state means the original Blizzard/Aethus element is active and Slim Suite's
+-- replacement is inactive. These calls intentionally set game HUD visibility to shown, even if the player
+-- previously hid that part in Interface settings: choosing Default explicitly asks for the game's design.
+SU.NATIVE_PARTS = {
+	SlimSuiteStoredLevelsButton = "levels", SlimSuiteSpellRowFrame = "build", SlimSuiteMeterFrame = "meter",
+	SlimSuiteClockFrame = "clock", SlimSuiteBossFrames = "bosses", SlimSuiteTallyFrame = "tally",
+	SlimSuiteAnnouncementFrame = "banners", SlimSuiteReviveFrame = "revive", SlimSuiteLocalClockFrame = "localClock",
+};
+function SU.RestoreNative(frame)
+	local d = SS.DB();
+	local part = SU.NATIVE_PARTS[frame];
+	if ( part ) then
+		SS.Safe(SS.HideNative, part, false);
+		local key = SS.NATIVE_KEYS and SS.NATIVE_KEYS[part];
+		if ( key ) then d[key] = nil; end
+		if ( type(AZS_SetHudShown) == "function" ) then SS.Safe(AZS_SetHudShown, part, true); end
+	end
+	if ( frame == "PlayerFrame" ) then
+		d.playerLook = "classic";
+		if ( SS.DB().partyIncludesSelf ) then SS.SetPartySelf(false); end
+		if ( SS.DB().mirrorTarget ) then SS.SetMirrorTarget(false); end
+	elseif ( frame == "TargetFrame" ) then
+		d.targetLook = "classic"; d.hideTarget = false;
+		SS.Safe(SS.TargetFrameHidden, false);
+	elseif ( frame == "PartyMemberFrame1" ) then d.partyLook = "classic";
+	elseif ( frame == "MinimapCluster" ) then
+		d.minimapSquare, d.minimapTransparent, d.minimapBar, d.gatherButtons = false, false, false, false;
+		SS.Safe(SS.SetMinimapBar, false, true); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar);
+	elseif ( frame == "MainMenuBar" ) then
+		d.plainBar = false; SS.Safe(SS.PlainBar, false); SS.Safe(SS.RestoreNativeActionBarLayout);
+	end
+	if ( frame == "SlimSuiteStatCounterFrame" ) then return; end
+	if ( frame == "TargetFrame" or frame == "PlayerFrame" or frame == "PartyMemberFrame1" ) then SS.Safe(SS.ApplyNewFrames); end
+	if ( frame == "MinimapCluster" ) then SS.Safe(SS.ApplyMinimapShape); end
+end
+
 function SU.SetOn(frame, on, title)
 	-- the newest choice wins: a target frame turned on or off by its own button takes precedence over the party/combine settings
 	if ( frame == "PlayerFrame" and on and not SU.restoring and SS.DB().partyIncludesSelf ) then SS.Safe(SS.ClaimTarget, "player"); end
@@ -550,6 +598,37 @@ function SU.Mode(frame)
 	return "default";
 end
 
+-- Detect an existing HUD setup so onboarding never resets a returning player's saved layout.
+function SS.HasPriorUISetup(d)
+	d = d or SS.DB();
+	if ( d.setupDone or d.unlocked ) then return true; end
+	if ( next(d.elementModes or {}) or next(d.enabledElements or {}) ) then return true; end
+	if ( next(d.frameDefault or {}) or next(d.layouts or {}) or d.layoutPerCharacter ) then return true; end
+	if ( next(d.sizes or {}) or next(d.scales or {}) or next(d.orientations or {}) ) then return true; end
+	for frame in pairs(d.places or {}) do if ( frame ~= "SlimSuiteItemRowFrame" ) then return true; end end
+	for _, key in ipairs({ "moveLevelButton", "moveMeter", "replaceBuildRows", "replaceClock", "replaceEncounters", "replaceTally", "replaceBanners", "replaceRevive", "replaceLocalClock", "minimapBar", "combatTextBox", "hideTarget", "partyIncludesSelf", "mirrorTarget", "combineTarget", "buffsOnPlayer", "minimapSquare", "minimapTransparent" }) do
+		if ( d[key] ) then return true; end
+	end
+	return false;
+end
+
+-- Reapply explicit element choices after the game restores its native frames during login or setup exit.
+function SS.ApplyElementModes()
+	if ( setupActive ) then return; end
+	local modes, steps, seen = SS.DB().elementModes or {}, SU.Steps(), {};
+	for i = 1, table.getn(steps) do
+		local frame = steps[i].frame;
+		if ( frame and (modes[frame] == "enabled" or modes[frame] == "disabled") ) then
+			seen[frame] = true;
+			SS.Safe(SU.SetOn, frame, modes[frame] == "enabled", steps[i].title);
+		end
+	end
+	if ( modes.SlimSuiteMeterFrame and not seen.SlimSuiteMeterFrame and (modes.SlimSuiteMeterFrame == "enabled" or modes.SlimSuiteMeterFrame == "disabled") ) then
+		SS.Safe(SU.SetOn, "SlimSuiteMeterFrame", modes.SlimSuiteMeterFrame == "enabled", "Damage meter");
+	end
+	if ( not SS.DB().unlocked ) then SS.Safe(SS.SetUnlocked, false, true); end
+end
+
 function SU.SetMode(frame, mode, title)
 	if ( mode ~= "enabled" and mode ~= "disabled" and mode ~= "default" ) then mode = "default"; end
 	local d = SS.DB();
@@ -566,6 +645,7 @@ function SU.SetMode(frame, mode, title)
 		SU.defaulting = true;
 		SU.SetOn(frame, false, title);
 		SU.defaulting = false;
+		SS.Safe(SU.RestoreNative, frame);
 		if ( SU.NATIVE[frame] ) then SS.Safe(SU.SetMovable, frame, false); end
 		if ( frame == "TargetFrame" ) then
 			d.hideTarget = false;
@@ -596,6 +676,8 @@ function SU.SetMode(frame, mode, title)
 	d.enabledElements = d.enabledElements or {};
 	d.enabledElements[frame] = mode == "enabled" and true or nil;
 	if ( not SU.batching ) then SU.RefreshBar(); SU.UpdateDemo(); SU.RefreshDemoButtons(); end
+	-- Selecting Enabled in setup immediately selects that element and exposes its green move handle.
+	if ( not SU.batching and setupActive and mode == "enabled" ) then SU.Focus(frame); end
 end
 
 function SU.CycleMode(frame)
@@ -848,6 +930,7 @@ function SS.RefreshCard(f)
 	local hp, hpMax = UnitHealth(unit) or 0, UnitHealthMax(unit) or 1;
 	if ( hpMax < 1 ) then hpMax = 1; end
 	f.hp:SetMinMaxValues(0, hpMax); f.hp:SetValue(hp);
+	SS.UpdateAbsorbMarker(f.hp, unit, hp, hpMax);
 	if ( f.hpWas ~= hp or f.hpMaxWas ~= hpMax ) then f.hpWas, f.hpMaxWas = hp, hpMax; f.hpText:SetText(hp .. " / " .. hpMax); end
 	local pw, pwMax = UnitMana(unit) or 0, UnitManaMax(unit) or 1;
 	if ( pwMax < 1 ) then pwMax = 1; end
@@ -858,6 +941,62 @@ function SS.RefreshCard(f)
 	f.power:SetMinMaxValues(0, pwMax); f.power:SetValue(pw);
 	f:Show();
 end
+
+-- Use the game's run state for the local hero (the documented `sh` field). For other unit
+-- tokens, show a value only if this client exposes a standard unit absorb query.
+function SS.AbsorbAmount(unit)
+	if ( unit == "player" and type(AZS_RUN) == "table" and tonumber(AZS_RUN.sh) ) then
+		local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
+		if ( phase == "playing" or phase == "choosing" or phase == "paused" ) then return math.max(0, tonumber(AZS_RUN.sh)); end
+	end
+	if ( type(UnitGetTotalAbsorbs) == "function" ) then
+		local ok, value = pcall(UnitGetTotalAbsorbs, unit);
+		if ( ok and tonumber(value) ) then return math.max(0, tonumber(value)); end
+	end
+	return nil;
+end
+function SS.UpdateAbsorbMarker(bar, unit, health, maximum)
+	if ( not bar or not unit ) then return; end
+	if ( not bar.slimAbsorb ) then
+		bar.slimAbsorb = bar:CreateTexture(nil, "OVERLAY");
+		bar.slimAbsorb:SetTexture("Interface\\TargetingFrame\\UI-StatusBar");
+		bar.slimAbsorb:SetVertexColor(0.2, 1, 0.35, 0.9);
+		bar.slimAbsorbText = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+		bar.slimAbsorbText:SetTextColor(0.55, 1, 0.55);
+	end
+	local value = SS.DB().showAbsorbs and SS.AbsorbAmount(unit) or nil;
+	local width = bar:GetWidth() or 0;
+	if ( not value or value <= 0 or not maximum or maximum <= 0 or width <= 0 ) then
+		bar.slimAbsorb:Hide(); bar.slimAbsorbText:Hide(); return;
+	end
+	local start = width * math.min(1, math.max(0, health or 0) / maximum);
+	local extent = math.max(2, width * value / maximum);
+	bar.slimAbsorb:ClearAllPoints();
+	bar.slimAbsorb:SetPoint("LEFT", bar, "LEFT", start, 0);
+	bar.slimAbsorb:SetWidth(extent); bar.slimAbsorb:SetHeight(bar:GetHeight() or 6);
+	bar.slimAbsorb:Show();
+	bar.slimAbsorbText:SetText("+" .. tostring(math.floor(value + 0.5)));
+	bar.slimAbsorbText:ClearAllPoints(); bar.slimAbsorbText:SetPoint("LEFT", bar.slimAbsorb, "RIGHT", 2, 0);
+	bar.slimAbsorbText:Show();
+end
+function SS.UpdateAbsorbMarkers()
+	local player = getglobal("SlimSuitePlayerCard");
+	if ( player and UnitExists("player") ) then SS.UpdateAbsorbMarker(player.hp, "player", UnitHealth("player") or 0, UnitHealthMax("player") or 1); end
+	local nativePlayer = getglobal("PlayerFrameHealthBar");
+	if ( nativePlayer and UnitExists("player") ) then SS.UpdateAbsorbMarker(nativePlayer, "player", UnitHealth("player") or 0, UnitHealthMax("player") or 1); end
+	local selfFrame = getglobal("SlimSuitePartySelfFrame");
+	if ( selfFrame and UnitExists("player") ) then SS.UpdateAbsorbMarker(selfFrame.hp, "player", UnitHealth("player") or 0, UnitHealthMax("player") or 1); end
+	local lines = getglobal("SlimSuitePartyLines");
+	if ( lines and lines.lines ) then
+		for i = 1, 5 do local line = lines.lines[i]; if ( line and line.unit and UnitExists(line.unit) ) then SS.UpdateAbsorbMarker(line.bar, line.unit, UnitHealth(line.unit) or 0, UnitHealthMax(line.unit) or 1); end end
+	end
+	for i = 1, 4 do
+		local unit = "party" .. i;
+		local bar = getglobal("PartyMemberFrame" .. i .. "HealthBar");
+		if ( bar and UnitExists(unit) ) then SS.UpdateAbsorbMarker(bar, unit, UnitHealth(unit) or 0, UnitHealthMax(unit) or 1); end
+	end
+end
+SS.Every("absorbMarkers", 0.25, function() SS.Safe(SS.UpdateAbsorbMarkers); end);
 
 -- The target's buff and debuff tooltips ask the game for buff number "index" of the target. Hovering an icon with no
 -- target, or one of Slim Suite's demo icons, gives no valid number, so the game shows an error. Only call the
@@ -1395,14 +1534,14 @@ function SU.Focus(frame)
 	if ( e ) then
 		SU.panel.title:SetText(SS.T and SS.T(e.title) or e.title);
 		mode = setupActive and frame and SU.Mode(frame) or nil;
-		SU.panel.text:SetText(SS.T(e.text) .. (mode and mode ~= "enabled" and "\n" .. SS.T("Choose Enabled to use Slim Suite's movable version before changing its layout or options.") or ""));
+		SU.panel.text:SetText(SS.T(e.text) .. (mode and mode ~= "enabled" and "\n" .. SS.T("Enable this element to show and move it before changing its settings.") or ""));
 		-- a sub-setting shows only while the setting it depends on is on
 		local all, shown = SU.ChecksFor(frame), {};
 		for i = 1, table.getn(all) do if ( not all[i][4] or all[i][4]() ) then table.insert(shown, all[i]); end end
 		checks = shown;
 	else
 		SU.panel.title:SetText(SS.T("Setup"));
-		SU.panel.text:SetText(SS.T("Choose Default to keep the game's normal element, Enabled to use Slim Suite's movable version, or Disabled to hide it. Select Enabled before changing its layout."));
+		SU.panel.text:SetText(SS.T("All elements start disabled on a new install. Enable one to show and move it; Default restores the game's original element. Right-click its name for settings. Your Default profiles will appear beside this list."));
 	end
 	local h = 58 + (SU.panel.text:GetHeight() or 28) + 40;
 	for i = 1, math.max(table.getn(checks), table.getn(SU.checks)) do
@@ -1678,6 +1817,22 @@ function SU.Click(frame)
 end
 
 -- the setup leaves Blizzard's interface visible until an element is explicitly enabled or disabled
+function SU.PlaceProfiles()
+	local panel = SU.bar and SU.bar.profilePanel;
+	if ( not panel ) then return; end
+	local left = SU.bar:GetLeft() or 0;
+	local width = SU.bar:GetWidth() or 0;
+	local profileWidth = panel:GetWidth() or 0;
+	panel:ClearAllPoints();
+	if ( left + width + profileWidth <= (UIParent:GetWidth() or 0) ) then
+		panel:SetPoint("TOPLEFT", SU.bar, "TOPRIGHT", -2, 0);
+	elseif ( left >= profileWidth ) then
+		panel:SetPoint("TOPRIGHT", SU.bar, "TOPLEFT", 2, 0);
+	else
+		panel:SetPoint("TOPLEFT", SU.bar, "BOTTOMLEFT", 0, 2);
+	end
+end
+
 function SU.Begin()
 	if ( not SU.panel ) then SU.Build(); end
 	SU.Unreveal();
@@ -1699,25 +1854,25 @@ function SU.Begin()
 	local modes = SS.DB().elementModes or {};
 	SS.DB().elementModes = modes;
 	local saved = SS.DB().enabledElements or {};
-	local enableCustomDefaults = (tonumber(SS.DB().customElementsEnabledOnSetupVersion) or 0) < 1;
+	local d = SS.DB();
+	local initializeDisabled = (tonumber(d.firstSetupDefaultsVersion) or 0) < 1 and not d.setupDone and (SS.firstRunSetupPending or not SS.HasPriorUISetup(d));
 	SU.restoring = false;
 	SU.batching = true;      -- one bar and demo refresh at the end, not one per element
 	SS.Safe(SU.SetGridSetting, SS.DB().showEditGrid and true or false);
-	-- Migrate prior binary selections. On the first Toggle UI Settings visit, Slim Suite's own movable elements start
-	-- enabled so the user can arrange them immediately; native Blizzard elements remain at Default. Later visits respect
-	-- every Enabled, Disabled or Default choice the user made.
+	-- A clean profile starts with every element, including Blizzard's native version, explicitly Disabled.
+	-- Profiles that already chose modes keep those choices and their existing migration data.
 	for i = 1, table.getn(SU.elements) do
 		local f = SU.elements[i].frame;
+		if ( initializeDisabled ) then modes[f] = "disabled"; end
 		local mode = SU.Mode(f);
 		if ( modes[f] == nil and saved[f] ) then modes[f] = "enabled"; mode = "enabled"; end
-		if ( enableCustomDefaults and string.sub(f, 1, 9) == "SlimSuite" and mode == "default" ) then modes[f] = "enabled"; mode = "enabled"; end
 		if ( f == "SlimSuiteMeterFrame" and SS.DB().moveMeter ) then mode = modes[f] or "enabled"; end
 		if ( f == "PlayerFrame" and SS.DB().partyIncludesSelf ) then mode = modes[f] or "default"; end
 		if ( f == "TargetFrame" and SS.DB().hideTarget ) then mode = modes[f] or "disabled"; end
 		if ( mode == "enabled" or mode == "disabled" ) then SS.Safe(SU.SetMode, f, mode, SU.titles[f]);
 		else SS.Safe(SU.SetMode, f, "default", SU.titles[f]); end
 	end
-	if ( enableCustomDefaults ) then SS.DB().customElementsEnabledOnSetupVersion = 1; end
+	if ( initializeDisabled ) then d.firstSetupDefaultsVersion = 1; end
 	SU.batching = false;
 	-- the bar: one button per element
 	SU.barButtons = SU.barButtons or {};
@@ -1761,6 +1916,15 @@ function SU.Begin()
 				end);
 				state:SetHeight(17); state.ownerFrame = name; state.modeValue = value;
 				state:SetPoint("LEFT", b, "LEFT", 105 + ((j - 1) * 67), 0);
+				state:SetScript("OnEnter", function()
+					if ( not GameTooltip ) then return; end
+					GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+					if ( this.modeValue == "default" ) then GameTooltip:AddLine(SS.T("Restore Blizzard / Aethus default. Hide Slim Suite's replacement and turn the game's element on."), 1, 0.82, 0.2);
+					elseif ( this.modeValue == "enabled" ) then GameTooltip:AddLine(SS.T("Show and move Slim Suite's replacement."), 0.4, 1, 0.4);
+					else GameTooltip:AddLine(SS.T("Hide both the game element and Slim Suite's replacement."), 1, 0.45, 0.35); end
+					GameTooltip:Show();
+				end);
+				state:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
 				b.states[j] = state;
 			end
 		end
@@ -1777,6 +1941,7 @@ function SU.Begin()
 	for name, b in pairs(SU.barButtons) do if ( not wanted[name] ) then b:Hide(); for j = 1, table.getn(b.states or {}) do b.states[j]:Hide(); end end end
 	SU.bar:SetWidth(6 + (col + 1) * COLUMN);
 	SU.bar:SetHeight((maxIdx + 1) * LINE + 12 + TOP + BOTTOM);
+	SU.PlaceProfiles();
 	if ( SU.bar.resetAll ) then
 		SU.bar.resetAll:ClearAllPoints(); SU.bar.resetAll:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -104, 7);
 		SU.bar.done:ClearAllPoints(); SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
@@ -1889,6 +2054,42 @@ function SU.Build()
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	SU.bar:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
 	SU.bar:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+	-- A compact sidecar for the starter profiles the author will supply later. It moves with the setup list.
+	SU.bar.profilePanel = CreateFrame("Frame", "SlimSuiteDefaultProfiles", SU.bar);
+	SU.bar.profilePanel:SetWidth(184); SU.bar.profilePanel:SetHeight(136);
+	SU.bar.profilePanel:SetFrameStrata("DIALOG");
+	SU.bar.profilePanel:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+	SU.bar.profilePanel:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
+	SU.bar.profilePanel:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+	SU.bar.profilePanel.title = SU.bar.profilePanel:CreateFontString(nil, "OVERLAY", "GameFontNormal");
+	SU.bar.profilePanel.title:SetPoint("TOPLEFT", SU.bar.profilePanel, "TOPLEFT", 10, -10);
+	SU.bar.profilePanel.title:SetText(SS.T("Default profiles"));
+	SU.bar.profilePanel.note = SU.bar.profilePanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	SU.bar.profilePanel.note:SetPoint("TOPLEFT", SU.bar.profilePanel, "TOPLEFT", 10, -34);
+	SU.bar.profilePanel.note:SetWidth(160); SU.bar.profilePanel.note:SetJustifyH("LEFT"); SU.bar.profilePanel.note:SetText(SS.T("Read-only presets. Applying one creates your own editable copy."));
+	SU.bar.profilePanel.buttons = {};
+	SU.bar.profilePanel.Refresh = function()
+		local names = {};
+		for name, layout in pairs(SS.DEFAULT_PROFILES or {}) do if ( type(name) == "string" and type(layout) == "table" ) then table.insert(names, name); end end
+		table.sort(names);
+		for i = 1, math.max(table.getn(names), table.getn(SU.bar.profilePanel.buttons)) do
+			local button = SU.bar.profilePanel.buttons[i];
+			if ( not button and names[i] and K and K.Button ) then
+				button = K.Button(SU.bar.profilePanel, names[i], 164, function() SS.ApplyDefaultProfile(this.profileName); end);
+				SU.bar.profilePanel.buttons[i] = button;
+			end
+			if ( button ) then
+				if ( names[i] ) then button.profileName = names[i]; button:SetText(names[i]); button:ClearAllPoints(); button:SetPoint("TOPLEFT", SU.bar.profilePanel, "TOPLEFT", 10, -58 - ((i - 1) * 22)); button:Show();
+				else button:Hide(); end
+			end
+		end
+		if ( table.getn(names) == 0 ) then
+			SU.bar.profilePanel.note:SetText(SS.T("Your read-only presets will appear here. Applying one creates your editable copy."));
+		else SU.bar.profilePanel.note:SetText(SS.T("Applying a read-only preset creates your editable copy.")); end
+	end;
+	SU.bar.profilePanel.Refresh();
+	SU.bar.profilePanel:SetPoint("TOPLEFT", SU.bar, "TOPRIGHT", -2, 0);
 	-- the list can be dragged by its background; it stays where it was put
 	SU.bar:SetMovable(true); SU.bar:EnableMouse(true); SU.bar:RegisterForDrag("LeftButton");
 	if ( SU.bar.SetClampedToScreen ) then SU.bar:SetClampedToScreen(true); end
@@ -1897,6 +2098,7 @@ function SU.Build()
 		this:StopMovingOrSizing();
 		local l, t = this:GetLeft(), this:GetTop();
 		if ( l and t ) then SS.DB().elementListPlace = { x = l, y = t - UIParent:GetHeight() }; end
+		SU.PlaceProfiles();
 	end);
 	local saved = SS.DB().elementListPlace;
 	if ( type(saved) == "table" and saved.x and saved.y ) then SU.bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT", saved.x, saved.y);
@@ -1979,6 +2181,7 @@ function SS.SetupHide()
 	setupActive = false;
 	SU.on = {};                                            -- nothing is "on in the setup" outside it
 	SU.Unreveal();
+	SS.Safe(SS.ApplyElementModes);
 	if ( SU.panel ) then SU.panel:Hide(); end
 	if ( SU.bar ) then SU.bar:Hide(); end
 	SS.Safe(SS.EndPreviewsIfDone);
@@ -2179,6 +2382,7 @@ function SS.WinBuild()
 			{"Replace Default Combat Text with Movable Box?", function() return SS.DB().combatTextBox; end, function(v) SU.FEATURES.SlimSuiteCombatTextFrame(v and true or false); if ( SS.DB().unlocked ) then SS.SetUnlocked(true, true); end SU.Rebuild(); end},
 			{"Replace Default Minimap Buttons with a Movable Row? (optional)", function() return SS.DB().minimapBar; end, function(v) SS.SetMinimapBar(v); end},
 			{head="Everywhere"},
+			{"Show green absorb amounts on player and party frames (when the client exposes them)", function() return SS.DB().showAbsorbs; end, function(v) SS.DB().showAbsorbs = v and true or false; SS.Safe(SS.UpdateAbsorbMarkers); end},
 			{"Floating combat text over enemies (Slim Suite's own)", function() return SS.DB().floatingText; end, function(v) SS.DB().floatingText = v; end},
 			{"Show Slim Suite above the level-up and new-item cards", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
 		}, -86, function(y) uiLastY = y; PlaceTail(); end);
@@ -2195,6 +2399,11 @@ function SS.WinBuild()
 			{"Hide the Oogax Q opening line (English game text only)", function() return SS.DB().hideOpeningLine;end,function(v) SS.DB().hideOpeningLine=v;end},
 			{"Hide 'Who dares to enter my lair' (English game text only)", function() return SS.DB().hideLairLine;end,function(v) SS.DB().hideLairLine=v;end},
 			{"Hide in-game roleplay lines from chat", function() return SS.DB().hideRP;end,function(v) SS.DB().hideRP=v;end},
+			{head="Enemy frames"},
+			{"Show native enemy nameplates", function() return SS.NativeEnemyNameplatesEnabled and SS.NativeEnemyNameplatesEnabled(); end, function(v) SS.SetNativeEnemyNameplates(v); end},
+			{"Use modern Slim Suite enemy frames", function() return SS.DB().modernEnemyFrames; end, function(v) SS.SetModernEnemyFrames(v); end},
+			{"Only show bosses and lair guardians on modern enemy frames", function() return SS.DB().enemyBossesOnly; end, function(v) SS.SetEnemyPlateBossesOnly(v); end},
+			{"Show boss and lair debuffs and remaining time on modern enemy frames", function() return SS.DB().enemyPlateDebuffs; end, function(v) SS.SetEnemyPlateDebuffs(v); end},
 			{head="Camera and marks"},
 			{"Camera as far out as it goes (50)", function() return SS.DB().camera; end, function(v) SS.DB().camera = v; SS.Camera(v); end},
 			{"Mark pulled bosses and Guardians (Skull, X, Circle, Star)", function() return SS.DB().bossMarks; end, function(v) SS.DB().bossMarks = v; end},
@@ -2212,6 +2421,17 @@ function SS.WinBuild()
 			{head="Deaths and spells"},
 			{"Mark where a downed friend can be revived", function() return SS.DB().deathMarks; end, function(v) SS.DB().deathMarks = v; end},
 			{"Play a sound when you or a teammate dies", function() return SS.DB().deathSound; end, function(v) SS.DB().deathSound = v; end},
+			{"   Use LEGO die instead of Baby Crying", function() return SS.DB().legoDeathSound; end, function(v) SS.DB().legoDeathSound = v and true or false; end},
+			{button = "Preview: Baby Crying (death)", onClick = function() SS.PreviewSound("death"); end},
+			{button = "Preview: LEGO die", onClick = function() SS.PreviewSound("legoDeath"); end},
+			{"Play Low Health Sound at 30% health or lower (1 second, every 5 seconds)", function() return SS.DB().lowHealthSound; end, function(v) SS.DB().lowHealthSound = v and true or false; end},
+			{button = "Preview: Low Health Sound", onClick = function() SS.PreviewSound("lowHealth"); end},
+			{"Play hitmarker when a boss, Guardian, or lair owner is killed", function() return SS.DB().bossHitmarkerSound; end, function(v) SS.DB().bossHitmarkerSound = v and true or false; end},
+			{button = "Preview: Hitmarker", onClick = function() SS.PreviewSound("bossHitmarker"); end},
+			{"Play whip crack when a boss, Guardian, or lair owner is killed", function() return SS.DB().bossWhipSound; end, function(v) SS.DB().bossWhipSound = v and true or false; end},
+			{button = "Preview: Whip Crack", onClick = function() SS.PreviewSound("bossWhip"); end},
+			{"Play a sound when opening a cache", function() return SS.DB().chestOpenSound; end, function(v) SS.DB().chestOpenSound = v and true or false; end},
+			{button = "Preview: Zelda chest opening", onClick = function() SS.PreviewSound("chestOpen"); end},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
 			{head="Accessibility"},
 			{"High-contrast encounter bars", function() return SS.DB().accessibilityContrast; end, function(v) SS.DB().accessibilityContrast = v and true or false; SS.Safe(SS.UpdateBossFrames); end},

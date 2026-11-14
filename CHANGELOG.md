@@ -4,6 +4,17 @@ Newest first. Each release's notes on GitHub are taken from its section here.
 
 ## Unreleased
 
+## 1.27
+- Added optional LEGO die death sound, hitmarker and whip-crack boss/Guardian/lair-owner kill sounds, and a Zelda-style cache-opening sound. Added an in-game preview button for each included sound so players can audition them before enabling.
+- Added optional LEGO die death sound, hitmarker and whip-crack boss/Guardian/lair-owner kill sounds, and a Zelda-style cache-opening sound. Added an in-game preview button for each included sound so players can audition them before enabling.
+- New installs open directly into setup with all native and Slim Suite elements Disabled; enabling an element immediately opens its controls and exposes its move handle.
+- Added an attached Default profiles side panel with reserved slots for the profiles to be provided later.
+- Choosing Default now explicitly restores the Blizzard/Aethus element and turns its game HUD visibility setting on; the movable replacement is turned off. The Level Up default restores the native Level Up button through the game's HUD API without displaying a chat command.
+- Added a disabled-by-default low-health sound option using the supplied sound asset; it triggers at or below 30% health, is rate-limited to once every five seconds, and requests a one-second playback window.
+- Added the Stat counter [WIP] setup placeholder and a read-only creator preset pathway that creates a numbered My Custom Profile copy before applying changes.
+- Added native enemy-nameplate control and optional modern Slim Suite overlays, with a boss/lair-guardian filter, raid marks and documented boss/guardian debuff timers; ordinary enemy overlays are limited to 64 at a time.
+- Added optional green absorb markers and numeric amounts to player and party health bars when the client exposes the data.
+
 ## 1.26
 - Added a parenthetical hint beside Demo explaining that right-clicking an element name opens its settings.
 

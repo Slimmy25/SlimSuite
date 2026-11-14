@@ -167,9 +167,11 @@ SS.DEFAULTS = {
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
 	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
-	partyIncludesSelf = false, floatingText = false, deathSound = false, hideTarget = false, mirrorTarget = false,
+	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, lowHealthSound = false,
+	bossHitmarkerSound = false, bossWhipSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
-	partyFaces = true, cardPortraits = true, targetDebuffs = true, moveLevelButton = false, moveMeter = false,
+	partyFaces = true, cardPortraits = true, targetDebuffs = true, showAbsorbs = false, moveLevelButton = false, moveMeter = false,
+	modernEnemyFrames = false, enemyBossesOnly = true, enemyPlateDebuffs = true,
 	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
@@ -468,15 +470,65 @@ end
 -- ---------------------------------------------------------------- the death sound
 -- Boss, guardian and downed-friend markers live in SlimSuiteWorld.lua. They draw their own markers through the
 -- game's world-anchor API and never change your target.
-DEATH_SOUND = "Interface\\AddOns\\SlimSuite\\Baby Crying.mp3";
+SS.SOUND_FILES = {
+	death = "Interface\\AddOns\\SlimSuite\\Baby Crying.mp3",
+	legoDeath = "Interface\\AddOns\\SlimSuite\\lego-die.mp3",
+	lowHealth = "Interface\\AddOns\\SlimSuite\\Low Health Sound.mp3",
+	bossHitmarker = "Interface\\AddOns\\SlimSuite\\hitmarker.mp3",
+	bossWhip = "Interface\\AddOns\\SlimSuite\\Whip-Crack.mp3",
+	chestOpen = "Interface\\AddOns\\SlimSuite\\zelda-chest-opening-and-item-catch.mp3",
+};
+local soundPreviewHandle;
+function SS.PlayAddonSound(key)
+	local path = SS.SOUND_FILES[key];
+	if ( not path or not PlaySoundFile ) then return false; end
+	local ok, played = SS.Safe(PlaySoundFile, path);
+	return ok and played and true or false;
+end
+function SS.PreviewSound(key)
+	local path = SS.SOUND_FILES[key];
+	if ( not path or not PlaySoundFile ) then return; end
+	if ( soundPreviewHandle and StopSound ) then SS.Safe(StopSound, soundPreviewHandle); end
+	soundPreviewHandle = nil;
+	local ok, played, handle = SS.Safe(PlaySoundFile, path);
+	if ( ok and played and handle ) then soundPreviewHandle = handle; end
+end
 function SS.PlayDeathSound()
 	if ( not SS.DB().deathSound or not PlaySoundFile ) then return; end
-	SS.Safe(PlaySoundFile, DEATH_SOUND);
+	SS.PlayAddonSound(SS.DB().legoDeathSound and "legoDeath" or "death");
+end
+function SS.PlayBossKillSound()
+	local d = SS.DB();
+	if ( d.bossHitmarkerSound ) then SS.PlayAddonSound("bossHitmarker"); end
+	if ( d.bossWhipSound ) then SS.PlayAddonSound("bossWhip"); end
+end
+function SS.PlayChestOpenSound()
+	if ( SS.DB().chestOpenSound ) then SS.PlayAddonSound("chestOpen"); end
 end
 
 deathSoundFrame = CreateFrame("Frame");
 deathSoundFrame:RegisterEvent("PLAYER_DEAD");
 deathSoundFrame:SetScript("OnEvent", function() SS.PlayDeathSound(); end);
+
+-- Optional low-health alert. Keep the warning short where the client exposes a stoppable sound handle,
+-- and rate-limit it so a player near 30% health hears it at most once every five seconds.
+local lowHealthLastPlayed = -10;
+local function PlayLowHealthSound()
+	if ( not SS.DB().lowHealthSound or not UnitHealth or not UnitHealthMax or not PlaySoundFile ) then return; end
+	local maximum = UnitHealthMax("player") or 0;
+	if ( maximum <= 0 or (UnitHealth("player") or maximum) / maximum > 0.30 ) then return; end
+	local now = GetTime and GetTime() or 0;
+	if ( now - lowHealthLastPlayed < 5 ) then return; end
+	lowHealthLastPlayed = now;
+	SS.PlayAddonSound("lowHealth");
+end
+local lowHealthEvents = CreateFrame("Frame");
+lowHealthEvents:RegisterEvent("UNIT_HEALTH");
+lowHealthEvents:RegisterEvent("UNIT_MAXHEALTH");
+lowHealthEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
+lowHealthEvents:SetScript("OnEvent", function()
+	if ( event == "PLAYER_ENTERING_WORLD" or arg1 == "player" ) then SS.Safe(PlayLowHealthSound); end
+end);
 
 
 -- ---------------------------------------------------------------- moving the UI, and the target frame

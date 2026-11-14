@@ -549,7 +549,7 @@ local ON_TOP = { "SlimSuiteWorldMarkers", "SlimSuiteMeterFrame", "SlimSuiteStore
 	"SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame",
 	"SlimSuiteTallyFrame", "SlimSuiteReviveFrame", "SlimSuiteCombatTextFrame", "SlimSuiteProcMeter",
 	"SlimSuiteLocalClockFrame", "SlimSuiteFloatingText", "SlimSuiteStoreLevelsToggle", "SlimSuitePlayerCard", "SlimSuiteTargetCard",
-	"SlimSuitePartyLines", "SlimSuitePartySelfFrame", "SlimSuiteMinimapBar", "SlimSuiteRaidIconPanel" };
+	"SlimSuitePartyLines", "SlimSuitePartySelfFrame", "SlimSuiteMinimapBar", "SlimSuiteRaidIconPanel", "SlimSuiteStatCounterFrame" };
 -- Off by default: the game's cards then cover Slim Suite like the rest of the HUD. Only when the player turns the
 -- setting on are Slim Suite's frames lifted above them.
 function W.ApplyOnTop()
@@ -557,6 +557,13 @@ function W.ApplyOnTop()
 	local on = DB().onTopOfScreens and true or false;
 	for i = 1, table.getn(ON_TOP) do
 		local f = getglobal(ON_TOP[i]);
+		if ( f ) then
+			local ok = SS.Safe(AZS_SetOnTopOfScreens, f, on);
+			if ( not ok and on ) then SS.Safe(AZS_SetOnTopOfScreens, f); end
+		end
+	end
+	for i = 1, 64 do
+		local f = getglobal("SlimSuiteEnemyNameplate" .. i);
 		if ( f ) then
 			local ok = SS.Safe(AZS_SetOnTopOfScreens, f, on);
 			if ( not ok and on ) then SS.Safe(AZS_SetOnTopOfScreens, f); end
@@ -1374,12 +1381,45 @@ end
 -- leaves the list with more health left (out of range, despawned, walked off) is never counted. Each is counted once.
 -- If the game ever puts its own counts in AZS_RUN, those are used instead.
 -- The counts are kept in the saved settings per run, so they survive a /reload.
-local tally = { bosses = 0, guardians = 0, alive = {}, counted = {}, run = nil, lastKills = nil };
+local tally = { bosses = 0, guardians = 0, alive = {}, counted = {}, soundPlayed = {}, run = nil, lastKills = nil };
 SS.KILL_PERCENT = 3;                                       -- at or under this much health, a boss or Guardian is as good as dead
-local function CountKill(id, kind)
-	if ( tally.counted[id] ) then return; end
+local function BossKillSoundOnce(id)
+	if ( tally.soundPlayed[id] ) then return; end
+	tally.soundPlayed[id] = true;
+	if ( SS.PlayBossKillSound ) then SS.PlayBossKillSound(); end
+end
+local function CountKill(id, kind, confirmed)
+	if ( tally.counted[id] ) then if ( confirmed ) then BossKillSoundOnce(id); end; return; end
 	tally.counted[id] = true;
 	if ( kind == "boss" ) then tally.bosses = tally.bosses + 1; else tally.guardians = tally.guardians + 1; end
+	if ( confirmed ) then BossKillSoundOnce(id); end
+end
+
+-- AZS_CHESTS lists caches waiting to be opened. A cache disappearing in the same run means it was opened;
+-- remember ids so unrelated full-list refreshes cannot replay the sound for an already opened cache.
+local chestSoundState = { run = nil, known = nil };
+local function TrackChestOpens()
+	local phase = A.Call("AZS_GetPhase");
+	if ( phase ~= "playing" and phase ~= "choosing" and phase ~= "paused" ) then return; end
+	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
+	local context = A.Call("AZS_GetMeterContext");
+	local runId = (run and run.run) or (type(context) == "table" and context.runId);
+	if ( runId == nil ) then return; end
+	runId = tostring(runId);
+	local caches, current = A.Caches(), {};
+	for i = 1, table.getn(caches) do
+		local cache = caches[i];
+		if ( type(cache) == "table" and cache.id ~= nil ) then current[cache.id] = true; end
+	end
+	if ( chestSoundState.run == runId and chestSoundState.known ) then
+		for id in pairs(chestSoundState.known) do
+			if ( not current[id] ) then
+				if ( SS.PlayChestOpenSound ) then SS.PlayChestOpenSound(); end
+				break;
+			end
+		end
+	end
+	chestSoundState.run, chestSoundState.known = runId, current;
 end
 
 local function TrackKills()
@@ -1397,7 +1437,7 @@ local function TrackKills()
 		else
 			tally.bosses, tally.guardians = 0, 0;
 		end
-		tally.alive, tally.counted, tally.run = {}, {}, key;
+		tally.alive, tally.counted, tally.soundPlayed, tally.run = {}, {}, {}, key;
 	end
 	tally.lastKills = kills;
 	if ( not playing ) then tally.alive = {}; return; end
@@ -1414,19 +1454,23 @@ local function TrackKills()
 				local what = boss and "boss" or "guardian";
 				local hp, hpm = tonumber(u.hp), tonumber(u.hpm);
 				local pct = (hp and hpm and hpm > 0) and hp * 100 / hpm or nil;
-				if ( (hp and hp <= 0) or (u.dead) or (pct and pct <= SS.KILL_PERCENT) ) then
-					CountKill(u.id, what);
-					tally.alive[u.id] = nil;
-				else
-					tally.alive[u.id] = what;                       -- seen with health left (healed back up too)
-				end
+				local confirmed = (hp and hp <= 0) or u.dead;
+				local low = pct and pct <= SS.KILL_PERCENT or false;
+				if ( confirmed or low ) then CountKill(u.id, what, confirmed and true or false); end
+				-- Keep a low-health special enemy tracked until it disappears from the live list. The
+				-- tally can count at 3%, but the optional kill sound waits for confirmed death/disappearance.
+				tally.alive[u.id] = { kind = what, low = low };
 			end
 		end
 	end
 	-- gone from the list: no longer followed; an empty list (a loading screen) changes nothing
 	if ( any ) then
 		for id in pairs(tally.alive) do
-			if ( not seen[id] ) then tally.alive[id] = nil; end
+			if ( not seen[id] ) then
+				local previous = tally.alive[id];
+				if ( type(previous) == "table" and previous.low ) then BossKillSoundOnce(id); end
+				tally.alive[id] = nil;
+			end
 		end
 	end
 	local saved = DB().runKills;
@@ -1447,6 +1491,7 @@ local ticker = CreateFrame("Frame");
 SS.Every("box", 0.05, function() SS.Safe(DrawBox); end);
 SS.Every("tracker", 0.1, function()
 	SS.Safe(TrackKills);
+	SS.Safe(TrackChestOpens);
 	SS.Safe(UpdateTargetDebuffs);
 	SS.Safe(UpdateRevive);
 	SS.Safe(UpdateProc);

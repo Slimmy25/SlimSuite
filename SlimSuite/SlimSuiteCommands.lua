@@ -4,6 +4,7 @@ if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one se
 loader = CreateFrame("Frame");
 loader:RegisterEvent("VARIABLES_LOADED");
 loader:RegisterEvent("PLAYER_ENTERING_WORLD");
+local firstRunSetupPending = false;
 -- The game's Interface settings (Show Run Clock, Show Boss Bars ...) can be turned off by the player. A part that is
 -- off when the game loads, and that Slim Suite did not turn off itself, was turned off by the player: Slim Suite's own
 -- movable version is switched on in its place, once (turning Slim Suite's version off afterwards is respected).
@@ -76,12 +77,24 @@ function SS.Startup(entering, loaded)
 	SS.Safe(SS.HookTooltipOwner);
 	SS.Safe(PlaceAll);
 	SS.Safe(UpdateMeter);
+	SS.Safe(SS.UpdateEnemyNameplates);
 	if ( entering ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
+	SS.Safe(SS.ApplyElementModes);
 end
 loader:RegisterEvent("PLAYER_LOGOUT");
 loader:SetScript("OnEvent", function()
 	if ( event == "PLAYER_LOGOUT" ) then SS.Safe(SS.LayoutLogout); return; end
+	if ( event == "VARIABLES_LOADED" ) then
+		local d = SS.DB();
+		local unfinished = not d.setupDone and (tonumber(d.firstSetupDefaultsVersion) or 0) >= 1;
+		firstRunSetupPending = not d.setupDone and (unfinished or not SS.HasPriorUISetup(d));
+		SS.firstRunSetupPending = firstRunSetupPending;
+	end
 	SS.Startup(event == "PLAYER_ENTERING_WORLD", event == "VARIABLES_LOADED");
+	if ( event == "PLAYER_ENTERING_WORLD" and firstRunSetupPending and not SU.autoStartedFirstRun ) then
+		SU.autoStartedFirstRun = true;
+		SS.StartSetup(true);
+	end
 end);
 
 -- ---------------------------------------------------------------- layouts
@@ -92,7 +105,8 @@ SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "mu
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
 	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "minimapSquare", "minimapTransparent",
-	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments",
+	"gatherButtons", "gatherSide", "minimapBar", "tooltipCustom", "plainBar", "showRacialAbility", "xpSegments", "showAbsorbs",
+	"enemyNameplates", "modernEnemyFrames", "enemyBossesOnly", "enemyPlateDebuffs",
 	"encounterBarThickness", "encounterNameAlign", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion" };
 function SS.CopyTable(t)
 	local out = {};
@@ -116,6 +130,7 @@ end
 -- puts a layout in place of the current one and draws everything again from it
 function SS.LayoutApply(layout, quiet)
 	if ( type(layout) ~= "table" ) then return false; end
+	SS.activeCustomProfile = nil;
 	if ( setupActive ) then SS.SetupEnd(true); end
 	if ( SS.demoRunning ) then SS.StopDemoMode(); end
 	local d = SS.DB();
@@ -208,6 +223,43 @@ function SS.LayoutNames()
 	table.sort(names);
 	return names;
 end
+-- Creator-authored profiles live in code and are read-only. Applying one always makes a saved
+-- user copy first, so later layout edits can never write back into the shipped preset.
+SS.DEFAULT_PROFILES = SS.DEFAULT_PROFILES or {};
+function SS.IsDefaultProfile(name)
+	return type(name) == "string" and type(SS.DEFAULT_PROFILES[name]) == "table";
+end
+function SS.NextCustomProfileName()
+	local highest = 0;
+	for name in pairs(SS.DB().layouts or {}) do
+		local _, _, number = string.find(tostring(name), "^My Custom Profile #(%d+)$");
+		if ( number and tonumber(number) > highest ) then highest = tonumber(number); end
+	end
+	return "My Custom Profile #" .. (highest + 1);
+end
+function SS.ApplyDefaultProfile(name)
+	local preset = SS.DEFAULT_PROFILES[name];
+	if ( type(preset) ~= "table" ) then return false; end
+	local custom = SS.NextCustomProfileName();
+	SS.DB().layouts[custom] = SS.CopyTable(preset);
+	SS.LayoutApply(SS.DB().layouts[custom]);
+	SS.activeCustomProfile = custom;
+	SS.activeCustomProfileText = SS.LayoutText(SS.LayoutSnapshot());
+	local f = getglobal("SlimSuiteLayoutFrame");
+	if ( f ) then f.selectedProfile = custom; if ( f.RefreshProfiles ) then f.RefreshProfiles(); end end
+	K.Print(NAME, "read-only preset copied to \"" .. custom .. "\". Your changes are saved to that copy.");
+	return true, custom;
+end
+function SS.TrackActiveCustomProfile()
+	local name = SS.activeCustomProfile;
+	if ( not name or type(SS.DB().layouts[name]) ~= "table" ) then return; end
+	local text = SS.LayoutText(SS.LayoutSnapshot());
+	if ( text ~= SS.activeCustomProfileText ) then
+		SS.DB().layouts[name] = SS.LayoutSnapshot();
+		SS.activeCustomProfileText = text;
+	end
+end
+SS.Every("trackCustomProfile", 1, function() SS.Safe(SS.TrackActiveCustomProfile); end);
 function SS.LayoutBundleText()
 	local names=SS.LayoutNames();
 	if ( table.getn(names)==0 ) then return nil; end
@@ -313,6 +365,7 @@ function SS.ShowLayoutWindow()
 		local save=K.Button(f,"Save current as profile",158,function()
 			local name=string.gsub(f.profileName:GetText() or "","^%s*(.-)%s*$","%1");
 			if ( name=="" or string.sub(name,1,5)=="char:" ) then K.Print(NAME,"enter a profile name (char: names are reserved). "); return; end
+			if ( SS.IsDefaultProfile(name) ) then K.Print(NAME,"that is a read-only default profile. Apply it to create a My Custom Profile copy first."); return; end
 			SS.DB().layouts[name]=SS.LayoutSnapshot(); f.selectedProfile=name; f.box:SetText(SS.LayoutText(SS.DB().layouts[name])); f.RefreshProfiles();
 			K.Print(NAME,"profile \""..name.."\" saved.");
 		end);
@@ -347,14 +400,19 @@ function SS.ShowLayoutWindow()
 		local use=K.Button(f,"Import / apply",120,function()
 			local bundle=SS.LayoutBundleFromText(f.box:GetText());
 			if ( bundle ) then
-				for name,layout in pairs(bundle) do SS.DB().layouts[name]=layout; end
+				for name,layout in pairs(bundle) do
+					if ( SS.IsDefaultProfile(name) ) then name = SS.NextCustomProfileName(); end
+					SS.DB().layouts[name]=layout;
+				end
 				f.RefreshProfiles(); K.Print(NAME,"the imported profile bundle is saved. Select a profile to apply it."); return;
 			end
 			local layout=SS.LayoutFromText(f.box:GetText());
 			if ( not layout ) then K.Print(NAME,"that text is not a Slim Suite layout."); return; end
 			SS.LayoutApply(layout);
 			local name=string.gsub(f.profileName:GetText() or "","^%s*(.-)%s*$","%1");
-			if ( name~="" and string.sub(name,1,5)~="char:" ) then SS.DB().layouts[name]=layout; f.selectedProfile=name; f.RefreshProfiles(); K.Print(NAME,"layout imported, applied and saved as profile \""..name.."\".");
+			if ( name~="" and string.sub(name,1,5)~="char:" ) then
+				if ( SS.IsDefaultProfile(name) ) then name=SS.NextCustomProfileName(); end
+				SS.DB().layouts[name]=layout; f.selectedProfile=name; f.profileName:SetText(name); f.RefreshProfiles(); K.Print(NAME,"layout imported, applied and saved as profile \""..name.."\".");
 			else K.Print(NAME,"the imported layout is now in use. Enter a profile name and import again to save it."); end
 		end);
 		use:SetPoint("BOTTOMRIGHT",f,"BOTTOMRIGHT",-24,20);
@@ -400,6 +458,8 @@ function SS.RefreshDiagnostics()
 		SS.T("Damage meter snapshot (AZS_GetMeterSnapshot):").." "..status(type(AZS_GetMeterSnapshot)=="function"),
 		SS.T("Floating combat-text projection (AZS_ProjectCombatTextAnchors):").." "..status(type(AZS_ProjectCombatTextAnchors)=="function"),
 		SS.T("Combat-text event hook (AZS_RegisterCombatTextFrameHandler):").." "..status(type(AZS_RegisterCombatTextFrameHandler)=="function"),
+		SS.T("Enemy world anchors (AZS_GetWorldAnchors):").." "..status(type(AZS_GetWorldAnchors)=="function"),
+		SS.T("Enemy frame projection (AZS_ProjectWorldAnchors):").." "..status(type(AZS_ProjectWorldAnchors)=="function"),
 		"",
 		SS.T("This view reports detected client and game hooks. Missing optional hooks do not necessarily prevent Slim Suite's core HUD features from working."),
 	};
