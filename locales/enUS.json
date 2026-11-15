@@ -455,5 +455,14 @@
   "the minimap button is hidden. /slimsuite minimap brings it back.": "the minimap button is hidden. /slimsuite minimap brings it back.",
   "the original size is not available yet; try again after the frame appears.": "the original size is not available yet; try again after the frame appears.",
   "the pasted layout is in use.": "the pasted layout is in use.",
-  "up": "up"
+  "up": "up",
+  "Started with": "Started with",
+  "Tracking from": "Tracking from",
+  "Starting luck unavailable": "Starting luck unavailable",
+  "Every luck gain improves these odds": "Every luck gain improves these odds",
+  "Luck payoff: +%.1f%% legendary odds": "Luck payoff: +%.1f%% legendary odds",
+  "Luck is below your starting value": "Luck is below your starting value",
+  "Cena": "Cena",
+  "To Be Continued JoJo": "To Be Continued JoJo",
+  "pillar man jojo": "pillar man jojo"
 }

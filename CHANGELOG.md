@@ -2,6 +2,10 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.43
+- Added Cena and pillar man jojo as optional match-start songs, plus To Be Continued JoJo for victory. All three retain their original filenames and are normalized to the existing audio mix.
+- Stabilized legendary luck graph axes and added starting/current luck with encouragement based on the measured relative improvement in estimated legendary odds. Live luck continues to follow character stats; mid-run tracking is labeled honestly.
+
 ## 1.42
 - Promoted Legendary luck out of WIP, retaining its percentage/graph GUI and removing investment/status phrases. Added an always-available green setup preview and verified shared resizing while respecting its optional live-display toggle.
 - Fixed Lua 5.0 clock-overlay errors caused by unavailable math.huge. The same compatibility issue in numeric profile import validation is fixed, with legacy-constant regression coverage.

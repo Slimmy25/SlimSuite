@@ -19,7 +19,7 @@ check("luck prototype is optional",SS.ELEMENTS.SlimSuiteLuckFrame.optional and n
 SS.ENV.SU.SetMode("SlimSuiteLuckFrame","enabled","Legendary luck")
 AZS_STATS={luck=.3}; SS.UpdateLuck()
 check("enabled luck widget displays real current luck",SlimSuiteLuckFrame:IsShown() and string.find(SlimSuiteLuckFrame.labels[2]:GetText(),"30.0",1,true))
-check("luck display gives percentages without advisory statuses",SlimSuiteLuckFrame.labels[5]:GetText()==SS.T("Estimated chance per card") and SS.LuckTrend==nil)
+check("luck display gives percentages without advisory statuses",SlimSuiteLuckFrame.labels[7]:GetText()==SS.T("Estimated chance per card") and SS.LuckTrend==nil)
 SS.StartSetup(true); SS.RefreshEditHandles()
 check("luck widget participates in green mover",SS.ENV.handles.SlimSuiteLuckFrame and SS.ENV.handles.SlimSuiteLuckFrame:IsShown())
 local handle=SS.ENV.handles.SlimSuiteLuckFrame
@@ -32,5 +32,20 @@ SS.StartSetup(true); SS.RefreshEditHandles(); SS.UpdateLuck()
 check("optional luck is still green and placeable in setup",SS.ENV.handles.SlimSuiteLuckFrame:IsShown() and SlimSuiteLuckFrame:IsShown() and SlimSuiteLuckFrame:GetAlpha()==1)
 SS.SetupEnd(true); SS.UpdateLuck()
 check("disabled luck preview disappears outside setup",not SlimSuiteLuckFrame:IsShown())
+local phase="ready"; AZS_GetPhase=function() return phase end; AZS_ZONE={run="luck-progress"}; AZS_STATS={luck=.2}
+local level=10; UnitLevel=function() return level end
+SS.LuckProgress(); phase="playing"; AZS_STATS.luck=.5
+local grown=SS.LuckProgress()
+check("progress retains actual starting and current luck",grown.baseline.luck==.2 and grown.baseline.fromStart and grown.luck==.5 and grown.gain>0)
+local xmax,ymax=grown.maxLuck,grown.maxChance
+AZS_STATS.luck=.2; level=11; local dropped=SS.LuckProgress()
+check("normal stat or level changes do not rescale axes",dropped.maxLuck==xmax and dropped.maxChance==ymax)
+check("level alone is not credited as a luck investment",math.abs(dropped.gain)<.00001)
+AZS_STATS.luck=3; local expanded=SS.LuckProgress(); AZS_STATS.luck=.2; local restored=SS.LuckProgress()
+check("exceptional luck expands but never shrinks plot scale",expanded.maxLuck==3 and restored.maxLuck==3 and restored.maxChance==expanded.maxChance)
+AZS_STATS.luck=nil; local missing=SS.LuckProgress()
+check("missing stats never become fabricated zero luck",missing.luck==nil and missing.baseline.luck==.2)
+AZS_ZONE.run="joined-midrun"; AZS_STATS.luck=.7; local joined=SS.LuckProgress()
+check("joining midrun does not invent a run-start baseline",joined.baseline.luck==.7 and not joined.baseline.fromStart)
 print("meter/luck problems: "..bad)
 assert(bad==0 and #ERRORS==0,"meter/luck regressions")

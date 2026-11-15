@@ -455,5 +455,14 @@
   "the minimap button is hidden. /slimsuite minimap brings it back.": "El botón del minimapa está oculto. /slimsuite minimap lo muestra de nuevo.",
   "the original size is not available yet; try again after the frame appears.": "El tamaño original aún no está disponible; inténtalo cuando aparezca el marco.",
   "the pasted layout is in use.": "El diseño pegado está en uso.",
-  "up": "arriba"
+  "up": "arriba",
+  "Started with": "Al empezar",
+  "Tracking from": "Registro desde",
+  "Starting luck unavailable": "Suerte inicial no disponible",
+  "Every luck gain improves these odds": "Cada aumento de suerte mejora estas probabilidades",
+  "Luck payoff: +%.1f%% legendary odds": "Mejora por suerte: +%.1f%% de probabilidad legendaria",
+  "Luck is below your starting value": "La suerte está por debajo del valor inicial",
+  "Cena": "Cena",
+  "To Be Continued JoJo": "To Be Continued JoJo",
+  "pillar man jojo": "pillar man jojo"
 }

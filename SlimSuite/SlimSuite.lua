@@ -488,6 +488,9 @@ end
 -- Boss, guardian and downed-friend markers live in SlimSuiteWorld.lua. They draw their own markers through the
 -- game's world-anchor API and never change your target.
 SS.SOUND_FILES = {
+ cenaStart = "Interface\\AddOns\\SlimSuite\\cena.mp3",
+ pillarStart = "Interface\\AddOns\\SlimSuite\\pillarman song.mp3",
+ jojoVictory = "Interface\\AddOns\\SlimSuite\\to be continued jojo.mp3",
 	death = "Interface\\AddOns\\SlimSuite\\Baby Crying.mp3",
 	legoDeath = "Interface\\AddOns\\SlimSuite\\lego-die.mp3",
  duckDeath = "Interface\\AddOns\\SlimSuite\\duck-toy-sound.mp3",
@@ -507,9 +510,9 @@ function SS.SoundSelection(group)
  local d=SS.DB();
  if group=="death" then return d.deathSound and (d.duckDeathSound and "duckDeath" or (d.legoDeathSound and "legoDeath" or "death")) or "off"; end
  if group=="teammate" then return d.teammateDeathSound or "same"; end
- if group=="victory" then return d.matchVictorySound and "matchVictory" or "off"; end
+ if group=="victory" then return d.matchVictorySound=="jojoVictory" and "jojoVictory" or (d.matchVictorySound and "matchVictory" or "off"); end
  if group=="loss" then return d.matchWastedSound and "matchWasted" or (d.matchLossSound and "matchLoss" or "off"); end
- if group=="start" then return d.matchStartSound and "matchStart" or "off"; end
+ if group=="start" then return (d.matchStartSound=="cenaStart" or d.matchStartSound=="pillarStart") and d.matchStartSound or (d.matchStartSound and "matchStart" or "off"); end
  if group=="lowHealth" then return d.lowHealthSound and "lowHealth" or "off"; end
  if group=="chest" then return d.chestOpenSound and "chestOpen" or "off"; end
  if group=="boss" then
@@ -523,9 +526,9 @@ function SS.SetSoundSelection(group,key)
  local d=SS.DB();
  if group=="death" then d.deathSound=key=="death" or key=="legoDeath" or key=="duckDeath"; d.legoDeathSound=key=="legoDeath"; d.duckDeathSound=key=="duckDeath";
  elseif group=="teammate" then d.teammateDeathSound=key;
- elseif group=="victory" then d.matchVictorySound=key=="matchVictory";
+ elseif group=="victory" then d.matchVictorySound=key=="jojoVictory" and key or key=="matchVictory";
  elseif group=="loss" then d.matchLossSound=key=="matchLoss"; d.matchWastedSound=key=="matchWasted";
- elseif group=="start" then d.matchStartSound=key=="matchStart";
+ elseif group=="start" then d.matchStartSound=(key=="cenaStart" or key=="pillarStart") and key or key=="matchStart";
  elseif group=="lowHealth" then d.lowHealthSound=key=="lowHealth";
  elseif group=="chest" then d.chestOpenSound=key=="chestOpen";
  elseif group=="boss" then d.bossHitmarkerSound=key=="bossHitmarker"; d.bossWhipSound=key=="bossWhip"; d.bossGotchaSound=key=="bossGotcha"; end
