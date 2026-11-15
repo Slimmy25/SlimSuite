@@ -1,9 +1,38 @@
 -- Temporary card-screen presentation; no saved layout or visibility settings are edited.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 local saved={}; local tooltipWas; local registered={}; local finishing; local itemRefresh=0;
+local clockEvidence={run=nil,value=nil,stableAt=nil,phase=nil,phaseAt=nil,active=false};
 function SS.ChoiceHUDActive()
- return not SS.DB().vanillaUI and SS.DB().cardEdgeHUD~=false and type(AZS_GetPhase)=="function" and AZS_GetPhase()=="choosing";
+ local d=SS.DB(); local now=GetTime();
+ local phase=type(AZS_GetPhase)=="function" and AZS_GetPhase() or nil;
+ local run=type(AZS_ZONE)=="table" and AZS_ZONE.run;
+ if run~=clockEvidence.run then clockEvidence={run=run,value=nil,stableAt=nil,phase=nil,phaseAt=now,active=false}; end
+ if phase~=clockEvidence.phase then clockEvidence.phase=phase; clockEvidence.phaseAt=now; end
+ local value;
+ if type(AZS_GetRunTime)=="function" then
+  local ok,result=SS.Safe(AZS_GetRunTime);
+  if ok and type(result)=="number" and result==result and result>=0 and result<math.huge then value=result; end
+ end
+ local moved=false;
+ if value~=nil then
+  moved=clockEvidence.value~=nil and math.abs(value-clockEvidence.value)>.001;
+  if clockEvidence.value==nil or moved then clockEvidence.stableAt=now; end
+  clockEvidence.value=value;
+ end
+ if d.vanillaUI or d.cardEdgeHUD==false or d.unlocked then clockEvidence.active=false; return false; end
+ -- Older clients with no readable interpolated clock retain phase-only behavior.
+ if value==nil then clockEvidence.active=phase=="choosing"; return clockEvidence.active; end
+ if phase=="choosing" then
+  -- A pause alone cannot open this overlay: both choosing and a stable clock are required.
+  clockEvidence.active=now-(clockEvidence.phaseAt or now)>=.25 and now-(clockEvidence.stableAt or now)>=.25;
+ elseif phase=="playing" and clockEvidence.active then
+  -- Wait for the matching clock restart. A bounded grace avoids trapping the overlay
+  -- if a client reports playing but never resumes publishing its clock.
+  if moved or now-(clockEvidence.phaseAt or now)>=1 then clockEvidence.active=false; end
+ else clockEvidence.active=false; end
+ return clockEvidence.active;
 end
+
 function SS.ChoiceItemsActive() return SS.ChoiceHUDActive() and not SS.DB().unlocked and not finishing; end
 local function Capture(name)
  local f=getglobal(name); if ( not f or saved[name] ) then return; end

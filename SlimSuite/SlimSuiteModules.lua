@@ -80,7 +80,7 @@ function SS.SetModuleEnabled(id,on)
    if saved then Restore(saved); d.moduleSettings.ui=nil;
    else
     d.vanillaUI=false; SU.batching=true;
-    for _,name in ipairs(SS.SETUP_ORDER) do SU.SetMode(name,"enabled",SS.ELEMENTS[name].title); end
+    for _,name in ipairs(SS.SETUP_ORDER) do SU.SetMode(name,SS.ELEMENTS[name].optional and "disabled" or "enabled",SS.ELEMENTS[name].title); end
     SU.batching=false;
    end
   end

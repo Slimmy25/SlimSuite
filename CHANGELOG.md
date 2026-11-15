@@ -2,6 +2,11 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.41
+- Temporary choice overlays now corroborate choosing with a stopped interpolated run clock, and wait for playing plus a clock restart before normal restoration. Ordinary pause cannot open the overlay; missing clocks retain phase-only compatibility and stalled closing clocks have a bounded safety timeout.
+- Added bracketed Talent/Gear source labels to damage-meter spell rows using documented source categories and origins.
+- Added an optional, movable Legendary luck [WIP] panel with current luck, estimated legendary card/amulet chances, model curves and the requested trend phrases. The prototype uses the supplied approximation and is disabled by default.
+
 ## 1.40
 - Replaced the main splash/settings tabs with a five-module hub: Chat Mods, Sound Effects, User Interface, Gameplay and Misc. Each category has an on/off switch and its own settings page.
 - Module switches retain preferences; disabling User Interface restores the native HUD and preserves the saved custom layout, including muted elements, for re-enabling. Exports/autosave retain paused preferences and profile imports cannot bypass a disabled module.

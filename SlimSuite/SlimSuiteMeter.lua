@@ -304,6 +304,7 @@ function M.Attach(frame)
 		row.icon = row:CreateTexture(nil, 'ARTWORK'); row.icon:SetPoint('LEFT', row, 'LEFT', 1, 0); row.icon:SetWidth(18); row.icon:SetHeight(18);
 		row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
 		row.name = Label(row, 12, CREAM); row.name:SetPoint('LEFT', row, 'LEFT', 23, 0);
+  row.tag=Label(row,8,GOLD); row.tag:Hide();
 		row.proc = CreateFrame('Frame', nil, row); row.proc:SetHeight(12); row.proc:SetWidth(28);
 		row.proc.fill = Tex(row.proc, 'BACKGROUND', 0.1, 0.2, 0.35, 0.9); row.proc.fill:SetAllPoints(row.proc);
 		Border(row.proc, { 0.3, 0.5, 0.75 });
@@ -396,6 +397,18 @@ local function IsPet(actor, snapshot)
 	if kind == '' or kind == 'hero' or kind == 'player' then return false; end
 	return actor.name ~= nil and (kind == 'pet' or kind == 'summon' or kind == 'totem');
 end
+function M.SourceTags(source,snapshot)
+ if type(source)~='table' then return ''; end
+ local talent,gear=false,false;
+ local function Kind(entry,key)
+  key=tostring(key or entry and entry.sourceKey or '');
+  if entry and entry.kind=='talent' or string.find(key,'^talent:') or key=='talents' then talent=true; end
+  if entry and entry.kind=='item' or string.find(key,'^item:') or string.find(key,'^amulet:') or string.find(key,'^jewel:') or string.find(key,'^set:') then gear=true; end
+ end
+ Kind(source,source.sourceKey);
+ for _,key in ipairs(source.originSourceKeys or {}) do Kind(snapshot and snapshot.sources and snapshot.sources[key],key); end
+ return (talent and (' ['..SS.T('Talent')..']') or '')..(gear and (' ['..SS.T('Gear')..']') or '');
+end
 local function IsProc(source)
 	if type(source) ~= 'table' then return false; end
 	return source.proc == true or source.isProc == true or string.lower(tostring(source.kind or source.sourceKind or '')) == 'proc';
@@ -482,7 +495,9 @@ function M.Draw(active, editing)
 		if row then
 			local source = snapshot.sources and snapshot.sources[row.sourceKey]; local actor = snapshot.actors and snapshot.actors[row.ownerId];
 			if row.pet then source = nil; end
-			button.entry = row; button.source = source; button.label = row.pet or source and source.name or actor and actor.name or 'Unknown source';
+			button.entry = row; button.source = source;
+   local baseLabel=row.pet or source and source.name or actor and actor.name or 'Unknown source';
+   local tags=not row.pet and M.SourceTags(source,snapshot) or ''; button.label=baseLabel..tags;
 			local rowWidth = math.max(20, width - 10); button:SetWidth(rowWidth);
 			local share = top > 0 and Num(row.displayAmount) / top or 0;
 			button.bar:SetWidth(math.max(1, rowWidth * math.max(0, math.min(1, share))));
@@ -494,7 +509,16 @@ function M.Draw(active, editing)
 			FitString(button.value, value, valueWidth, 8);
 			local proc = not row.pet and IsProc(source);
 			if proc then button.proc:Show(); else button.proc:Hide(); end
-			FitString(button.name, (M.offset + i) .. '. ' .. button.label, math.max(24, rowWidth - 24 - valueWidth - 4 - (proc and 32 or 0)), 8);
+			local labelRoom=math.max(24,rowWidth-24-valueWidth-4-(proc and 32 or 0));
+   button.tag:SetText(tags);
+   local tagWidth=tags~='' and math.min(math.max(0,labelRoom-20),(button.tag:GetStringWidth() or 0)+2) or 0;
+   local nameRoom=math.max(16,labelRoom-tagWidth-(tagWidth>0 and 3 or 0));
+   FitString(button.name,(M.offset+i)..'. '..baseLabel,nameRoom,8);
+   if tagWidth>0 then
+    FitString(button.tag,tags,tagWidth,8); button.tag:ClearAllPoints();
+    button.tag:SetPoint('LEFT',button.name,'LEFT',math.min(nameRoom,button.name:GetStringWidth() or nameRoom)+3,0); button.tag:Show();
+    button.proc:ClearAllPoints(); button.proc:SetPoint('LEFT',button.tag,'RIGHT',4,0);
+   else button.tag:Hide(); button.proc:ClearAllPoints(); button.proc:SetPoint('LEFT',button.name,'RIGHT',4,0); end
 			local color = M.view == 'group' and not M.owner and SS.ClassColor and SS.ClassColor(ClassOf(actor));   -- Slim Suite's one class colour table
 			if not color then
 				if row.pet then color = PetColor(row.pet);

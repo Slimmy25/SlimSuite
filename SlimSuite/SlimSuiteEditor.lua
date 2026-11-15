@@ -56,6 +56,7 @@ end
 
 -- turn an element on or off: its frame (and the frames that move with it) and its handle
 SU.FEATURES = {
+ SlimSuiteLuckFrame=function(v) SS.DB().luckPanel=v; if SS.UpdateLuck then SS.UpdateLuck(); end end,
 	SlimSuiteCompassFrame = function(v) SS.DB().compassOn=v; if ( SS.UpdateCompass ) then SS.UpdateCompass(); end end,
 	SlimSuiteStatCounterFrame = function(v)
 		SS.DB().statCounter=v and true or false; if ( SS.UpdateStats ) then SS.UpdateStats(); else SU.statCounterPlaceholder:Hide(); end
