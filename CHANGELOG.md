@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.40
+- Replaced the main splash/settings tabs with a five-module hub: Chat Mods, Sound Effects, User Interface, Gameplay and Misc. Each category has an on/off switch and its own settings page.
+- Module switches retain preferences; disabling User Interface restores the native HUD and preserves the saved custom layout, including muted elements, for re-enabling. Exports/autosave retain paused preferences and profile imports cannot bypass a disabled module.
+- Removed diagnostics/compatibility screens, their slash commands, and all installed-addon management controls. Moved accessibility settings to Misc.
+
+- Removed the separate load-in/game-launch song option. One match-start selector now plays on first movement only; existing enabled early-load selections migrate to it.
+
 ## 1.39
 - Restored the seven original user-supplied MP3 filenames and updated playback paths and normalization records without changing the normalized audio.
 - Combat text now retains one shared forward-only insertion row across quiet/empty periods. Normal hits and highlights continue where the prior line left off, wrap bottom-to-top, and never repack surviving lines backward. Resizing safely wraps the retained cursor into the new bounds.

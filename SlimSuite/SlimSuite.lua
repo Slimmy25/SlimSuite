@@ -162,7 +162,7 @@ SS.DEFAULTS = {
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
 	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
-	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchLoadSound = false, matchVictorySound = false, teammateDeathSound = "same", lowHealthSound = false,
+	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchVictorySound = false, teammateDeathSound = "same", lowHealthSound = false,
 	bossHitmarkerSound = false, bossWhipSound = false, bossGotchaSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
 	partyFaces = true, cardPortraits = true, targetDebuffs = true, showAbsorbs = false, moveLevelButton = false, moveMeter = false,
@@ -175,7 +175,7 @@ SS.DEFAULTS = {
 	tallyContext = true,
 };
 SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
-	"itemRowSeen", "statHidden", "chatOffsets", "words", "layouts", "enabledElements", "elementModes" };
+	"itemRowSeen", "modules", "moduleSettings", "statHidden", "chatOffsets", "words", "layouts", "enabledElements", "elementModes" };
 function SS.PrepareDB(d)
 	for key, value in pairs(SS.DEFAULTS) do if ( d[key] == nil ) then d[key] = value; end end
 	for i = 1, table.getn(SS.DEFAULT_TABLES) do
@@ -190,6 +190,9 @@ function SS.PrepareDB(d)
 			if ( ok and shown ~= nil ) then d.showGuardianFlag = SS.HudShown(shown); end
 		end
 	end
+ -- Retired early-load audio now uses the supported first-movement song setting.
+ if d.matchLoadSound then d.matchStartSound=true; end
+ d.matchLoadSound=nil;
 	-- retired settings
 	d.box, d.bloat, d.x, d.y, d.helloOnStart = nil, nil, nil, nil, nil;          -- the Say & Party box and "Remove bloat"
 	d.partyMeter = nil;                                     -- the party meter is now the damage meter's Party tab
@@ -363,6 +366,7 @@ CHAT_FILTER.IsRoleplay = function(msg, sourceEvent)
 end;
 
 function SS.Hidden(msg, sourceEvent)
+ if SS.ModuleEnabled and not SS.ModuleEnabled("chat") then return false; end
 	if ( type(msg) ~= "string" ) then return false; end
 	if ( CHAT_FILTER.allowPlayers or CHAT_FILTER.playerEvents[sourceEvent or CHAT_FILTER.activeEvent] ) then return false; end
 	if ( string.find(msg, "|Hplayer:", 1, true) ) then return false; end   -- a player's own words
@@ -458,7 +462,7 @@ end
 
 function SS.CustomGuardianFlag()
  local d=SS.DB();
- return not d.vanillaUI and d.showGuardianFlag and (SS.FeatureEnabled("MinimapCluster") or d.minimapLairs or d.minimapBosses or d.minimapCaches);
+ return (not SS.ModuleEnabled or SS.ModuleEnabled("gameplay")) and not d.vanillaUI and d.showGuardianFlag and (SS.FeatureEnabled("MinimapCluster") or d.minimapLairs or d.minimapBosses or d.minimapCaches);
 end
 function SS.RestoreGuardianFlag()
  local d=SS.DB();
@@ -467,6 +471,7 @@ function SS.RestoreGuardianFlag()
  end
 end
 function SS.ApplyGuardianFlag()
+ if SS.ModuleEnabled and not SS.ModuleEnabled("gameplay") then SS.RestoreGuardianFlag(); return; end
  if ( type(AZS_SetHudShown)~="function" ) then return; end
  local d=SS.DB();
  if ( d.vanillaUI ) then SS.RestoreGuardianFlag(); return; end
@@ -504,7 +509,6 @@ function SS.SoundSelection(group)
  if group=="teammate" then return d.teammateDeathSound or "same"; end
  if group=="victory" then return d.matchVictorySound and "matchVictory" or "off"; end
  if group=="loss" then return d.matchWastedSound and "matchWasted" or (d.matchLossSound and "matchLoss" or "off"); end
- if group=="load" then return d.matchLoadSound and "matchStart" or "off"; end
  if group=="start" then return d.matchStartSound and "matchStart" or "off"; end
  if group=="lowHealth" then return d.lowHealthSound and "lowHealth" or "off"; end
  if group=="chest" then return d.chestOpenSound and "chestOpen" or "off"; end
@@ -521,7 +525,6 @@ function SS.SetSoundSelection(group,key)
  elseif group=="teammate" then d.teammateDeathSound=key;
  elseif group=="victory" then d.matchVictorySound=key=="matchVictory";
  elseif group=="loss" then d.matchLossSound=key=="matchLoss"; d.matchWastedSound=key=="matchWasted";
- elseif group=="load" then d.matchLoadSound=key=="matchStart";
  elseif group=="start" then d.matchStartSound=key=="matchStart";
  elseif group=="lowHealth" then d.lowHealthSound=key=="lowHealth";
  elseif group=="chest" then d.chestOpenSound=key=="chestOpen";
@@ -535,6 +538,7 @@ function SS.DeathSoundSelection(group)
 end
 local soundPreviewHandle;
 function SS.PlayAddonSound(key)
+ if SS.ModuleEnabled and not SS.ModuleEnabled("sounds") then return false; end
 	local path = SS.SOUND_FILES[key];
 	if ( not path or not PlaySoundFile ) then return false; end
 	local ok, played = SS.Safe(PlaySoundFile, path);
@@ -548,7 +552,7 @@ function SS.PreviewSound(key)
 	local ok, played, handle = SS.Safe(PlaySoundFile, path);
 	if ( ok and played and handle ) then soundPreviewHandle = handle; end
 end
-local matchAudio={phase=nil,loaded=false,loadRun=nil,started=false,lost=false,won=false,pending={}};
+local matchAudio={phase=nil,started=false,lost=false,won=false,pending={}};
 local function MatchPhase()
  if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok then return value; end end
  return type(AZS_RUN)=="table" and AZS_RUN.ph or nil;
@@ -573,14 +577,6 @@ function SS.UpdateMatchSounds()
  if phase=="ready" and previous~="ready" then
   matchAudio.started=false; matchAudio.lost=false; matchAudio.won=false; matchAudio.pending={};
  end
- local run=type(AZS_ZONE)=="table" and AZS_ZONE.run;
- if phase=="ready" then
-  if not matchAudio.loaded or (run~=nil and matchAudio.loadRun~=nil and run~=matchAudio.loadRun) then
-   matchAudio.loaded=true;
-   local selected=SS.SoundSelection("load"); if selected~="off" then SS.PlayAddonSound(selected); end
-  end
-  if run~=nil then matchAudio.loadRun=run; end
- elseif phase~=nil then matchAudio.loaded=false; matchAudio.loadRun=nil; end
  if phase=="playing" and previous=="ready" and not matchAudio.started then
   matchAudio.started=true;
   local selected=SS.SoundSelection("start"); if selected~="off" then SS.PlayAddonSound(selected); end

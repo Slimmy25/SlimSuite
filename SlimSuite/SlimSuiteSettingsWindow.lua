@@ -75,7 +75,8 @@ function SS.Check(parent, label, y, get, set, indent)
 	cb.get = get;
 	SS.TrackToggle(cb);
 	cb:SetScript("OnClick", function()
-		local v = not (get() and true or false);
+		if this.cond and not this.cond() then return; end
+  local v = not (get() and true or false);
 		SS.ChangeSetting(get, set, v);
 		K.Sound(v and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff");
 		SS.RefreshToggles();
@@ -97,34 +98,18 @@ function SS.SoundPreviewIcon(parent,key)
  return button;
 end
 function SS.WinBuild()
-	win = K.Window("SlimSuiteFrame", "Slim Suite", 470, 560);
-	local hero = K.Hero(win, 380);
-	hero:SetWidth(430);
-	hero:SetPoint("TOPLEFT", win, "TOPLEFT", 20, -30);
-	K.Icon(hero.icon, "INV_Misc_Gear_02");
-	hero.heading:SetText("Slim Suite");
-	hero.line:SetText(SS.T("A Swiss-army knife of useful tools and UI controls."));
-	hero.version=hero:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
-	hero.version:SetPoint("TOPRIGHT",hero,"TOPRIGHT",-9,-8); hero.version:SetText("v"..SS.AddonVersion()); hero.version:SetTextColor(0.95,0.76,0.3);
-	local tabUi = K.Button(win, "Modifying the User Interface", 210, nil);
-	tabUi:SetPoint("TOPLEFT", win, "TOPLEFT", 20, -101);
-	local tabOther = K.Button(win, "New/Unique, But Minor Features", 210, nil);
-	tabOther:SetPoint("TOPLEFT", tabUi, "TOPRIGHT", 4, 0);
-	local bodyTop = -132;
-	local uiScroll, uiChild = K.Scroll("SlimSuiteUiScroll", win, 422);
-	uiScroll:SetPoint("TOPLEFT", win, "TOPLEFT", 20, bodyTop);
-	uiScroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 48);
-	local otherScroll, otherChild = K.Scroll("SlimSuiteOtherScroll", win, 422);
-	otherScroll:SetPoint("TOPLEFT", win, "TOPLEFT", 20, bodyTop);
-	otherScroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 48);
-	local addonsScroll, addonsChild = K.Scroll("SlimSuiteAddonsScroll", win, 422);
-	addonsScroll:SetPoint("TOPLEFT", win, "TOPLEFT", 20, bodyTop);
-	addonsScroll:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -30, 48);
-	-- A page is a list of groups: {head="Name"} starts one. A row whose label starts with spaces is a sub-setting: it
-	-- shows only while the setting above it (the one it belongs to) is on.
-	local function AddRows(parent, entries, startY, after)
+ win=K.Window("SlimSuiteFrame","Slim Suite",470,560);
+ local hero=K.Hero(win,380); hero:SetWidth(430); hero:SetPoint("TOPLEFT",win,"TOPLEFT",20,-30);
+ K.Icon(hero.icon,"INV_Misc_Gear_02"); hero.heading:SetText("Slim Suite"); hero.line:SetText(SS.T("Choose a module to open its settings."));
+ hero.version=hero:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); hero.version:SetPoint("TOPRIGHT",hero,"TOPRIGHT",-9,-8); hero.version:SetText("v"..SS.AddonVersion());
+ local hub=CreateFrame("Frame","SlimSuiteModuleHub",win); hub:SetPoint("TOPLEFT",win,"TOPLEFT",20,-110); hub:SetWidth(422); hub:SetHeight(390);
+ SS.moduleHubButtons={}; local views={}; local current;
+ local back=K.Button(win,"Back",75,function() SS.OpenModulePage(nil); end); back:SetPoint("TOPLEFT",win,"TOPLEFT",20,-102);
+ local master=SS.Check(win,"Module enabled",-100,function() return current and SS.ModuleEnabled(current); end,function(v) if current then SS.SetModuleEnabled(current,v); end end);
+ master:ClearAllPoints(); master:SetPoint("LEFT",back,"RIGHT",14,0); master.moduleControl=true; master.label:SetWidth(260); master.label:SetHeight(28);
+	local function AddRows(parent, entries, startY, after, module)
 		SS.pages = SS.pages or {};
-		local page = { parent = parent, rows = {}, startY = startY, after = after };
+		local page = { parent = parent, rows = {}, startY = startY, after = after, module=module };
 		local up = nil;
 		for i = 1, table.getn(entries) do
 			local row = entries[i];
@@ -169,52 +154,29 @@ function SS.WinBuild()
 				table.insert(page.rows, r);
 			end
 		end
-		table.insert(SS.pages, page);
+		for _,r in ipairs(page.rows) do
+   if r.cb then r.cb.cond=function() return SS.ModuleEnabled(module); end end
+  end
+  table.insert(SS.pages, page);
 		SS.LayoutPage(page);
 		return page;
 	end
-	local reset, resetAll, addonsTab, uiLastY, otherLastY;
-	-- the tooltip-size and reset controls sit under the last row of the UI page
-	local function PlaceTail()
-		if ( not reset or not uiLastY ) then return; end
-		local y0=uiLastY-14;
-		reset:ClearAllPoints(); reset:SetPoint("TOPLEFT",uiChild,"TOPLEFT",10,y0);
-		uiChild:SetHeight(-y0+44);
-	end
-	-- the Manage Addons button sits under the last row of the Other page
-	local function PlaceAddons()
-		if ( not addonsTab or not otherLastY ) then return; end
-		addonsTab:ClearAllPoints(); addonsTab:SetPoint("TOPLEFT", otherChild, "TOPLEFT", 10, otherLastY - 12);
-		otherChild:SetHeight(-(otherLastY - 12) + 44);
-	end
-	local function CheckboxRows()
-		local noteTitle = uiChild:CreateFontString(nil, "OVERLAY", "GameFontNormal");
-		noteTitle:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -8); noteTitle:SetText(SS.T("Moving the game's UI"));
-		local note = uiChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		note:SetPoint("TOPLEFT", noteTitle, "BOTTOMLEFT", 0, -3); note:SetWidth(390); note:SetHeight(38);
-		note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetHeight(52); note:SetText(SS.T("Slim Suite replaces the game HUD automatically. Use Toggle UI Settings to arrange it, or Go back to vanilla to restore the original interface."));
-		AddRows(uiChild, {
+ local worldEntry=SS.WorldCombatEntry();
+ local uiEntries={
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
-			{button = "Go back to vanilla", width = 280, onClick = function() SS.GoBackToVanilla(); end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
 			{button = "Profiles & import/export", onClick = function() SS.ShowLayoutWindow(); end},
 			{button = "Recommended HUD preset", onClick = function() SS.ShowHUDRecommendation(); end},
-			{button = "Diagnostics & compatibility", onClick = function() SS.ShowDiagnosticsWindow(); end},
 			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
 			{head="Everywhere"},
 			{"Compass",function() return SS.DB().compassOn; end,function(v) SU.SetMode("SlimSuiteCompassFrame",v and "enabled" or "disabled","Compass"); end},
 			{"Show green absorb amounts on player and party frames (when the client exposes them)", function() return SS.DB().showAbsorbs; end, function(v) SS.DB().showAbsorbs = v and true or false; SS.Safe(SS.UpdateAbsorbMarkers); end},
-			SS.WorldCombatEntry(),
+			worldEntry,
 			{"Build and stats beside card choices",function() return SS.DB().cardEdgeHUD~=false; end,function(v) SS.DB().cardEdgeHUD=v; end},
 			{"Show Slim Suite above the level-up and new-item cards", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
-		}, -86, function(y) uiLastY = y; PlaceTail(); end);
-	end
-	local function BuildOther()
-		local purpose=otherChild:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");
-		purpose:SetPoint("TOPLEFT",otherChild,"TOPLEFT",10,-8);purpose:SetWidth(390);purpose:SetHeight(32);
-		purpose:SetJustifyH("LEFT");purpose:SetJustifyV("TOP");purpose:SetText(SS.T("The goal of clearing up chat is to see your friends' chat better in multiplayer."));
-		AddRows(otherChild, {
+ };
+ local otherEntries={
 			{"Language (reload UI)", function() return SS.DB().language or "auto"; end,
 			 function(v) SS.DB().language = v; end,
 			 choice={{"auto","auto"},{"English","enUS"},{"Español","esES"},{"Français","frFR"},{"Deutsch","deDE"},{"Português (Brasil)","ptBR"},{"Italiano","itIT"}} },
@@ -252,7 +214,6 @@ function SS.WinBuild()
    {"Boss / guardian / lair kill sound",group="boss",sounds={{"Off","off"},{"Hitmarker","bossHitmarker"},{"Whip Crack","bossWhip"},{"Gotcha — Dave Chappelle","bossGotcha"}}},
    {"Match loss sound",group="loss",sounds={{"Off","off"},{"The Price Is Right: losing horn","matchLoss"},{"GTA V: Wasted","matchWasted"}}},
    {"Victory sound",group="victory",sounds={{"Off","off"},{"GTA San Andreas","matchVictory"}}},
-   {"Load-in song (Move to Start)",group="load",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"}}},
    {"Match start song",group="start",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"}}},
    {"Chest opening sound",group="chest",sounds={{"Off","off"},{"Zelda: final four notes","chestOpen"}}},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
@@ -260,57 +221,50 @@ function SS.WinBuild()
 			{"High-contrast encounter bars", function() return SS.DB().accessibilityContrast; end, function(v) SS.DB().accessibilityContrast = v and true or false; SS.Safe(SS.UpdateBossFrames); end},
 			{"Larger encounter names", function() return SS.DB().accessibilityLargeText; end, function(v) SS.DB().accessibilityLargeText = v and true or false; SS.Safe(SS.UpdateBossFrames); end},
 			{"Reduce floating combat-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end},
-			{head="Support"},
-			{button = "View diagnostics & compatibility", onClick = function() SS.ShowDiagnosticsWindow(); end},
-		}, -48, function(y) otherLastY = y; PlaceAddons(); end);
-	end
-	local function BuildAddonManager()
-		local title = addonsChild:CreateFontString(nil, "OVERLAY", "GameFontNormal");
-		title:SetPoint("TOPLEFT", addonsChild, "TOPLEFT", 8, -8); title:SetText(SS.T("Enabled game addons"));
-		local note = addonsChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6); note:SetText(SS.T("Changes apply after reload. Uncheck to disable an addon."));
-		local n = (GetNumAddOns and GetNumAddOns()) or 0;
-		local y = -48;
-		for index = 1, n do
-			local name, addonTitle, addonNotes, enabled = GetAddOnInfo(index);
-			local state = GetAddOnEnableState and GetAddOnEnableState(nil, index) or (enabled and 1 or 0);
-			if ( name and string.sub(string.lower(name), 1, 9) ~= "blizzard_" and name ~= "SlimSuite" ) then
-				local cb = CreateFrame("CheckButton", nil, addonsChild, "UICheckButtonTemplate");
-				cb:SetPoint("TOPLEFT", addonsChild, "TOPLEFT", 6, y); cb:SetWidth(24); cb:SetHeight(24);
-				cb:SetChecked((state or 0) > 0 and 1 or nil);
-				cb:SetScript("OnClick", function()
-					if ( this:GetChecked() ) then EnableAddOn(name); else DisableAddOn(name); end
-				end);
-				local label = addonsChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-				label:SetPoint("LEFT", cb, "RIGHT", 4, 0); label:SetWidth(372); label:SetJustifyH("LEFT"); label:SetText(addonTitle or name);
-				y = y - 26;
-			end
-		end
-		addonsChild:SetHeight(math.max(64, -y + 12));
-		local reload = K.Button(win, "Reload for changes", 160, function() if ( ReloadUI ) then ReloadUI(); end end);
-		reload:SetPoint("BOTTOMLEFT", win, "BOTTOMLEFT", 28, 17);
-		win.reloadButton = reload;
-		local errors = K.Button(win, "Error log", 120, function() SS.ShowErrors(); end);
-		errors:SetPoint("BOTTOMLEFT", win, "BOTTOMLEFT", 198, 17);
-	end
-	reset = K.Button(uiChild, "Reset positions", 140, function() SS.ResetPlaces(); end);
-	reset:SetPoint("TOPLEFT", uiChild, "TOPLEFT", 10, -784);
-	resetAll = K.Button(uiChild, "Reset all UI", 126, function() SS.ResetUI(); end);
-	resetAll:SetPoint("LEFT", reset, "RIGHT", 8, 0);
-	uiChild:SetHeight(818);
-	CheckboxRows(); BuildOther(); BuildAddonManager();
-	local function SelectPage(which)
-		uiScroll:Hide(); otherScroll:Hide(); addonsScroll:Hide();
-		if ( win.reloadButton ) then win.reloadButton:Hide(); end
-		if ( which == "ui" ) then uiScroll:Show(); tabUi:LockHighlight(); tabOther:UnlockHighlight();
-		elseif ( which == "other" ) then otherScroll:Show(); tabUi:UnlockHighlight(); tabOther:LockHighlight();
-		else addonsScroll:Show(); if ( win.reloadButton ) then win.reloadButton:Show(); end end
-	end
-	tabUi:SetScript("OnClick", function() SelectPage("ui"); end);
-	tabOther:SetScript("OnClick", function() SelectPage("other"); end);
-	addonsTab = K.Button(otherChild, "Manage Addons", 132, function() SelectPage("addons"); end);
-	PlaceTail(); PlaceAddons();
-	SelectPage("other");
+ };
+ local entries={chat={},sounds={},ui={},gameplay={},misc={}};
+ for _,row in ipairs(uiEntries) do table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
+ local category="misc";
+ for _,row in ipairs(otherEntries) do
+  if row.head then
+   category=({["Chat mods"]="chat",["Enemy frames"]="gameplay",["Camera and marks"]="gameplay",["Minimap"]="ui",["Deaths and spells"]="sounds",["Accessibility"]="misc"})[row.head] or "misc";
+  end
+  local destination=category; local label=row[1];
+  if label=="Mark where a downed friend can be revived" or label=="Show caches on the minimap" or label=="Show bosses on the minimap" or label=="Show lairs on the minimap, with their 3:00 refill timer" or label=="Show the game's nearest Guardian lair flag on minimap" then destination="gameplay";
+  elseif label=="Minimap button" then destination="misc";
+  elseif label=="Cooldown numbers on the spell squares" then destination="ui"; end
+  table.insert(entries[destination],row);
+ end
+ table.insert(entries.ui,{button="Reset positions",onClick=function() SS.ResetPlaces(); end});
+ table.insert(entries.ui,{button="Reset all UI",onClick=function() SS.ResetUI(); end});
+ for i,id in ipairs(SS.MODULE_ORDER) do
+  local module=id;
+  local open=K.Button(hub,SS.T(SS.MODULE_TITLES[id]),275,function() SS.OpenModulePage(module); end);
+  open:SetHeight(42); open:SetPoint("TOPLEFT",hub,"TOPLEFT",6,-(i-1)*58);
+  local toggle=K.Button(hub,"",110,function() SS.SetModuleEnabled(module,not SS.ModuleEnabled(module)); end);
+  toggle:SetHeight(42); toggle:SetPoint("LEFT",open,"RIGHT",8,0); SS.moduleHubButtons[id]=toggle;
+  local scroll,child=K.Scroll("SlimSuiteModule_"..id,win,422);
+  scroll:SetPoint("TOPLEFT",win,"TOPLEFT",20,-139); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-30,34);
+  local page=AddRows(child,entries[id],-8,nil,id); views[id]={scroll=scroll,page=page};
+ end
+ SS.RefreshModuleHub=function()
+  for id,button in pairs(SS.moduleHubButtons) do button:SetText(SS.T(SS.ModuleEnabled(id) and "On" or "Off")); end
+  if current then
+   for _,row in ipairs(views[current].page.rows) do
+    local enabled=SS.ModuleEnabled(current);
+    if row.b then if enabled then row.b:Enable(); else row.b:Disable(); end end
+   end
+  end
+ end;
+ SS.OpenModulePage=function(id)
+  current=id;
+  for _,view in pairs(views) do view.scroll:Hide(); end
+  if id and views[id] then hub:Hide(); back:Show(); master:Show(); master.label:Show(); views[id].scroll:Show(); master.label:SetText(SS.T(SS.MODULE_TITLES[id]).." — "..SS.T("Module enabled"));
+  else hub:Show(); back:Hide(); master:Hide(); master.label:Hide(); end
+  SS.RefreshToggles(); SS.RefreshModuleHub();
+ end;
+ win:SetScript("OnShow",function() SS.OpenModulePage(nil); end);
+ SS.OpenModulePage(nil);
 end
 
 function SS.Toggle()
@@ -359,7 +313,7 @@ SS.HELP = {
 	"/slim: the settings window.  /slim edit: move and size the UI (/slim lock when done).  /slim setup: the guided setup.",
 	"/slim demo: Demo Mode on or off.  /slim levelup: Slim Suite's Level Up button or the game's own.",
 	"/slim layout: manage named profiles and import/export layouts.  /slim layout save <name>, load <name>, delete <name>, list.",
-	"/slim hud: recommended positions for this display.  /slim diagnostics: client and game compatibility details.",
+	"/slim hud: recommended positions for this display.",
 	"/slim reset places, /slim reset all: back to where everything started.",
 	"/slim hide <words>, /slim unhide <words>, /slim hide: chat lines with those words.",
 	"/slim minimap: the gear button.  /slim errors: the error log.  /slim mouse: names the frame under the cursor.",
@@ -388,8 +342,6 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		K.Print(NAME, "chat lines with \"" .. rest .. "\" are shown again.");
 	elseif ( cmd == "errors" ) then
 		SS.ShowErrors();
-	elseif ( cmd == "diagnostics" or cmd == "compatibility" ) then
-		SS.ShowDiagnosticsWindow();
 	elseif ( cmd == "hud" or cmd == "recommend" ) then
 		SS.ShowHUDRecommendation();
 	elseif ( cmd == "mouse" ) then

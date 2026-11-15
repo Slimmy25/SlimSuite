@@ -38,6 +38,6 @@ for _,page in ipairs(SS.pages) do for _,row in ipairs(page.rows) do
   check("sound row selects exactly its choice",SS.SoundSelection(row.soundGroup)==row.soundKey)
  end
 end end
-check("all sound groups include alternatives and Off",counts.boss==4 and counts.death==4 and counts.lowHealth==2 and counts.chest==2 and counts.loss==3 and counts.start==2 and counts.victory==2 and counts.teammate==6 and counts.load==2 and previews==17)
+check("all sound groups include alternatives and Off",counts.boss==4 and counts.death==4 and counts.lowHealth==2 and counts.chest==2 and counts.loss==3 and counts.start==2 and counts.victory==2 and counts.teammate==6 and counts.load==nil and previews==16)
 print("adaptive/sound problems: "..bad)
 assert(bad==0 and #ERRORS==0,"adaptive/sound regressions")

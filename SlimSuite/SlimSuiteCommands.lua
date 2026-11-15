@@ -85,6 +85,7 @@ function SS.Startup(entering, loaded)
 	if ( entering ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
 	SS.Safe(SS.ApplyElementModes);
 	SS.Safe(SS.RefreshChatDock);
+ if SS.EnforcePausedModules then SS.EnforcePausedModules(false); end
 end
 loader:RegisterEvent("PLAYER_LOGOUT");
 loader:SetScript("OnEvent", function()
@@ -98,7 +99,7 @@ loader:SetScript("OnEvent", function()
 	SS.Startup(event == "PLAYER_ENTERING_WORLD", event == "VARIABLES_LOADED");
 	if ( event == "PLAYER_ENTERING_WORLD" and firstRunSetupPending and not SU.autoStartedFirstRun ) then
 		SU.autoStartedFirstRun = true;
-		SS.StartSetup(true);
+		SS.StartSetup(true); SS.SetupEnd(true); SS.Toggle();
 	end
 end);
 
@@ -135,7 +136,8 @@ function SS.LayoutSnapshot()
 		local key = SS.LAYOUT_KEYS[i];
 		out[key] = d[key];
 	end
-	return out;
+	if SS.ModuleLayoutPreferences then SS.ModuleLayoutPreferences(out); end
+ return out;
 end
 -- puts a layout in place of the current one and draws everything again from it
 function SS.LayoutApply(layout, quiet)
@@ -153,6 +155,7 @@ function SS.LayoutApply(layout, quiet)
 		d[key] = layout[key];
 	end
 	SS.PrepareDB(d);                                       -- anything the layout did not carry gets its default
+ if SS.EnforcePausedModules then SS.EnforcePausedModules(true); end
 	-- Older profile strings omitted this derived native-layout state.
 	for frame, mode in pairs(d.elementModes) do
 		if ( SU and SU.NATIVE[frame] ) then d.frameDefault[frame] = mode == "default" and true or nil; end
@@ -490,48 +493,6 @@ function SS.ShowLayoutWindow()
 	f:Show();
 end
 
-function SS.ShowDiagnosticsWindow()
-	local f=getglobal("SlimSuiteDiagnosticsFrame");
-	if ( not f ) then
-		f=K.Window("SlimSuiteDiagnosticsFrame","Diagnostics & compatibility",500,390);
-		local scroll=CreateFrame("ScrollFrame","SlimSuiteDiagnosticsScroll",f,"UIPanelScrollFrameTemplate");
-		scroll:SetPoint("TOPLEFT",f,"TOPLEFT",22,-42); scroll:SetPoint("BOTTOMRIGHT",f,"BOTTOMRIGHT",-40,54);
-		local box=CreateFrame("EditBox","SlimSuiteDiagnosticsText",scroll); box:SetMultiLine(true); box:SetAutoFocus(false); box:SetFontObject(GameFontHighlightSmall); box:SetWidth(425); box:SetHeight(360); box:SetMaxLetters(0); box:SetScript("OnEscapePressed",function() this:ClearFocus(); end); scroll:SetScrollChild(box); f.box=box;
-		local refresh=K.Button(f,"Refresh",90,function() SS.RefreshDiagnostics(); end); refresh:SetPoint("BOTTOMLEFT",f,"BOTTOMLEFT",24,18);
-		local errors=K.Button(f,"Error log",90,function() SS.ShowErrors(); end); errors:SetPoint("LEFT",refresh,"RIGHT",8,0);
-		local close=K.Button(f,"Close",90,function() f:Hide(); end); close:SetPoint("BOTTOMRIGHT",f,"BOTTOMRIGHT",-24,18);
-	end
-	SS.RefreshDiagnostics(); f:Show();
-end
-function SS.RefreshDiagnostics()
-	local f=getglobal("SlimSuiteDiagnosticsFrame"); if ( not f or not f.box ) then return; end
-	local game,build,buildDate,interface="unknown","unknown","unknown","unknown";
-	if ( GetBuildInfo ) then local ok,a,b,c,d=pcall(GetBuildInfo); if ( ok ) then game,build,buildDate,interface=a or game,b or build,c or buildDate,d or interface; end end
-	local locale=GetLocale and GetLocale() or "unknown";
-	local display=SS.DisplayContext and SS.DisplayContext();
-	local names=SS.LayoutNames and SS.LayoutNames() or {};
-	local function status(ok) return ok and SS.T("Available") or SS.T("Not detected (related integration may be unavailable)"); end
-	local lines={
-		SS.T("Slim Suite version:").." "..SS.AddonVersion(),
-		SS.T("Addon interface:").." 11200",
-		SS.T("Game client:").." "..tostring(game).."  |  "..SS.T("build").." "..tostring(build).."  |  "..SS.T("interface").." "..tostring(interface),
-		SS.T("Client locale:").." "..tostring(locale),
-		SS.T("Detected HUD template:").." "..tostring(display and display.template.id or "unknown").."  |  "..SS.T("screen").." "..tostring(display and (display.resolution[1].."x"..display.resolution[2]) or "unknown"),
-		SS.T("Saved named profiles:").." "..tostring(table.getn(names)).."  |  "..SS.T("per-character:").." "..(SS.DB().layoutPerCharacter and SS.T("on") or SS.T("off")),
-		"",
-		SS.T("Azeroth Survivors compatibility"),
-		SS.T("Run phase API (AZS_GetPhase):").." "..status(type(AZS_GetPhase)=="function"),
-		SS.T("Encounter data (AZS_UNITS):").." "..status(type(AZS_UNITS)=="table"),
-		SS.T("Damage meter snapshot (AZS_GetMeterSnapshot):").." "..status(type(AZS_GetMeterSnapshot)=="function"),
-		SS.T("Floating combat-text projection (AZS_ProjectCombatTextAnchors):").." "..status(type(AZS_ProjectCombatTextAnchors)=="function"),
-		SS.T("Combat-text event hook (AZS_RegisterCombatTextFrameHandler):").." "..status(type(AZS_RegisterCombatTextFrameHandler)=="function"),
-		SS.T("Enemy world anchors (AZS_GetWorldAnchors):").." "..status(type(AZS_GetWorldAnchors)=="function"),
-		SS.T("Enemy frame projection (AZS_ProjectWorldAnchors):").." "..status(type(AZS_ProjectWorldAnchors)=="function"),
-		"",
-		SS.T("This view reports detected client and game hooks. Missing optional hooks do not necessarily prevent Slim Suite's core HUD features from working."),
-	};
-	f.box:SetText(table.concat(lines,"\n"));
-end
 
 buffLayoutUpdater = CreateFrame("Frame");
 buffLayoutUpdater:RegisterEvent("UNIT_AURA");

@@ -99,7 +99,7 @@ Listen to each included sound before enabling it:
 
 Use higher-contrast encounter bars, larger encounter names, and reduced combat-text motion. The interface supports **English, Spanish, French, German, Portuguese (Brazil), and Italian**. Follow the client language automatically or choose one in settings, then reload the UI. Game-provided names stay in the game's language.
 
-Built-in diagnostics show detected client features and compatibility information. The persistent error log keeps Slim Suite errors available between sessions, and the addon manager lets you enable or disable other installed addons before reloading.
+The main hub groups SlimSuite into Chat Mods, Sound Effects, User Interface, Gameplay, and Misc. Each module has its own on/off switch and settings page. Turning a module off preserves its choices for later. The persistent error log remains available through `/slim errors`.
 
 ## Install
 
@@ -120,7 +120,6 @@ Built-in diagnostics show detected client features and compatibility information
 | `/slim layout` | Open profiles and import/export. |
 | `/slim hud` | Open recommended HUD positions. |
 | `/slim errors` | Open the saved error log. |
-| `/slim diagnostics` | View compatibility information. |
 | `/slim minimap` | Show or hide Slim Suite's minimap button. |
 | `/slim help` | List the available commands. |
 

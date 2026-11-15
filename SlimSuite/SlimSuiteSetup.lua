@@ -682,6 +682,7 @@ function SS.SetupRescue(err)
 	K.Print(NAME, "the setup hit a problem and closed; your UI is back as it was. /slim errors shows what happened.");
 end
 function SS.StartSetup(fromStart)
+ if SS.ModuleEnabled and not SS.ModuleEnabled("ui") then SS.SetModuleEnabled("ui",true); end
 	local d=SS.DB();
 	if ( d.vanillaUI ) then
 		d.vanillaUI=false; d.setupDone=nil; d.firstSetupDefaultsVersion=nil;
