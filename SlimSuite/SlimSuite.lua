@@ -162,8 +162,8 @@ SS.DEFAULTS = {
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
 	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
-	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, lowHealthSound = false,
-	bossHitmarkerSound = false, bossWhipSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
+	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchVictorySound = false, teammateDeathSound = "same", lowHealthSound = false,
+	bossHitmarkerSound = false, bossWhipSound = false, bossGotchaSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
 	partyFaces = true, cardPortraits = true, targetDebuffs = true, showAbsorbs = false, moveLevelButton = false, moveMeter = false,
 	modernEnemyFrames = false, enemyBossesOnly = true, enemyPlateDebuffs = false,
@@ -215,7 +215,7 @@ function SS.PrepareDB(d)
 	if ( type(d.itemRowCounter) ~= "number" ) then d.itemRowCounter = 0; end
 	if ( type(d.gridDivisions) ~= "number" ) then d.gridDivisions = tonumber(d.gridSpacing) or 128; end
 	if ( not d.gridHalved ) then d.gridDivisions = (d.gridDivisions or 128) / 2; d.gridHalved = true; end   -- grid sizes were halved in v1.02
-	if ( d.gridDivisions ~= 16 and d.gridDivisions ~= 32 and d.gridDivisions ~= 64 and d.gridDivisions ~= 128 ) then d.gridDivisions = 64; end
+	if ( d.gridDivisions ~= 8 and d.gridDivisions ~= 16 and d.gridDivisions ~= 32 and d.gridDivisions ~= 64 ) then d.gridDivisions = 64; end
 	d.gridSpacing = nil;
 	if ( not d.gridOffDefault ) then d.showEditGrid = false; d.mirrorTarget = false; d.gridOffDefault = true; end
 	-- Mirror Target is now one setting that both combines the unit frames and mirrors their positions.
@@ -485,11 +485,52 @@ end
 SS.SOUND_FILES = {
 	death = "Interface\\AddOns\\SlimSuite\\Baby Crying.mp3",
 	legoDeath = "Interface\\AddOns\\SlimSuite\\lego-die.mp3",
+ duckDeath = "Interface\\AddOns\\SlimSuite\\DuckToy.mp3",
+ matchLoss = "Interface\\AddOns\\SlimSuite\\MatchLoss.mp3",
+ matchWasted = "Interface\\AddOns\\SlimSuite\\MatchWasted.mp3",
+ matchStart = "Interface\\AddOns\\SlimSuite\\MatchStart.mp3",
+ robloxDeath = "Interface\\AddOns\\SlimSuite\\RobloxDeath.mp3",
+ matchVictory = "Interface\\AddOns\\SlimSuite\\MatchVictory.mp3",
 	lowHealth = "Interface\\AddOns\\SlimSuite\\Low Health Sound.mp3",
 	bossHitmarker = "Interface\\AddOns\\SlimSuite\\hitmarker.mp3",
 	bossWhip = "Interface\\AddOns\\SlimSuite\\Whip-Crack.mp3",
+ bossGotcha = "Interface\\AddOns\\SlimSuite\\Gotcha.mp3",
 	chestOpen = "Interface\\AddOns\\SlimSuite\\zelda-chest-opening-and-item-catch.mp3",
 };
+-- One selected sound per event. Existing flags remain compatible with saved settings.
+function SS.SoundSelection(group)
+ local d=SS.DB();
+ if group=="death" then return d.deathSound and (d.duckDeathSound and "duckDeath" or (d.legoDeathSound and "legoDeath" or "death")) or "off"; end
+ if group=="teammate" then return d.teammateDeathSound or "same"; end
+ if group=="victory" then return d.matchVictorySound and "matchVictory" or "off"; end
+ if group=="loss" then return d.matchWastedSound and "matchWasted" or (d.matchLossSound and "matchLoss" or "off"); end
+ if group=="start" then return d.matchStartSound and "matchStart" or "off"; end
+ if group=="lowHealth" then return d.lowHealthSound and "lowHealth" or "off"; end
+ if group=="chest" then return d.chestOpenSound and "chestOpen" or "off"; end
+ if group=="boss" then
+  if d.bossHitmarkerSound then return "bossHitmarker"; end
+  if d.bossWhipSound then return "bossWhip"; end
+  if d.bossGotchaSound then return "bossGotcha"; end
+ end
+ return "off";
+end
+function SS.SetSoundSelection(group,key)
+ local d=SS.DB();
+ if group=="death" then d.deathSound=key=="death" or key=="legoDeath" or key=="duckDeath"; d.legoDeathSound=key=="legoDeath"; d.duckDeathSound=key=="duckDeath";
+ elseif group=="teammate" then d.teammateDeathSound=key;
+ elseif group=="victory" then d.matchVictorySound=key=="matchVictory";
+ elseif group=="loss" then d.matchLossSound=key=="matchLoss"; d.matchWastedSound=key=="matchWasted";
+ elseif group=="start" then d.matchStartSound=key=="matchStart";
+ elseif group=="lowHealth" then d.lowHealthSound=key=="lowHealth";
+ elseif group=="chest" then d.chestOpenSound=key=="chestOpen";
+ elseif group=="boss" then d.bossHitmarkerSound=key=="bossHitmarker"; d.bossWhipSound=key=="bossWhip"; d.bossGotchaSound=key=="bossGotcha"; end
+ SS.RefreshToggles();
+end
+function SS.DeathSoundSelection(group)
+ local selected=SS.SoundSelection(group=="teammate" and "teammate" or "death");
+ if selected=="same" then return SS.SoundSelection("death"); end
+ return selected;
+end
 local soundPreviewHandle;
 function SS.PlayAddonSound(key)
 	local path = SS.SOUND_FILES[key];
@@ -505,14 +546,62 @@ function SS.PreviewSound(key)
 	local ok, played, handle = SS.Safe(PlaySoundFile, path);
 	if ( ok and played and handle ) then soundPreviewHandle = handle; end
 end
-function SS.PlayDeathSound()
-	if ( not SS.DB().deathSound or not PlaySoundFile ) then return; end
-	SS.PlayAddonSound(SS.DB().legoDeathSound and "legoDeath" or "death");
+local matchAudio={phase=nil,started=false,lost=false,won=false,pending={}};
+local function MatchPhase()
+ if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok then return value; end end
+ return type(AZS_RUN)=="table" and AZS_RUN.ph or nil;
 end
+local function MatchLost(phase)
+ local summary=type(AZS_END)=="table" and AZS_END or nil;
+ if type(AZS_GetRunSummary)=="function" then local ok,value=SS.Safe(AZS_GetRunSummary); if ok and type(value)=="table" then summary=value; end end
+ if summary and (summary.result=="left" or summary.result=="victory") then return false; end
+ return phase=="dead" or (phase~="ready" and summary and summary.result=="defeat");
+end
+function SS.PlayDeathSound(group)
+ -- Wait for the end result before choosing an ordinary death vs. final game-over sound.
+ if SS.DeathSoundSelection(group)=="off" then return; end
+ table.insert(matchAudio.pending,{due=GetTime()+.75,group=group});
+end
+function SS.UpdateMatchSounds()
+ local phase=MatchPhase(); local previous=matchAudio.phase;
+ if not previous then
+  -- Loading into an old end screen or an active match must not replay its music.
+  if table.getn(matchAudio.pending)==0 then matchAudio.lost=MatchLost(phase) and true or false; matchAudio.won=phase=="victory"; end
+ end
+ if phase=="ready" and previous~="ready" then
+  matchAudio.started=false; matchAudio.lost=false; matchAudio.won=false; matchAudio.pending={};
+ end
+ if phase=="playing" and previous=="ready" and not matchAudio.started then
+  matchAudio.started=true;
+  local selected=SS.SoundSelection("start"); if selected~="off" then SS.PlayAddonSound(selected); end
+ end
+ if MatchLost(phase) then
+  matchAudio.pending={};
+  if not matchAudio.lost then
+   matchAudio.lost=true;
+   local selected=SS.SoundSelection("loss"); if selected~="off" then SS.PlayAddonSound(selected); end
+  end
+ elseif phase=="victory" then
+  matchAudio.pending={};
+  if not matchAudio.won then
+   matchAudio.won=true;
+   local selected=SS.SoundSelection("victory"); if selected~="off" then SS.PlayAddonSound(selected); end
+  end
+ elseif type(AZS_END)=="table" and AZS_END.result=="left" then matchAudio.pending={};
+ else
+  for i=table.getn(matchAudio.pending),1,-1 do
+   if GetTime()>=matchAudio.pending[i].due then
+    local pending=table.remove(matchAudio.pending,i);
+    local selected=SS.DeathSoundSelection(pending.group); if selected~="off" then SS.PlayAddonSound(selected); end
+   end
+  end
+ end
+ matchAudio.phase=phase;
+end
+SS.Every("matchSounds",.05,function() SS.UpdateMatchSounds(); end);
 function SS.PlayBossKillSound()
-	local d = SS.DB();
-	if ( d.bossHitmarkerSound ) then SS.PlayAddonSound("bossHitmarker"); end
-	if ( d.bossWhipSound ) then SS.PlayAddonSound("bossWhip"); end
+ local selected=SS.SoundSelection("boss");
+ if selected~="off" then SS.PlayAddonSound(selected); end
 end
 function SS.PlayChestOpenSound()
 	if ( SS.DB().chestOpenSound ) then SS.PlayAddonSound("chestOpen"); end

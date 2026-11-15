@@ -2,6 +2,18 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.37
+- Added normalized GTA V Wasted exclusively to final match-loss choices, separate from recoverable player/teammate death audio. Future audio additions require normalization and measured-asset checks before release.
+- Added an independent teammate death selector with Roblox and Same as player, plus an optional GTA San Andreas victory sound that plays once per win.
+- Leveled all 13 MP3 assets to a common -12 LUFS target (original Whip Crack + 1.5 dB), with limiting and endpoint fades. Decoded true peaks remain below -1 dBTP; included reproducible build-time normalization and asset checks.
+- Added Duck Toy to player/teammate death sound choices, The Price Is Right losing horn to a separate match-loss group, and Kit Kit Kit as an optional match-start song.
+- Ordinary death sounds wait briefly for the run result; confirmed defeat clears them and plays only the selected game-over alert. Start songs play once on Ready → Playing; victories, leaving and historical end screens do not replay loss audio.
+- Combat highlights now learn per-source damage and critical-hit frequency, blending baselines each minute. Routine repeated crits remain in the downward log; rare or unusually strong hits use the rightward highlight rows. Learning resets per run and is bounded to 64 recent sources.
+- Combat text animates every rendered UI frame, with cached, UTF-8-safe binary-search text fitting.
+- Sound events now offer one selected sound or Off. Small speaker icons beside each option replace standalone preview buttons; added the supplied Gotcha sample for boss/guardian/lair kills.
+- Trimmed the Zelda chest sound to its final four-note phrase (about 2.5 seconds).
+- Added raw death-notification, confirmed corpse-anchor and authoritative boss/guardian counter fallbacks for kill sounds, with cross-source deduplication and silent historical initialization.
+
 ## 1.36
 - Normal combat hits now stack downward without horizontal drift. Crits have their own top-to-bottom row cursor, fading right within bounds; normal rows avoid active crits and wrapping clears the prior crit before reuse.
 - Fixed both optional boss/guardian/lair-owner kill sounds to use confirmed game death banners, independently of visible announcements. Deduplicated callback and polling delivery; loading historical banners does not replay old kills.

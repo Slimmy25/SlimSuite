@@ -42,11 +42,12 @@ function SS.LayoutPage(page)
 				r.cb:ClearAllPoints(); r.cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 26 + r.lead, y);
 				rowHeight = math.max(28, SS.WrappedLabelHeight(r.cb.label, 350 - r.lead) + 8);
 				r.cb:Show(); r.cb.label:Show();
+    if r.preview then r.preview:ClearAllPoints(); r.preview:SetPoint("RIGHT",r.cb,"LEFT",-2,0); r.preview:Show(); end
 			end
 			y = y - rowHeight;
 		else
 			if ( r.kind == "button" ) then r.b:Hide();
-			elseif ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); end
+			elseif ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); if r.preview then r.preview:Hide(); end end
 		end
 	end
 	parent:SetHeight(math.max(20, -y + 12));
@@ -82,6 +83,19 @@ function SS.Check(parent, label, y, get, set, indent)
 	return cb;
 end
 
+function SS.SoundPreviewIcon(parent,key)
+ local button=CreateFrame("Button",nil,parent); button:SetWidth(18); button:SetHeight(18);
+ -- A small native-texture speaker silhouette, avoiding unsupported emoji glyphs.
+ for _,r in ipairs({{1,6,4,6},{5,4,2,10},{7,2,2,14},{11,5,1,8},{14,3,1,12}}) do
+  local t=button:CreateTexture(nil,"ARTWORK"); t:SetTexture(1,.82,.3,1);
+  t:SetPoint("TOPLEFT",button,"TOPLEFT",r[1],-r[2]); t:SetWidth(r[3]); t:SetHeight(r[4]);
+ end
+ button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
+ button:SetScript("OnClick",function() SS.PreviewSound(key); end);
+ button:SetScript("OnEnter",function() if GameTooltip then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(SS.T("Preview sound")); GameTooltip:Show(); end end);
+ button:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide(); end end);
+ return button;
+end
 function SS.WinBuild()
 	win = K.Window("SlimSuiteFrame", "Slim Suite", 470, 560);
 	local hero = K.Hero(win, 380);
@@ -119,6 +133,17 @@ function SS.WinBuild()
 				fs:SetText(SS.T(row.head)); fs:SetTextColor(1, 0.82, 0);
 				table.insert(page.rows, { kind = "head", fs = fs });
 				up = nil;
+   elseif row.sounds then
+    local fs=parent:CreateFontString(nil,"OVERLAY","GameFontNormal"); fs:SetText(SS.T(row[1])); fs:SetTextColor(1,.82,0);
+    table.insert(page.rows,{kind="head",fs=fs});
+    for _,option in ipairs(row.sounds) do
+     local key=option[2]; local group=row.group;
+     local cb=SS.Check(parent,option[1],startY,function() return SS.SoundSelection(group)==key; end,function() SS.SetSoundSelection(group,key); end,20);
+     cb.soundGroup=group; cb.soundKey=key;
+     local preview=key~="off" and key~="same" and SS.SoundPreviewIcon(parent,key) or nil;
+     table.insert(page.rows,{kind="check",lead=20,cb=cb,preview=preview,soundGroup=group,soundKey=key});
+    end
+    up=nil;
 			elseif ( row.button ) then
 				local b = K.Button(parent, SS.T(row.button), row.width or 150, row.onClick);
 				table.insert(page.rows, { kind = "button", b = b });
@@ -221,18 +246,14 @@ function SS.WinBuild()
 			{"Minimap button", function() local m = SS.DB().minimap; return not (m and m.hide); end, function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (m and m.hide and true or false) == v ) then SS.Mini.Toggle(); end end end},
 			{head="Deaths and spells"},
 			{"Mark where a downed friend can be revived", function() return SS.DB().deathMarks; end, function(v) SS.DB().deathMarks = v; end},
-			{"Play a sound when you or a teammate dies", function() return SS.DB().deathSound; end, function(v) SS.DB().deathSound = v; end},
-			{"   Use LEGO die instead of Baby Crying", function() return SS.DB().legoDeathSound; end, function(v) SS.DB().legoDeathSound = v and true or false; end},
-			{button = "Preview: Baby Crying (death)", onClick = function() SS.PreviewSound("death"); end},
-			{button = "Preview: LEGO die", onClick = function() SS.PreviewSound("legoDeath"); end},
-			{"Play Low Health Sound at 30% health or lower (1 second, every 5 seconds)", function() return SS.DB().lowHealthSound; end, function(v) SS.DB().lowHealthSound = v and true or false; end},
-			{button = "Preview: Low Health Sound", onClick = function() SS.PreviewSound("lowHealth"); end},
-			{"Play hitmarker when a boss, Guardian, or lair owner is killed", function() return SS.DB().bossHitmarkerSound; end, function(v) SS.DB().bossHitmarkerSound = v and true or false; end},
-			{button = "Preview: Hitmarker", onClick = function() SS.PreviewSound("bossHitmarker"); end},
-			{"Play whip crack when a boss, Guardian, or lair owner is killed", function() return SS.DB().bossWhipSound; end, function(v) SS.DB().bossWhipSound = v and true or false; end},
-			{button = "Preview: Whip Crack", onClick = function() SS.PreviewSound("bossWhip"); end},
-			{"Play a sound when opening a cache", function() return SS.DB().chestOpenSound; end, function(v) SS.DB().chestOpenSound = v and true or false; end},
-			{button = "Preview: Zelda chest opening", onClick = function() SS.PreviewSound("chestOpen"); end},
+   {"Death sound",group="death",sounds={{"Off","off"},{"Baby Crying","death"},{"LEGO die","legoDeath"},{"duck toy sound","duckDeath"}}},
+   {"Teammate death sound",group="teammate",sounds={{"Same as player","same"},{"Off","off"},{"Baby Crying","death"},{"LEGO die","legoDeath"},{"duck toy sound","duckDeath"},{"Roblox death sound","robloxDeath"}}},
+   {"Low health sound (30% or lower)",group="lowHealth",sounds={{"Off","off"},{"Low Health Sound","lowHealth"}}},
+   {"Boss / guardian / lair kill sound",group="boss",sounds={{"Off","off"},{"Hitmarker","bossHitmarker"},{"Whip Crack","bossWhip"},{"Gotcha — Dave Chappelle","bossGotcha"}}},
+   {"Match loss sound",group="loss",sounds={{"Off","off"},{"The Price Is Right: losing horn","matchLoss"},{"GTA V: Wasted","matchWasted"}}},
+   {"Victory sound",group="victory",sounds={{"Off","off"},{"GTA San Andreas","matchVictory"}}},
+   {"Match start song",group="start",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"}}},
+   {"Chest opening sound",group="chest",sounds={{"Off","off"},{"Zelda: final four notes","chestOpen"}}},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
 			{head="Accessibility"},
 			{"High-contrast encounter bars", function() return SS.DB().accessibilityContrast; end, function(v) SS.DB().accessibilityContrast = v and true or false; SS.Safe(SS.UpdateBossFrames); end},

@@ -11,7 +11,9 @@ for round = 1, 3 do
 			local before = cb.get() and true or false
 			Click(cb); Tick(1); errs("box " .. i)
 			local after = cb.get() and true or false
-			if after == before then bad = bad + 1; print("no change: box " .. i) end
+			if cb.soundGroup then
+    if not after or SS.SoundSelection(cb.soundGroup)~=cb.soundKey then bad=bad+1; print("radio selection failed: box "..i) end
+   elseif after == before then bad = bad + 1; print("no change: box " .. i) end
 			for _, o in ipairs(SS.toggleBoxes) do
 				if o.get and o:IsVisible() and ((o.checked and true or false) ~= (o.get() and true or false)) then
 					bad = bad + 1; print("stale after box " .. i)

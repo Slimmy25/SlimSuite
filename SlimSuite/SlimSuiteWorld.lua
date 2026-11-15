@@ -331,7 +331,7 @@ local function DownedFriends(now)
 			local u = "party" .. i;
 			local down = UnitExists(u) and (UnitIsDeadOrGhost and UnitIsDeadOrGhost(u)) and true or false;
 			local key = UnitExists(u) and UnitName(u) or nil;
-			if ( key and down ) then current[key] = true; if ( not downed[key] ) then downed[key] = { first = now }; if ( SS.PlayDeathSound ) then SS.PlayDeathSound(); end end end
+			if ( key and down ) then current[key] = true; if ( not downed[key] ) then downed[key] = { first = now }; if ( SS.PlayDeathSound ) then SS.PlayDeathSound("teammate"); end end end
 		end
 		for k in pairs(downed) do if ( not current[k] ) then downed[k] = nil; end end
 		return {};
@@ -347,7 +347,7 @@ local function DownedFriends(now)
 			if ( not downed[key] ) then
 				local slot = name and PartySlot(name) or nil;
 				downed[key] = { first = now, icon = DEATH_ICONS[slot or i] or DEATH_ICONS[1] };
-				if ( SS.PlayDeathSound ) then SS.PlayDeathSound(); end
+				if ( SS.PlayDeathSound ) then SS.PlayDeathSound("teammate"); end
 			end
 			table.insert(shown, { entry = f, key = key, name = name, state = downed[key] });
 		end
@@ -408,7 +408,7 @@ local function Gather(now)
 		end
 	end
 	-- downed friends: each fall comes with its own anchor
-	local friends = (d.deathMarks or d.deathSound) and DownedFriends(now) or {};
+	local friends = (d.deathMarks or SS.DeathSoundSelection("teammate")~="off") and DownedFriends(now) or {};
 	if ( d.deathMarks ) then
 		for i = 1, table.getn(friends) do
 			local f = friends[i];
@@ -759,7 +759,7 @@ end
 local NORMAL_LIFE, CRIT_LIFE, FADE, MAX_LINES = 3, 6, 0.6, 14;
 -- each option is on unless turned off in its setting (ctHeals, ctCrits, ctIcons, ctLong)
 local function CTOn(key) return DB()[key] ~= false; end
-local function CTLife(e) return (e.crit and CRIT_LIFE or NORMAL_LIFE) * (CTOn("ctLong") and 2 or 1); end
+local function CTLife(e) return (((e.featured==true) or (e.featured==nil and e.crit)) and CRIT_LIFE or NORMAL_LIFE) * (CTOn("ctLong") and 2 or 1); end
 local box = CreateFrame("Frame", "SlimSuiteCombatTextFrame", UIParent);
 box:SetWidth(260); box:SetHeight(220);
 box:SetPoint("RIGHT", UIParent, "RIGHT", -260, 40);
@@ -799,25 +799,79 @@ local function IconFor(event)
 	return icon;
 end
 
--- Large-hit emphasis shares the same bounded tiers as ordinary hits.
-local recentBest={};
-local function MarkBig(e)
- if e.heal then return; end
- table.insert(recentBest,e.amount);
- if table.getn(recentBest)>20 then table.remove(recentBest,1); end
- local best=0; for _,amount in ipairs(recentBest) do best=math.max(best,amount); end
- e.emphasized=CTOn("ctPop") and (e.crit or table.getn(recentBest)>=5 and e.amount>=best) or nil;
+-- Per-source minute summaries learn routine damage without storing the combat log.
+-- Completed minutes blend into the baseline; the current minute provides warm-up data.
+local learning={sources={},minute=nil,run=nil,lastFeatured=-100};
+function SS.ResetCombatLearning()
+ learning={sources={},minute=nil,run=nil,lastFeatured=-100};
+end
+function SS.LearnCombatHighlight(e)
+ if e.heal then return false; end
+ local now=GetTime(); local run=type(AZS_ZONE)=="table" and AZS_ZONE.run;
+ if run~=learning.run then SS.ResetCombatLearning(); learning.run=run; end
+ local minute=math.floor(now/60);
+ if learning.minute~=minute then
+  for key,source in pairs(learning.sources) do
+   local current=source.current;
+   if current and current.count>0 then
+    local mean=current.sum/current.count; local square=current.square/current.count; local crit=current.crits/current.count;
+    local old=source.baseline; local weight=old and .6 or 1;
+    source.baseline={mean=old and old.mean*(1-weight)+mean*weight or mean,
+     square=old and old.square*(1-weight)+square*weight or square,
+     crit=old and old.crit*(1-weight)+crit*weight or crit,count=math.min(10000,(old and old.count or 0)+current.count)};
+   end
+   source.current={count=0,sum=0,square=0,crits=0};
+   if now-source.seen>180 then learning.sources[key]=nil; end
+  end
+  learning.minute=minute;
+ end
+ local key=tostring(e.sourceKey or e.name or "other"); local source=learning.sources[key];
+ if not source then
+  local count,oldest,oldTime=0,nil,now;
+  for id,s in pairs(learning.sources) do count=count+1; if s.seen<=oldTime then oldest=id; oldTime=s.seen; end end
+  if count>=64 and oldest then learning.sources[oldest]=nil; end
+  source={seen=now,lastFeatured=-100,current={count=0,sum=0,square=0,crits=0}}; learning.sources[key]=source;
+ end
+ source.seen=now;
+ local c=source.current; local baseline=source.baseline;
+ if not baseline and c.count>0 then baseline={mean=c.sum/c.count,square=c.square/c.count,crit=c.crits/c.count,count=c.count}; end
+ local count=baseline and baseline.count or 0; local mean=baseline and baseline.mean or e.amount;
+ local deviation=baseline and math.sqrt(math.max(0,baseline.square-mean*mean)) or 0;
+ local critRate=baseline and baseline.crit or 0;
+ local exceptional=count>=8 and e.amount>=mean+math.max(deviation*2,mean*.75);
+ local uncommonCrit=e.crit and (count<12 or critRate<.15 or e.amount>=mean+math.max(deviation*1.8,mean*.25));
+ local frequency=c.count/math.max(1,now-minute*60);
+ local cooldown=math.min(3.5,.8+frequency*.08);
+ local feature=(exceptional or uncommonCrit) and now-source.lastFeatured>=cooldown and now-learning.lastFeatured>=.15;
+ c.count=c.count+1; c.sum=c.sum+e.amount; c.square=c.square+e.amount*e.amount;
+ if e.crit then c.crits=c.crits+1; end
+ if feature then source.lastFeatured=now; learning.lastFeatured=now; end
+ return feature and true or false;
+end
+local function Featured(e)
+ if e.featured~=nil then return e.featured; end
+ return e.crit and true or false; -- legacy/manual previews
 end
 -- WoW 1.12 does not clip children: fit the actual glyphs before showing a line.
 function SS.FitCombatText(text,value,width)
-	value=string.gsub(tostring(value or ""),"[\r\n\t]"," ");
-	text:SetText(value);
-	while ( (text:GetStringWidth() or 0)>math.max(0,width) and string.len(value)>0 ) do
-		local cut=string.len(value);
-		while ( cut>1 and string.byte(value,cut)>=128 and string.byte(value,cut)<192 ) do cut=cut-1; end
-		value=string.sub(value,1,cut-1); text:SetText(value);
-	end
+ value=string.gsub(tostring(value or ""),"[\r\n\t]"," "); width=math.floor(math.max(0,width));
+ local font,size,flags=text:GetFont(); local style=tostring(font)..tostring(size)..tostring(flags);
+ if text.slimCombatValue==value and text.slimCombatWidth==width and text.slimCombatStyle==style then return; end
+ text.slimCombatValue,text.slimCombatWidth,text.slimCombatStyle=value,width,style;
+ text:SetText(value);
+ if (text:GetStringWidth() or 0)<=width then return; end
+ -- Search character boundaries rather than removing and measuring every byte each frame.
+ local cuts={0};
+ for i=2,string.len(value) do local byte=string.byte(value,i); if byte<128 or byte>=192 then table.insert(cuts,i-1); end end
+ table.insert(cuts,string.len(value));
+ local low,high,best=1,table.getn(cuts),0;
+ while low<=high do
+  local middle=math.floor((low+high)/2); text:SetText(string.sub(value,1,cuts[middle]));
+  if (text:GetStringWidth() or 0)<=width then best=cuts[middle]; low=middle+1; else high=middle-1; end
+ end
+ text:SetText(string.sub(value,1,best));
 end
+
 local function CombatRows()
  return math.max(1,math.min(MAX_LINES,math.floor(((box:GetHeight() or 220)-12)/28)));
 end
@@ -825,13 +879,13 @@ local function LayoutCombatEntries(now)
  local rows=CombatRows(); local occupied={};
  for i=table.getn(box.entries),1,-1 do
   local e=box.entries[i];
-  if now-e.born>CTLife(e) or e.crit and e.tier and e.tier>=rows then table.remove(box.entries,i);
-  elseif e.crit then occupied[e.tier or 0]=true; end
+  if now-e.born>CTLife(e) or Featured(e) and e.tier and e.tier>=rows then table.remove(box.entries,i);
+  elseif Featured(e) then occupied[e.tier or 0]=true; end
  end
  -- Newest normal hits start at the top; older normal hits move down around reserved crit rows.
  local tier=0; local keep={};
  for _,e in ipairs(box.entries) do
-  if e.crit then table.insert(keep,e);
+  if Featured(e) then table.insert(keep,e);
   else
    while tier<rows and occupied[tier] do tier=tier+1; end
    if tier<rows then e.tier=tier; tier=tier+1; table.insert(keep,e); end
@@ -840,14 +894,17 @@ local function LayoutCombatEntries(now)
  box.entries=keep;
 end
 local function AddEntry(e)
- MarkBig(e);
- if e.crit then
+ if e.featured==nil then
+  e.featured=e.demo and e.crit and true or (not e.demo and SS.LearnCombatHighlight(e) or false);
+ end
+ e.emphasized=CTOn("ctPop") and e.featured or nil;
+ if Featured(e) then
   local rows=CombatRows();
   box.nextCritTier=math.mod(box.nextCritTier or 0,rows);
   e.tier=box.nextCritTier; box.nextCritTier=math.mod(box.nextCritTier+1,rows);
   -- A reused row is cleared before showing its next crit, including during bursts.
   for i=table.getn(box.entries),1,-1 do
-   if box.entries[i].crit and box.entries[i].tier==e.tier then table.remove(box.entries,i); end
+   if Featured(box.entries[i]) and box.entries[i].tier==e.tier then table.remove(box.entries,i); end
   end
  end
  table.insert(box.entries,1,e);
@@ -861,12 +918,12 @@ local function OnCombatEvent(event)
 	if ( kind ~= "damage" and not CTOn("ctHeals") ) then return; end
 	local name = event.meterSource or event.abilityName or event.spell or event.damageType or "";
 	AddEntry({ born = GetTime(), crit = event.critical == true and CTOn("ctCrits"), heal = kind ~= "damage",
-		amount = math.floor(event.amount + 0.5), name = tostring(name), icon = CTOn("ctIcons") and IconFor(event) or nil });
+		amount = math.floor(event.amount + 0.5), sourceKey=event.meterSourceKey or event.spellId or name, name = tostring(name), icon = CTOn("ctIcons") and IconFor(event) or nil });
 end
 if ( SlimSuiteMeter and SlimSuiteMeter.listeners ) then table.insert(SlimSuiteMeter.listeners, OnCombatEvent); end
 -- Demo Mode: a sample hit or heal goes into the real box (its own options still apply to what is drawn)
 function SlimSuiteWorld.DemoHit(amount, name, icon, crit, heal)
-	AddEntry({ born = GetTime(), crit = crit and CTOn("ctCrits"), heal = heal and true or false,
+	AddEntry({ born = GetTime(), demo=true, crit = crit and CTOn("ctCrits"), heal = heal and true or false,
 		amount = amount, name = name, icon = CTOn("ctIcons") and icon or nil });
 end
 
@@ -893,7 +950,7 @@ local function DrawBox()
 		local h = (e.crit or e.emphasized) and 24 or 15;
   y=-6-(e.tier or (i-1))*28;
   local life=CTLife(e); local progress=math.max(0,math.min(1,(now-e.born)/life));
-  local x=8+((not e.crit or d.accessibilityReduceMotion) and 0 or progress*math.max(0,(box:GetWidth() or 260)-46));
+  local x=8+((not Featured(e) or d.accessibilityReduceMotion) and 0 or progress*math.max(0,(box:GetWidth() or 260)-46));
 		local lineWidth=(box:GetWidth() or 260)-x-6;
 		if ( lineWidth<20 ) then break; end
 		if ( n >= MAX_LINES or y - h < bottom ) then break; end
@@ -901,8 +958,8 @@ local function DrawBox()
 		local l = BoxLine(n);
 		local life = CTLife(e);
 		local age = now - e.born;
-		local alpha = e.crit and (1-progress) or 1;
-		if ( not e.crit and age > life - FADE ) then alpha = math.max(0, (life - age) / FADE); end
+		local alpha = Featured(e) and (1-progress) or 1;
+		if ( not Featured(e) and age > life - FADE ) then alpha = math.max(0, (life - age) / FADE); end
 		l:ClearAllPoints();
 		l:SetPoint("TOPLEFT", box, "TOPLEFT", x, y);
 		l:SetWidth(lineWidth); l:SetHeight(h);
@@ -1476,12 +1533,31 @@ end
 -- The counts are kept in the saved settings per run, so they survive a /reload.
 local tally = { bosses = 0, guardians = 0, alive = {}, counted = {}, run = nil, lastKills = nil };
 SS.KILL_PERCENT = 3;                                       -- at or under this much health, a boss or Guardian is as good as dead
--- Sound playback follows confirmed game death banners, never a low-health estimate
--- or disappearance from the live list. Shared IDs deduplicate callback/poll delivery.
+-- Three documented confirmation paths share one-to-one event matching. A second
+-- channel acknowledges an existing kill instead of replaying its sound; simultaneous
+-- same-name kills on the same channel still remain separate events.
 local killBannerLastId,killBannersSeeded=0,false;
+local killSounds={recent={},dead={},deadSeeded=false,anchorAt=-1,counts={},run=nil};
+local function ConfirmKillSound(source,kind,name)
+ local now=GetTime(); name=type(name)=="string" and name or "";
+ local context=type(AZS_ZONE)=="table" and AZS_ZONE.run;
+ for i=table.getn(killSounds.recent),1,-1 do
+  local entry=killSounds.recent[i];
+  if now-entry.time>3 then table.remove(killSounds.recent,i); end
+ end
+ for _,entry in ipairs(killSounds.recent) do
+  if entry.run==context and entry.kind==kind and not entry.sources[source] and (name=="" or entry.name=="" or name==entry.name) then
+   entry.sources[source]=true;
+   if entry.name=="" then entry.name=name; end
+   return;
+  end
+ end
+ table.insert(killSounds.recent,{kind=kind,name=name,time=now,run=context,sources={[source]=true}});
+ SS.PlayBossKillSound();
+end
 local function SeedKillBanners()
  if type(AZS_BANNERS)~="table" then return; end
- for _,banner in ipairs(type(AZS_BANNERS)=="table" and AZS_BANNERS or {}) do
+ for _,banner in ipairs(AZS_BANNERS) do
   if type(banner.id)=="number" then killBannerLastId=math.max(killBannerLastId,banner.id); end
  end
  killBannersSeeded=true;
@@ -1491,11 +1567,59 @@ function SS.OnEncounterKillBanner(banner)
  if type(banner)~="table" or type(banner.id)~="number" then return; end
  if banner.id<=killBannerLastId then return; end
  killBannerLastId=banner.id;
- if banner.kind=="bossdown" or banner.kind=="guardian" then SS.PlayBossKillSound(); end
+ if banner.kind=="bossdown" or banner.kind=="guardian" then
+  ConfirmKillSound("banner",banner.kind=="guardian" and "guardian" or "boss",banner.name);
+ end
 end
 local function TrackKillBanners()
  if not killBannersSeeded then SeedKillBanners(); return; end
  for _,banner in ipairs(type(AZS_BANNERS)=="table" and AZS_BANNERS or {}) do SS.OnEncounterKillBanner(banner); end
+end
+-- The raw wire notification remains available if another addon replaces the native
+-- banner handler list. Parse exactly the creator's documented AZSBANNER payload.
+local killSoundEvents=CreateFrame("Frame");
+killSoundEvents:RegisterEvent("CHAT_MSG_ADDON");
+killSoundEvents:SetScript("OnEvent",function()
+ if arg1~="AZSBANNER" or type(arg2)~="string" then return; end
+ local _,_,id,kind,_,name=string.find(arg2,"^id=(%d+);kind=(%w+);boss=(%d);name=([^;]*);text=(.*)$");
+ if id then SS.OnEncounterKillBanner({id=tonumber(id),kind=kind,name=name}); end
+end);
+local function TrackConfirmedKills()
+ local run=type(AZS_RUN)=="table" and AZS_RUN or {};
+ local context=type(AZS_ZONE)=="table" and AZS_ZONE.run;
+ if context~=nil and context~=killSounds.run then
+  killSounds.run=context; killSounds.counts={};
+ end
+ -- These counters are authoritative even if death notifications are not dispatched.
+ local phase=A.Call("AZS_GetPhase");
+ for _,field in ipairs({"bk","gk"}) do
+  local value=tonumber(run[field]); local previous=killSounds.counts[field];
+  if value and value>=0 then
+   if previous and value>previous and (phase=="playing" or phase=="choosing" or phase=="paused" or phase=="victory") then
+    for i=1,math.min(40,value-previous) do ConfirmKillSound("counter",field=="bk" and "boss" or "guardian"); end
+   end
+   killSounds.counts[field]=value;
+  end
+ end
+ if GetTime()-killSounds.anchorAt<.25 then return; end
+ killSounds.anchorAt=GetTime();
+ local dead,cursor,complete={},nil,false;
+ for pageNumber=1,32 do
+  local page=A.Call("AZS_GetWorldAnchors",{kinds={"boss","finalBoss","guardian"},states={"dead"}},cursor);
+  if type(page)~="table" or type(page.entries)~="table" then return; end
+  for _,entry in ipairs(page.entries) do
+   if entry.anchorId and entry.state=="dead" and (entry.kind=="boss" or entry.kind=="finalBoss" or entry.kind=="guardian") then dead[entry.anchorId]=entry; end
+  end
+  if not page.hasMore then complete=true; break; end
+  cursor=page.nextCursor; if not cursor then return; end
+ end
+ if not complete then return; end
+ if killSounds.deadSeeded then
+  for id,entry in pairs(dead) do
+   if not killSounds.dead[id] then ConfirmKillSound("anchor",entry.kind=="guardian" and "guardian" or "boss",entry.name); end
+  end
+ end
+ killSounds.dead=dead; killSounds.deadSeeded=true;
 end
 local function CountKill(id, kind)
  if tally.counted[id] then return; end
@@ -1585,10 +1709,11 @@ end
 
 -- ---------------------------------------------------------------- tickers
 local ticker = CreateFrame("Frame");
-SS.Every("box", 0.05, function() SS.Safe(DrawBox); end);
+SS.Every("box", 0, function() SS.Safe(DrawBox); end);
 SS.Every("tracker", 0.1, function()
 	SS.Safe(TrackKills);
  SS.Safe(TrackKillBanners);
+ SS.Safe(TrackConfirmedKills);
 	SS.Safe(TrackChestOpens);
 	SS.Safe(UpdateTargetDebuffs);
 	SS.Safe(UpdateRevive);

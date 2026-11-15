@@ -1,0 +1,112 @@
+{
+  "target_lufs": -12.0,
+  "reference": "Original Whip-Crack.mp3 integrated loudness + 1.5 dB",
+  "true_peak_ceiling_dbtp": -1.0,
+  "analysis": "Integrated loudness; effects under 400 ms repeated only during analysis/normalization, then trimmed to their original duration",
+  "assets": [
+    {
+      "file": "Baby Crying.mp3",
+      "duration_seconds": 4.584,
+      "source_sha256": "f27e2d269b5b73744fda7bd68ee6db66a7c57db74319dd7a5c8a0f9ae494f398",
+      "sha256": "82317d2a6feeddf2cbc32fdf7d4ff529c1180b6e4ee740a97a79760e499f283c",
+      "integrated_lufs": -12.44,
+      "true_peak_dbtp": -2.41
+    },
+    {
+      "file": "DuckToy.mp3",
+      "duration_seconds": 0.961,
+      "source_sha256": "bcbc2386c4c77b6cb3b1a6fca186073385dcfa701c8ee245391b220cd93eaf5b",
+      "sha256": "16a5b90291412ea6fffc2c8b61c9fbe61fb8bc312b9278c54938962c6f70c507",
+      "integrated_lufs": -11.99,
+      "true_peak_dbtp": -2.84
+    },
+    {
+      "file": "Gotcha.mp3",
+      "duration_seconds": 0.673,
+      "source_sha256": "307e4d461885450dfaea5b8acd7e7f4cb87324e5332c9ec4b791930d85867652",
+      "sha256": "55e0c3220acd639566e49577b7f77366177711e9081c861934a7177cbf0fb57a",
+      "integrated_lufs": -12.34,
+      "true_peak_dbtp": -3.17
+    },
+    {
+      "file": "hitmarker.mp3",
+      "duration_seconds": 0.12,
+      "source_sha256": "98919e4bfc17f19daf9f04e175367215fc09d129841e0192a97529c8a05d6f0c",
+      "sha256": "ff83ff7f88064e01999d34459474414ee9936dd96afbfba3b25d61bdc9d1f836",
+      "integrated_lufs": -11.87,
+      "true_peak_dbtp": -1.33
+    },
+    {
+      "file": "lego-die.mp3",
+      "duration_seconds": 1.649,
+      "source_sha256": "52863c02902e2666c7c88beb24551b1e05f3a86c7fcb8b9c493d277a29f3c23a",
+      "sha256": "70fffae5dbd626718f6d3cd76a96d656ed4b19ac25ebfa626ae5f8280661641f",
+      "integrated_lufs": -12.47,
+      "true_peak_dbtp": -3.02
+    },
+    {
+      "file": "Low Health Sound.mp3",
+      "duration_seconds": 1.0,
+      "source_sha256": "b6563cc11234f7a1bf871be473d2363c613357116fafca086ed40734e270c61f",
+      "sha256": "e0405dd409e615b5329851809c2fbf54a9f6701d972507e9e98d2d550b0a9d79",
+      "integrated_lufs": -12.03,
+      "true_peak_dbtp": -7.99
+    },
+    {
+      "file": "MatchLoss.mp3",
+      "duration_seconds": 5.068,
+      "source_sha256": "ad2424b7ddcb7e9c9a78978b8263573563db72bb44f910509ffbdb91a0fdf370",
+      "sha256": "9060d564d9eb6a31728c880b91e6bc4e852942d3241785f6ee2e69d5e192b0e6",
+      "integrated_lufs": -12.0,
+      "true_peak_dbtp": -3.36
+    },
+    {
+      "file": "MatchStart.mp3",
+      "duration_seconds": 12.428,
+      "source_sha256": "b7759498e872f45247d55840eaf6d72cb99108829eb6a0707b52c8f6b7f47bd4",
+      "sha256": "692c69c6df960e8f802549a40d1cfc05b4b406a5cd48113e7a22ea5c73158b3d",
+      "integrated_lufs": -12.17,
+      "true_peak_dbtp": -1.9
+    },
+    {
+      "file": "MatchVictory.mp3",
+      "duration_seconds": 10.031,
+      "source_sha256": "f139c87906e0084a37838a80ba2160f4dd0396543c45b83fcf4ff0bb84641f17",
+      "sha256": "3cac2b625e3cb69820d152575bfd327aada91ce6695f75e243e360ed634bd915",
+      "integrated_lufs": -12.35,
+      "true_peak_dbtp": -2.52
+    },
+    {
+      "file": "MatchWasted.mp3",
+      "duration_seconds": 7.758,
+      "source_sha256": "e95924a8ad7beed439ea6ac264a64f5aca99e65b2e3e1d730b644a565e009b6c",
+      "sha256": "a6fdcfe3180361d58adf8a646535113aa798f6534e411f2a25851800371393c6",
+      "integrated_lufs": -12.47,
+      "true_peak_dbtp": -1.98
+    },
+    {
+      "file": "RobloxDeath.mp3",
+      "duration_seconds": 1.0,
+      "source_sha256": "fd51f1f5b2d1293cf1466a5f5a912c05db77fde5c511a743da76211c98c0db8b",
+      "sha256": "6819967e115ce764f2836802c4305c9821843faf814c9dd92ea9d1ddef6ea328",
+      "integrated_lufs": -12.03,
+      "true_peak_dbtp": -3.55
+    },
+    {
+      "file": "Whip-Crack.mp3",
+      "duration_seconds": 1.051,
+      "source_sha256": "c6b0ece6dec741183ed0f4e5152181a491d0642aba26afad2fa479db2a0bb7e2",
+      "sha256": "279e00aabdc84c393f8ce87c299ee2f170a70dbf9f9be700dabccee67488895f",
+      "integrated_lufs": -11.99,
+      "true_peak_dbtp": -1.47
+    },
+    {
+      "file": "zelda-chest-opening-and-item-catch.mp3",
+      "duration_seconds": 2.52,
+      "source_sha256": "cfb876a6cc2f53e09f01904950c4b97ee7b5c56cb08f140abe1e4ef6273d1ffd",
+      "sha256": "43a6d7baffdccedcb0c749f209bd45e70b5722c4e04fa7a2bbde8ff56936087e",
+      "integrated_lufs": -12.3,
+      "true_peak_dbtp": -3.14
+    }
+  ]
+}
