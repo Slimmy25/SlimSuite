@@ -885,7 +885,7 @@ local function CombatRows()
  return math.max(1,math.min(MAX_LINES,math.floor(((box:GetHeight() or 220)-12)/28)));
 end
 local function LayoutCombatEntries(now)
- local rows=CombatRows(); local occupied={};
+ local rows=CombatRows();
  -- Preserve normal-log capacity even during a burst of qualifying critical hits.
  local maxHighlights=math.max(0,rows-math.max(1,math.ceil(rows*.35)));
  if maxHighlights==0 then for _,entry in ipairs(box.entries) do entry.featured=false; entry.emphasized=nil; end end
@@ -896,33 +896,22 @@ local function LayoutCombatEntries(now)
  end
  for i=table.getn(box.entries),1,-1 do
   local e=box.entries[i];
-  if now-e.born>CTLife(e) or Featured(e) and e.tier and e.tier>=rows then table.remove(box.entries,i);
-  elseif Featured(e) then occupied[e.tier or 0]=true; end
+  if now-e.born>CTLife(e) or (e.tier and e.tier>=rows) then table.remove(box.entries,i); end
  end
- -- Newest normal hits start at the top; older normal hits move down around reserved crit rows.
- local tier=0; local keep={};
- for _,e in ipairs(box.entries) do
-  if Featured(e) then table.insert(keep,e);
-  else
-   while tier<rows and occupied[tier] do tier=tier+1; end
-   if tier<rows then e.tier=tier; tier=tier+1; table.insert(keep,e); end
-  end
- end
- box.entries=keep;
+ -- Existing rows keep their assigned position; expiration never repacks the survivors.
+
 end
 local function AddEntry(e)
  if e.featured==nil then
   e.featured=e.demo and e.crit and true or (not e.demo and SS.LearnCombatHighlight(e) or false);
  end
  e.emphasized=CTOn("ctPop") and e.featured or nil;
- if Featured(e) then
-  local rows=CombatRows();
-  box.nextCritTier=math.mod(box.nextCritTier or 0,rows);
-  e.tier=box.nextCritTier; box.nextCritTier=math.mod(box.nextCritTier+1,rows);
-  -- A reused row is cleared before showing its next crit, including during bursts.
-  for i=table.getn(box.entries),1,-1 do
-   if Featured(box.entries[i]) and box.entries[i].tier==e.tier then table.remove(box.entries,i); end
-  end
+ -- One forward-only cursor serves both streams and survives empty/hidden periods.
+ local rows=CombatRows();
+ box.nextCombatTier=math.mod(box.nextCombatTier or 0,rows);
+ e.tier=box.nextCombatTier; box.nextCombatTier=math.mod(box.nextCombatTier+1,rows);
+ for i=table.getn(box.entries),1,-1 do
+  if box.entries[i].tier==e.tier then table.remove(box.entries,i); end
  end
  table.insert(box.entries,1,e);
  LayoutCombatEntries(GetTime());

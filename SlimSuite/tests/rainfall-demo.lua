@@ -17,7 +17,7 @@ end
 SS.StopDemoMode()
 check("setup handles return after demo",compass:IsShown() and su.bar:IsShown())
 su.SetMode("SlimSuiteCombatTextFrame","enabled","Combat text"); SS.SetupEnd(true)
-local box=SlimSuiteCombatTextFrame; box:SetHeight(220); box:SetWidth(260); box.entries={}; box.nextTier=0
+local box=SlimSuiteCombatTextFrame; box:SetHeight(220); box:SetWidth(260); box.entries={}; box.nextCombatTier=0
 local function Hit(i,crit) SlimSuiteWorld.DemoHit(i,crit and "Crit" or "Normal",nil,crit,false) end
 Hit(1,false); Hit(2,true); Hit(3,false); Hit(4,true)
 Tick(1,.05)
@@ -34,9 +34,9 @@ crit,normal=Find("Crit"),Find("Normal")
 check("crits travel right and remain on their assigned row",crit.points[1][4]>critX and crit.points[1][5]==critY)
 check("crits fade while moving",crit:GetAlpha()<alpha)
 check("normal hits never drift right",normal.points[1][4]==normalX)
-local before=box.nextCritTier
+local before=box.nextCombatTier
 Hit(5,false); Hit(6,false)
-check("normal hits do not advance critical waterfall",box.nextCritTier==before)
+check("normal hits advance the same forward cursor",box.nextCombatTier==math.mod(before+2,math.floor((box:GetHeight()-12)/28)))
 for i=7,30 do Hit(i,true) end
 local tiers={}
 for _,entry in ipairs(box.entries) do check("critical wrap retires the previous row",not tiers[entry.tier]); tiers[entry.tier]=true end
@@ -64,5 +64,24 @@ local weakX=weak and weak.points[1][4]; Tick(2,.1); weak=Find("Weak crit")
 check("weak crit scrolls normally without drifting right",weak and weak.points[1][4]==weakX)
 Tick(1,15)
 check("expired text disappears before later hits",#box.entries==0)
+-- Quiet periods and wrap-around must retain one forward-only next-row position.
+box.entries={}; box.nextCombatTier=0
+local capacity=math.floor((box:GetHeight()-12)/28)
+for i=0,capacity*3+2 do
+ SlimSuiteWorld.DemoHit(100+i,"Remembered",nil,math.mod(i,2)==1,false)
+ check("line continues forward across idle gaps and wrap "..i,box.entries[1].tier==math.mod(i,capacity))
+ local nextTier=box.nextCombatTier
+ Tick(1,15)
+ check("expiration preserves next insertion row "..i,#box.entries==0 and box.nextCombatTier==nextTier)
+end
+SlimSuiteWorld.DemoHit(101,"Fixed first",nil,false,false)
+local fixed=box.entries[1]; local firstTier=fixed.tier
+SlimSuiteWorld.DemoHit(102,"Fixed second",nil,false,false)
+Tick(1,.05)
+check("adding a later row never repacks an existing row",fixed.tier==firstTier)
+local nextTier=box.nextCombatTier
+box:SetHeight(100)
+SlimSuiteWorld.DemoHit(103,"Resized continuation",nil,false,false)
+check("resizing wraps retained cursor into new bounds",box.entries[1].tier==math.mod(nextTier,math.floor((box:GetHeight()-12)/28)))
 print("rainfall/demo problems: "..bad)
 assert(bad==0 and #ERRORS==0,"rainfall/demo regressions")

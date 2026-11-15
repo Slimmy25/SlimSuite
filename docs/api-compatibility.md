@@ -42,3 +42,5 @@ Live verification remains needed for physical screen edges, native artwork/masks
 - **Load-in audio:** the optional load-in song plays once when the documented phase becomes `ready`, including the first available phase after addon load. The movement-start song remains a separate `ready` → `playing` event. Temporary missing phase values do not replay load-in audio; a new ready visit or a changed known run ID permits it again.
 
 - **Normal combat text preservation:** highlights can occupy at most roughly 65% of the box rows, leaving at least one normal row. A one-row box demotes highlights to ordinary text. Weak/non-featured crits use ordinary white styling and no critical suffix, while their true critical flag remains available to the learner. Both per-source and player-wide learned damage baselines govern highlighting.
+
+- **Combat insertion continuity:** a runtime cursor shared by ordinary and featured hits advances once per accepted line. Expiration and hiding do not reset it, and surviving rows are never repacked. Reusing a row clears its prior line first. The cursor wraps into current bounds after a resize; no saved layout/profile data is modified.

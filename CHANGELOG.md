@@ -2,6 +2,10 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.39
+- Restored the seven original user-supplied MP3 filenames and updated playback paths and normalization records without changing the normalized audio.
+- Combat text now retains one shared forward-only insertion row across quiet/empty periods. Normal hits and highlights continue where the prior line left off, wrap bottom-to-top, and never repack surviving lines backward. Resizing safely wraps the retained cursor into the new bounds.
+
 ## 1.38
 - Demoted weak crits now use normal white text, normal font size and no critical suffix or rightward effect. Highlight selection checks both the source baseline and the player’s learned overall damage.
 - Reserved normal-log capacity so critical highlight bursts cannot consume every row and erase ordinary damage.

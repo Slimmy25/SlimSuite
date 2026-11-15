@@ -485,16 +485,16 @@ end
 SS.SOUND_FILES = {
 	death = "Interface\\AddOns\\SlimSuite\\Baby Crying.mp3",
 	legoDeath = "Interface\\AddOns\\SlimSuite\\lego-die.mp3",
- duckDeath = "Interface\\AddOns\\SlimSuite\\DuckToy.mp3",
- matchLoss = "Interface\\AddOns\\SlimSuite\\MatchLoss.mp3",
- matchWasted = "Interface\\AddOns\\SlimSuite\\MatchWasted.mp3",
- matchStart = "Interface\\AddOns\\SlimSuite\\MatchStart.mp3",
- robloxDeath = "Interface\\AddOns\\SlimSuite\\RobloxDeath.mp3",
- matchVictory = "Interface\\AddOns\\SlimSuite\\MatchVictory.mp3",
+ duckDeath = "Interface\\AddOns\\SlimSuite\\duck-toy-sound.mp3",
+ matchLoss = "Interface\\AddOns\\SlimSuite\\the-price-is-right-losing-horn.mp3",
+ matchWasted = "Interface\\AddOns\\SlimSuite\\gta-v-wasted-death-sound.mp3",
+ matchStart = "Interface\\AddOns\\SlimSuite\\Kit-kit-kit-kit-song.mp3",
+ robloxDeath = "Interface\\AddOns\\SlimSuite\\roblox-death-sound_1.mp3",
+ matchVictory = "Interface\\AddOns\\SlimSuite\\gta-san-andreas-abertura-oficial.mp3",
 	lowHealth = "Interface\\AddOns\\SlimSuite\\Low Health Sound.mp3",
 	bossHitmarker = "Interface\\AddOns\\SlimSuite\\hitmarker.mp3",
 	bossWhip = "Interface\\AddOns\\SlimSuite\\Whip-Crack.mp3",
- bossGotcha = "Interface\\AddOns\\SlimSuite\\Gotcha.mp3",
+ bossGotcha = "Interface\\AddOns\\SlimSuite\\GotchaBIt.Dave Chapelle.mp3",
 	chestOpen = "Interface\\AddOns\\SlimSuite\\zelda-chest-opening-and-item-catch.mp3",
 };
 -- One selected sound per event. Existing flags remain compatible with saved settings.
