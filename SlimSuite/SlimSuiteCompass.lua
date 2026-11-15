@@ -17,9 +17,12 @@ function SS.CompassOffset(x,y,facing,width)
 end
 function SS.UpdateCompass()
  local d=SS.DB();
- if ( not SS.FeatureEnabled("SlimSuiteCompassFrame") or d.vanillaUI ) then frame:Hide(); return; end
+ if ( (not SS.FeatureEnabled("SlimSuiteCompassFrame") and not d.unlocked) or d.vanillaUI ) then frame:Hide(); return; end
  local position=type(AZS_GetPlayerPosition)=="function" and AZS_GetPlayerPosition() or nil;
- if ( type(position)~="table" or type(position.x)~="number" or type(position.y)~="number" ) then frame:Hide(); return; end
+ if ( type(position)~="table" or type(position.x)~="number" or type(position.y)~="number" ) then
+  if d.unlocked then frame:Show(); else frame:Hide(); end
+  return;
+ end
  local w,h=frame:GetWidth(),frame:GetHeight(); local rail=d.compassStyle~="free";
  frame:SetBackdropColor(.02,.025,.035,rail and .65 or 0); frame:SetBackdropBorderColor(.55,.47,.27,rail and .7 or 0);
  if ( rail ) then frame.track:Show(); else frame.track:Hide(); end
@@ -73,4 +76,4 @@ function SS.UpdateCompass()
  for i=used+1,table.getn(frame.markers) do frame.markers[i]:Hide(); end
  frame:Show(); if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(frame); end
 end
-SS.Every("compass",.1,function() SS.UpdateCompass(); end);
+SS.Every("compass",0,function() SS.UpdateCompass(); end);

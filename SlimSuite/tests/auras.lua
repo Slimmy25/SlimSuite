@@ -42,6 +42,7 @@ local function CheckBounds(label,layout,list)
 end
 local layout=SS.LayoutBoundedAuras(buttons,player,nil,nil,'above')
 CheckBounds('player',layout,buttons)
+check('player above icons are readable at 26 pixels',math.abs(buttons[1]:GetHeight()*buttons[1]:GetEffectiveScale()-26)<.001)
 check('player uses two rows when needed',layout.rows==2 and layout.shown>0)
 check('overflow stays hidden instead of making a third row',layout.hidden>0 and layout.shown+layout.hidden==30)
 local hidden

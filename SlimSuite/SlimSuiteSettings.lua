@@ -323,7 +323,7 @@ function SU.ChecksFor(frame)
 			{ "Crits: bigger and longer", function() return SS.DB().ctCrits ~= false; end, function(v) SS.DB().ctCrits = v and true or false; end },
 			{ "Spell icons", function() return SS.DB().ctIcons ~= false; end, function(v) SS.DB().ctIcons = v and true or false; end },
 			{ "Lines stay twice as long", function() return SS.DB().ctLong ~= false; end, function(v) SS.DB().ctLong = v and true or false; end },
-			{ "Crits and your biggest hits grow and fall away", short = "Big hits grow and fall", function() return SS.DB().ctPop ~= false; end, function(v) SS.DB().ctPop = v and true or false; end },
+			{ "Emphasize crits and your biggest hits", short = "Emphasize big hits", function() return SS.DB().ctPop ~= false; end, function(v) SS.DB().ctPop = v and true or false; end },
 			{ "Reduce floating-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end } },
 	};
 	if ( frame=="SlimSuiteStatCounterFrame" and SS.StatSettings ) then list[frame]=SS.StatSettings(); end

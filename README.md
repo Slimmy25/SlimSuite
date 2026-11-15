@@ -74,7 +74,7 @@ Combat-log mode hides the game’s damage numbers by default. Its World damage d
 
 The optional **Compass** offers a marked rail or free-standing arrow markers, with separate Boss, Lair and Chest filters. Minimap points use real world positions and disappear outside the visible range rather than sliding around its rim. Pregame previews appear only where the client already supplies a position; future-boss schedules do not expose spawn coordinates.
 
-Build and Stats can remain above card-selection screens, docked at the viewport edges. Their tooltips stay usable there, and leaving the selection restores their earlier anchors.
+During card selection, a temporary item row appears beneath the native spell strip at matching icon size, even when your normal item row is hidden. Stats can remain at the screen edge and item tooltips stay usable. Leaving selection restores your normal hidden, split/joined, orientation and sizing preferences.
 
 ### A minimap that fits your layout
 

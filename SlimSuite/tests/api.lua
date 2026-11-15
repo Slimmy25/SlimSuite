@@ -183,14 +183,14 @@ local pl = (plate.portrait and plate.portrait:GetLeft()) or plate:GetLeft()
 check("first buff stays within the portrait-aligned layout", b0 and pl and SS.auraLayouts[plate] and SS.auraLayouts[plate].left <= pl * plate:GetEffectiveScale())
 check("second buff to its right, same row", b1 and b1[4] > b0[4] and b1[5] == b0[5])
 local rows, lowest = {}, nil
-for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; rows[p[5]] = true; if not lowest or p[5] < lowest then lowest = p[5] end end
+for i = 0, 9 do local p = getglobal("BuffButton" .. i).points and getglobal("BuffButton" .. i).points[1]; if p then rows[p[5]] = true; if not lowest or p[5] < lowest then lowest = p[5] end end end
 local n = 0; for _ in pairs(rows) do n = n + 1 end
 check("more buffs make more rows", n > 1)
 check("first buff is on the top row (rows grow down)", b0[5] > lowest)
 local right = PartyMemberFrame1:GetLeft()
-local last = getglobal("BuffButton9").points[1]
-for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]
-	if SS.CurrentOrientation("PartyMemberFrame1") == "horizontal" and right and (p[4] + 30) * BuffFrame:GetEffectiveScale() > right * PartyMemberFrame1:GetEffectiveScale() then check("buff " .. i .. " stops before the next frame", false) end end
+local last = getglobal("BuffButton9").points and getglobal("BuffButton9").points[1]
+for i = 0, 9 do local p = getglobal("BuffButton" .. i).points and getglobal("BuffButton" .. i).points[1]
+	if p and SS.CurrentOrientation("PartyMemberFrame1") == "horizontal" and right and (p[4] + 30) * BuffFrame:GetEffectiveScale() > right * PartyMemberFrame1:GetEffectiveScale() then check("buff " .. i .. " stops before the next frame", false) end end
 SS.SetPartySelf(false); Tick(2)
 print("partybuffs problems: " .. bad)
 -- Demo Mode: menus go away for a small On/Off box and come back after; the party keeps your layout
@@ -225,12 +225,12 @@ SS.SetPartySelf(true); SU.SetPartyRow(true); Tick(3)
 SlimSuitePartySelfFrame.hp:SetWidth(100); SlimSuitePartySelfFrame.mp:SetWidth(100); SS.LayoutPartyBuffs()
 local barEnd = SlimSuitePartySelfFrame.hp:GetRight()
 local pastBar = false
-for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; if (p[4] + 30) * BuffFrame:GetEffectiveScale() > barEnd + 0.5 then pastBar = true end end
+for i = 0, 9 do local b=getglobal("BuffButton" .. i); local p=b.points and b.points[1]; if p and b:GetAlpha()>0 and (p[4] + b:GetWidth()) * b:GetEffectiveScale() > barEnd + 0.5 then pastBar = true end end
 check("buffs stop where the plate's bars end", not pastBar)
 local L, W = SS.BuffRoom(SlimSuitePartySelfFrame, SlimSuitePartySelfFrame.portrait, PartyMemberFrame1)
 local edge = L + W
 local over = false
-for i = 0, 9 do local p = getglobal("BuffButton" .. i).points[1]; if (p[4] + 30) * BuffFrame:GetEffectiveScale() > edge then over = true end end
+for i = 0, 9 do local b=getglobal("BuffButton" .. i); local p=b.points and b.points[1]; if p and b:GetAlpha()>0 and (p[4] + b:GetWidth()) * b:GetEffectiveScale() > edge then over = true end end
 check("row: buffs stay inside the room before party member 1", not over)
 local oldExists, oldBuff = UnitExists, UnitBuff
 UnitExists = function(u) return u == "player" or u == "party1" end
@@ -325,26 +325,24 @@ StaticPopupDialogs.SLIMSUITE_MIRROR_BUFFS.OnAccept()
 check("accepting puts the target's auras on the mirrored side", SS.DB().targetAuraSide == "right")
 SS.SetMirrorTarget(false); SS.SetBuffsPlace("own")
 print("aura problems: " .. bad)
--- combat text: crits and the biggest hits pop out, grow right and fall, sized by how big they are next to normal hits
+-- All hits share tiered rows: crits cannot overlap a separate popup layer.
 SS.DB().combatTextBox = true
-for i = 1, 8 do SlimSuiteWorld.DemoHit(100, "Hit", nil, false) end
-SlimSuiteWorld.DemoHit(400, "Big crit", nil, true)
-SlimSuiteWorld.DemoHit(150, "Small crit", nil, true)
-Tick(1, 0.05)
-local big, small
-for _, p in ipairs(SlimSuiteCombatTextFrame.pops) do
-	if p:IsShown() then local t = p.text:GetText() or ""; if string.find(t, "Big") then big = p elseif string.find(t, "Small") then small = p end end
+SlimSuiteCombatTextFrame.entries={}; SlimSuiteCombatTextFrame.nextTier=0
+SlimSuiteWorld.DemoHit(400,"Big crit",nil,true)
+SlimSuiteWorld.DemoHit(150,"Small crit",nil,true)
+Tick(1,.05)
+local big,small
+for _,p in ipairs(SlimSuiteCombatTextFrame.lines) do
+ if p:IsShown() then local t=p.text:GetText() or ""; if string.find(t,"Big") then big=p elseif string.find(t,"Small") then small=p end end
 end
-check("crits pop out", big and small)
-Tick(20, 0.05)
-local bigS, smallS = big:GetScale(), small:GetScale()
-check("a bigger crit grows bigger", bigS > smallS)
-local bx = big.points[1][4] * bigS
-Tick(10, 0.05)
-check("it moves right", big.points[1][4] * big:GetScale() > bx)
-Tick(200, 0.05)
-check("and goes away in the end", not big:IsShown())
-print("pop problems: " .. bad)
+check("crits have separate tiers",big and small and big.points[1][5]~=small.points[1][5])
+local bx=big.points[1][4]
+Tick(10,.05)
+check("crits glide right",big.points[1][4]>bx)
+Tick(400,.05)
+local remains=false; for _,e in ipairs(SlimSuiteCombatTextFrame.entries) do if e.name=="Big crit" or e.name=="Small crit" then remains=true end end
+check("crits disappear in the end",not remains)
+print("rainfall problems: "..bad)
 -- Demo Mode moves everything the way a run would
 SS.DB().replaceEncounters, SS.DB().replaceTally, SS.DB().replaceClock = true, true, true
 SS.DB().elementModes.SlimSuiteBossFrames = "enabled"

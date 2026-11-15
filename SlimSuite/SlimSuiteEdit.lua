@@ -334,6 +334,26 @@ function SS.SquareFrame(on)
 	if ( zone ) then zone:SetAlpha(1); zone:Show(); end
 end
 
+-- Restore native chrome after a legacy containment pass suppressed a texture or its
+-- parent was clipped. Keep the ring below the native controls rather than moving them.
+function SS.RestoreMinimapChrome()
+ if ( not Minimap or not MinimapCluster ) then return; end
+ if ( SS.DB().elementModes.MinimapCluster~="enabled" ) then return; end
+ if ( MinimapCluster.SetClipsChildren ) then MinimapCluster:SetClipsChildren(false); end
+ if ( Minimap.SetClipsChildren ) then Minimap:SetClipsChildren(false); end
+ if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(MinimapCluster,true); end
+ local level=(Minimap:GetFrameLevel() or 1)+10;
+ for _,name in ipairs({"MinimapZoomIn","MinimapZoomOut","MinimapToggleButton","MiniMapWorldMapButton","GameTimeFrame"}) do
+  local control=getglobal(name);
+  if ( control ) then
+   if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(control,true); end
+   control:SetAlpha(1);
+   if ( control.SetFrameLevel ) then control:SetFrameLevel(math.max(control:GetFrameLevel() or 1,level)); end
+   if ( control.Show ) then control:Show(); end
+  end
+ end
+end
+
 -- The game's own clock is made for the round map in its first place. Once the map is square or has been moved,
 -- Slim Suite's clock takes over (it hangs under the map wherever the map goes) so the two never clash.
 function SS.ClockFollowsMap()
@@ -445,6 +465,7 @@ end
 
 -- buttons that appear later (new mail, a queue, another addon's button) join the square's column
 SS.Every("squareEdge", 1, function()
+	SS.RestoreMinimapChrome();
 	if ( SS.SquareColumn() ) then SS.ArrangeEdgeButtons(true); end
 
 	-- the ring and the round border always match the map's real shape, whatever else showed or hid them
@@ -1030,7 +1051,7 @@ function SS.ShowLockPanel()
 		gridCheck:SetScript("OnClick", function() SS.DB().showEditGrid = not SS.DB().showEditGrid; if ( SS.DB().unlocked ) then ShowEditGrid(); end SS.RefreshToggles(); end);
 		local gridLabel = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		gridLabel:SetPoint("LEFT", gridCheck, "RIGHT", 0, 0); gridLabel:SetText(SS.T("Grid"));
-		local gridSizes = {16, 32, 64, 128};
+		local gridSizes = {8, 16, 32, 64};
 		lockPanel.gridButtons = {};
 		for i = 1, table.getn(gridSizes) do
 			local pixels = gridSizes[i];
@@ -1112,7 +1133,7 @@ function SS.ShowLockPanel()
 		lockPanel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 18, -78);
 	end
 	for i = 1, table.getn(lockPanel.gridButtons or {}) do
-		local pixels = ({16, 32, 64, 128})[i];
+		local pixels = ({8, 16, 32, 64})[i];
 		if ( tonumber(SS.DB().gridDivisions) == pixels ) then lockPanel.gridButtons[i]:LockHighlight();
 		else lockPanel.gridButtons[i]:UnlockHighlight(); end
 	end
@@ -1336,6 +1357,7 @@ function SS.Handle(name, label)
 		handles[name] = h;
 	end
 	if ( SS.AddResizeGrip ) then SS.AddResizeGrip(h,name); end
+ if SS.demoRunning then h:Hide(); end
 	return h;
 end
 
@@ -1368,8 +1390,20 @@ function SS.AvailableElements()
 end
 
 -- whether a frame may have a handle now: not left to the game's own layout, its design in use, not joined to a unit frame
+function SS.RefreshEditHandles()
+ local available=SS.AvailableElements();
+ for _,entry in ipairs(MOVABLE) do
+  local name=entry[1]; local wanted=SS.DB().unlocked and not SS.demoRunning and
+   ((setupActive and SS.SetupShows(name)) or (not setupActive and (not editOnly or editOnly==name)));
+  if wanted and SS.HandleAllowed(name,available) then
+   local h=SS.Handle(name,entry[2]); if h then h:Show(); end
+  elseif handles[name] then handles[name]:Hide(); end
+ end
+end
+
 function SS.HandleAllowed(name, available)
 	local d = SS.DB();
+ if SS.demoRunning then return false; end
 	if ( d.frameDefault and d.frameDefault[name] ) then return false; end
 	if ( (available or SS.AvailableElements())[name] == false ) then return false; end
 	if ( name == "BuffFrame" and (d.buffsOnTarget or d.buffsOnPlayer) ) then return false; end

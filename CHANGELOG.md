@@ -2,6 +2,22 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.35
+- Fixed build refreshes reopening green handles during Demo; editor previews and demo previews now have separate predicates.
+- Encounter clicks now wait for authoritative target updates instead of cycling against stale server data; failed restoration is checked by spawn ID.
+- Normal Explosive Orbs are discovered through living world anchors. Their encounter rows show real target/unit health when available and explicitly report unavailable health otherwise.
+- Removed the unused combat popup pool/animation. Large-hit emphasis now uses the same bounded rainfall rows; renamed its setting and translated the new labels in all six supported locales.
+- Explosive Orb takes first encounter-bar priority and reserves Skull ahead of bosses.
+- Combat text uses separate downward tiers with rightward drift; tier reuse retires the prior hit.
+- Demo mode hides all editor handles and restores them afterward. Grid choices are now 8/16/32/64; the compass is included in fresh setup defaults and remains editable on older profiles.
+- Damage meters now request actor-level credits and combine each owner's pet/summon attacks without folding them into player spell rows.
+- Player buffs above the frame use larger icons while retaining two-row bounds and collision checks.
+- Removed duplicate guardian/lair waypoints. Encounter bars exclude ordinary elites, and clicks verify the exact hostile encounter ID instead of targeting by name.
+- Compass and minimap share a per-frame moving-encounter position query. Active guardians join boss tracking; unavailable coordinates clear instead of retaining a stale marker.
+- Selection screens temporarily show a horizontal item row beneath the native spell strip, sized from the supplied reference. Normal hidden/muted state, split/joined layout, sizing, orientation and scale remain unchanged and restore on exit.
+- Exempted native minimap chrome from generic child clipping and released suppressed textures; restored the moon, top-right controls and full zoom buttons above the square ring.
+- Attached local time now stays directly beneath the minimap border through layout rebuilds, using scale-correct spacing. Detached clocks retain their own positions.
+
 ## 1.34
 - Combat log mode now suppresses native CombatDamage numbers and restores the original setting on exit/logout. Added native-number retention, all-enemy icons/critical hits, and boss-only damage modes, with an optional accompanying log.
 - Build hover uses exact spell hyperlinks or matching real spellbook descriptions before an explicit unavailable message. Pregame cooldown labels read the actual starting spell/racial payload and show reported remaining time or the full interval without a fake countdown.

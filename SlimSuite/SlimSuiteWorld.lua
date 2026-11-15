@@ -71,6 +71,61 @@ function A.Catalog(now)
 	return catalog;
 end
 
+-- Compass/map bearings need current world coordinates, not camera projection pixels.
+-- Query only moving encounter units, once per UI frame shared by both consumers.
+local liveBossAt,liveBosses=nil,{};
+local LIVE_BOSS_QUERY={kinds={"boss","finalBoss","guardian"},states={"alive"}};
+function A.LiveBossPositions(now)
+ if ( liveBossAt==now ) then return liveBosses; end
+ liveBossAt=now; liveBosses={};
+ if ( not A.Has("AZS_GetWorldAnchors") ) then return liveBosses; end
+ local nextList,cursor={},nil;
+ for pageNumber=1,32 do
+  local page=A.Call("AZS_GetWorldAnchors",LIVE_BOSS_QUERY,cursor);
+  if ( type(page)~="table" or type(page.entries)~="table" ) then return liveBosses; end
+  for _,entry in ipairs(page.entries) do
+   if ( entry.unitId~=nil and entry.state~="dead" and entry.positionAvailable and type(entry.x)=="number" and type(entry.y)=="number" ) then nextList[entry.unitId]=entry; end
+  end
+  if ( not page.hasMore ) then liveBosses=nextList; return liveBosses; end
+  cursor=page.nextCursor; if ( not cursor ) then return liveBosses; end
+ end
+ return liveBosses;
+end
+
+-- Ordinary orbs are absent from AZS_UNITS. Discover their actual spawn IDs through
+-- living enemy anchors; obtain HP only from an authoritative unit or current target.
+local orbAnchors,orbReadAt={},-1;
+function W.ExplosiveOrbs()
+ local now=GetTime();
+ if now-orbReadAt>=.25 then
+  orbReadAt=now; local found,cursor,complete={},nil,false;
+  for pageNumber=1,32 do
+   local page=A.Call("AZS_GetWorldAnchors",{kinds={"enemy","elite","guardian","boss","finalBoss"},states={"alive"}},cursor);
+   if type(page)~="table" or type(page.entries)~="table" then break; end
+   for _,entry in ipairs(page.entries) do
+    if entry.unitId and entry.state~="dead" and type(entry.name)=="string" and string.lower(entry.name)=="explosive orb" then found[entry.unitId]=entry; end
+   end
+   if not page.hasMore then complete=true; break; end
+   cursor=page.nextCursor; if not cursor then break; end
+  end
+  orbAnchors=complete and found or {};
+ end
+ local health={};
+ for _,u in ipairs(type(AZS_UNITS)=="table" and AZS_UNITS or {}) do health[u.id]=u; end
+ if type(AZS_TARGET)=="table" and AZS_TARGET.id then health[AZS_TARGET.id]=AZS_TARGET; end
+ local out={};
+ for id,entry in pairs(orbAnchors) do
+  local unit=health[id]; local dead=unit and (unit.kind=="dead" or type(unit.hp)=="number" and unit.hp<=0);
+  local friendly=unit and (unit.kind=="other" or unit.kind=="player");
+  if not dead and not friendly then
+   local known=unit and type(unit.hp)=="number" and type(unit.hpm)=="number" and unit.hpm>0;
+   table.insert(out,{id=id,name=entry.name,anchorId=entry.anchorId,kind="normal",hp=known and unit.hp or nil,hpm=known and unit.hpm or nil});
+  end
+ end
+ table.sort(out,function(a,b) return a.id<b.id; end);
+ return out;
+end
+
 -- AZS_ProjectWorldAnchors: requests are { anchorId, attachment ("position" or "overhead"), offset = { z = yards } }.
 -- Gives a map: anchor id -> { x, y, on, dist } in UIParent units, for the anchors on screen only (the game gives no
 -- screen place for one that is off screen or behind the camera). Asks in groups of 256, the most per call.
@@ -194,6 +249,7 @@ W.SetRaidIcon = function(tex, index) SetRaidIcon(tex, index); end
 
 local function PulledEnemies()
 	local list, seen = {}, {};
+ for _,orb in ipairs(W.ExplosiveOrbs()) do seen[orb.id]=true; table.insert(list,{id=orb.id,name=orb.name,kind="explosive",anchorId=orb.anchorId}); end
 	local function Add(src, kindDefault, wantAwake)
 		if ( type(src) ~= "table" ) then return; end
 		for i = 1, table.getn(src) do
@@ -207,6 +263,9 @@ local function PulledEnemies()
 			end
 		end
 	end
+ for _,u in ipairs(type(AZS_UNITS)=="table" and AZS_UNITS or {}) do
+  if ( not seen[u.id] and SS.IsExplosiveOrb(u) and (u.hp or 0)>0 ) then seen[u.id]=true; table.insert(list,{id=u.id,name=u.name,kind="explosive"}); end
+ end
 	Add(A.Call("AZS_GetBosses"), "boss", true);
 	Add(A.Call("AZS_GetGuardians"), "guardian", true);
 	return list;
@@ -230,6 +289,13 @@ local function AssignIcons(enemies)
 	for id, icon in pairs(assigned) do
 		if ( alive[id] ) then taken[icon] = true; else assigned[id] = nil; end
 	end
+ -- An orb is the highest-priority threat: reserve Skull before assigning other encounters.
+ local orb;
+ for _,e in ipairs(enemies) do if e.kind=="explosive" then orb=e; break; end end
+ if orb and assigned[orb.id]~=8 then
+  for id,icon in pairs(assigned) do if icon==8 or id==orb.id then assigned[id]=nil; taken[icon]=nil; end end
+  assigned[orb.id]=8; taken[8]=true;
+ end
 	local function Free()
 		for i = 1, table.getn(BOSS_ICONS) do if ( not taken[BOSS_ICONS[i]] ) then return BOSS_ICONS[i]; end end
 		return nil;
@@ -300,7 +366,7 @@ local function Gather(now)
 	local phase = A.Call("AZS_GetPhase");
 	local inRun = phase == nil or phase == "playing" or phase == "choosing" or phase == "paused";
 	local cat = (inRun and (d.bossMarks or d.prePullMarks)) and A.Catalog(now) or { byUnit = {}, byLair = {} };
-	local want, kinds = {}, {};
+	local want, kinds, markedUnits = {}, {}, {};
 	local function Want(anchorId, attachment, offset, kind)
 		if ( anchorId == nil or kinds[anchorId] ) then return; end
 		table.insert(want, { anchorId = anchorId, attachment = attachment, offset = offset });
@@ -312,7 +378,7 @@ local function Gather(now)
 		AssignIcons(enemies);
 		for i = 1, table.getn(enemies) do
 			local e = enemies[i];
-			local a = cat.byUnit[e.id];
+			local a = cat.byUnit[e.id] or (e.anchorId and {anchorId=e.anchorId});
 			if ( assigned[e.id] and a ) then Want(a.anchorId, "overhead", nil, { icon = assigned[e.id] }); end
 		end
 	else
@@ -324,13 +390,13 @@ local function Gather(now)
 		for i = 1, table.getn(sleeping) do
 			local s = sleeping[i];
 			local a = cat.byUnit[s.id];
-			if ( a ) then Want(a.anchorId, "overhead", nil, { prePull = true, name = s.name }); end
+			if ( a ) then Want(a.anchorId, "overhead", nil, { prePull = true, name = s.name }); markedUnits[s.id]=true; end
 		end
 		local lairs = W.LairInfo(now);
 		for i = 1, table.getn(lairs) do
 			local l = lairs[i];
 			local a = cat.byLair[l.index];
-			if ( a and l.state ~= "awake" ) then
+			if ( a and l.state ~= "awake" and not markedUnits[l.id] ) then
 				local kind = { prePull = true, name = l.name };
 				-- an empty lair is labelled with its refill countdown, so you know when to go back
 				if ( l.state == "empty" ) then
@@ -733,40 +799,14 @@ local function IconFor(event)
 	return icon;
 end
 
--- Big hits: a crit, or a hit as big as the best of the last few, leaves the list and "pops": it grows to the right and
--- falls away only inside its editable rectangle. How big it grows, how far right it goes and how long it hangs
--- before falling all depend on how big it is next to your normal hits (the running average of your non-crit damage).
-local recentBest = {};                                     -- the biggest damage of the last 20 hits
+-- Large-hit emphasis shares the same bounded tiers as ordinary hits.
+local recentBest={};
 local function MarkBig(e)
-	if ( e.heal ) then return e; end
-	if ( not e.crit ) then
-		box.normalAvg = box.normalAvg and (box.normalAvg * 0.9 + e.amount * 0.1) or e.amount;
-	end
-	table.insert(recentBest, e.amount);
-	if ( table.getn(recentBest) > 20 ) then table.remove(recentBest, 1); end
-	local best = 0;
-	for i = 1, table.getn(recentBest) do if ( recentBest[i] > best ) then best = recentBest[i]; end end
-	local top = table.getn(recentBest) >= 5 and e.amount >= best;
-	if ( (e.crit or top) and CTOn("ctPop") and not DB().accessibilityReduceMotion ) then
-		local normal = box.normalAvg or e.amount;
-		e.pop = math.max(1, math.min(4, e.amount / math.max(1, normal)));   -- 1 = a normal-sized hit, 4 = four times or more
-	end
-	return e;
-end
-local POP_LIMIT = 6;
-box.pops = {};
-local function PopLine(i)
-	local p = box.pops[i];
-	if ( p ) then return p; end
-	p = CreateFrame("Frame", nil, box);
-	p:SetFrameStrata("HIGH"); p:SetWidth(260); p:SetHeight(20);
-	p.icon = p:CreateTexture(nil, "ARTWORK"); p.icon:SetPoint("LEFT", p, "LEFT", 0, 0); p.icon:SetWidth(15); p.icon:SetHeight(15);
-	p.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
-	p.text = p:CreateFontString(nil, "OVERLAY");
-	p.text:SetPoint("LEFT", p.icon, "RIGHT", 4, 0); p.text:SetJustifyH("LEFT");
-	p.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 11, "OUTLINE");
-	box.pops[i] = p;
-	return p;
+ if e.heal then return; end
+ table.insert(recentBest,e.amount);
+ if table.getn(recentBest)>20 then table.remove(recentBest,1); end
+ local best=0; for _,amount in ipairs(recentBest) do best=math.max(best,amount); end
+ e.emphasized=CTOn("ctPop") and (e.crit or table.getn(recentBest)>=5 and e.amount>=best) or nil;
 end
 -- WoW 1.12 does not clip children: fit the actual glyphs before showing a line.
 function SS.FitCombatText(text,value,width)
@@ -778,50 +818,15 @@ function SS.FitCombatText(text,value,width)
 		value=string.sub(value,1,cut-1); text:SetText(value);
 	end
 end
-local function DrawPops(now)
-	local n = 0;
-	local list = box.popList or {};
-	local width,height=box:GetWidth() or 260,box:GetHeight() or 220;
-	for i = table.getn(list), 1, -1 do
-		local e = list[i];
-		local r = e.pop;
-		local life = 2.5 + 1.5 * r;                         -- bigger hits hang on longer
-		local age = now - e.born;
-		local grow = math.min(1, age / 0.35);                -- it swells in the first third of a second
-		local scale = 1 + (0.05 + 0.08 * (r - 1)) * grow;   -- subtle growth for large hits
-		local x = 14 + age * (8 + 5 * r);                    -- a slow drift keeps repeated hits easy to read
-		local hang = 0.4 + 0.35 * r;                         -- it holds before it falls
-		local fall = age > hang and (age - hang) * (age - hang) * (120 / r) or 0;   -- bigger ones fall more slowly
-		local available=(width-x-8)/scale;
-		if ( age > life or 8+fall+22*scale>height-8 or available<30 or n >= POP_LIMIT ) then
-			table.remove(list, i);
-		else
-			n = n + 1;
-			local p = PopLine(n);
-			p:SetScale(scale);
-			p:ClearAllPoints();
-			p:SetPoint("TOPLEFT", box, "TOPLEFT", x/scale, (-8-fall)/scale);
-			p:SetWidth(available);
-			p.text:SetHeight(16);
-			p.icon:SetTexture(e.icon or nil); p.icon:SetWidth(e.icon and 15 or 0);
-			SS.FitCombatText(p.text,(e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name,available-(e.icon and 23 or 8));
-			if ( e.crit ) then p.text:SetTextColor(1, 0.85, 0.2); else p.text:SetTextColor(1, 0.55, 0.25); end
-			local fade = life - age < 0.6 and math.max(0, (life - age) / 0.6) or 1;
-			p:SetAlpha(fade);
-			p:Show();
-		end
-	end
-	for i = n + 1, table.getn(box.pops) do box.pops[i]:Hide(); end
-end
 local function AddEntry(e)
-	MarkBig(e);
-	if ( e.pop ) then
-		box.popList = box.popList or {};
-		table.insert(box.popList, e);
-		return;                                            -- it pops instead of taking a line in the list
-	end
-	table.insert(box.entries, 1, e);
-	while ( table.getn(box.entries) > 40 ) do table.remove(box.entries); end
+ MarkBig(e);
+ -- Reserve one entire tier per hit. Reusing a tier retires its old hit before the new one appears.
+ local rows=math.max(1,math.min(MAX_LINES,math.floor(((box:GetHeight() or 220)-12)/28)));
+ box.nextTier=math.mod(box.nextTier or 0,rows);
+ e.tier=box.nextTier; box.nextTier=math.mod(box.nextTier+1,rows);
+ for i=table.getn(box.entries),1,-1 do if box.entries[i].tier==e.tier then table.remove(box.entries,i); end end
+ table.insert(box.entries,1,e);
+ while table.getn(box.entries)>MAX_LINES do table.remove(box.entries); end
 end
 
 local function OnCombatEvent(event)
@@ -845,26 +850,29 @@ local function DrawBox()
 	local editing = Editing("SlimSuiteCombatTextFrame");
 	local demo = SS.Demoing("SlimSuiteCombatTextFrame");   -- Demo Mode samples only this enabled element
 	local now = GetTime();
-	if ( (not d.combatTextBox or (SS.CombatLogVisible and not SS.CombatLogVisible())) and not editing and not demo ) then box:Hide(); box.popList = {}; DrawPops(now); return; end
-	DrawPops(now);
+	for i = table.getn(box.entries), 1, -1 do
+		local e = box.entries[i];
+		if ( now - e.born > CTLife(e) or (e.tier and e.tier>=math.max(1,math.min(MAX_LINES,math.floor(((box:GetHeight() or 220)-12)/28)))) ) then table.remove(box.entries, i); end
+	end
+	if ( (not d.combatTextBox or (SS.CombatLogVisible and not SS.CombatLogVisible())) and not editing and not demo ) then box:Hide(); return; end
 	local list = box.entries;
 	-- nothing to show (no hits yet): the box stays out of the way unless it is being placed
-	if ( table.getn(list) == 0 and table.getn(box.popList or {}) == 0 and not editing and not demo ) then box:Hide(); return; end
+	if ( table.getn(list) == 0 and not editing and not demo ) then box:Hide(); return; end
 	box:Show();
 	if ( editing and table.getn(list) == 0 ) then
 		list = { { born = now, crit = true, amount = 1234, name = "Crit example", icon = "Interface\\Icons\\Spell_Fire_Fireball02" },
 			{ born = now, amount = 512, name = "Hit example", icon = "Interface\\Icons\\Spell_Frost_FrostBolt02" } };
 	end
-	for i = table.getn(box.entries), 1, -1 do
-		local e = box.entries[i];
-		if ( now - e.born > CTLife(e) ) then table.remove(box.entries, i); end
-	end
+
 	local y, n = -6, 0;
 	local bottom = -(box:GetHeight() or 220) + 6;
 	for i = 1, table.getn(list) do
 		local e = list[i];
-		local h = e.crit and 24 or 15;
-		local lineWidth=(box:GetWidth() or 260)-(e.crit and 32 or 14);
+		local h = (e.crit or e.emphasized) and 24 or 15;
+  y=-6-(e.tier or (i-1))*28;
+  local life=CTLife(e); local progress=math.max(0,math.min(1,(now-e.born)/life));
+  local x=8+(d.accessibilityReduceMotion and 0 or progress*math.max(0,(box:GetWidth() or 260)-46));
+		local lineWidth=(box:GetWidth() or 260)-x-6;
 		if ( lineWidth<20 ) then break; end
 		if ( n >= MAX_LINES or y - h < bottom ) then break; end
 		n = n + 1;
@@ -874,10 +882,10 @@ local function DrawBox()
 		local alpha = 1;
 		if ( age > life - FADE ) then alpha = math.max(0, (life - age) / FADE); end
 		l:ClearAllPoints();
-		l:SetPoint("TOPLEFT", box, "TOPLEFT", e.crit and 26 or 8, y);
+		l:SetPoint("TOPLEFT", box, "TOPLEFT", x, y);
 		l:SetWidth(lineWidth); l:SetHeight(h);
 		l.icon:SetWidth(e.icon and (h - 2) or 0); l.icon:SetHeight(h - 2); l.icon:SetTexture(e.icon or nil);
-		l.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",e.crit and 16 or 11,"OUTLINE");
+		l.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",e.crit and 16 or (e.emphasized and 14 or 11),"OUTLINE");
 		l.text:SetHeight(h-4);
 		SS.FitCombatText(l.text,(e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name,math.max(0,l:GetWidth()-(e.icon and h+4 or 6)));
 		if ( e.heal ) then l.text:SetTextColor(0.3, 1, 0.4);
@@ -1122,7 +1130,7 @@ local function GatherPins(space, options)
 			local x, y = A.Pos(l.entry);
 			if ( x and (d.minimapLairs or l.flagged) and SameSpace(l.entry, space) ) then
 				local mark=W.MarkFor(l.id);
-				local t = { x = x, y = y, size = l.flagged and 13 or 11, texture = mark and RAID_ICONS or PRE_PULL_ICON, tip = l.name, category = "lair", raid = mark, label = mark and l.name or nil };
+				local t = { x = x, y = y, size = l.flagged and 13 or 11, texture = mark and RAID_ICONS or PRE_PULL_ICON, tip = l.name, category = "lair", unitId = l.id, raid = mark, label = mark and l.name or nil };
 				if ( l.state == "awake" ) then
 					t.r, t.g, t.b, t.sub = 1, 0.3, 0.25, "Awake: its Guardian is fighting";
 				elseif ( l.state == "empty" ) then
@@ -1138,21 +1146,26 @@ local function GatherPins(space, options)
 		end
 	end
 	if ( d.minimapBosses ) then
-		-- a boss's place comes from the world-anchor catalog (AZS_GetBosses carries no position)
-		local bosses = A.Call("AZS_GetBosses");
-		local cat = A.Catalog(GetTime());
-		if ( type(bosses) == "table" ) then
-			for i = 1, table.getn(bosses) do
-				local b = bosses[i];
-				local a = type(b) == "table" and b.id ~= nil and cat.byUnit[b.id] or nil;
-				if ( a and a.positionAvailable and SameSpace(a, space) ) then
-					-- the boss's own marker icon when it has one, else a skull
-					table.insert(result, { x = a.x, y = a.y, size = 15, texture = RAID_ICONS,
-						raid = W.MarkFor(b.id) or 8, tip = b.name or "Boss", label = b.name or "Boss", category = "boss", grey = phase=="ready", alpha = phase=="ready" and .45 or 1, sub = phase=="ready" and SS.T("Not yet available") or nil });
-				end
+		local live=A.LiveBossPositions(GetTime());
+		local names,awake={},{};
+		for _,entry in ipairs(A.Call("AZS_GetBosses") or {}) do names[entry.id]=entry.name; end
+		for _,entry in ipairs(A.Call("AZS_GetGuardians") or {}) do names[entry.id]=entry.name; awake[entry.id]=entry.awake==true or entry.state==1; end
+		for _,entry in ipairs(type(AZS_UNITS)=="table" and AZS_UNITS or {}) do
+			if ( entry.kind=="guardian" ) then awake[entry.id]=entry.awake==true or entry.state==1; end
+		end
+		for id,entry in pairs(live) do
+			local kind=entry.kind; local guardian=kind=="guardian";
+			if ( (kind=="boss" or kind=="finalBoss" or kind=="final" or (guardian and awake[id])) and SameSpace(entry,space) ) then
+				local name=entry.name or names[id] or SS.T("Boss");
+				table.insert(result,{x=entry.x,y=entry.y,size=15,texture=RAID_ICONS,raid=W.MarkFor(id) or 8,
+				 tip=name,label=name,category="boss",unitId=id,anchorId=entry.anchorId,
+				 grey=phase=="ready",alpha=phase=="ready" and .45 or 1,sub=phase=="ready" and SS.T("Not yet available") or nil});
 			end
 		end
 	end
+ -- Prefer the moving guardian over its fixed home when both filters are enabled.
+ local liveUnits={}; for _,point in ipairs(result) do if point.category=="boss" then liveUnits[point.unitId]=true; end end
+ for i=table.getn(result),1,-1 do local point=result[i]; if point.category=="lair" and point.unitId and point.unitId~=0 and liveUnits[point.unitId] then table.remove(result,i); end end
  return result;
 end
 
@@ -1172,7 +1185,7 @@ local function UpdateMinimapPins()
 	if ( SS.Demoing("MinimapCluster") and not px ) then px, py = 0, 0; end   -- Demo Mode samples use the player's map centre
 	local position=A.playerPosition;
 	local identity=tostring(space)..":"..tostring(position and position.runId)..":"..tostring(position and position.mapId);
-	if ( now >= pinGather or identity~=pinIdentity ) then pinIdentity=identity; pinGather = now + 0.1; targets=GatherPins(position or space); end
+	if ( d.minimapBosses or now >= pinGather or identity~=pinIdentity ) then pinIdentity=identity; pinGather = now + 0.1; targets=GatherPins(position or space); end
 	if ( px and Minimap and Minimap:IsVisible() ) then
 		for i = 1, table.getn(targets) do PlacePin(px, py, targets[i]); end
 	end
@@ -1268,6 +1281,15 @@ local function LocalTimeText()
 	return string.format("%d:%02d%s", h12, m, suffix);
 end
 
+function W.DockLocalClock()
+ if ( DB().clockDetached or not Minimap ) then return; end
+ local scale=DB().scales.SlimSuiteLocalClockFrame;
+ if ( SS.DisplayElementScale ) then scale=SS.DisplayElementScale("SlimSuiteLocalClockFrame",type(scale)=="number" and scale or 1); end
+ if ( type(scale)=="number" ) then clock:SetScale(scale); end
+ local ratio=SS.EffectiveScale(Minimap)/SS.EffectiveScale(clock);
+ local border=SS.squareActive and not DB().minimapTransparent and 5 or 0;
+ clock:ClearAllPoints(); clock:SetPoint("TOP",Minimap,"BOTTOM",0,-(border+2)*ratio);
+end
 local function UpdateLocalClock()
 	local editing = Editing("SlimSuiteLocalClockFrame");
 	if ( not SS.FeatureEnabled("SlimSuiteLocalClockFrame") ) then clock:Hide(); SS.HideNative("localClock", false); return; end
@@ -1282,6 +1304,10 @@ local function UpdateLocalClock()
 	if ( type(custom) == "table" and custom.w and custom.h ) then w, h = custom.w, custom.h; end   -- the size set is the size
 	clock:SetWidth(w); clock:SetHeight(h);
 	if ( SS.FitText ) then SS.FitText(clock.text, math.max(10, w - 10)); end   -- the time shrinks to fit a small box
+	if ( not DB().clockDetached ) then
+		W.DockLocalClock();
+		if ( Minimap and not Minimap:IsVisible() and not editing ) then clock:Hide(); return; end
+	end
 	clock:Show();
 end
 W.UpdateLocalClock = function() SS.Safe(UpdateLocalClock); end
@@ -1297,7 +1323,7 @@ W.SetClockDetached = function(on)
 	else
 		if ( db.places ) then db.places.SlimSuiteLocalClockFrame = nil; end
 		clock:ClearAllPoints();
-		if ( Minimap ) then clock:SetPoint("TOP", Minimap, "BOTTOM", 0, -2);
+		if ( Minimap ) then W.DockLocalClock();
 		else clock:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -60, -170); end
 	end
 	SS.Safe(UpdateLocalClock);

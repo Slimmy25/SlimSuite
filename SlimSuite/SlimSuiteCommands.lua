@@ -865,9 +865,10 @@ function SS.DemoMeterSnapshot(t)
 	for i = 1, table.getn(DEMO_METER) do
 		local d = DEMO_METER[i];
 		local amount = math.floor(d[4] + t * 210 * d[5]);
-		snap.actors["a" .. i] = { name = d[1], kind = d[6] or "hero" };
+		local actorId="demo:"..d[1];
+		snap.actors[actorId] = { name = d[1], kind = d[6] or "hero" };
 		snap.sources["s" .. i] = { name = d[2], school = d[7], proc = d[8], icon = { status = "ready", path = "Interface\\Icons\\" .. d[3] } };
-		snap.rows[i] = { rowId = "r" .. i, sourceKey = "s" .. i, ownerId = "a" .. i, displayAmount = amount,
+		snap.rows[i] = { rowId = "r" .. i, sourceKey = "s" .. i, ownerId = "demo:hero", actorId = actorId, displayAmount = amount,
 			displayRate = { status = "ready", value = math.floor(d[5] * 210) } };
 	end
 	return snap;
@@ -901,6 +902,7 @@ function SS.StartDemoMode()
 	end
 	SS.demoElements = enabled;
 	SS.demoRunning = true;
+ SS.RefreshEditHandles();
 	demoT = 0; demoHitClock = 0;
 	SS.demoBuffOn = {};
 	if ( SS.Demoing("SlimSuiteMeterFrame") and SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(0); end
@@ -942,6 +944,7 @@ function SS.StopDemoMode()
 	SS.Safe(SS.ApplyNewFrames);
 	DemoRedraw();
 	SS.Safe(SS.ShowDemoBox, false);
+ SS.RefreshEditHandles();
 end
 
 -- While Demo Mode runs, Slim Suite's menus are put away so the samples can be seen, and a small "DEMO MODE" box

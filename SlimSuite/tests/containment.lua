@@ -57,15 +57,9 @@ local box=SlimSuiteCombatTextFrame
 for _,width in ipairs({40,120,260}) do for _,height in ipairs({20,60,220}) do for _,age in ipairs({.1,1,2,4}) do
  box:SetWidth(width); box:SetHeight(height); box:SetScale(1.5)
  d.sizes.SlimSuiteCombatTextFrame={w=width,h=height}
- box.popList={{born=GetTime()-age,pop=4,amount=123456,name=string.rep("W",100).."\nwrapped",crit=true,icon="test"}}
- box.entries={{born=GetTime(),amount=123,name=string.rep("W",100),crit=true,icon="test"}}
+ box.entries={{born=GetTime()-age,tier=0,emphasized=true,amount=123,name=string.rep("W",100),crit=true,icon="test"}}
  Tick(1,.05)
  local w,h=box:GetWidth(),box:GetHeight()
- for _,pop in ipairs(box.pops) do if pop:IsShown() and pop:GetAlpha()>0 then
-  local point=pop.points[1]; local scale=pop:GetScale(); local x,top=point[4]*scale,-point[5]*scale
-  check("animated popup rectangle stays inside box",x>=0 and x+pop:GetWidth()*scale<=w+.01 and top>=0 and top+pop:GetHeight()*scale<=h+.01)
-  check("animated popup glyphs and icon fit",pop.text:GetStringWidth()+23<=pop:GetWidth()+.01)
- end end
  for _,line in ipairs(box.lines) do if line:IsShown() and line:GetAlpha()>0 then
   local point=line.points[1]
   check("ordinary row stays inside box",point[4]>=0 and point[4]+line:GetWidth()<=w+.01 and -point[5]+line:GetHeight()<=h+.01)

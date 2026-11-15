@@ -113,7 +113,8 @@ function SS.LayoutBoundedAuras(buttons, plate, portrait, nextFrame, side)
 			if ( text.GetPoint ) then local _,_,_,_,y=text:GetPoint(1); gap=math.max(gap,-(y or 0)); end
 			th=((text:GetHeight() or 0)+gap)*scale;
 		end
-		local shrink=math.min(1,16*SS.EffectiveScale(plate)/math.max(1,(button:GetHeight() or 16)*scale));
+		local iconSize=plate==SS.PlayerAnchor() and side=="above" and 26 or 16;
+		local shrink=iconSize*SS.EffectiveScale(plate)/math.max(1,(button:GetHeight() or 16)*scale);
 		button:SetScale(button.slimAuraOriginal.scale*shrink);
 		width=math.max(width,math.max((button:GetWidth() or 16)*scale+margin,tw)*shrink);
 		height=math.max(height,((button:GetHeight() or 16)*scale+th)*shrink);

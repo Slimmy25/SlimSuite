@@ -155,12 +155,19 @@ function SS.CreateClockFrame()
 	clockFrame:Hide();
 end
 
+function SS.IsExplosiveOrb(unit)
+ if ( type(unit)~="table" or type(unit.name)~="string" ) then return false; end
+ local kind=SS.UnitKind(unit);
+ return string.lower(unit.name)=="explosive orb" and (kind=="normal" or kind=="elite" or kind=="guardian" or kind=="boss");
+end
+
 function SS.BossPriority(unit)
+ if SS.IsExplosiveOrb(unit) then return 0; end
 	local kind = UnitKind(unit);
 	if ( kind == "final" ) then return 1; end
 	if ( kind == "boss" ) then return 2; end
 	if ( kind == "guardian" ) then return 3; end
-	if ( kind == "elite" ) then return 4; end
+	-- Ordinary elites are not encounters, even when they share a guardian name.
 	return nil;
 end
 
@@ -187,16 +194,25 @@ end
 function SS.EncounterList()
 	-- AZS_UNITS carries live hp/hpm for bosses, guardians and elites; the game updates it before the AZSUNITS event.
 	local units = type(AZS_UNITS) == "table" and AZS_UNITS or {};
-	local list = {};
+	local list,seen = {},{};
 	for i = 1, table.getn(units) do
 		local unit = units[i];
 		local priority = type(unit) == "table" and SS.BossPriority(unit) or nil;
-		local awake = type(unit) == "table" and (UnitKind(unit) ~= "guardian" or unit.state == 1);
+		local awake = type(unit) == "table" and (SS.IsExplosiveOrb(unit) or UnitKind(unit) ~= "guardian" or unit.state == 1);
 		if ( priority and awake and type(unit.id) == "number" and type(unit.name) == "string"
 			and type(unit.hp) == "number" and type(unit.hpm) == "number" and unit.hp > 0 and unit.hpm > 0 ) then
 			table.insert(list, { id = unit.id, name = unit.name, kind = UnitKind(unit), hp = unit.hp, hpm = unit.hpm, priority = priority, order = i });
+   seen[unit.id]=true;
 		end
 	end
+ if SlimSuiteWorld and SlimSuiteWorld.ExplosiveOrbs then
+  for _,orb in ipairs(SlimSuiteWorld.ExplosiveOrbs()) do
+   if not seen[orb.id] then
+    table.insert(list,{id=orb.id,name=orb.name,kind="normal",hp=orb.hp,hpm=orb.hpm,
+     unknownHealth=not orb.hp or not orb.hpm,priority=0,order=table.getn(units)+table.getn(list)+1});
+   end
+  end
+ end
 	table.sort(list, function(a, b)
 		if ( a.priority ~= b.priority ) then return a.priority < b.priority; end
 		return a.order < b.order;
@@ -217,6 +233,73 @@ function SS.ClampAbsoluteFrame(name, f)
 		SetRootPosition(f, nx, ny);
 	end
 end
+
+-- Target identity arrives in AZSTGT after the native selection changes. Never spin
+-- through enemies against the previous server snapshot in a single click handler.
+local targetRequest;
+local function FinishEncounterTarget(success)
+ SS.encounterTargetResult=success;
+ targetRequest=nil; SS.Stop("encounterTarget");
+end
+local function RestoreEncounterTarget()
+ local request=targetRequest; if not request then return; end
+ if ( type(AZS_TARGET)=="table" and AZS_TARGET.id==request.previousId ) then FinishEncounterTarget(false); return; end
+ if ( request.previousName and TargetByName ) then
+  request.restoring=true; request.waitUntil=GetTime()+1;
+  SS.Safe(TargetByName,request.previousName,true);
+ else
+  FinishEncounterTarget(false);
+  if ClearTarget then SS.Safe(ClearTarget); end
+ end
+end
+local function StepEncounterTarget()
+ local request=targetRequest; if not request then return; end
+ if request.restoring then
+  if GetTime()>=request.waitUntil then
+   FinishEncounterTarget(false);
+   if ClearTarget then SS.Safe(ClearTarget); end
+  end
+  return;
+ end
+ if GetTime()>=request.deadline or request.attempts>=40 then RestoreEncounterTarget(); return; end
+ if request.waitUntil then
+  if GetTime()>=request.waitUntil then RestoreEncounterTarget(); end
+  return;
+ end
+ request.attempts=request.attempts+1; request.waitUntil=GetTime()+1;
+ local ok=SS.Safe(TargetNearestEnemy);
+ if not ok then RestoreEncounterTarget(); end
+end
+function SS.TargetEncounter(unit)
+ if ( not unit or not unit.id or not TargetNearestEnemy ) then return false; end
+ if ( type(AZS_TARGET)=="table" and AZS_TARGET.id==unit.id and
+  (not UnitCanAttack or UnitCanAttack("player","target")) ) then return true; end
+ targetRequest={id=unit.id,previousId=type(AZS_TARGET)=="table" and AZS_TARGET.id,
+  previousName=type(AZS_TARGET)=="table" and AZS_TARGET.name,seen={},attempts=0,deadline=GetTime()+6};
+ SS.encounterTargetResult=nil;
+ SS.Every("encounterTarget",.05,StepEncounterTarget);
+ StepEncounterTarget();
+ return true; -- accepted; success is established only by the subsequent authoritative event
+end
+local encounterTargetEvents=CreateFrame("Frame");
+encounterTargetEvents:RegisterEvent("CHAT_MSG_ADDON");
+encounterTargetEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
+encounterTargetEvents:SetScript("OnEvent",function()
+ if event=="PLAYER_ENTERING_WORLD" then FinishEncounterTarget(false); return; end
+ if arg1~="AZSTGT" or not targetRequest or type(AZS_TARGET)~="table" then return; end
+ local request=targetRequest;
+ if not request.waitUntil then return; end
+ if request.restoring then
+  local clear=AZS_TARGET.id~=request.previousId;
+  FinishEncounterTarget(false);
+  if clear and ClearTarget then SS.Safe(ClearTarget); end
+  return;
+ end
+ if AZS_TARGET.id==request.id and (not UnitCanAttack or UnitCanAttack("player","target")) then FinishEncounterTarget(true); return; end
+ local key=tostring(AZS_TARGET.id)..":"..tostring(AZS_TARGET.kind)..":"..tostring(AZS_TARGET.name);
+ if request.seen[key] then RestoreEncounterTarget(); return; end
+ request.seen[key]=true; request.waitUntil=nil; -- one more enemy on the next UI tick
+end);
 
 function SS.EncounterRow(index)
 	if ( encounterRows[index] ) then return encounterRows[index]; end
@@ -253,11 +336,7 @@ function SS.EncounterRow(index)
 	row:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
 	row:SetScript("OnClick", function()
 		local unit = this.unit;
-		if ( not unit or not unit.name or not TargetByName ) then return; end
-		-- The encounter API exposes stable IDs for health tracking, but the client target API
-		-- selects visible units by name. Ask it for this exact name and leave range/visibility
-		-- rejection to the game; never retarget a different nearby enemy as a fallback.
-		SS.Safe(TargetByName, unit.name, true);
+		SS.TargetEncounter(unit);
 	end);
 	row:SetScript("OnEnter", function()
 		if ( not this.unit or not GameTooltip ) then return; end
@@ -265,8 +344,9 @@ function SS.EncounterRow(index)
 		local center = this:GetCenter();
 		local onRight = center and center * RootFactor(this) > (UIParent:GetWidth() / 2);
 		GameTooltip:SetOwner(this, onRight and "ANCHOR_LEFT" or "ANCHOR_RIGHT");
-		GameTooltip:AddLine(this.unit.name .. "  [" .. (this.unit.kind == "guardian" and "Guardian" or (this.unit.kind == "elite" and "Elite" or "Boss")) .. "]");
-		GameTooltip:AddLine("Health: " .. tostring(math.floor(this.unit.hp)) .. " / " .. tostring(math.floor(this.unit.hpm)), 1, 0.82, 0);
+		GameTooltip:AddLine(this.unit.name .. "  [" .. (SS.IsExplosiveOrb(this.unit) and this.unit.name or (this.unit.kind == "guardian" and "Guardian" or (this.unit.kind == "elite" and "Elite" or "Boss"))) .. "]");
+		if this.unit.unknownHealth then GameTooltip:AddLine(SS.T("Health unavailable"),1,.82,0);
+  else GameTooltip:AddLine("Health: " .. tostring(math.floor(this.unit.hp)) .. " / " .. tostring(math.floor(this.unit.hpm)), 1, 0.82, 0); end
 		GameTooltip:AddLine("Click to target", 0.75, 0.75, 0.75);
 		GameTooltip:Show();
 	end);
@@ -312,7 +392,7 @@ function SS.UpdateEncounterRows(list)
 	local largeNames = d.accessibilityLargeText and true or false;
 	local highContrast = d.accessibilityContrast and true or false;
 	local sig = (vertical and "v" or "h") .. padding .. "|" .. cardWidth .. "|" .. rowHeight .. "|" .. nameAlign .. "|" .. barThickness .. "|" .. tostring(largeNames);
-	for i = 1, count do sig = sig .. "|" .. tostring(list[i].name) .. tostring(list[i].kind); end
+	for i = 1, count do sig = sig .. "|" .. tostring(list[i].name) .. tostring(list[i].kind)..tostring(list[i].unknownHealth); end
 	local relayout = bossFrame.sig ~= sig;
 	bossFrame.sig = sig;
 	for i = 1, table.getn(list) do
@@ -326,7 +406,7 @@ function SS.UpdateEncounterRows(list)
 		row.bar:ClearAllPoints();
 		row:ClearAllPoints();
 		row:SetPoint("TOPLEFT", bossFrame, "TOPLEFT", vertical and (padding + ((i - 1) * (cardWidth + gap))) or padding, -(padding + (vertical and 0 or ((i - 1) * rowHeight))));
-		row.name:SetText(unit.name);
+		row.name:SetText(unit.name..(unit.unknownHealth and (" ("..SS.T("Health unavailable")..")") or ""));
 		if ( vertical ) then
 			SS.SetGameDefaultFont(row.name, largeNames and 10.5 or 8.5);
 			local barTopOffset = 34 + padding;
@@ -366,7 +446,7 @@ function SS.UpdateEncounterRows(list)
 			end
 			row.mark:Show();
 		else row.mark:Hide(); end
-		local health = math.max(0, math.min(1, unit.hp / unit.hpm));
+		local health = unit.unknownHealth and 0 or math.max(0, math.min(1, unit.hp / unit.hpm));
 		if ( highContrast ) then
 			row.bar:SetStatusBarColor(1, 0.82, 0.12, 1);
 			row.bar.background:SetVertexColor(0.01, 0.01, 0.04, 1);
@@ -820,7 +900,7 @@ VisualInsets = function(frame)
 	if ( frame == MainMenuExpBar ) then
 		return 0, 0, (frame:GetWidth() or 0) * factor, (frame:GetHeight() or 0) * factor;
 	end
-	if ( frame == MainMenuBar or frame == PartyMemberFrame1 or frame == BuffFrame ) then
+	if ( frame == MainMenuBar or frame == PartyMemberFrame1 or frame == BuffFrame or frame == MinimapCluster ) then
 		-- These Blizzard groups have unused parent padding or detached siblings. Clamp their
 		-- actual visible controls as a group so scale cannot leave a gap or clip a companion.
 		local minX, minY, maxX, maxY;
@@ -833,7 +913,11 @@ VisualInsets = function(frame)
 				minY = minY and math.min(minY, b) or b; maxY = maxY and math.max(maxY, t) or t;
 			end
 		end
-		if ( frame == MainMenuBar ) then
+		if ( frame == MinimapCluster ) then
+			Include(Minimap); Include(SS.squareRing);
+			for _,name in ipairs({"MinimapZoneTextButton","MinimapToggleButton","MiniMapWorldMapButton","GameTimeFrame","MinimapZoomIn","MinimapZoomOut"}) do Include(getglobal(name)); end
+			if ( SS.DB().replaceLocalClock and not SS.DB().clockDetached ) then Include(getglobal("SlimSuiteLocalClockFrame")); end
+		elseif ( frame == MainMenuBar ) then
 			for i = 1, 6 do Include(getglobal("ActionButton" .. i)); end
 			Include(ActionButton12);
 			if ( ActionButton12 ) then Include(ActionButton12.slimRacialBorder); end
@@ -887,6 +971,7 @@ ApplyFeatureMute = function(name)
 		for _, companion in ipairs(companions) do SS.CollectFeatureFrames(getglobal(companion), list, seen, 0); end
 	end
 	local muted = SS.DB().muted[name] and true or false;
+	if ( name=="SlimSuiteItemRowFrame" and SS.ChoiceItemsActive and SS.ChoiceItemsActive() ) then muted=false; end
 	if ( name == "ChatFrame1" and not setupActive and SS.DB().elementModes.ChatFrame1 == "disabled" ) then muted = true; end
 	for i = 1, table.getn(list) do
 		local target = list[i];
@@ -1569,6 +1654,9 @@ function SS.Place(name, ignoreAnchor)
 	if ( not f ) then return; end
 	if ( name == "ChatFrame1" and SS.ChatIsCustom and not SS.ChatIsCustom() ) then return; end
 	if ( SS.DB().frameDefault and SS.DB().frameDefault[name] ) then return; end   -- "Default": the game's own placement
+	if ( name=="SlimSuiteLocalClockFrame" and not SS.DB().clockDetached and SlimSuiteWorld and SlimSuiteWorld.DockLocalClock ) then
+		SlimSuiteWorld.DockLocalClock(); return;
+	end
 	if ( (name == "SlimSuiteSpellRowFrame" and type(p) ~= "table") or (name == "SlimSuiteItemRowFrame" and
 		(type(p) ~= "table" or (SS.BuildRowsJoined(name) and p.relative ~= "SlimSuiteSpellRowFrame"))) ) then
 		p = SS.BuildRowDefaultPlace(name);

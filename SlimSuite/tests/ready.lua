@@ -45,15 +45,16 @@ setup.SetMode("SlimSuiteCombatTextFrame","enabled","Combat text")
 d.combatTextBox=true
 local box=SlimSuiteCombatTextFrame
 box:SetWidth(200); box:SetHeight(100)
-box.entries={}; box.popList={{born=GetTime(),pop=1,amount=100,name="A very long spell name that must fit inside the box",crit=true}}
+box.entries={}; box.nextTier=0
+SlimSuiteWorld.DemoHit(100,"A very long spell name that must fit inside the box",nil,true)
 Tick(1)
-local pop=box.pops[1]
-check("popups belong to combat box",pop and pop:GetParent()==box)
-check("popup anchors follow the movable box",pop and pop.points[1][2]==box)
-if pop then check("popup text fits available width",pop.text:GetStringWidth()<=pop:GetWidth()-4) end
-box.popList={{born=GetTime()-2,pop=1,amount=100,name="Expired at box edge"}}
-Tick(1)
-check("falling hits expire at box bottom",#box.popList==0)
+local line=box.lines[1]
+check("rainfall rows belong to combat box",line and line:GetParent()==box)
+check("rainfall anchors follow movable box",line and line.points[1][2]==box)
+if line then check("rainfall text fits available width",line.text:GetStringWidth()<=line:GetWidth()-4) end
+Tick(1,15)
+check("expired rainfall leaves no queued rows",#box.entries==0)
+
 d.tallyContext=true; d.tallyVertical=false; d.sizes.SlimSuiteTallyFrame=nil
 SS.DrawTally(SS.TallyParts({kills=1,gold=2,chest=3}))
 local tally=SlimSuiteTallyFrame

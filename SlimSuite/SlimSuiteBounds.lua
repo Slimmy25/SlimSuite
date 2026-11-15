@@ -10,6 +10,12 @@ local function Restore(region)
  if ( region.slimBoundsAlpha~=nil ) then region:SetAlpha(region.slimBoundsAlpha); region.slimBoundsAlpha=nil; end
 end
 function SS.EnforceElementBounds(owner,release)
+ -- Native minimap chrome intentionally crosses the terrain rectangle. Its mask clips
+ -- terrain/pins; generic HUD containment must not clip the moon, title or zoom controls.
+ if ( owner==MinimapCluster or owner==Minimap ) then
+  release=true;
+  if ( Minimap and Minimap.SetClipsChildren ) then SS.Safe(Minimap.SetClipsChildren,Minimap,false); end
+ end
  local l,r,b,t=Rect(owner); if ( not l ) then return; end
  local rawL,rawR,rawB,rawT=l,r,b,t;
  local left,right,bottom,top=RootBounds(owner);

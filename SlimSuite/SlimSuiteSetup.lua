@@ -22,7 +22,7 @@ end
 -- the panel shows one element's own questions, placed just below that element's handle
 -- the size buttons: the chosen grid size is lit
 function SU.RefreshGridButtons()
-	local sizes = { 16, 32, 64, 128 };
+	local sizes = { 8, 16, 32, 64 };
 	for i = 1, 4 do
 		if ( SU.sizes and SU.sizes[i] ) then
 			if ( tonumber(SS.DB().gridDivisions) == sizes[i] ) then SU.sizes[i]:LockHighlight(); else SU.sizes[i]:UnlockHighlight(); end
@@ -559,7 +559,7 @@ function SU.Build()
 	SU.bar = CreateFrame("Frame", "SlimSuiteSetupBar", UIParent);
 	SU.grid = Tick(8, -8, "Grid", function() return SS.DB().showEditGrid; end, function(v) SU.SetGridSetting(v); end);
 	SU.sizes = {};
-	local sizes = { 16, 32, 64, 128 };
+	local sizes = { 8, 16, 32, 64 };
 	for i = 1, 4 do
 		local pixels = sizes[i];
 		local b = K.Button(SU.bar, tostring(pixels), 34, function()
@@ -698,7 +698,7 @@ SU.COMPANIONS = SS.ELEMENT_COMPANIONS;
 -- an element turned on in the setup, or a frame that comes with one (the jewelry row with the build spells)
 function SS.SetupShows(name)
 	if ( not setupActive or not SU.on or not name ) then return false; end
-	if ( SU.on[name] or SU.on[SS.Element(name)] ) then return true; end
+	if ( name=="SlimSuiteCompassFrame" or SU.on[name] or SU.on[SS.Element(name)] ) then return true; end
 	for parent in pairs(SU.on) do
 		local list = SU.CompanionsOf(parent);
 		for i = 1, table.getn(list) do if ( list[i] == name ) then return true; end end

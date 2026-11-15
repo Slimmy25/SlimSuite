@@ -30,7 +30,7 @@ SS.ELEMENTS = {
 	SlimSuitePartyLines = {},
 	SlimSuitePlayerCard = {},
 	SlimSuiteStatCounterFrame = { feature = "statCounter" },
-	SlimSuiteCompassFrame = { feature = "compassOn", optional = true, title = "Compass", text = "Bearings to known bosses, lairs and caches. Choose a rail or free markers." },
+	SlimSuiteCompassFrame = { feature = "compassOn", title = "Compass", text = "Bearings to known bosses, lairs and caches. Choose a rail or free markers." },
 	SlimSuiteTargetCard = {},
 };
 SS.NATIVE_KEYS, SS.NATIVE_ELEMENTS, SS.NATIVE_FRAMES, SS.NATIVE_PARTS = {}, {}, {}, {};

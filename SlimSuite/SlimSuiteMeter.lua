@@ -70,7 +70,7 @@ local function Query()
 	local context,err=AZS_GetMeterContext();
 	if not context then return nil,err and err.code or 'Waiting for a run';end
 	SyncContext(context);
-	local q={apiVersion=1,runId=context.runId,metric=M.view=='healing' and 'healing' or 'damage',scope=M.view=='group' and (M.owner and 'owner' or 'party') or 'self',period=M.view=='boss' and 'encounter' or 'run',groupBy=M.view=='group' and not M.owner and 'owner' or 'source',windowSeconds=0};
+	local q={apiVersion=1,runId=context.runId,metric=M.view=='healing' and 'healing' or 'damage',scope=M.view=='group' and (M.owner and 'owner' or 'party') or 'self',period=M.view=='boss' and 'encounter' or 'run',groupBy=M.view=='group' and not M.owner and 'owner' or 'actor_source',windowSeconds=0};
 	if M.view=='healing' then q.healingPerspective='performed';end
 	if M.view=='group' and M.owner then q.ownerId=M.owner;end
 	if M.checkpoints[M.view] then q.checkpointId=M.checkpoints[M.view];end
@@ -368,7 +368,7 @@ local function NowRate(snapshot)
 		local result;
 		if type(ctx) == 'table' and ctx.runId then
 			local q = { apiVersion = 1, runId = ctx.runId, metric = M.view == 'healing' and 'healing' or 'damage', scope = 'self',
-				period = M.view == 'boss' and 'encounter' or 'run', groupBy = 'source', windowSeconds = 5 };
+				period = M.view == 'boss' and 'encounter' or 'run', groupBy = 'actor_source', windowSeconds = 5 };
 			if M.view == 'healing' then q.healingPerspective = 'performed'; end
 			local ok, r = SS.Safe(AZS_GetMeterSnapshot, q);
 			if ok and type(r) == 'table' then result = r.totals and r.totals.displayRate; end
@@ -394,7 +394,7 @@ local function IsPet(actor, snapshot)
 	if type(actor) ~= 'table' then return false; end
 	local kind = string.lower(tostring(actor.kind or ''));
 	if kind == '' or kind == 'hero' or kind == 'player' then return false; end
-	return actor.name ~= nil;
+	return actor.name ~= nil and (kind == 'pet' or kind == 'summon' or kind == 'totem');
 end
 local function IsProc(source)
 	if type(source) ~= 'table' then return false; end
@@ -404,15 +404,16 @@ local function GroupPets(snapshot, rows)
 	if not snapshot or M.view == 'group' and not M.owner then return rows; end
 	local out, pets = {}, {};
 	for _, row in ipairs(rows) do
-		local actor = snapshot.actors and snapshot.actors[row.ownerId];
+		local actor = snapshot.actors and snapshot.actors[row.actorId or row.ownerId];
 		if IsPet(actor, snapshot) then
-			local g = pets[actor.name];
+			local key=tostring(row.ownerId)..'|'..tostring(actor.summonKey or actor.totemKey or actor.creatureEntry or row.actorId or actor.name);
+			local g = pets[key];
 			if not g then
 				local src = snapshot.sources and snapshot.sources[row.sourceKey];
-				g = { rowId = 'pet:' .. actor.name, pet = actor.name, ownerId = row.ownerId, displayAmount = 0, share = 0, parts = {},
+				g = { rowId = 'pet:' .. key, pet = actor.name, ownerId = row.ownerId, displayAmount = 0, share = 0, parts = {},
 					icon = (type(actor.icon) == 'table' and actor.icon) or (type(actor.icon) == 'string' and { status = 'ready', path = actor.icon }) or (src and src.icon),
 					displayRate = { status = 'ready', value = 0 } };
-				pets[actor.name] = g; table.insert(out, g);
+				pets[key] = g; table.insert(out, g);
 			end
 			g.displayAmount = g.displayAmount + Num(row.displayAmount); g.share = g.share + Num(row.share);
 			if row.displayRate and row.displayRate.status == 'ready' then g.displayRate.value = g.displayRate.value + Num(row.displayRate.value); end

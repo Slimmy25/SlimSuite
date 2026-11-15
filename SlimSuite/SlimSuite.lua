@@ -558,6 +558,7 @@ win = nil;                                               -- the settings window 
 -- True while an element is being placed: in the setup when its element is turned on there, or in Toggle UI Settings
 -- (all elements, or the one chosen with "Choose element"). A new-school card counts as its element.
 function SS.IsEditing(name)
+ if SS.demoRunning then return false; end
 	if ( setupActive ) then return (SS.SetupShows and SS.SetupShows(name)) and true or false; end
 	if ( not SS.DB().unlocked ) then return false; end
 	return (not editOnly or editOnly == name or (SS.Element and SS.Element(editOnly) == SS.Element(name))) and true or false;
@@ -624,6 +625,7 @@ BUILD = { ICON = 28, GAP = 4, ROW_GAP = 8 };
 
 function SS.LayoutItemRow()
 	if ( not itemRow ) then return; end
+	if ( SS.ChoiceItemsActive and SS.ChoiceItemsActive() and SS.LayoutChoiceItems ) then SS.LayoutChoiceItems(); return; end
 	local gap = BUILD.GAP;
 	if ( not SS.DB().sizes.SlimSuiteItemRowFrame ) then
 		if ( SS.DB().orientations.SlimSuiteItemRowFrame == "vertical" ) then
@@ -759,7 +761,7 @@ function SS.RefreshItemRow()
 		end
 	end
 	SS.LayoutItemRow();
-	if ( d.replaceBuildRows and not d.hideBuildItems ) then itemRow:Show(); else itemRow:Hide(); end
+	if ( (SS.ChoiceItemsActive and SS.ChoiceItemsActive()) or (d.replaceBuildRows and not d.hideBuildItems) ) then itemRow:Show(); else itemRow:Hide(); end
 	if ( SS.IsEditing("SlimSuiteItemRowFrame") and d.replaceBuildRows and handles.SlimSuiteItemRowFrame ) then handles.SlimSuiteItemRowFrame:Show(); end
 end
 
@@ -885,6 +887,7 @@ function SS.RefreshSpellRow()
 		if ( iconLoaded or SS.Previewing("SlimSuiteSpellRowFrame") ) then button:Show(); else button:Hide(); end
 	end
 	SS.LayoutSpellRow();
+	if ( SS.ChoiceItemsActive and SS.ChoiceItemsActive() and SS.HideChoiceSpellRow ) then SS.HideChoiceSpellRow(); return; end
 	if ( SS.DB().replaceBuildRows and not SS.DB().hideBuildSpells ) then spellRow:Show(); else spellRow:Hide(); end
 	if ( SS.IsEditing("SlimSuiteSpellRowFrame") and SS.DB().replaceBuildRows and handles.SlimSuiteSpellRowFrame ) then handles.SlimSuiteSpellRowFrame:Show(); end
 end
@@ -941,6 +944,9 @@ function SS.ApplyBuildRowReplacement()
 	SS.HideNative("build", enabled);
 	if ( spellRow ) then if ( enabled and not SS.DB().hideBuildSpells ) then spellRow:Show(); else spellRow:Hide(); end end
 	if ( itemRow ) then if ( enabled and not SS.DB().hideBuildItems ) then itemRow:Show(); else itemRow:Hide(); end end
+	if ( SS.ChoiceItemsActive and SS.ChoiceItemsActive() ) then
+		SS.HideChoiceSpellRow(); SS.LayoutChoiceItems(); itemRow:Show();
+	end
 end
 SS.ApplyBuildRowReplacement();
 
