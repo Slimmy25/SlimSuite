@@ -18,21 +18,29 @@ SS.StopDemoMode()
 check("setup handles return after demo",compass:IsShown() and su.bar:IsShown())
 su.SetMode("SlimSuiteCombatTextFrame","enabled","Combat text"); SS.SetupEnd(true)
 local box=SlimSuiteCombatTextFrame; box:SetHeight(220); box:SetWidth(260); box.entries={}; box.nextTier=0
-local function Hit(i) SlimSuiteWorld.DemoHit(i,"Hit",nil,i==2,false) end
-for i=1,4 do Hit(i) end
+local function Hit(i,crit) SlimSuiteWorld.DemoHit(i,crit and "Crit" or "Normal",nil,crit,false) end
+Hit(1,false); Hit(2,true); Hit(3,false); Hit(4,true)
 Tick(1,.05)
-local rows={}; local oldX
-for _,line in ipairs(box.lines) do if line:IsShown() then
- local p=line.points[1]; check("distinct rainfall row",not rows[p[5]]); rows[p[5]]=true
- if not oldX then oldX=p[4] end
-end end
-check("big hits use the same tier allocator",#box.entries==4)
+local function Find(text)
+ for _,line in ipairs(box.lines) do if line:IsShown() and string.find(line.text:GetText() or "",text,1,true) then return line end end
+end
+local rows={}
+for _,entry in ipairs(box.entries) do check("mixed streams reserve distinct rows",not rows[entry.tier]); rows[entry.tier]=true end
+local crit,normal=Find("Crit"),Find("Normal")
+local critY,critX,normalX=crit.points[1][5],crit.points[1][4],normal.points[1][4]
+local alpha=crit:GetAlpha()
 Tick(2,.2)
-check("rainfall travels right",box.lines[1].points[1][4]>oldX)
-for i=5,30 do Hit(i) end
+crit,normal=Find("Crit"),Find("Normal")
+check("crits travel right and remain on their assigned row",crit.points[1][4]>critX and crit.points[1][5]==critY)
+check("crits fade while moving",crit:GetAlpha()<alpha)
+check("normal hits never drift right",normal.points[1][4]==normalX)
+local before=box.nextCritTier
+Hit(5,false); Hit(6,false)
+check("normal hits do not advance critical waterfall",box.nextCritTier==before)
+for i=7,30 do Hit(i,true) end
 local tiers={}
-for _,entry in ipairs(box.entries) do check("tier reuse retires old text",not tiers[entry.tier]); tiers[entry.tier]=true end
-check("tier pool remains bounded",#box.entries<=math.floor((box:GetHeight()-12)/28))
+for _,entry in ipairs(box.entries) do check("critical wrap retires the previous row",not tiers[entry.tier]); tiers[entry.tier]=true end
+check("mixed pool remains inside available rows",#box.entries<=math.floor((box:GetHeight()-12)/28))
 Tick(1,15)
 check("expired text disappears before later hits",#box.entries==0)
 print("rainfall/demo problems: "..bad)

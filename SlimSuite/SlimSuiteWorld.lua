@@ -754,8 +754,8 @@ local function UpdateProc()
 end
 
 -- ---------------------------------------------------------------- combat text test box
--- A fixed, movable box (not floating in the world): your newest hits on top, each with its spell icon. Crits stick
--- out of the group: indented further, bigger, and they stay on screen twice as long.
+-- Normal hits form a downward log. Crits reserve successive fixed rows and fade right;
+-- normal rows use the remaining space so neither stream can overlap the other.
 local NORMAL_LIFE, CRIT_LIFE, FADE, MAX_LINES = 3, 6, 0.6, 14;
 -- each option is on unless turned off in its setting (ctHeals, ctCrits, ctIcons, ctLong)
 local function CTOn(key) return DB()[key] ~= false; end
@@ -818,15 +818,40 @@ function SS.FitCombatText(text,value,width)
 		value=string.sub(value,1,cut-1); text:SetText(value);
 	end
 end
+local function CombatRows()
+ return math.max(1,math.min(MAX_LINES,math.floor(((box:GetHeight() or 220)-12)/28)));
+end
+local function LayoutCombatEntries(now)
+ local rows=CombatRows(); local occupied={};
+ for i=table.getn(box.entries),1,-1 do
+  local e=box.entries[i];
+  if now-e.born>CTLife(e) or e.crit and e.tier and e.tier>=rows then table.remove(box.entries,i);
+  elseif e.crit then occupied[e.tier or 0]=true; end
+ end
+ -- Newest normal hits start at the top; older normal hits move down around reserved crit rows.
+ local tier=0; local keep={};
+ for _,e in ipairs(box.entries) do
+  if e.crit then table.insert(keep,e);
+  else
+   while tier<rows and occupied[tier] do tier=tier+1; end
+   if tier<rows then e.tier=tier; tier=tier+1; table.insert(keep,e); end
+  end
+ end
+ box.entries=keep;
+end
 local function AddEntry(e)
  MarkBig(e);
- -- Reserve one entire tier per hit. Reusing a tier retires its old hit before the new one appears.
- local rows=math.max(1,math.min(MAX_LINES,math.floor(((box:GetHeight() or 220)-12)/28)));
- box.nextTier=math.mod(box.nextTier or 0,rows);
- e.tier=box.nextTier; box.nextTier=math.mod(box.nextTier+1,rows);
- for i=table.getn(box.entries),1,-1 do if box.entries[i].tier==e.tier then table.remove(box.entries,i); end end
+ if e.crit then
+  local rows=CombatRows();
+  box.nextCritTier=math.mod(box.nextCritTier or 0,rows);
+  e.tier=box.nextCritTier; box.nextCritTier=math.mod(box.nextCritTier+1,rows);
+  -- A reused row is cleared before showing its next crit, including during bursts.
+  for i=table.getn(box.entries),1,-1 do
+   if box.entries[i].crit and box.entries[i].tier==e.tier then table.remove(box.entries,i); end
+  end
+ end
  table.insert(box.entries,1,e);
- while table.getn(box.entries)>MAX_LINES do table.remove(box.entries); end
+ LayoutCombatEntries(GetTime());
 end
 
 local function OnCombatEvent(event)
@@ -850,10 +875,7 @@ local function DrawBox()
 	local editing = Editing("SlimSuiteCombatTextFrame");
 	local demo = SS.Demoing("SlimSuiteCombatTextFrame");   -- Demo Mode samples only this enabled element
 	local now = GetTime();
-	for i = table.getn(box.entries), 1, -1 do
-		local e = box.entries[i];
-		if ( now - e.born > CTLife(e) or (e.tier and e.tier>=math.max(1,math.min(MAX_LINES,math.floor(((box:GetHeight() or 220)-12)/28)))) ) then table.remove(box.entries, i); end
-	end
+ LayoutCombatEntries(now);
 	if ( (not d.combatTextBox or (SS.CombatLogVisible and not SS.CombatLogVisible())) and not editing and not demo ) then box:Hide(); return; end
 	local list = box.entries;
 	-- nothing to show (no hits yet): the box stays out of the way unless it is being placed
@@ -871,7 +893,7 @@ local function DrawBox()
 		local h = (e.crit or e.emphasized) and 24 or 15;
   y=-6-(e.tier or (i-1))*28;
   local life=CTLife(e); local progress=math.max(0,math.min(1,(now-e.born)/life));
-  local x=8+(d.accessibilityReduceMotion and 0 or progress*math.max(0,(box:GetWidth() or 260)-46));
+  local x=8+((not e.crit or d.accessibilityReduceMotion) and 0 or progress*math.max(0,(box:GetWidth() or 260)-46));
 		local lineWidth=(box:GetWidth() or 260)-x-6;
 		if ( lineWidth<20 ) then break; end
 		if ( n >= MAX_LINES or y - h < bottom ) then break; end
@@ -879,8 +901,8 @@ local function DrawBox()
 		local l = BoxLine(n);
 		local life = CTLife(e);
 		local age = now - e.born;
-		local alpha = 1;
-		if ( age > life - FADE ) then alpha = math.max(0, (life - age) / FADE); end
+		local alpha = e.crit and (1-progress) or 1;
+		if ( not e.crit and age > life - FADE ) then alpha = math.max(0, (life - age) / FADE); end
 		l:ClearAllPoints();
 		l:SetPoint("TOPLEFT", box, "TOPLEFT", x, y);
 		l:SetWidth(lineWidth); l:SetHeight(h);
@@ -1452,18 +1474,33 @@ end
 -- leaves the list with more health left (out of range, despawned, walked off) is never counted. Each is counted once.
 -- If the game ever puts its own counts in AZS_RUN, those are used instead.
 -- The counts are kept in the saved settings per run, so they survive a /reload.
-local tally = { bosses = 0, guardians = 0, alive = {}, counted = {}, soundPlayed = {}, run = nil, lastKills = nil };
+local tally = { bosses = 0, guardians = 0, alive = {}, counted = {}, run = nil, lastKills = nil };
 SS.KILL_PERCENT = 3;                                       -- at or under this much health, a boss or Guardian is as good as dead
-local function BossKillSoundOnce(id)
-	if ( tally.soundPlayed[id] ) then return; end
-	tally.soundPlayed[id] = true;
-	if ( SS.PlayBossKillSound ) then SS.PlayBossKillSound(); end
+-- Sound playback follows confirmed game death banners, never a low-health estimate
+-- or disappearance from the live list. Shared IDs deduplicate callback/poll delivery.
+local killBannerLastId,killBannersSeeded=0,false;
+local function SeedKillBanners()
+ if type(AZS_BANNERS)~="table" then return; end
+ for _,banner in ipairs(type(AZS_BANNERS)=="table" and AZS_BANNERS or {}) do
+  if type(banner.id)=="number" then killBannerLastId=math.max(killBannerLastId,banner.id); end
+ end
+ killBannersSeeded=true;
 end
-local function CountKill(id, kind, confirmed)
-	if ( tally.counted[id] ) then if ( confirmed ) then BossKillSoundOnce(id); end; return; end
-	tally.counted[id] = true;
-	if ( kind == "boss" ) then tally.bosses = tally.bosses + 1; else tally.guardians = tally.guardians + 1; end
-	if ( confirmed ) then BossKillSoundOnce(id); end
+if type(AZS_BANNERS)=="table" then SeedKillBanners(); end
+function SS.OnEncounterKillBanner(banner)
+ if type(banner)~="table" or type(banner.id)~="number" then return; end
+ if banner.id<=killBannerLastId then return; end
+ killBannerLastId=banner.id;
+ if banner.kind=="bossdown" or banner.kind=="guardian" then SS.PlayBossKillSound(); end
+end
+local function TrackKillBanners()
+ if not killBannersSeeded then SeedKillBanners(); return; end
+ for _,banner in ipairs(type(AZS_BANNERS)=="table" and AZS_BANNERS or {}) do SS.OnEncounterKillBanner(banner); end
+end
+local function CountKill(id, kind)
+ if tally.counted[id] then return; end
+ tally.counted[id]=true;
+ if kind=="boss" then tally.bosses=tally.bosses+1; else tally.guardians=tally.guardians+1; end
 end
 
 -- The creator documents AZS_RUN.ck as caches opened. Catalog disappearance is not an open event.
@@ -1500,7 +1537,7 @@ local function TrackKills()
 		else
 			tally.bosses, tally.guardians = 0, 0;
 		end
-		tally.alive, tally.counted, tally.soundPlayed, tally.run = {}, {}, {}, key;
+		tally.alive, tally.counted, tally.run = {}, {}, key;
 	end
 	tally.lastKills = kills;
 	if ( not playing ) then tally.alive = {}; return; end
@@ -1519,9 +1556,8 @@ local function TrackKills()
 				local pct = (hp and hpm and hpm > 0) and hp * 100 / hpm or nil;
 				local confirmed = (hp and hp <= 0) or u.dead;
 				local low = pct and pct <= SS.KILL_PERCENT or false;
-				if ( confirmed or low ) then CountKill(u.id, what, confirmed and true or false); end
-				-- Keep a low-health special enemy tracked until it disappears from the live list. The
-				-- tally can count at 3%, but the optional kill sound waits for confirmed death/disappearance.
+				if ( confirmed or low ) then CountKill(u.id, what); end
+				-- The tally keeps its legacy low-health estimate; sounds use confirmed banners independently.
 				tally.alive[u.id] = { kind = what, low = low };
 			end
 		end
@@ -1530,8 +1566,6 @@ local function TrackKills()
 	if ( any ) then
 		for id in pairs(tally.alive) do
 			if ( not seen[id] ) then
-				local previous = tally.alive[id];
-				if ( type(previous) == "table" and previous.low ) then BossKillSoundOnce(id); end
 				tally.alive[id] = nil;
 			end
 		end
@@ -1554,6 +1588,7 @@ local ticker = CreateFrame("Frame");
 SS.Every("box", 0.05, function() SS.Safe(DrawBox); end);
 SS.Every("tracker", 0.1, function()
 	SS.Safe(TrackKills);
+ SS.Safe(TrackKillBanners);
 	SS.Safe(TrackChestOpens);
 	SS.Safe(UpdateTargetDebuffs);
 	SS.Safe(UpdateRevive);

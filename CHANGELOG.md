@@ -2,6 +2,10 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.36
+- Normal combat hits now stack downward without horizontal drift. Crits have their own top-to-bottom row cursor, fading right within bounds; normal rows avoid active crits and wrapping clears the prior crit before reuse.
+- Fixed both optional boss/guardian/lair-owner kill sounds to use confirmed game death banners, independently of visible announcements. Deduplicated callback and polling delivery; loading historical banners does not replay old kills.
+
 ## 1.35
 - Fixed build refreshes reopening green handles during Demo; editor previews and demo previews now have separate predicates.
 - Encounter clicks now wait for authoritative target updates instead of cycling against stale server data; failed restoration is checked by spawn ID.

@@ -694,7 +694,10 @@ SS.CreateAnnouncementFrame();
 SS.Every("announcement", 0, function()
 	if ( announcementStarted ) then SS.Safe(SS.UpdateAnnouncementFrame); end
 end, announcementFrame);
-bannerHandler = function(banner) SS.Safe(SS.ShowAnnouncement, banner); end;
+bannerHandler = function(banner)
+ if SS.OnEncounterKillBanner then SS.Safe(SS.OnEncounterKillBanner,banner); end
+ SS.Safe(SS.ShowAnnouncement,banner);
+end;
 bannerHandlerRegistered = false;
 function SS.RegisterAnnouncementHandler()
 	if ( bannerHandlerRegistered ) then return true; end
