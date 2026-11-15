@@ -1,11 +1,11 @@
--- Optional WIP: the supplied rarity-weight model, not an authoritative game roll.
+-- Optional legendary-percentage display using the supplied rarity-weight model.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 local frame=CreateFrame("Frame","SlimSuiteLuckFrame",UIParent);
 frame:SetWidth(280); frame:SetHeight(190); frame:SetPoint("CENTER",UIParent,"CENTER",250,-130);
 frame:SetBackdrop({bgFile="Interface\\Tooltips\\UI-Tooltip-Background",edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",tile=true,tileSize=16,edgeSize=12,insets={left=3,right=3,top=3,bottom=3}});
 frame:SetBackdropColor(.025,.025,.04,.85); frame:SetBackdropBorderColor(.7,.55,.2,1); frame:Hide();
 frame.labels={}; frame.dots={};
-for i=1,6 do
+for i=1,5 do
  local fs=frame:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); fs:SetJustifyH("LEFT"); fs:SetHeight(16); frame.labels[i]=fs;
 end
 function SS.LegendaryChance(luck,level,bonus)
@@ -14,26 +14,22 @@ function SS.LegendaryChance(luck,level,bonus)
  if k>1 then return 1/(60/(k*k*k*k)+25/(k*k*k)+10/(k*k)+4/k+1); end
  local square=k*k; return square*square/(60+25*k+10*square+4*square*k+square*square);
 end
-function SS.LuckTrend(luck,level)
- local a,b,c=SS.LegendaryChance(luck,level),SS.LegendaryChance(luck+.1,level),SS.LegendaryChance(luck+.2,level);
- if not a then return; end
- return c-b>=b-a and "Stonks rising" or "New Nvidia Affair";
-end
 function SS.UpdateLuck()
- if not SS.FeatureEnabled("SlimSuiteLuckFrame") or SS.DB().vanillaUI then frame:Hide(); return; end
+ if (not SS.FeatureEnabled("SlimSuiteLuckFrame") and not SS.IsEditing("SlimSuiteLuckFrame")) or SS.DB().vanillaUI then frame:Hide(); return; end
+ if SS.IsEditing("SlimSuiteLuckFrame") then frame:SetAlpha(1); else ApplyFeatureMute("SlimSuiteLuckFrame"); end
  local luck=type(AZS_STATS)=="table" and tonumber(AZS_STATS.luck);
  local level=UnitLevel and UnitLevel("player"); local base=SS.LegendaryChance(luck,level);
  local w,h=frame:GetWidth(),frame:GetHeight();
- local values={SS.T("Legendary luck [WIP]"),luck and (SS.T("Luck")..": "..string.format("%.1f%%",luck*100)) or SS.T("Luck unavailable"),
+ local values={SS.T("Legendary luck"),luck and (SS.T("Luck")..": "..string.format("%.1f%%",luck*100)) or SS.T("Luck unavailable"),
   base and (SS.T("Spells / rings / trinkets")..": "..string.format("%.2f%%",base*100)) or "-",
   base and (SS.T("Amulets")..": "..string.format("%.2f%%",SS.LegendaryChance(luck,level,.5)*100)) or "-",
-  base and SS.T(SS.LuckTrend(luck,level)) or "",SS.T("Model estimate; trend only")};
+  SS.T("Estimated chance per card")};
  for i,fs in ipairs(frame.labels) do
-  fs:ClearAllPoints(); fs:SetPoint("TOPLEFT",frame,"TOPLEFT",8,-(i<=4 and (8+(i-1)*19) or h-(i==5 and 39 or 21)));
+  fs:ClearAllPoints(); fs:SetPoint("TOPLEFT",frame,"TOPLEFT",8,-(i<=4 and (8+(i-1)*19) or h-21));
   fs:SetWidth(w-16); fs:SetText(values[i]); SS.FitText(fs,w-16,8,16,values[i]);
-  if i==1 or i==5 then fs:SetTextColor(1,.8,.25); else fs:SetTextColor(.9,.9,.9); end
+  if i==1 then fs:SetTextColor(1,.8,.25); else fs:SetTextColor(.9,.9,.9); end
  end
- local plotTop,plotHeight=90,math.max(12,h-139);
+ local plotTop,plotHeight=90,math.max(12,h-118);
  local maxLuck=math.max(2,luck or 0); local graphMaximum=math.max(.05,(SS.LegendaryChance(maxLuck,level or 0,.5) or .4)*1.05);
  for i=1,48 do
   local dot=frame.dots[i]; if not dot then dot=frame:CreateTexture(nil,"ARTWORK"); frame.dots[i]=dot; end

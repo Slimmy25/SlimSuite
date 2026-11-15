@@ -11,7 +11,7 @@ function SS.ChoiceHUDActive()
  local value;
  if type(AZS_GetRunTime)=="function" then
   local ok,result=SS.Safe(AZS_GetRunTime);
-  if ok and type(result)=="number" and result==result and result>=0 and result<math.huge then value=result; end
+  if ok and type(result)=="number" and result>=0 and result-result==0 then value=result; end
  end
  local moved=false;
  if value~=nil then

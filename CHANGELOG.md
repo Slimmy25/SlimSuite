@@ -2,6 +2,10 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.42
+- Promoted Legendary luck out of WIP, retaining its percentage/graph GUI and removing investment/status phrases. Added an always-available green setup preview and verified shared resizing while respecting its optional live-display toggle.
+- Fixed Lua 5.0 clock-overlay errors caused by unavailable math.huge. The same compatibility issue in numeric profile import validation is fixed, with legacy-constant regression coverage.
+
 ## 1.41
 - Temporary choice overlays now corroborate choosing with a stopped interpolated run clock, and wait for playing plus a clock restart before normal restoration. Ordinary pause cannot open the overlay; missing clocks retain phase-only compatibility and stalled closing clocks have a bounded safety timeout.
 - Added bracketed Talent/Gear source labels to damage-meter spell rows using documented source categories and origins.

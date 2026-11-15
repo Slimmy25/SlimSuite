@@ -170,7 +170,7 @@ function SS.WinBuild()
 			{button = "Recommended HUD preset", onClick = function() SS.ShowHUDRecommendation(); end},
 			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
 			{head="Everywhere"},
-   {"Legendary luck [WIP]",function() return SS.FeatureEnabled("SlimSuiteLuckFrame"); end,function(v) SU.SetMode("SlimSuiteLuckFrame",v and "enabled" or "disabled","Legendary luck [WIP]"); end},
+   {"Legendary luck",function() return SS.FeatureEnabled("SlimSuiteLuckFrame"); end,function(v) SU.SetMode("SlimSuiteLuckFrame",v and "enabled" or "disabled","Legendary luck"); end},
 			{"Compass",function() return SS.DB().compassOn; end,function(v) SU.SetMode("SlimSuiteCompassFrame",v and "enabled" or "disabled","Compass"); end},
 			{"Show green absorb amounts on player and party frames (when the client exposes them)", function() return SS.DB().showAbsorbs; end, function(v) SS.DB().showAbsorbs = v and true or false; SS.Safe(SS.UpdateAbsorbMarkers); end},
 			worldEntry,

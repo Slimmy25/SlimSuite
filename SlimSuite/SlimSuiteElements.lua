@@ -30,7 +30,7 @@ SS.ELEMENTS = {
 	SlimSuitePartyLines = {},
 	SlimSuitePlayerCard = {},
 	SlimSuiteStatCounterFrame = { feature = "statCounter" },
- SlimSuiteLuckFrame = {feature="luckPanel",optional=true,title="Legendary luck [WIP]",label="Legendary luck [WIP]",text="Estimated legendary card chances from the supplied luck model."},
+ SlimSuiteLuckFrame = {feature="luckPanel",optional=true,title="Legendary luck",label="Legendary luck",text="Estimated legendary card chances from the supplied luck model."},
 	SlimSuiteCompassFrame = { feature = "compassOn", title = "Compass", text = "Bearings to known bosses, lairs and caches. Choose a rail or free markers." },
 	SlimSuiteTargetCard = {},
 };
@@ -59,7 +59,7 @@ SS.MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "Part
 	{ "SlimSuiteReviveFrame", "Revive bar" },
 	{ "SlimSuiteLocalClockFrame", "Local clock" },
 	{ "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
-	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" }, {"SlimSuiteLuckFrame","Legendary luck [WIP]"} };
+	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" }, {"SlimSuiteLuckFrame","Legendary luck"} };
 SS.ELEMENTS["PlayerFrame"].label = "Player";
 SS.ELEMENTS["TargetFrame"].label = "Target";
 SS.ELEMENTS["PartyMemberFrame1"].label = "Party";

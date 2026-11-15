@@ -254,7 +254,7 @@ function SS.LayoutFromText(text)
 	for path, kind, raw in string.gfind(string.sub(text, 6), "([^;=]+)=([nsb])([^;]*)") do
 		local value;
 		if ( kind == "n" ) then value = tonumber(raw); elseif ( kind == "b" ) then value = raw == "1"; else value = raw; end
-		if ( (kind == "n" and (not value or value ~= value or value == math.huge or value == -math.huge)) or (kind == "b" and raw ~= "0" and raw ~= "1") ) then return nil; end
+		if ( (kind == "n" and (not value or value-value ~= 0)) or (kind == "b" and raw ~= "0" and raw ~= "1") ) then return nil; end
 		local keys = {};
 		for key in string.gfind(path, "[^%.]+") do table.insert(keys, key); end
 		local root = keys[1];

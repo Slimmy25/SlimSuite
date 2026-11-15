@@ -699,7 +699,7 @@ SU.COMPANIONS = SS.ELEMENT_COMPANIONS;
 -- an element turned on in the setup, or a frame that comes with one (the jewelry row with the build spells)
 function SS.SetupShows(name)
 	if ( not setupActive or not SU.on or not name ) then return false; end
-	if ( name=="SlimSuiteCompassFrame" or SU.on[name] or SU.on[SS.Element(name)] ) then return true; end
+	if ( name=="SlimSuiteCompassFrame" or name=="SlimSuiteLuckFrame" or SU.on[name] or SU.on[SS.Element(name)] ) then return true; end
 	for parent in pairs(SU.on) do
 		local list = SU.CompanionsOf(parent);
 		for i = 1, table.getn(list) do if ( list[i] == name ) then return true; end end

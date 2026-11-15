@@ -31,5 +31,19 @@ AZS_GetRunTime=function() return 20 end; AZS_ZONE.run="clock-two"; SS.UpdateChoi
 check("a new run discards old clock evidence",not SS.ChoiceHUDActive())
 AdvanceTime(.3); SS.UpdateChoiceHUD(); d.cardEdgeHUD=false; SS.UpdateChoiceHUD()
 check("turning off overlay always closes it",not SS.ChoiceHUDActive())
+-- Lua 5.0 has no math.huge; only call production logic while it is absent,
+-- because the host mock's geometry implementation intentionally uses Lua 5.3 math.
+local originalHuge=math.huge; math.huge=nil
+AZS_GetRunTime=function() return 10 end; d.cardEdgeHUD=true; phase="choosing"
+local ok,value=pcall(SS.ChoiceHUDActive)
+local text=SS.LayoutText(SS.LayoutSnapshot()); local imported=SS.LayoutFromText(text)
+AZS_GetRunTime=function() return 1/0 end
+local infiniteOk=pcall(SS.ChoiceHUDActive)
+AZS_GetRunTime=function() return 0/0 end
+local nanOk=pcall(SS.ChoiceHUDActive)
+math.huge=originalHuge
+check("legacy clock check works without math.huge",ok)
+check("legacy numeric profile parsing works without math.huge",imported~=nil)
+check("non-finite clock values are handled safely",infiniteOk and nanOk)
 print("choice clock problems: "..bad)
 assert(bad==0 and #ERRORS==0,"choice clock regressions")
