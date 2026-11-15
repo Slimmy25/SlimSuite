@@ -801,9 +801,9 @@ end
 
 -- Per-source minute summaries learn routine damage without storing the combat log.
 -- Completed minutes blend into the baseline; the current minute provides warm-up data.
-local learning={sources={},minute=nil,run=nil,lastFeatured=-100};
+local learning={sources={},minute=nil,run=nil,lastFeatured=-100,globalCount=0,globalSum=0,globalMean=nil};
 function SS.ResetCombatLearning()
- learning={sources={},minute=nil,run=nil,lastFeatured=-100};
+ learning={sources={},minute=nil,run=nil,lastFeatured=-100,globalCount=0,globalSum=0,globalMean=nil};
 end
 function SS.LearnCombatHighlight(e)
  if e.heal then return false; end
@@ -811,6 +811,11 @@ function SS.LearnCombatHighlight(e)
  if run~=learning.run then SS.ResetCombatLearning(); learning.run=run; end
  local minute=math.floor(now/60);
  if learning.minute~=minute then
+  if learning.globalCount>0 then
+   local mean=learning.globalSum/learning.globalCount;
+   learning.globalMean=learning.globalMean and learning.globalMean*.4+mean*.6 or mean;
+  end
+  learning.globalCount=0; learning.globalSum=0;
   for key,source in pairs(learning.sources) do
    local current=source.current;
    if current and current.count>0 then
@@ -839,10 +844,14 @@ function SS.LearnCombatHighlight(e)
  local deviation=baseline and math.sqrt(math.max(0,baseline.square-mean*mean)) or 0;
  local critRate=baseline and baseline.crit or 0;
  local exceptional=count>=8 and e.amount>=mean+math.max(deviation*2,mean*.75);
- local uncommonCrit=e.crit and (count<12 or critRate<.15 or e.amount>=mean+math.max(deviation*1.8,mean*.25));
+ local globalMean=learning.globalMean or (learning.globalCount>=12 and learning.globalSum/learning.globalCount) or nil;
+ local weakForPlayer=globalMean and e.amount<globalMean*.6;
+ local strongForSource=count<12 or e.amount>=mean+math.max(deviation,mean*.2);
+ local uncommonCrit=e.crit and strongForSource and (count<12 or critRate<.15 or e.amount>=mean+math.max(deviation*1.8,mean*.25));
  local frequency=c.count/math.max(1,now-minute*60);
  local cooldown=math.min(3.5,.8+frequency*.08);
- local feature=(exceptional or uncommonCrit) and now-source.lastFeatured>=cooldown and now-learning.lastFeatured>=.15;
+ local feature=not weakForPlayer and (exceptional or uncommonCrit) and now-source.lastFeatured>=cooldown and now-learning.lastFeatured>=.15;
+ learning.globalCount=learning.globalCount+1; learning.globalSum=learning.globalSum+e.amount;
  c.count=c.count+1; c.sum=c.sum+e.amount; c.square=c.square+e.amount*e.amount;
  if e.crit then c.crits=c.crits+1; end
  if feature then source.lastFeatured=now; learning.lastFeatured=now; end
@@ -877,6 +886,14 @@ local function CombatRows()
 end
 local function LayoutCombatEntries(now)
  local rows=CombatRows(); local occupied={};
+ -- Preserve normal-log capacity even during a burst of qualifying critical hits.
+ local maxHighlights=math.max(0,rows-math.max(1,math.ceil(rows*.35)));
+ if maxHighlights==0 then for _,entry in ipairs(box.entries) do entry.featured=false; entry.emphasized=nil; end end
+ local highlights=0;
+ for _,entry in ipairs(box.entries) do if Featured(entry) then highlights=highlights+1; end end
+ for i=table.getn(box.entries),1,-1 do
+  if highlights>maxHighlights and Featured(box.entries[i]) then table.remove(box.entries,i); highlights=highlights-1; end
+ end
  for i=table.getn(box.entries),1,-1 do
   local e=box.entries[i];
   if now-e.born>CTLife(e) or Featured(e) and e.tier and e.tier>=rows then table.remove(box.entries,i);
@@ -947,7 +964,8 @@ local function DrawBox()
 	local bottom = -(box:GetHeight() or 220) + 6;
 	for i = 1, table.getn(list) do
 		local e = list[i];
-		local h = (e.crit or e.emphasized) and 24 or 15;
+		local important=Featured(e);
+  local h = important and 24 or 15;
   y=-6-(e.tier or (i-1))*28;
   local life=CTLife(e); local progress=math.max(0,math.min(1,(now-e.born)/life));
   local x=8+((not Featured(e) or d.accessibilityReduceMotion) and 0 or progress*math.max(0,(box:GetWidth() or 260)-46));
@@ -964,11 +982,11 @@ local function DrawBox()
 		l:SetPoint("TOPLEFT", box, "TOPLEFT", x, y);
 		l:SetWidth(lineWidth); l:SetHeight(h);
 		l.icon:SetWidth(e.icon and (h - 2) or 0); l.icon:SetHeight(h - 2); l.icon:SetTexture(e.icon or nil);
-		l.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",e.crit and 16 or (e.emphasized and 14 or 11),"OUTLINE");
+		l.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",important and (e.crit and 16 or 14) or 11,"OUTLINE");
 		l.text:SetHeight(h-4);
-		SS.FitCombatText(l.text,(e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name,math.max(0,l:GetWidth()-(e.icon and h+4 or 6)));
+		SS.FitCombatText(l.text,(important and e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name,math.max(0,l:GetWidth()-(e.icon and h+4 or 6)));
 		if ( e.heal ) then l.text:SetTextColor(0.3, 1, 0.4);
-		elseif ( e.crit ) then l.text:SetTextColor(1, 0.85, 0.2);
+		elseif ( important ) then l.text:SetTextColor(1, 0.85, 0.2);
 		else l.text:SetTextColor(1, 1, 1); end
 		l:SetAlpha(alpha);
 		l:Show();

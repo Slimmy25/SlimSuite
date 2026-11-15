@@ -162,7 +162,7 @@ SS.DEFAULTS = {
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
 	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
-	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchVictorySound = false, teammateDeathSound = "same", lowHealthSound = false,
+	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchLoadSound = false, matchVictorySound = false, teammateDeathSound = "same", lowHealthSound = false,
 	bossHitmarkerSound = false, bossWhipSound = false, bossGotchaSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
 	partyFaces = true, cardPortraits = true, targetDebuffs = true, showAbsorbs = false, moveLevelButton = false, moveMeter = false,
@@ -504,6 +504,7 @@ function SS.SoundSelection(group)
  if group=="teammate" then return d.teammateDeathSound or "same"; end
  if group=="victory" then return d.matchVictorySound and "matchVictory" or "off"; end
  if group=="loss" then return d.matchWastedSound and "matchWasted" or (d.matchLossSound and "matchLoss" or "off"); end
+ if group=="load" then return d.matchLoadSound and "matchStart" or "off"; end
  if group=="start" then return d.matchStartSound and "matchStart" or "off"; end
  if group=="lowHealth" then return d.lowHealthSound and "lowHealth" or "off"; end
  if group=="chest" then return d.chestOpenSound and "chestOpen" or "off"; end
@@ -520,6 +521,7 @@ function SS.SetSoundSelection(group,key)
  elseif group=="teammate" then d.teammateDeathSound=key;
  elseif group=="victory" then d.matchVictorySound=key=="matchVictory";
  elseif group=="loss" then d.matchLossSound=key=="matchLoss"; d.matchWastedSound=key=="matchWasted";
+ elseif group=="load" then d.matchLoadSound=key=="matchStart";
  elseif group=="start" then d.matchStartSound=key=="matchStart";
  elseif group=="lowHealth" then d.lowHealthSound=key=="lowHealth";
  elseif group=="chest" then d.chestOpenSound=key=="chestOpen";
@@ -546,7 +548,7 @@ function SS.PreviewSound(key)
 	local ok, played, handle = SS.Safe(PlaySoundFile, path);
 	if ( ok and played and handle ) then soundPreviewHandle = handle; end
 end
-local matchAudio={phase=nil,started=false,lost=false,won=false,pending={}};
+local matchAudio={phase=nil,loaded=false,loadRun=nil,started=false,lost=false,won=false,pending={}};
 local function MatchPhase()
  if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok then return value; end end
  return type(AZS_RUN)=="table" and AZS_RUN.ph or nil;
@@ -571,6 +573,14 @@ function SS.UpdateMatchSounds()
  if phase=="ready" and previous~="ready" then
   matchAudio.started=false; matchAudio.lost=false; matchAudio.won=false; matchAudio.pending={};
  end
+ local run=type(AZS_ZONE)=="table" and AZS_ZONE.run;
+ if phase=="ready" then
+  if not matchAudio.loaded or (run~=nil and matchAudio.loadRun~=nil and run~=matchAudio.loadRun) then
+   matchAudio.loaded=true;
+   local selected=SS.SoundSelection("load"); if selected~="off" then SS.PlayAddonSound(selected); end
+  end
+  if run~=nil then matchAudio.loadRun=run; end
+ elseif phase~=nil then matchAudio.loaded=false; matchAudio.loadRun=nil; end
  if phase=="playing" and previous=="ready" and not matchAudio.started then
   matchAudio.started=true;
   local selected=SS.SoundSelection("start"); if selected~="off" then SS.PlayAddonSound(selected); end

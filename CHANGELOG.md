@@ -2,6 +2,11 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.38
+- Demoted weak crits now use normal white text, normal font size and no critical suffix or rightward effect. Highlight selection checks both the source baseline and the player’s learned overall damage.
+- Reserved normal-log capacity so critical highlight bursts cannot consume every row and erase ordinary damage.
+- Added a separate optional Load-in song (Move to Start) selector. It plays once on entering the ready screen, independently of the existing Ready → Playing start-song option, with protection against repeated polling and temporary missing phase data.
+
 ## 1.37
 - Added normalized GTA V Wasted exclusively to final match-loss choices, separate from recoverable player/teammate death audio. Future audio additions require normalization and measured-asset checks before release.
 - Added an independent teammate death selector with Roblox and Same as player, plus an optional GTA San Andreas victory sound that plays once per win.

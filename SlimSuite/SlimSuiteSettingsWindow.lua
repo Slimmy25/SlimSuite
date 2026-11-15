@@ -252,6 +252,7 @@ function SS.WinBuild()
    {"Boss / guardian / lair kill sound",group="boss",sounds={{"Off","off"},{"Hitmarker","bossHitmarker"},{"Whip Crack","bossWhip"},{"Gotcha — Dave Chappelle","bossGotcha"}}},
    {"Match loss sound",group="loss",sounds={{"Off","off"},{"The Price Is Right: losing horn","matchLoss"},{"GTA V: Wasted","matchWasted"}}},
    {"Victory sound",group="victory",sounds={{"Off","off"},{"GTA San Andreas","matchVictory"}}},
+   {"Load-in song (Move to Start)",group="load",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"}}},
    {"Match start song",group="start",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"}}},
    {"Chest opening sound",group="chest",sounds={{"Off","off"},{"Zelda: final four notes","chestOpen"}}},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},

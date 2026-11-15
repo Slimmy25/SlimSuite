@@ -41,6 +41,27 @@ for i=7,30 do Hit(i,true) end
 local tiers={}
 for _,entry in ipairs(box.entries) do check("critical wrap retires the previous row",not tiers[entry.tier]); tiers[entry.tier]=true end
 check("mixed pool remains inside available rows",#box.entries<=math.floor((box:GetHeight()-12)/28))
+SlimSuiteWorld.DemoHit(77,"Visible ordinary",nil,false,false)
+Tick(2,.05)
+check("ordinary damage survives a highlight flood",Find("Visible ordinary")~=nil)
+local featureCount=0
+for _,entry in ipairs(box.entries) do if entry.featured then featureCount=featureCount+1 end end
+check("highlights leave room for the normal log",featureCount<math.floor((box:GetHeight()-12)/28))
+SS.ResetCombatLearning(); AZS_ZONE={run="weak-crit"}
+for i=1,30 do SS.LearnCombatHighlight({amount=1000,sourceKey="strong",name="Strong"}) end
+check("small rare crits are weak relative to player damage",not SS.LearnCombatHighlight({amount=100,crit=true,sourceKey="weak",name="Weak"}))
+for _,listener in ipairs(SlimSuiteMeter.listeners) do listener({kind="damage",amount=100,critical=true,meterSourceKey="weak",meterSource="Weak crit"}) end
+Tick(1,.05)
+for _,line in ipairs(box.lines) do
+ line.text.SetTextColor=function(self,r,g,b) self.testColor={r,g,b} end
+ line.text.SetFont=function(self,font,size) self.testFontSize=size end
+end
+Tick(1,.05)
+local weak=Find("Weak crit")
+check("weak crit becomes an ordinary white line",weak and weak.text.testColor and weak.text.testColor[1]==1 and weak.text.testColor[2]==1 and weak.text.testColor[3]==1)
+check("weak crit has normal size and no critical suffix",weak and weak.text.testFontSize==11 and not string.find(weak.text:GetText(),"!",1,true))
+local weakX=weak and weak.points[1][4]; Tick(2,.1); weak=Find("Weak crit")
+check("weak crit scrolls normally without drifting right",weak and weak.points[1][4]==weakX)
 Tick(1,15)
 check("expired text disappears before later hits",#box.entries==0)
 print("rainfall/demo problems: "..bad)
