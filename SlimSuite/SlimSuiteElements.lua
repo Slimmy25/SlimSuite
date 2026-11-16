@@ -1,5 +1,7 @@
 -- Shared element ownership metadata.
 SS = SS or {};
+SS.ACHIEVEMENTS_WIP=true;
+function SS.AchievementsAvailable() return not SS.ACHIEVEMENTS_WIP; end
 function SS.FeatureEnabled(name)
 	local d = SS.DB(); local mode = d.elementModes and d.elementModes[name];
 	if ( mode == "enabled" or mode == "disabled" or mode == "default" ) then return mode == "enabled"; end
@@ -30,6 +32,7 @@ SS.ELEMENTS = {
 	SlimSuitePartyLines = {},
 	SlimSuitePlayerCard = {},
 	SlimSuiteStatCounterFrame = { feature = "statCounter" },
+ SlimSuiteAchievementsButton = {feature="achievementButton",optional=true,title="Side achievements",label="Side achievements",text="Open your unofficial side objectives."},
  SlimSuiteLuckFrame = {feature="luckPanel",optional=true,title="Legendary luck",label="Legendary luck",text="Estimated legendary card chances from the supplied luck model."},
 	SlimSuiteCompassFrame = { feature = "compassOn", title = "Compass", text = "Bearings to known bosses, lairs and caches. Choose a rail or free markers." },
 	SlimSuiteTargetCard = {},
@@ -59,7 +62,7 @@ SS.MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "Part
 	{ "SlimSuiteReviveFrame", "Revive bar" },
 	{ "SlimSuiteLocalClockFrame", "Local clock" },
 	{ "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
-	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" }, {"SlimSuiteLuckFrame","Legendary luck"} };
+	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" }, {"SlimSuiteLuckFrame","Legendary luck"}, {"SlimSuiteAchievementsButton","Side achievements"} };
 SS.ELEMENTS["PlayerFrame"].label = "Player";
 SS.ELEMENTS["TargetFrame"].label = "Target";
 SS.ELEMENTS["PartyMemberFrame1"].label = "Party";
@@ -84,7 +87,7 @@ SS.ELEMENTS["SlimSuitePlayerCard"].label = "Player (new style)";
 SS.ELEMENTS["SlimSuiteTargetCard"].label = "Target (new style)";
 SS.ELEMENTS["SlimSuiteCombatTextFrame"].label = "Combat text";
 SS.ELEMENTS["SlimSuiteStatCounterFrame"].label = "Stats";
-SS.SETUP_ORDER = { "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip", "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteTallyFrame", "SlimSuiteAnnouncementFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteCompassFrame", "SlimSuiteLuckFrame" };
+SS.SETUP_ORDER = { "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip", "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteTallyFrame", "SlimSuiteAnnouncementFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton" };
 SS.ELEMENTS["PlayerFrame"].title = "Unit frame"; SS.ELEMENTS["PlayerFrame"].text = "Your hero's frame: health, power and level. Drag the green handle to place it; its size and scale are below.";
 SS.ELEMENTS["PartyMemberFrame1"].title = "Party frames"; SS.ELEMENTS["PartyMemberFrame1"].text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Choose a column or a row, face plates or thin lines, and whether you join them.";
 SS.ELEMENTS["MainMenuBar"].title = "Action bar"; SS.ELEMENTS["MainMenuBar"].text = "Your spells. Drag to place it; its size, and turning it upright, are below.";
@@ -121,6 +124,7 @@ SS.ELEMENTS["SlimSuitePartyLines"].owner = "PartyMemberFrame1";
 SS.ELEMENTS["SlimSuiteItemRowFrame"].owner = "SlimSuiteSpellRowFrame";
 SS.ELEMENT_COMPANIONS = { ChatFrame1 = { "ChatFrame1Tab", "ChatFrame1EditBox" }, SlimSuiteSpellRowFrame = { "SlimSuiteItemRowFrame" }, PlayerFrame = { "SlimSuiteProcMeter" } };
 SS.DISPLAY_ANCHORS = {
+ SlimSuiteAchievementsButton={"TOPLEFT",.02,.35},
  SlimSuiteLuckFrame={"TOPLEFT",.68,.42},
  PlayerFrame = { "TOPLEFT", .02, .98 }, TargetFrame = { "TOPLEFT", .165, .98 },
  PartyMemberFrame1 = { "TOPLEFT", .02, .87 },
@@ -136,3 +140,9 @@ SS.DISPLAY_ANCHORS = {
  SlimSuiteAnnouncementFrame = { "CENTER", .5, .70 }, GameTooltip = { "BOTTOMRIGHT", .995, .005 }
 };
 for name, anchor in pairs(SS.DISPLAY_ANCHORS) do SS.ELEMENTS[name].anchor = anchor; end
+
+-- WIP features do not appear in setup or register movable handles.
+if not SS.AchievementsAvailable() then
+ for i=table.getn(SS.MOVABLE),1,-1 do if SS.MOVABLE[i][1]=="SlimSuiteAchievementsButton" then table.remove(SS.MOVABLE,i); end end
+ for i=table.getn(SS.SETUP_ORDER),1,-1 do if SS.SETUP_ORDER[i]=="SlimSuiteAchievementsButton" then table.remove(SS.SETUP_ORDER,i); end end
+end

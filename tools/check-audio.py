@@ -8,5 +8,5 @@ assert set(assets)=={row['file'] for row in report['assets']},'Audio inventory c
 for row in report['assets']:
     assert hashlib.sha256(assets[row['file']].read_bytes()).hexdigest()==row['sha256'],row['file']
     assert row['true_peak_dbtp']<=report['true_peak_ceiling_dbtp'],row['file']
-    assert abs(row['integrated_lufs']-report['target_lufs'])<=.6,row['file']
+    assert abs(row['integrated_lufs']-(report['target_lufs']+report.get('loudness_exceptions',{}).get(row['file'],0)))<=.6,row['file']
 print('Audio checks passed:',len(assets),'assets, measured peaks and loudness within bounds')

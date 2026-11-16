@@ -160,9 +160,9 @@ SS.DEFAULTS = {
 	replaceClock = false, replaceEncounters = false, replaceTally = false, replaceBanners = false,
 	camera = true, plainBar = false, cooldowns = false, bossMarks = true, deathMarks = true, prePullMarks = false,
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
-	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, luckPanel = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
+	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, luckPanel = false, achievementButton = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
-	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchVictorySound = false, teammateDeathSound = "same", lowHealthSound = false,
+	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, robloxDeathSound = false, matchHaloSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchVictorySound = false, finalBossSound = false, finalBossSounds = {}, teammateDeathSound = "same", lowHealthSound = false,
 	bossHitmarkerSound = false, bossWhipSound = false, bossGotchaSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
 	partyFaces = true, cardPortraits = true, targetDebuffs = true, showAbsorbs = false, moveLevelButton = false, moveMeter = false,
@@ -488,6 +488,9 @@ end
 -- Boss, guardian and downed-friend markers live in SlimSuiteWorld.lua. They draw their own markers through the
 -- game's world-anchor API and never change your target.
 SS.SOUND_FILES = {
+ finalMegalovania = "Interface\\AddOns\\SlimSuite\\undertale-megalovania.mp3",
+ csgoStart = "Interface\\AddOns\\SlimSuite\\csgo-okay-lets-go.mp3",
+ haloLoss = "Interface\\AddOns\\SlimSuite\\game_over.mp3",
  cenaStart = "Interface\\AddOns\\SlimSuite\\cena.mp3",
  pillarStart = "Interface\\AddOns\\SlimSuite\\pillarman song.mp3",
  jojoVictory = "Interface\\AddOns\\SlimSuite\\to be continued jojo.mp3",
@@ -505,14 +508,36 @@ SS.SOUND_FILES = {
  bossGotcha = "Interface\\AddOns\\SlimSuite\\GotchaBIt.Dave Chapelle.mp3",
 	chestOpen = "Interface\\AddOns\\SlimSuite\\zelda-chest-opening-and-item-catch.mp3",
 };
+SS.SOUND_DURATIONS = {
+ finalMegalovania=16.614,
+ csgoStart=1.927,
+ haloLoss=1.48,
+ cenaStart=13.027,
+ pillarStart=10.215,
+ jojoVictory=10.92,
+ death=4.584,
+ legoDeath=1.649,
+ duckDeath=0.961,
+ matchLoss=5.068,
+ matchWasted=7.758,
+ matchStart=12.428,
+ robloxDeath=1.0,
+ matchVictory=10.031,
+ lowHealth=1.0,
+ bossHitmarker=0.12,
+ bossWhip=1.051,
+ bossGotcha=0.673,
+ chestOpen=2.52,
+};
 -- One selected sound per event. Existing flags remain compatible with saved settings.
 function SS.SoundSelection(group)
  local d=SS.DB();
- if group=="death" then return d.deathSound and (d.duckDeathSound and "duckDeath" or (d.legoDeathSound and "legoDeath" or "death")) or "off"; end
+ if group=="finalBoss" then return d.finalBossSound=="finalMegalovania" and "finalMegalovania" or "off"; end
+ if group=="death" then return d.deathSound and (d.robloxDeathSound and "robloxDeath" or (d.duckDeathSound and "duckDeath" or (d.legoDeathSound and "legoDeath" or "death"))) or "off"; end
  if group=="teammate" then return d.teammateDeathSound or "same"; end
  if group=="victory" then return d.matchVictorySound=="jojoVictory" and "jojoVictory" or (d.matchVictorySound and "matchVictory" or "off"); end
- if group=="loss" then return d.matchWastedSound and "matchWasted" or (d.matchLossSound and "matchLoss" or "off"); end
- if group=="start" then return (d.matchStartSound=="cenaStart" or d.matchStartSound=="pillarStart") and d.matchStartSound or (d.matchStartSound and "matchStart" or "off"); end
+ if group=="loss" then return d.matchHaloSound and "haloLoss" or (d.matchWastedSound and "matchWasted" or (d.matchLossSound and "matchLoss" or "off")); end
+ if group=="start" then return (d.matchStartSound=="cenaStart" or d.matchStartSound=="pillarStart" or d.matchStartSound=="csgoStart") and d.matchStartSound or (d.matchStartSound and "matchStart" or "off"); end
  if group=="lowHealth" then return d.lowHealthSound and "lowHealth" or "off"; end
  if group=="chest" then return d.chestOpenSound and "chestOpen" or "off"; end
  if group=="boss" then
@@ -524,11 +549,12 @@ function SS.SoundSelection(group)
 end
 function SS.SetSoundSelection(group,key)
  local d=SS.DB();
- if group=="death" then d.deathSound=key=="death" or key=="legoDeath" or key=="duckDeath"; d.legoDeathSound=key=="legoDeath"; d.duckDeathSound=key=="duckDeath";
+ if group=="finalBoss" then d.finalBossSound=key=="finalMegalovania" and key or false; SS.RefreshToggles(); return; end
+ if group=="death" then d.deathSound=key=="death" or key=="legoDeath" or key=="duckDeath" or key=="robloxDeath"; d.robloxDeathSound=key=="robloxDeath"; d.legoDeathSound=key=="legoDeath"; d.duckDeathSound=key=="duckDeath";
  elseif group=="teammate" then d.teammateDeathSound=key;
  elseif group=="victory" then d.matchVictorySound=key=="jojoVictory" and key or key=="matchVictory";
- elseif group=="loss" then d.matchLossSound=key=="matchLoss"; d.matchWastedSound=key=="matchWasted";
- elseif group=="start" then d.matchStartSound=(key=="cenaStart" or key=="pillarStart") and key or key=="matchStart";
+ elseif group=="loss" then d.matchHaloSound=key=="haloLoss"; d.matchLossSound=key=="matchLoss"; d.matchWastedSound=key=="matchWasted";
+ elseif group=="start" then d.matchStartSound=(key=="cenaStart" or key=="pillarStart" or key=="csgoStart") and key or key=="matchStart";
  elseif group=="lowHealth" then d.lowHealthSound=key=="lowHealth";
  elseif group=="chest" then d.chestOpenSound=key=="chestOpen";
  elseif group=="boss" then d.bossHitmarkerSound=key=="bossHitmarker"; d.bossWhipSound=key=="bossWhip"; d.bossGotchaSound=key=="bossGotcha"; end
@@ -540,20 +566,33 @@ function SS.DeathSoundSelection(group)
  return selected;
 end
 local soundPreviewHandle;
+SS.previewUntil=0;
+function SS.PreviewActive(key)
+ if SS.previewKey and GetTime()>=SS.previewUntil then SS.previewKey=nil; soundPreviewHandle=nil; end
+ return SS.previewKey and (not key or key==SS.previewKey);
+end
+function SS.StopPreview()
+ if not SS.PreviewActive() then return true; end
+ if not soundPreviewHandle or type(StopSound)~="function" then return false; end
+ SS.Safe(StopSound,soundPreviewHandle); soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
+end
 function SS.PlayAddonSound(key)
  if SS.ModuleEnabled and not SS.ModuleEnabled("sounds") then return false; end
-	local path = SS.SOUND_FILES[key];
-	if ( not path or not PlaySoundFile ) then return false; end
-	local ok, played = SS.Safe(PlaySoundFile, path);
-	return ok and played and true or false;
+ local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return false; end
+ if SS.PreviewActive() and not SS.StopPreview() then return false; end
+ local ok,played=SS.Safe(PlaySoundFile,path); return ok and played and true or false;
 end
 function SS.PreviewSound(key)
-	local path = SS.SOUND_FILES[key];
-	if ( not path or not PlaySoundFile ) then return; end
-	if ( soundPreviewHandle and StopSound ) then SS.Safe(StopSound, soundPreviewHandle); end
-	soundPreviewHandle = nil;
-	local ok, played, handle = SS.Safe(PlaySoundFile, path);
-	if ( ok and played and handle ) then soundPreviewHandle = handle; end
+ local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return; end
+ local same=SS.PreviewActive(key);
+ if not SS.StopPreview() then return; end
+ if same then return; end
+ local ok,played,handle=SS.Safe(PlaySoundFile,path);
+ -- Legacy clients may return nothing despite playing successfully.
+ if ok and played~=false then
+  soundPreviewHandle=handle; SS.previewKey=key;
+  SS.previewUntil=GetTime()+((SS.SOUND_DURATIONS and SS.SOUND_DURATIONS[key]) or 5);
+ end
 end
 local matchAudio={phase=nil,started=false,lost=false,won=false,pending={}};
 local function MatchPhase()

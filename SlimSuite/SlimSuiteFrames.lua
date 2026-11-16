@@ -832,6 +832,8 @@ function SS.MinSize(name)
 	elseif ( name == "SlimSuiteSpellRowFrame" ) then
 		if ( vertical ) then return 36, 92; end
 		return 92, 24;
+	elseif ( name == "SlimSuiteAchievementsButton" ) then
+  return 120,28;
 	elseif ( name == "SlimSuiteLuckFrame" ) then
   return 240,170;
  elseif ( name == "SlimSuiteCompassFrame" ) then

@@ -26,10 +26,15 @@ report={'target_lufs':target,'reference':'Original Whip-Crack.mp3 integrated lou
     'true_peak_ceiling_dbtp':-1.0,'analysis':'Integrated loudness; effects under 400 ms repeated only during analysis/normalization, then trimmed to their original duration', 'assets':[]}
 prior_assets={row['file']:row for row in prior['assets']} if prior else {}
 pending=[]
+base_target=target
+report['loudness_exceptions']=(prior or {}).get('loudness_exceptions',{})
+report['gain_exceptions']=(prior or {}).get('gain_exceptions',{})
+report['equalization']={'cena.mp3':'bass gain -3 dB at 120 Hz'}
 with tempfile.TemporaryDirectory(prefix='slimsuite-audio-') as folder:
     for path in sorted((ROOT/'SlimSuite').glob('*.mp3')):
+        target=base_target+report['loudness_exceptions'].get(path.name,0)
         source_hash=digest(path)
-        if path.name in prior_assets and prior_assets[path.name]['sha256']==source_hash:
+        if path.name in prior_assets and prior_assets[path.name]['sha256']==source_hash and abs(prior_assets[path.name]['integrated_lufs']-target)<=.6:
             report['assets'].append(prior_assets[path.name]); print(path.name,'already normalized',flush=True); continue
         info=sf.info(path); duration=info.frames/info.samplerate
         first=measure(path); output=Path(folder)/path.name
@@ -57,12 +62,12 @@ with tempfile.TemporaryDirectory(prefix='slimsuite-audio-') as folder:
             subprocess.run([FFMPEG,'-hide_banner','-loglevel','error','-y','-i',str(output),'-af',
                 'volume=%.3fdB'%gain,'-c:a','libmp3lame','-q:a','2',str(lifted)],check=True)
             output=lifted; final=measure(output)
-        # MP3 reconstruction can overshoot; attenuate/re-encode if the decoded true peak exceeds -1 dBTP.
+        # MP3 reconstruction can overshoot; limit/re-encode if the decoded true peak exceeds -1 dBTP.
         peak=float(final['input_tp'])
         if peak>-1:
             limited=Path(folder)/('limited-'+path.name)
             subprocess.run([FFMPEG,'-hide_banner','-loglevel','error','-y','-i',str(output),'-af',
-                'volume=%.3fdB'%(-1.3-peak),'-c:a','libmp3lame','-q:a','2',str(limited)],check=True)
+                'alimiter=limit=0.65:level=false:attack=1:release=40:latency=true','-c:a','libmp3lame','-q:a','2',str(limited)],check=True)
             output=limited; final=measure(output)
         assert float(final['input_tp'])<=-1,path.name
         assert abs(float(final['input_i'])-target)<=.6,(path.name,final['input_i'],target)

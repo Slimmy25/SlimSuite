@@ -26,7 +26,7 @@ function SS.LayoutPage(page)
 				if ( rows[j].kind == "head" ) then break; end
 				if ( show[j] ) then any = true; break; end
 			end
-			r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y);
+			r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", r.deathHeader and 240 or 8, y);
 			if ( any ) then r.fs:Show(); y = y - 24; else r.fs:Hide(); end
 		elseif ( show[i] ) then
 			local rowHeight = 28;
@@ -34,7 +34,12 @@ function SS.LayoutPage(page)
 				r.b:ClearAllPoints(); r.b:SetPoint("TOPLEFT", parent, "TOPLEFT", 26, y + 2);
 				r.b:Show();
 				rowHeight = 30;
-			elseif ( r.kind == "choice" ) then
+			elseif r.kind=="deathmatrix" then
+    r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT",parent,"TOPLEFT",48,y-5); r.fs:SetWidth(170); r.fs:Show();
+    r.cb:ClearAllPoints(); r.cb:SetPoint("TOPLEFT",parent,"TOPLEFT",250,y); r.cb:Show(); r.cb.label:Hide();
+    r.mate:ClearAllPoints(); r.mate:SetPoint("TOPLEFT",parent,"TOPLEFT",350,y); r.mate:Show(); r.mate.label:Hide();
+    if r.preview then r.preview:ClearAllPoints(); r.preview:SetPoint("TOPLEFT",parent,"TOPLEFT",24,y-4); r.preview:Show(); end
+   elseif ( r.kind == "choice" ) then
 				r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 30 + r.lead, y - 6);
 				rowHeight = math.max(28, SS.WrappedLabelHeight(r.fs, 140 - r.lead) + 10);
 				r.fs:Show(); r.b:Show();
@@ -86,14 +91,18 @@ end
 
 function SS.SoundPreviewIcon(parent,key)
  local button=CreateFrame("Button",nil,parent); button:SetWidth(18); button:SetHeight(18);
- -- A small native-texture speaker silhouette, avoiding unsupported emoji glyphs.
- for _,r in ipairs({{1,6,4,6},{5,4,2,10},{7,2,2,14},{11,5,1,8},{14,3,1,12}}) do
-  local t=button:CreateTexture(nil,"ARTWORK"); t:SetTexture(1,.82,.3,1);
-  t:SetPoint("TOPLEFT",button,"TOPLEFT",r[1],-r[2]); t:SetWidth(r[3]); t:SetHeight(r[4]);
+ local glyph=button:CreateFontString(nil,"OVERLAY","GameFontNormal"); glyph:SetPoint("CENTER",button,"CENTER",0,0);
+ local square=button:CreateTexture(nil,"ARTWORK"); square:SetTexture(1,.82,.3,1); square:SetWidth(8); square:SetHeight(8); square:SetPoint("CENTER",button,"CENTER",0,0); button.stopGlyph=square;
+ local function refresh()
+  local active=SS.PreviewActive(key);
+  glyph:SetText(active and (type(StopSound)=="function" and "" or "...") or ">");
+  if button.stopGlyph then if active and type(StopSound)=="function" then button.stopGlyph:Show(); else button.stopGlyph:Hide(); end end
+  button.isStop=active and type(StopSound)=="function";
  end
+ button:SetScript("OnUpdate",function() refresh(); end); refresh();
  button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
  button:SetScript("OnClick",function() SS.PreviewSound(key); end);
- button:SetScript("OnEnter",function() if GameTooltip then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(SS.T("Preview sound")); GameTooltip:Show(); end end);
+ button:SetScript("OnEnter",function() if GameTooltip then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(SS.T(SS.PreviewActive(key) and (type(StopSound)=="function" and "Stop sound" or "Playing (client cannot stop sounds)") or "Play sound")); GameTooltip:Show(); end end);
  button:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide(); end end);
  return button;
 end
@@ -118,6 +127,19 @@ function SS.WinBuild()
 				fs:SetText(SS.T(row.head)); fs:SetTextColor(1, 0.82, 0);
 				table.insert(page.rows, { kind = "head", fs = fs });
 				up = nil;
+   elseif row.deathMatrix then
+    local title=parent:CreateFontString(nil,"OVERLAY","GameFontNormal"); title:SetText(SS.T("Your Death Sound")); table.insert(page.rows,{kind="head",fs=title});
+    local header=parent:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); header:SetText(SS.T("Your Death").."     "..SS.T("Teammate Death"));
+    header:SetPoint("TOPLEFT",parent,"TOPLEFT",242,0);
+    local headerRow={kind="head",fs=header,deathHeader=true}; table.insert(page.rows,headerRow);
+    for _,option in ipairs(row.deathMatrix) do
+     local key=option[2]; local fs=parent:CreateFontString(nil,"OVERLAY","GameFontHighlight"); fs:SetText(SS.T(option[1])); fs:SetHeight(24); fs:SetJustifyH("LEFT");
+     local cb=SS.Check(parent,"",startY,function() return SS.SoundSelection("death")==key; end,function() SS.SetSoundSelection("death",key); end);
+     cb.soundGroup="death"; cb.soundKey=key;
+     local mate=SS.Check(parent,"",startY,function() return SS.DeathSoundSelection("teammate")==key; end,function() SS.SetSoundSelection("teammate",key); end); mate.soundGroup="teammate"; mate.soundKey=key; mate.cond=function() return SS.ModuleEnabled(module); end
+     table.insert(page.rows,{kind="deathmatrix",fs=fs,cb=cb,mate=mate,preview=key~="off" and SS.SoundPreviewIcon(parent,key) or nil,soundGroup="death",soundKey=key});
+    end
+    up=nil;
    elseif row.sounds then
     local fs=parent:CreateFontString(nil,"OVERLAY","GameFontNormal"); fs:SetText(SS.T(row[1])); fs:SetTextColor(1,.82,0);
     table.insert(page.rows,{kind="head",fs=fs});
@@ -209,13 +231,14 @@ function SS.WinBuild()
 			{"Minimap button", function() local m = SS.DB().minimap; return not (m and m.hide); end, function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (m and m.hide and true or false) == v ) then SS.Mini.Toggle(); end end end},
 			{head="Deaths and spells"},
 			{"Mark where a downed friend can be revived", function() return SS.DB().deathMarks; end, function(v) SS.DB().deathMarks = v; end},
-   {"Death sound",group="death",sounds={{"Off","off"},{"Baby Crying","death"},{"LEGO die","legoDeath"},{"duck toy sound","duckDeath"}}},
-   {"Teammate death sound",group="teammate",sounds={{"Same as player","same"},{"Off","off"},{"Baby Crying","death"},{"LEGO die","legoDeath"},{"duck toy sound","duckDeath"},{"Roblox death sound","robloxDeath"}}},
+   {deathMatrix={{"Off","off"},{"Baby Crying","death"},{"LEGO die","legoDeath"},{"duck toy sound","duckDeath"},{"Roblox death sound","robloxDeath"}}},
    {"Low health sound (30% or lower)",group="lowHealth",sounds={{"Off","off"},{"Low Health Sound","lowHealth"}}},
    {"Boss / guardian / lair kill sound",group="boss",sounds={{"Off","off"},{"Hitmarker","bossHitmarker"},{"Whip Crack","bossWhip"},{"Gotcha — Dave Chappelle","bossGotcha"}}},
-   {"Match loss sound",group="loss",sounds={{"Off","off"},{"The Price Is Right: losing horn","matchLoss"},{"GTA V: Wasted","matchWasted"}}},
+   {"Match loss sound",group="loss",sounds={{"Off","off"},{"The Price Is Right: losing horn","matchLoss"},{"GTA V: Wasted","matchWasted"},{'Halo "Game Over"',"haloLoss"}}},
    {"Victory sound",group="victory",sounds={{"Off","off"},{"GTA San Andreas","matchVictory"},{"To Be Continued JoJo","jojoVictory"}}},
-   {"Match start song",group="start",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"},{"Cena","cenaStart"},{"pillar man jojo","pillarStart"}}},
+   {"Final boss arrival soundtrack",group="finalBoss",sounds={{"Off","off"},{"Megalovania","finalMegalovania"}}},
+   {button="Final boss soundtracks",onClick=function() SS.OpenFinalBossSounds(); end},
+   {"Match start song",group="start",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"},{"Cena","cenaStart"},{"pillar man jojo","pillarStart"},{"CSGO Okay Let’s Go","csgoStart"}}},
    {"Chest opening sound",group="chest",sounds={{"Off","off"},{"Zelda: final four notes","chestOpen"}}},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
 			{head="Accessibility"},
@@ -223,6 +246,7 @@ function SS.WinBuild()
 			{"Larger encounter names", function() return SS.DB().accessibilityLargeText; end, function(v) SS.DB().accessibilityLargeText = v and true or false; SS.Safe(SS.UpdateBossFrames); end},
 			{"Reduce floating combat-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end},
  };
+ if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),275,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",6,-300); end;
  local entries={chat={},sounds={},ui={},gameplay={},misc={}};
  for _,row in ipairs(uiEntries) do table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
  local category="misc";
@@ -236,6 +260,8 @@ function SS.WinBuild()
   elseif label=="Cooldown numbers on the spell squares" then destination="ui"; end
   table.insert(entries[destination],row);
  end
+ if SS.AchievementsAvailable() then table.insert(entries.ui,{"Side achievements button",function() return SS.FeatureEnabled("SlimSuiteAchievementsButton"); end,function(v) SU.SetMode("SlimSuiteAchievementsButton",v and "enabled" or "disabled","Side achievements"); end});
+ table.insert(entries.gameplay,{button="Side achievements",onClick=function() SS.OpenAchievements(); end}); end;
  table.insert(entries.ui,{button="Reset positions",onClick=function() SS.ResetPlaces(); end});
  table.insert(entries.ui,{button="Reset all UI",onClick=function() SS.ResetUI(); end});
  for i,id in ipairs(SS.MODULE_ORDER) do

@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.44
+- Added normalized Megalovania as an optional final-boss arrival soundtrack, with per-boss overrides for all twelve guide finals and duplicate/reload protection.
+- Kept achievements hidden and fully inactive behind a WIP gate. Added a provenance-aware fallback observation framework, separating revive attempts and self-reported credit from confirmed game data.
+- Added normalized CSGO Okay Let’s Go to match-start songs. Built the dormant unofficial side-achievement catalog and menu, including optional Azeroth Stats goals; no achievement UI or tracking is enabled in this WIP release.
+- Combined player and teammate death sounds into one shared selection matrix, including Roblox for both. Added Halo "Game Over" exclusively for final defeat.
+- Added play/stop previews where supported and prevented overlapping previews on legacy clients without StopSound.
+- Reduced Cena bass by 3 dB at 120 Hz. Applied a one-time +6.02 dB Hitmarker boost before peak limiting; all other sounds retain the standard mix.
+
 ## 1.43
 - Added Cena and pillar man jojo as optional match-start songs, plus To Be Continued JoJo for victory. All three retain their original filenames and are normalized to the existing audio mix.
 - Stabilized legendary luck graph axes and added starting/current luck with encouragement based on the measured relative improvement in estimated legendary odds. Live luck continues to follow character stats; mid-run tracking is labeled honestly.

@@ -14,11 +14,19 @@
     },
     {
       "file": "cena.mp3",
-      "duration_seconds": 13.113,
-      "source_sha256": "ac8c97c0babadbf8cdb2e659c20a10a5ea2223e4fb4eeab1454342375ea3f1f0",
-      "sha256": "278d875ad4c6a00d4a0b001670a1960e01a333ad800b832a847bf04a49f7a3d2",
-      "integrated_lufs": -12.36,
-      "true_peak_dbtp": -2.86
+      "duration_seconds": 13.027,
+      "source_sha256": "fcf680fd8990b20f307e78c214af10582ce8124006e404849dd8f688a6342532",
+      "sha256": "550f3b39f658e42c92885e1099e2349b430e8cff22d5f9a78337fa5f31b367d3",
+      "integrated_lufs": -12.25,
+      "true_peak_dbtp": -2.42
+    },
+    {
+      "file": "csgo-okay-lets-go.mp3",
+      "duration_seconds": 1.927,
+      "source_sha256": "518d2a5bcf658d0636e3af540076655ed983cf19b8241c173a05171bce63e28e",
+      "sha256": "c5e2eaf118d97995f56b2df00dfad4a28f973937790b40881c4fe9a08398a6f1",
+      "integrated_lufs": -12.38,
+      "true_peak_dbtp": -3.27
     },
     {
       "file": "duck-toy-sound.mp3",
@@ -27,6 +35,14 @@
       "sha256": "16a5b90291412ea6fffc2c8b61c9fbe61fb8bc312b9278c54938962c6f70c507",
       "integrated_lufs": -11.99,
       "true_peak_dbtp": -2.84
+    },
+    {
+      "file": "game_over.mp3",
+      "duration_seconds": 1.48,
+      "source_sha256": "6ac48b43de3c51de4e27203f8c85ed4a40fe71210dbb5837022f7b8fe6bff5ac",
+      "sha256": "fa5ad73bd3a5256d5ffae4308390559280aacf4e84e5af2afb2974e0f1ddb794",
+      "integrated_lufs": -12.01,
+      "true_peak_dbtp": -2.85
     },
     {
       "file": "GotchaBIt.Dave Chapelle.mp3",
@@ -55,10 +71,10 @@
     {
       "file": "hitmarker.mp3",
       "duration_seconds": 0.12,
-      "source_sha256": "98919e4bfc17f19daf9f04e175367215fc09d129841e0192a97529c8a05d6f0c",
-      "sha256": "ff83ff7f88064e01999d34459474414ee9936dd96afbfba3b25d61bdc9d1f836",
-      "integrated_lufs": -11.87,
-      "true_peak_dbtp": -1.33
+      "source_sha256": "24d60b33ce2b0e588528722a4f3566dfb956d00b59207b1c5ebb4837da9df637",
+      "sha256": "2a81a914f935473a2c4121618ddcd6a4fc6efe47781f69a78296a50e729e9946",
+      "integrated_lufs": -10.73,
+      "true_peak_dbtp": -1.49
     },
     {
       "file": "Kit-kit-kit-kit-song.mp3",
@@ -117,6 +133,14 @@
       "true_peak_dbtp": -2.9
     },
     {
+      "file": "undertale-megalovania.mp3",
+      "duration_seconds": 16.614,
+      "source_sha256": "22a9e4b5804271062a7ee540103bdd78e9829207a724d53d443f64b0bbce29ab",
+      "sha256": "88d0bd5ccd8a1c5acaf8be4bda7aed07e80829b439b3dbf032e3d123bf7f9234",
+      "integrated_lufs": -12.03,
+      "true_peak_dbtp": -1.4
+    },
+    {
       "file": "Whip-Crack.mp3",
       "duration_seconds": 1.051,
       "source_sha256": "c6b0ece6dec741183ed0f4e5152181a491d0642aba26afad2fa479db2a0bb7e2",
@@ -132,5 +156,17 @@
       "integrated_lufs": -12.3,
       "true_peak_dbtp": -3.14
     }
-  ]
+  ],
+  "loudness_exceptions": {
+    "hitmarker.mp3": 1.27
+  },
+  "gain_exceptions": {
+    "hitmarker.mp3": {
+      "requested_gain_db": 6.0206,
+      "note": "Twice signal amplitude before peak limiting; transient loudness constrained by no-clipping ceiling."
+    }
+  },
+  "equalization": {
+    "cena.mp3": "bass gain -3 dB at 120 Hz"
+  }
 }
