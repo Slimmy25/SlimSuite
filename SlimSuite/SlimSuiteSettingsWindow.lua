@@ -91,19 +91,36 @@ end
 
 function SS.SoundPreviewIcon(parent,key)
  local button=CreateFrame("Button",nil,parent); button:SetWidth(18); button:SetHeight(18);
- local glyph=button:CreateFontString(nil,"OVERLAY","GameFontNormal"); glyph:SetPoint("CENTER",button,"CENTER",0,0);
- local square=button:CreateTexture(nil,"ARTWORK"); square:SetTexture(1,.82,.3,1); square:SetWidth(8); square:SetHeight(8); square:SetPoint("CENTER",button,"CENTER",0,0); button.stopGlyph=square;
+ -- Texture geometry keeps the media icons crisp without relying on font glyphs.
+ local play,paused,playing={},{},{};
+ local function bar(group,x,y,width,height)
+  local texture=button:CreateTexture(nil,"ARTWORK"); texture:SetTexture(1,1,1,1);
+  texture:SetWidth(width); texture:SetHeight(height); texture:SetPoint("CENTER",button,"CENTER",x,y);
+  table.insert(group,texture);
+ end
+ for i=0,7 do bar(play,-3+i,0,1,12-i*1.5); end
+ bar(paused,-3,0,3,12); bar(paused,3,0,3,12);
+ bar(playing,-4,0,2,5); bar(playing,0,0,2,11); bar(playing,4,0,2,7);
+ local hover=button:CreateTexture(nil,"BACKGROUND"); hover:SetTexture(1,1,1,.16); hover:SetAllPoints(button); hover:Hide();
+ local lastState;
+ local function show(group,visible)
+  for _,texture in ipairs(group) do if visible then texture:Show(); else texture:Hide(); end end
+ end
  local function refresh()
   local active=SS.PreviewActive(key);
-  glyph:SetText(active and (type(StopSound)=="function" and "" or "...") or ">");
-  if button.stopGlyph then if active and type(StopSound)=="function" then button.stopGlyph:Show(); else button.stopGlyph:Hide(); end end
-  button.isStop=active and type(StopSound)=="function";
+  local state=active and (SS.CanStopPreview() and "pause" or "playing") or (SS.previewNext==key and "queued" or "play");
+  if state==lastState then return; end
+  lastState=state; button.isStop=state=="pause";
+  show(play,state=="play"); show(paused,state=="pause"); show(playing,state=="playing" or state=="queued");
+  for _,texture in ipairs(playing) do texture:SetAlpha(state=="queued" and .4 or 1); end
  end
  button:SetScript("OnUpdate",function() refresh(); end); refresh();
- button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
- button:SetScript("OnClick",function() SS.PreviewSound(key); end);
- button:SetScript("OnEnter",function() if GameTooltip then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(SS.T(SS.PreviewActive(key) and (type(StopSound)=="function" and "Stop sound" or "Playing (client cannot stop sounds)") or "Play sound")); GameTooltip:Show(); end end);
- button:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide(); end end);
+ button:SetScript("OnClick",function() SS.PreviewSound(key); refresh(); end);
+ button:SetScript("OnEnter",function()
+  hover:Show();
+  if GameTooltip then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(SS.T(SS.previewNext==key and "Queued preview (waiting for current sound)" or SS.PreviewActive(key) and (SS.CanStopPreview() and "Stop sound" or "Playing (client cannot stop sounds)") or "Play sound")); GameTooltip:Show(); end
+ end);
+ button:SetScript("OnLeave",function() hover:Hide(); if GameTooltip then GameTooltip:Hide(); end end);
  return button;
 end
 function SS.WinBuild()

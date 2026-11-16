@@ -74,7 +74,7 @@ Combat-log mode hides the game’s damage numbers by default. Its World damage d
 
 The optional **Compass** offers a marked rail or free-standing arrow markers, with separate Boss, Lair and Chest filters. Minimap points use real world positions and disappear outside the visible range rather than sliding around its rim. Pregame previews appear only where the client already supplies a position; future-boss schedules do not expose spawn coordinates.
 
-During card selection, a temporary item row appears beneath the native spell strip at matching icon size, even when your normal item row is hidden. Stats can remain at the screen edge and item tooltips stay usable. Leaving selection restores your normal hidden, split/joined, orientation and sizing preferences.
+The temporary item row beneath the native card-selection spell strip is deferred and disabled. Its implementation is retained for later review, without changing saved build-row preferences. The separate screen-edge Stats placement and tooltip support remain available.
 
 ### A minimap that fits your layout
 
@@ -90,10 +90,20 @@ Choose which repetitive messages to hide: level-up stat bonuses, newly learned s
 
 Listen to each included sound before enabling it:
 
-- **Death or a downed teammate:** Baby Crying or LEGO die.
+- **Your death / teammate death:** Baby Crying, LEGO, duck toy, or Roblox, selected independently from a shared list.
 - **Low health:** a short warning at 30% health or below, with at least five seconds between alerts.
-- **Boss, Guardian, or lair-owner kills:** Hitmarker and/or Whip Crack.
-- **Opening a cache:** Zelda chest-opening audio, triggered by the game's confirmed opened-cache counter.
+- **Boss, Guardian, or lair-owner kills:** Hitmarker, Whip Crack, or Gotcha.
+- **Opening a cache:** the ending phrase of Zelda chest-opening audio, triggered by the confirmed opened-cache counter.
+- **Final defeat:** Price Is Right, GTA V Wasted, or Halo Game Over. Recoverable deaths do not trigger these.
+- **Victory:** GTA San Andreas or To Be Continued JoJo.
+- **First movement:** Kit, Cena, pillar man jojo, or CSGO Okay Let's Go.
+- **Final-boss arrival:** Megalovania, with a global choice and individual overrides for twelve guide finals. Documented zone keys let localized final names use the same override.
+
+Each group includes Off. Compact white play/pause-style controls preview sounds. The pause-style control stops rather than resumes the clip, and appears only when a sound handle and stop API are available. On clients without that support, a playing indicator replaces it; selecting another preview queues the latest request until the current clip ends. Clips never deliberately overlap, and Slim Suite does not change global music settings.
+
+### Legendary luck
+
+An optional resizable panel follows live total luck, estimates legendary card chances, and compares current luck with the observed starting value. Its graph expands when needed without shrinking as buffs expire. Joining mid-run is labeled Tracking from; the panel does not fabricate earlier history.
 
 ### Readability and support
 
@@ -127,4 +137,4 @@ The main hub groups SlimSuite into Chat Mods, Sound Effects, User Interface, Gam
 
 Production addon files live in [`SlimSuite/`](SlimSuite/). Translation dictionaries live in [`locales/`](locales/); regenerate their Lua tables with `python tools/build-locales.py` after editing them.
 
-See the [changelog](CHANGELOG.md), [client API notes](docs/api-compatibility.md), and [completed work and remaining checks](docs/code-review.md) for more detail. The automated checks are in [`SlimSuite/tests/`](SlimSuite/tests/), including behavior scenarios and compilation with Lua 5.0.3.
+See the [changelog](CHANGELOG.md), [client API notes](docs/api-compatibility.md), and [completed work and remaining checks](docs/code-review.md), [native UI verification plan](docs/ui-verification.md), and [API capability review](docs/api-capabilities.md) for more detail. The automated checks are in [`SlimSuite/tests/`](SlimSuite/tests/), including behavior scenarios and compilation with Lua 5.0.3.

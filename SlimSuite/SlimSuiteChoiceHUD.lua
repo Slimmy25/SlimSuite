@@ -1,5 +1,7 @@
 -- Temporary card-screen presentation; no saved layout or visibility settings are edited.
 if ( setfenv ) then setfenv(1, SS.ENV); end
+-- Deferred by owner: retain the footer implementation without changing saved preferences.
+SS.CHOICE_ITEMS_DEFERRED=true;
 local saved={}; local tooltipWas; local registered={}; local finishing; local itemRefresh=0;
 local clockEvidence={run=nil,value=nil,stableAt=nil,phase=nil,phaseAt=nil,active=false};
 function SS.ChoiceHUDActive()
@@ -33,7 +35,7 @@ function SS.ChoiceHUDActive()
  return clockEvidence.active;
 end
 
-function SS.ChoiceItemsActive() return SS.ChoiceHUDActive() and not SS.DB().unlocked and not finishing; end
+function SS.ChoiceItemsActive() return SS.ChoiceHUDActive() and not SS.CHOICE_ITEMS_DEFERRED and not SS.DB().unlocked and not finishing; end
 local function Capture(name)
  local f=getglobal(name); if ( not f or saved[name] ) then return; end
  local points={}; for i=1,f:GetNumPoints() do local a,b,c,x,y=f:GetPoint(i); table.insert(points,{a,b,c,x,y}); end
@@ -91,12 +93,14 @@ local function Restore()
  finishing=nil;
 end
 function SS.UpdateChoiceHUD()
- local active=SS.ChoiceItemsActive();
+ local active=SS.ChoiceHUDActive() and not SS.DB().unlocked and not finishing;
  if ( active ) then
+  if not SS.CHOICE_ITEMS_DEFERRED then
   -- Always provide the player's actual items on this page, even if that row is hidden in the normal HUD.
   SS.HideChoiceSpellRow();
   if ( GetTime()>=itemRefresh ) then itemRefresh=GetTime()+.1; SS.RefreshItemRow(); end
   SS.LayoutChoiceItems();
+  end
   local f=getglobal("SlimSuiteStatCounterFrame");
   if ( f and SS.FeatureEnabled("SlimSuiteStatCounterFrame") and f:IsShown() ) then
    Capture("SlimSuiteStatCounterFrame");

@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.45
+- Restyled sound previews with white play/pause-style icons and hover highlighting. Supported clients stop the previous preview before switching; legacy clients queue the latest request without overlap. True pause/resume remains unavailable on the inspected client.
+- Disabled the temporary card-selection item footer while retaining its implementation and normal build-row preferences. Independent Stats edge placement and tooltip support remain available.
+- Matched localized final-boss arrivals to existing per-boss soundtrack overrides using documented zone keys, retaining native final classification and replay protection.
+- Fixed empty sample party frames surviving native UI restoration and setup controls reappearing after Demo teardown.
+- Updated feature/audio documentation and added a native UI verification matrix and API capability review. Stationary native checks and 54 behavioral scenarios passed; combat, multiplayer and broader display coverage remain unverified.
+
 ## 1.44
 - Added normalized Megalovania as an optional final-boss arrival soundtrack, with per-boss overrides for all twelve guide finals and duplicate/reload protection.
 - Kept achievements hidden and fully inactive behind a WIP gate. Added a provenance-aware fallback observation framework, separating revive attempts and self-reported credit from confirmed game data.

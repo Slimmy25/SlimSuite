@@ -30,13 +30,15 @@ check("gameplay settings resume",d.bossMarks and d.camera and d.modernEnemyFrame
 d.accessibilityContrast=true
 SS.SetModuleEnabled("misc",false); check("Misc Off pauses accessibility",not d.accessibilityContrast)
 SS.SetModuleEnabled("misc",true); check("Misc On restores accessibility",d.accessibilityContrast)
-SS.StartSetup(true); SS.SetupEnd(true)
+SS.StartSetup(true); SS.StartDemoMode(); SS.SetupEnd(true)
+check("ending setup during Demo leaves no toolbar or samples",not SS.demoRunning and not SlimSuiteSetupBar:IsShown())
 d.places.SlimSuiteMeterFrame={x=123,y=234,coordinateSpace="uiParent"}; d.muted.SlimSuiteMeterFrame=true
 SS.ENV.PlaceAll(); local beforeTable=SS.LayoutSnapshot(); local before=SS.LayoutText(beforeTable)
 SS.SetModuleEnabled("ui",false); Tick(3)
 local allDefault=true
 for _,id in ipairs(SS.SETUP_ORDER) do if d.elementModes[id]~="default" then allDefault=false end end
 check("UI Off selects native HUD",allDefault and not d.replaceClock and not d.moveMeter)
+for i=1,4 do check("UI Off hides nonexistent party member "..i,not getglobal("PartyMemberFrame"..i):IsShown()) end
 check("paused UI exports retain the saved custom layout",SS.LayoutText(SS.LayoutSnapshot())==before)
 SS.LayoutApply(beforeTable,false)
 check("profile load cannot silently activate a paused UI module",not SS.ModuleEnabled("ui") and d.elementModes.SlimSuiteMeterFrame=="default")

@@ -314,7 +314,12 @@ function SU.SetMode(frame, mode, title)
 			local f = type(name) == "table" and name or getglobal(name);
 			if ( f and f.SetAlpha and not SU.FEATURES[frame] ) then
 				f:SetAlpha(1);
-				if ( f.Show and frame ~= "GameTooltip" ) then f:Show(); end
+				-- Default restores native visibility rules, not empty preview placeholders.
+    local partyIndex;
+    if type(name)=="string" then local _,_,index=string.find(name,"^PartyMemberFrame(%d)$"); partyIndex=index; end
+    if ( partyIndex and not UnitExists("party"..partyIndex) ) then f:Hide();
+    elseif ( name=="TargetFrame" and not UnitExists("target") ) then f:Hide();
+    elseif ( f.Show and frame ~= "GameTooltip" ) then f:Show(); end
 			end
 		end
 		if ( frame == "MinimapCluster" ) then SS.Safe(SS.ApplyMinimapShape); end

@@ -571,10 +571,14 @@ function SS.PreviewActive(key)
  if SS.previewKey and GetTime()>=SS.previewUntil then SS.previewKey=nil; soundPreviewHandle=nil; end
  return SS.previewKey and (not key or key==SS.previewKey);
 end
+function SS.CanStopPreview()
+ return SS.PreviewActive() and soundPreviewHandle and type(StopSound)=="function";
+end
 function SS.StopPreview()
  if not SS.PreviewActive() then return true; end
  if not soundPreviewHandle or type(StopSound)~="function" then return false; end
- SS.Safe(StopSound,soundPreviewHandle); soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
+ local ok,result=SS.Safe(StopSound,soundPreviewHandle); if not ok or result==false then return false; end
+ soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
 end
 function SS.PlayAddonSound(key)
  if SS.ModuleEnabled and not SS.ModuleEnabled("sounds") then return false; end
@@ -585,7 +589,8 @@ end
 function SS.PreviewSound(key)
  local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return; end
  local same=SS.PreviewActive(key);
- if not SS.StopPreview() then return; end
+ if not SS.StopPreview() then SS.previewNext=not same and key or nil; return; end
+ SS.previewNext=nil;
  if same then return; end
  local ok,played,handle=SS.Safe(PlaySoundFile,path);
  -- Legacy clients may return nothing despite playing successfully.
@@ -594,6 +599,13 @@ function SS.PreviewSound(key)
   SS.previewUntil=GetTime()+((SS.SOUND_DURATIONS and SS.SOUND_DURATIONS[key]) or 5);
  end
 end
+-- Legacy effects have no pause/stop API. Keep only the latest requested preview and
+-- start it when the current effect finishes, rather than overlap or lose the click.
+SS.Every("soundPreviewQueue",.05,function()
+ if SS.previewNext and not SS.PreviewActive() then
+  local key=SS.previewNext; SS.previewNext=nil; SS.PreviewSound(key);
+ end
+end);
 local matchAudio={phase=nil,started=false,lost=false,won=false,pending={}};
 local function MatchPhase()
  if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok then return value; end end

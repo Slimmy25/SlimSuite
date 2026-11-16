@@ -46,8 +46,17 @@ PlaySoundFile=function(path) return true,path end
 SS.PreviewSound("matchStart"); check("preview tracks active sound",SS.PreviewActive("matchStart"))
 SS.PreviewSound("cenaStart"); check("new preview stops old handle",stopped[1]==SS.SOUND_FILES.matchStart and SS.PreviewActive("cenaStart"))
 SS.PreviewSound("cenaStart"); check("same preview stops instead of replaying",not SS.PreviewActive() and stopped[2]==SS.SOUND_FILES.cenaStart)
+StopSound=function() return false end
+SS.PreviewSound("matchStart"); SS.PreviewSound("cenaStart")
+check("failed native stop retains playback and queues replacement",SS.PreviewActive("matchStart") and SS.previewNext=="cenaStart")
+SS.previewUntil=0; SS.previewNext=nil
 StopSound=nil; local played=0; PlaySoundFile=function() played=played+1 end
 SS.PreviewSound("matchStart"); SS.PreviewSound("cenaStart"); check("legacy previews never overlap",played==1)
+check("legacy switch retains latest queued preview",SS.previewNext=="cenaStart")
+SS.PreviewSound("pillarStart")
+check("latest pending request replaces earlier one",SS.previewNext=="pillarStart")
+SS.previewUntil=0; Tick(4,.05)
+check("queued preview starts only after current sound expires",played==2 and SS.PreviewActive("pillarStart") and not SS.previewNext)
 SS.previewUntil=0
 print("adaptive/sound problems: "..bad)
 assert(bad==0 and #ERRORS==0,"adaptive/sound regressions")

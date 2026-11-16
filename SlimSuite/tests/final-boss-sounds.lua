@@ -10,6 +10,14 @@ AZS_UNITS={{kind="final",name="Edwin VanCleef",id=100}}; SS.UpdateFinalBossSound
 SS.DB().finalBossSounds["Kel'Thuzad"]="off"; SS.OnFinalBossArrival({kind="finalboss",name="Kel'Thuzad"}); check("per-boss Off wins over global track",#sounds==1)
 SS.SetSoundSelection("finalBoss","off"); SS.DB().finalBossSounds.Nefarian="finalMegalovania"; SS.OnFinalBossArrival({kind="finalboss",name="Nefarian"}); check("individual selection works with global Off",#sounds==2)
 phase="ready"; AZS_UNITS={}; SS.UpdateFinalBossSounds(); phase="playing"; AZS_ZONE.run="final-b"; SS.OnFinalBossArrival({kind="finalboss",name="Nefarian"}); check("new run can play selected final again",#sounds==3)
+AZS_ZONE.zone="naxx"
+check("localized final uses stable zone override",SS.FinalBossTrack("Kel’Thuzad localisé")=="off")
+AZS_ZONE.zone="brm"
+check("localized final honors individual choice with global Off",SS.FinalBossTrack("Nefarian localisé")=="finalMegalovania")
+local before=#sounds; SS.OnFinalBossArrival({kind="finalboss",name="Nefarian localisé"})
+check("localized and English final identities deduplicate",#sounds==before)
+AZS_ZONE.zone="unknown"
+check("unknown zone and boss use global selection",SS.FinalBossTrack("Unknown final")=="off")
 SS.OpenFinalBossSounds(); check("catalog and menu cover all twelve guide finals",#SS.FINAL_BOSS_CATALOG==12 and SlimSuiteFinalBossSoundMenu:IsShown())
 SS.ACHIEVEMENTS_WIP=false; SlimSuiteAchievementsDB=nil
 check("observations require honest provenance",not SS.RecordSideObservation("manualReviveCredit",1,1,"confirmed","final-b"))

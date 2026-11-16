@@ -766,6 +766,8 @@ function SS.ConfirmSetupDone()
 end
 
 function SS.SetupEnd(finished)
+ -- Restore Demo-hidden menus before teardown, so they cannot reopen after Done/module pause.
+ if SS.demoRunning then SS.StopDemoMode(); end
 	if ( SU.confirmDone ) then SU.confirmDone:Hide(); end
 	SS.DB().setupDone = true;
 	local ok, err = pcall(SS.SetupHide);

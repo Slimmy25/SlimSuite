@@ -8,8 +8,17 @@ SS.FINAL_BOSS_CATALOG={
  {"Alterac Valley","Azuregos"},{"Blackrock Mountain","Nefarian"},
  {"Gates of Ahn'Qiraj","C'Thun"},{"Naxxramas","Kel'Thuzad"},
 };
+-- Stable documented zone keys select the guide entry even when native names are localized.
+local zoneKeys={"elwynn","duskwood","wsg","ungoro","ab","feralas","arena","sm","av","brm","aq","naxx"};
+function SS.FinalBossIdentity(name)
+ for _,entry in ipairs(SS.FINAL_BOSS_CATALOG) do if entry[2]==name then return name; end end
+ local zone=type(AZS_ZONE)=="table" and AZS_ZONE.zone;
+ for i,key in ipairs(zoneKeys) do if key==zone then return SS.FINAL_BOSS_CATALOG[i][2]; end end
+ return name;
+end
 function SS.FinalBossTrack(name)
- local d=SS.DB(); local selected=type(d.finalBossSounds)=="table" and d.finalBossSounds[name];
+ local d=SS.DB(); local identity=SS.FinalBossIdentity(name);
+ local selected=type(d.finalBossSounds)=="table" and d.finalBossSounds[identity];
  if selected=="off" then return "off"; end
  if selected=="finalMegalovania" then return selected; end
  return SS.SoundSelection("finalBoss");
@@ -24,8 +33,9 @@ function SS.OnFinalBossArrival(banner)
  if type(banner)~="table" or banner.kind~="finalboss" or type(banner.name)~="string" or banner.name=="" then return; end
  local current=type(AZS_GetPhase)=="function" and AZS_GetPhase();
  if current~="playing" and current~="choosing" and current~="paused" then return; end
- local s=state(); if s.played[banner.name] then return; end
- s.played[banner.name]=true;
+ local s=state(); local identity=SS.FinalBossIdentity(banner.name);
+ if s.played[identity] or s.played[banner.name] then return; end
+ s.played[identity]=true;
  local selected=SS.FinalBossTrack(banner.name); if selected~="off" then SS.PlayAddonSound(selected); end
 end
 function SS.UpdateFinalBossSounds()
@@ -42,7 +52,7 @@ function SS.UpdateFinalBossSounds()
  end
  for _,unit in ipairs(type(AZS_UNITS)=="table" and AZS_UNITS or {}) do
   if unit.kind=="final" and type(unit.name)=="string" then
-   if seeded then SS.OnFinalBossArrival({kind="finalboss",name=unit.name}); else s.played[unit.name]=true; end
+   if seeded then SS.OnFinalBossArrival({kind="finalboss",name=unit.name}); else s.played[SS.FinalBossIdentity(unit.name)]=true; end
   end
  end
  seeded=true;

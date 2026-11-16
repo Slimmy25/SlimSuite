@@ -62,6 +62,9 @@ local normalScale,normalWidth=item:GetScale(),d.sizes.SlimSuiteItemRowFrame.w
 local snapshot=SS.LayoutText(SS.LayoutSnapshot())
 AZS_GetPhase=function() return "choosing" end; d.cardEdgeHUD=true; d.unlocked=false
 SS.UpdateChoiceHUD()
+check("deferred selection items stay hidden and preserve preferences",SS.CHOICE_ITEMS_DEFERRED and not SS.ChoiceItemsActive() and not item:IsShown() and SS.LayoutText(SS.LayoutSnapshot())==snapshot)
+SS.CHOICE_ITEMS_DEFERRED=false -- exercise retained implementation without enabling production
+SS.UpdateChoiceHUD()
 local x,y,icon,gap=SS.ChoiceFooterLayout()
 check("hidden items are enabled only for the selection page",item:IsShown() and item:GetAlpha()==1)
 check("selection items match native spell icon size",item:GetHeight()==icon and item:GetWidth()==5*icon+4*gap and item:GetScale()==1)
