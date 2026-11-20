@@ -61,7 +61,8 @@ SU.nudge = CreateFrame("Frame", "SlimSuiteNudgeKeys", UIParent);
 if ( SU.nudge.EnableKeyboard ) then SU.nudge:EnableKeyboard(true); end
 SU.nudge:SetScript("OnKeyDown", function()
 	local f = SU.focus;
-	if ( not f or not SU.panel or not SU.panel:IsShown() or not f.GetLeft ) then return; end
+	if ( type(f) == "string" ) then f = getglobal(f); end
+	if ( type(f) ~= "table" or not f.GetLeft or not SU.panel or not SU.panel:IsShown() ) then return; end
 	local key = arg1;
 	local step = (IsShiftKeyDown and IsShiftKeyDown()) and 10 or 1;
 	local dx, dy = 0, 0;
