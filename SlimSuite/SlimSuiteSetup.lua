@@ -88,8 +88,9 @@ function SU.Focus(frame)
 		SU.outline:SetBackdropBorderColor(1, 0.82, 0.2, 1);
 		SU.outline:Hide();
 	end
-	if ( frame ) then
-		SU.outline:ClearAllPoints(); SU.outline:SetAllPoints(frame); SU.outline:Show();
+	local outlineTarget = (type(frame) == "string") and getglobal(frame) or frame;
+	if ( type(outlineTarget) == "table" and outlineTarget.SetAllPoints ) then
+		SU.outline:ClearAllPoints(); SU.outline:SetAllPoints(outlineTarget); SU.outline:Show();
 	else SU.outline:Hide(); end
 	local e;
 	for i = 1, table.getn(SU.elements or {}) do if ( SU.elements[i].frame == frame ) then e = SU.elements[i]; end end
@@ -189,7 +190,7 @@ function SU.Focus(frame)
 			end);
 		end
 		local rb = SU.resetButton;
-		local name = frame and frame.GetName and frame:GetName();
+		local name = (type(frame) == "string" and frame) or (type(frame) == "table" and frame.GetName and frame:GetName()) or nil;
 		if ( name and SS.IsLookElement(name) and (not setupActive or mode == "enabled") ) then
 			rb.elementName = name; rb:SetText(SS.T("Reset this element"));
 			rb:ClearAllPoints();
