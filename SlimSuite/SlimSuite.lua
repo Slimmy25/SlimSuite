@@ -697,9 +697,7 @@ SS.STYLE_NAMES = { original = "Original", meter = "RPG", tooltip = "New School" 
 SS.LOOK_ELEMENTS = { "SlimSuitePartyLines", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteBossFrames",
  "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame",
  "SlimSuiteLocalClockFrame", "SlimSuitePlayerCard", "SlimSuiteTargetCard", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame",
- "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton", "SlimSuiteProcMeter",
- "PlayerFrame", "TargetFrame", "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3", "PartyMemberFrame4", "BuffFrame", "MainMenuExpBar",
- "MainMenuBar", "CastingBarFrame" };
+ "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton", "SlimSuiteProcMeter" };
 function SS.IsLookElement(name)
  for i = 1, table.getn(SS.LOOK_ELEMENTS) do if ( SS.LOOK_ELEMENTS[i] == name ) then return true; end end
  return false;

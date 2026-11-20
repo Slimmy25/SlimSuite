@@ -1922,8 +1922,9 @@ end
 -- and the chosen panel is drawn behind it, in a child overlay that is removed from the game's frame only by hiding.
 -- Child frames (bars, portraits, text) are left alone. The minimap, chat and tooltip are not included yet: the minimap is
 -- round, the chat draws its text itself, and the tooltip is re-drawn by the game on every show.
-SS.SKINNABLE_BLIZZARD = { "PlayerFrame", "TargetFrame", "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3",
- "PartyMemberFrame4", "BuffFrame", "MainMenuExpBar", "MainMenuBar", "CastingBarFrame" };
+-- Default game frames keep the game's own look in every style. A panel behind them looked wrong, and hiding their
+-- textures also hides the frame art, so the reskin is off until a transparent version is worked out.
+SS.SKINNABLE_BLIZZARD = {};
 function SS.SkinBlizzardFrame(name)
 	local frame = getglobal(name);
 	if ( not frame or not frame.GetRegions or getglobal("SlimSuiteSkin_" .. name) ) then return; end
