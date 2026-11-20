@@ -123,7 +123,8 @@ function SU.Focus(frame)
 	end
 	-- this element's own look, under its settings: the global buttons set every element and clear it
 	do
-		local name = frame and frame.GetName and frame:GetName();
+		-- the menu is opened with a frame or with its name, so read the name either way
+		local name = (type(frame) == "string" and frame) or (type(frame) == "table" and frame.GetName and frame:GetName()) or nil;
 		if ( SU.lookButton == nil ) then
 			SU.lookButton = K.Button(SU.panel, "", 240, function()
 				local cur = SU.lookButton.elementName;
