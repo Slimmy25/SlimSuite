@@ -121,6 +121,35 @@ function SU.Focus(frame)
 			cb.get, cb.set, cb.cond = nil, nil, nil; cb:Hide();
 		end
 	end
+	-- this element's own look, under its settings: the global buttons set every element and clear it
+	do
+		local name = frame and frame.GetName and frame:GetName();
+		if ( SU.lookButton == nil ) then
+			SU.lookButton = K.Button(SU.panel, "", 240, function()
+				local cur = SU.lookButton.elementName;
+				if ( not cur ) then return; end
+				local o = SS.DB().styleOverrides and SS.DB().styleOverrides[cur];
+				local nextKey;
+				if ( o == nil ) then nextKey = "original"; elseif ( o == "original" ) then nextKey = "meter";
+				elseif ( o == "meter" ) then nextKey = "tooltip"; end
+				SS.SetElementLook(cur, nextKey); SU.Focus(SU.focus);
+			end);
+		end
+		local lb = SU.lookButton;
+		if ( name and SS.IsLookElement(name) and (not setupActive or mode == "enabled") ) then
+			local o = SS.DB().styleOverrides and SS.DB().styleOverrides[name];
+			local shownName = o and SS.STYLE_NAMES[o] or ("Global (" .. SS.STYLE_NAMES[SS.PanelStyleKey()] .. ")");
+			lb.elementName = name;
+			lb:SetText(SS.T("Look") .. ": " .. shownName);
+			lb:ClearAllPoints();
+			local anchor = (table.getn(checks) > 0) and SU.checks[table.getn(checks)] or SU.panel.text;
+			lb:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -8);
+			lb:SetParent(SU.panel); lb:Show();
+			h = h + 34;
+		else
+			lb.elementName = nil; lb:Hide();
+		end
+	end
 	-- the size & layout tools, under the settings
 	do
 		local ok = frame and (not setupActive or SU.Mode(frame) == "enabled") and SS.PrepareSizeTools(frame, e and e.title);
@@ -615,7 +644,7 @@ function SU.Build()
 	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);
 	SU.bar.resetAll:SetPoint("RIGHT", SU.bar.done, "LEFT", -6, 0);
 	-- Panel style: the three looks, bottom left beside Reset All and Done; the one in effect is lit
-	local styleChoices = { { "Original", "original" }, { "DPS meter", "meter" }, { "Tooltip", "tooltip" } };
+	local styleChoices = { { "Original", "original" }, { "RPG", "meter" }, { "New School", "tooltip" } };
 	SU.bar.styleButtons = {};
 	for i = 1, table.getn(styleChoices) do
 		local key = styleChoices[i][2];

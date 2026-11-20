@@ -11,8 +11,10 @@ if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one se
 SU = {};                                           -- the setup's panel, outline and steps
 SU.statCounterPlaceholder = CreateFrame("Frame", "SlimSuiteStatCounterFrame", UIParent);
 SU.statCounterPlaceholder:SetWidth(150); SU.statCounterPlaceholder:SetHeight(28);
+SS.OwnLook(SU.statCounterPlaceholder, function()
 SU.statCounterPlaceholder:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 SU.statCounterPlaceholder:SetBackdropColor(0.04, 0.035, 0.07, 0.9); SU.statCounterPlaceholder:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+end);
 SU.statCounterPlaceholder.label = SU.statCounterPlaceholder:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
 SU.statCounterPlaceholder.label:SetPoint("CENTER", SU.statCounterPlaceholder, "CENTER"); SU.statCounterPlaceholder.label:SetText("Stat counter [WIP]");
 SU.statCounterPlaceholder:Hide();

@@ -648,10 +648,12 @@ local revive = CreateFrame("Frame", "SlimSuiteReviveFrame", UIParent);
 revive:SetWidth(220); revive:SetHeight(26);
 revive:SetPoint("CENTER", UIParent, "CENTER", 0, -140);
 revive:SetFrameStrata("MEDIUM");
+SS.OwnLook(revive, function()
 revive:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 	tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 revive:SetBackdropColor(0.03, 0.03, 0.05, 0.85);
 revive:SetBackdropBorderColor(0.7, 0.52, 0.2, 0.9);
+end);
 revive.bar = CreateFrame("StatusBar", nil, revive);
 revive.bar:SetPoint("TOPLEFT", revive, "TOPLEFT", 5, -5);
 revive.bar:SetPoint("BOTTOMRIGHT", revive, "BOTTOMRIGHT", -5, 5);
@@ -764,10 +766,12 @@ local box = CreateFrame("Frame", "SlimSuiteCombatTextFrame", UIParent);
 box:SetWidth(260); box:SetHeight(220);
 box:SetPoint("RIGHT", UIParent, "RIGHT", -260, 40);
 box:SetFrameStrata("MEDIUM");
+SS.OwnLook(box, function()
 box:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 	tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 box:SetBackdropColor(0.02, 0.02, 0.03, 0.55);
 box:SetBackdropBorderColor(0.5, 0.4, 0.2, 0.6);
+end);
 box:Hide();
 box.lines, box.entries = {}, {};
 

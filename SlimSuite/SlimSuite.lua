@@ -83,9 +83,11 @@ function SS.ShowWarnTip(owner, text)
 	if ( not tip ) then
 		tip = CreateFrame("Frame", "SlimSuiteWarnTip", UIParent);
 		tip:SetFrameStrata("TOOLTIP");
+		SS.OwnLook(tip, function()
 		tip:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 			tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 		tip:SetBackdropColor(0.1, 0.05, 0, 0.95); tip:SetBackdropBorderColor(1, 0.6, 0.2, 1);
+		end);
 		tip.text = tip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 		tip.text:SetPoint("TOPLEFT", tip, "TOPLEFT", 8, -7); tip.text:SetWidth(200); tip.text:SetJustifyH("LEFT");
 		tip.text:SetTextColor(1, 0.75, 0.4);
@@ -613,10 +615,23 @@ function SS.PanelStyleKey()
  local key = SS.DB().uiStyle;
  return SS.PANEL_STYLES[key] and key or "original";
 end
+-- Names an element's look in the saved overrides: its own frame name, or slimName for an unnamed frame.
+function SS.FrameLookName(f)
+ if ( not f ) then return nil; end
+ if ( f.slimName ) then return f.slimName; end
+ if ( f.GetName ) then return f:GetName(); end
+ return nil;
+end
+-- The look an element uses: its own override from its right-click menu if it has one, otherwise the global choice.
+function SS.StyleKeyFor(name)
+ local o = name and SS.DB().styleOverrides and SS.DB().styleOverrides[name];
+ if ( o and SS.PANEL_STYLES[o] ) then return o; end
+ return SS.PanelStyleKey();
+end
 -- Applies the chosen look to one Slim Suite panel; cached so a panel that redraws often is only restyled on a change.
 function SS.ApplyPanelStyle(f)
  if not f or not f.SetBackdrop then return; end
- local key = SS.PanelStyleKey();
+ local key = SS.StyleKeyFor(SS.FrameLookName(f));
  if f.panelStyle == key then return; end
  local s = SS.PANEL_STYLES[key];
  f:SetBackdrop({ bgFile = s.bg, edgeFile = s.edge, tile = true, tileSize = 8, edgeSize = s.edgeSize,
@@ -628,7 +643,7 @@ end
 -- A frame whose band is made of textures (the tally, the local clock). Original keeps those textures exactly as they
 -- were; the other two styles hide them and draw the chosen panel behind the same frame.
 function SS.StyleBand(frame, textures, band)
-	local styled = SS.PanelStyleKey() ~= "original";
+	local styled = SS.StyleKeyFor(SS.FrameLookName(frame)) ~= "original";
 	if ( band and styled ) then
 		for i = 1, table.getn(textures) do textures[i]:Hide(); end
 		SS.ApplyPanelStyle(frame);
@@ -637,11 +652,60 @@ function SS.StyleBand(frame, textures, band)
 		if ( frame.panelStyle ~= nil ) then frame:SetBackdrop(nil); frame.panelStyle = nil; end
 	end
 end
-function SS.SetPanelStyle(key)
- SS.DB().uiStyle = SS.PANEL_STYLES[key] and key or "original";
+-- Every element panel keeps its own original look (look = a function that sets it). Original restores that look;
+-- Meter and Tooltip draw the chosen panel instead. hides = textures the element draws over its backdrop.
+SS.themedPanels = {};
+function SS.ThemePanel(f, look, hides)
+ if ( not f ) then return; end
+ if ( look and not f.slimOriginal ) then f.slimOriginal = look; table.insert(SS.themedPanels, f); end
+ if ( hides ) then f.styleHide = hides; end
+ local styled = SS.StyleKeyFor(SS.FrameLookName(f)) ~= "original";
+ if ( styled ) then
+  SS.ApplyPanelStyle(f);
+ elseif ( f.panelStyle and f.slimOriginal ) then
+  f.slimOriginal(); f.panelStyle = nil;
+ end
+ if ( f.styleHide ) then for i = 1, table.getn(f.styleHide) do if ( styled ) then f.styleHide[i]:Hide(); else f.styleHide[i]:Show(); end end end
+end
+function SS.OwnLook(f, look, hides)
+ look(); SS.ThemePanel(f, look, hides);
+end
+-- Looks that are not a backdrop (a plain texture) register a hook; it is handed the look its element uses.
+SS.themeHooks = {};
+function SS.AddThemeHook(fn, name)
+ table.insert(SS.themeHooks, { fn = fn, name = name }); fn(SS.StyleKeyFor(name));
+end
+function SS.RethemePanels()
+ for _, f in ipairs(SS.themedPanels) do SS.ThemePanel(f); end
+ for _, h in ipairs(SS.themeHooks) do h.fn(SS.StyleKeyFor(h.name)); end
+end
+-- Re-draws everything that reads the looks. Called after the global choice or one element's override changes.
+function SS.RefreshLooks()
+ SS.RethemePanels();
  if SS.UpdateLuck then SS.Safe(SS.UpdateLuck); end
  if SS.UpdateEnemyNameplates then SS.Safe(SS.UpdateEnemyNameplates); end
  if SS.ApplyMeterSkin then SS.Safe(SS.ApplyMeterSkin); end
+end
+-- The global buttons set every element to one look, so they clear each element's own override first.
+function SS.SetPanelStyle(key)
+ SS.DB().uiStyle = SS.PANEL_STYLES[key] and key or "original";
+ SS.DB().styleOverrides = {};
+ SS.RefreshLooks();
+end
+-- One element's look from its right-click menu. key = nil goes back to the global choice.
+SS.STYLE_NAMES = { original = "Original", meter = "RPG", tooltip = "New School" };
+SS.LOOK_ELEMENTS = { "SlimSuitePartyLines", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteBossFrames",
+ "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame",
+ "SlimSuiteLocalClockFrame", "SlimSuitePlayerCard", "SlimSuiteTargetCard", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame",
+ "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton" };
+function SS.IsLookElement(name)
+ for i = 1, table.getn(SS.LOOK_ELEMENTS) do if ( SS.LOOK_ELEMENTS[i] == name ) then return true; end end
+ return false;
+end
+function SS.SetElementLook(name, key)
+ local d = SS.DB(); d.styleOverrides = d.styleOverrides or {};
+ d.styleOverrides[name] = (key and SS.PANEL_STYLES[key]) and key or nil;
+ SS.RefreshLooks();
 end
 
 -- The one global rule for sound: nothing starts while the game is paused (the pause phase or the Esc menu is open).
@@ -907,6 +971,20 @@ function SS.BuildIconLook(button)
 	button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1);
 	button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
 	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
+	-- the slot's frame and empty fill follow the chosen panel look; Original keeps the grey gradient exactly
+	local parent = button:GetParent();
+	SS.AddThemeHook(function(key)
+		local s = SS.PANEL_STYLES[key];
+		if ( key == "original" or not s ) then
+			if ( button.border.SetGradient ) then button.border:SetGradient("VERTICAL", 0.26, 0.25, 0.27, 0.53, 0.52, 0.54); end
+			button.empty:SetTexture(0, 0, 0, 0.6);
+		else
+			local b = s.border;
+			if ( button.border.SetGradient ) then button.border:SetGradient("VERTICAL", b[1] * 0.5, b[2] * 0.5, b[3] * 0.5, b[1], b[2], b[3]); end
+			local c = s.color;
+			button.empty:SetTexture(c[1], c[2], c[3], 0.9);
+		end
+	end, parent and parent.GetName and parent:GetName());
 end
 
 -- Default replacement rows mirror the native build cluster: six spells in the upper row,

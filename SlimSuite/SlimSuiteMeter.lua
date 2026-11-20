@@ -350,12 +350,13 @@ function SS.ApplyMeterSkin()
 			if r and r.GetObjectType and r:GetObjectType() == 'Texture' then table.insert(frame.meterSkin, r); end
 		end
 	end
-	local meter = SS.PanelStyleKey() == 'meter';
+	-- the meter's own skin shows in Original and RPG; New School hides it and draws its panel instead
+	local skin = SS.StyleKeyFor('SlimSuiteMeterFrame') ~= 'tooltip';
 	for i = 1, table.getn(frame.meterSkin) do
-		if meter then frame.meterSkin[i]:Show(); else frame.meterSkin[i]:Hide(); end
+		if skin then frame.meterSkin[i]:Show(); else frame.meterSkin[i]:Hide(); end
 	end
 	frame.panelStyle = nil;
-	if meter then frame:SetBackdrop(nil); else SS.ApplyPanelStyle(frame); end
+	if skin then frame:SetBackdrop(nil); else SS.ApplyPanelStyle(frame); end
 end
 
 -- "x": the meter stays hidden for the rest of this run and comes back with the next one. Closed before a run, it

@@ -35,14 +35,17 @@ function SS.CreateLevelButton()
 	levelButton:SetWidth(184);
 	levelButton:SetHeight(58);
 	levelButton:SetFrameStrata("MEDIUM");
+	SS.OwnLook(levelButton, function()
 	levelButton:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	levelButton:SetBackdropColor(0.055, 0.035, 0.025, 0.96);
 	levelButton:SetBackdropBorderColor(0.82, 0.61, 0.24, 1);
+	end);
 	levelButton.panel = levelButton:CreateTexture(nil,"BACKGROUND");
 	levelButton.panel:SetPoint("TOPLEFT",levelButton,"TOPLEFT",3,-3); levelButton.panel:SetPoint("BOTTOMRIGHT",levelButton,"BOTTOMRIGHT",-3,3);
 	levelButton.panel:SetTexture(.12,.055,.025,.9);
 	if ( levelButton.panel.SetGradient ) then levelButton.panel:SetGradient("VERTICAL",.045,.025,.015,.20,.09,.035); end
+	SS.ThemePanel(levelButton, nil, { levelButton.panel });
 	levelButton:EnableMouse(true);
 	-- Keep a faint gold halo behind the button, like the game's own level-up control.
 	-- This is a region of the button itself, so it follows saved position, scale, and hover growth.
@@ -334,6 +337,9 @@ function SS.EncounterRow(index)
 	row.bar.background:SetVertexColor(0.04, 0.015, 0.01, 0.9);
 	row:EnableMouse(true);
 	row:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square");
+	-- an encounter row has no backdrop in Original; the chosen panel is drawn behind it in the other two styles
+	row.slimName = "SlimSuiteBossFrames";
+	SS.OwnLook(row, function() row:SetBackdrop(nil); end);
 	row:SetScript("OnClick", function()
 		local unit = this.unit;
 		SS.TargetEncounter(unit);
@@ -623,6 +629,7 @@ function SS.CreateAnnouncementFrame()
 	announcementFrame.text:SetNonSpaceWrap(true);
 	SS.SetGameDefaultFont(announcementFrame.text, 22);
 	announcementFrame.text:SetTextColor(0.96, 0.82, 0.52);
+	SS.OwnLook(announcementFrame, function() announcementFrame:SetBackdrop(nil); end);
 	announcementFrame:Hide();
 end
 

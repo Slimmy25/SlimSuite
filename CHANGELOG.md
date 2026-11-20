@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.51
+Every Slim Suite element can have its own look, and the panel styles are renamed RPG and New School.
+- Panel styles are now Original, RPG (the damage meter's gold-edged dark panel) and New School (the blue-tinted game tooltip panel).
+- Right-click any element that supports looks: its Look button cycles Global, Original, RPG and New School. The global buttons on the edit bar and the Panel style setting set every element at once and clear the individual looks.
+- Original keeps each element as it was before the panel styles. The damage meter now shows its own skin in Original and RPG; only New School hides it.
+- Converted to the panel styles: stored level-up button, revive bar, combat text, side achievements button, player and target cards, raid icon panel, stats panel, announcement banner, boss encounter rows, item and spell slots, party lines, compass, damage meter, luck, tally and local clock.
+- Not converted yet: enemy nameplates and the proc meter follow the global look only.
+
 ## 1.50
 Panel styles extend to the tally and local clock, the edit bar gets its style buttons on their own row, and the legendary luck panel shows its benefits.
 - Tally and local clock follow the panel style: Original keeps their dark band, DPS meter and Tooltip draw the chosen panel behind them.

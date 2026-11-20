@@ -2,8 +2,10 @@
 if ( setfenv ) then setfenv(1, SS.ENV); end
 local frame=CreateFrame("Frame","SlimSuiteCompassFrame",UIParent);
 frame:SetWidth(380); frame:SetHeight(88); frame:SetPoint("TOP",UIParent,"TOP",0,-65); frame:Hide();
+SS.OwnLook(frame, function()
 frame:SetBackdrop({bgFile="Interface\\Tooltips\\UI-Tooltip-Background",edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",tile=true,tileSize=16,edgeSize=8,insets={left=2,right=2,top=2,bottom=2}});
 frame:SetBackdropColor(.02,.025,.035,.65); frame:SetBackdropBorderColor(.55,.47,.27,.7);
+end);
 frame.arrow=frame:CreateTexture(nil,"OVERLAY"); frame.arrow:SetTexture("Interface\\Minimap\\MinimapArrow"); frame.arrow:SetWidth(14); frame.arrow:SetHeight(14); frame.arrow:SetPoint("TOP",frame,"TOP",0,-3);
 frame.track=frame:CreateTexture(nil,"BACKGROUND"); frame.track:SetTexture(.65,.56,.35,.4); frame.track:SetHeight(1);
 frame.track:SetPoint("TOPLEFT",frame,"TOPLEFT",16,-32); frame.track:SetPoint("TOPRIGHT",frame,"TOPRIGHT",-16,-32);
@@ -24,7 +26,10 @@ function SS.UpdateCompass()
   return;
  end
  local w,h=frame:GetWidth(),frame:GetHeight(); local rail=d.compassStyle~="free";
- frame:SetBackdropColor(.02,.025,.035,rail and .65 or 0); frame:SetBackdropBorderColor(.55,.47,.27,rail and .7 or 0);
+ if ( SS.StyleKeyFor("SlimSuiteCompassFrame") == "original" ) then
+  frame:SetBackdropColor(.02,.025,.035,rail and .65 or 0); frame:SetBackdropBorderColor(.55,.47,.27,rail and .7 or 0);
+ elseif ( rail ) then SS.ThemePanel(frame);
+ else frame:SetBackdropColor(0,0,0,0); frame:SetBackdropBorderColor(0,0,0,0); end
  if ( rail ) then frame.track:Show(); else frame.track:Hide(); end
  local heading=math.mod(360-math.deg(position.facing or 0),360); local first=math.floor((heading-90)/15)*15;
  for i=1,14 do

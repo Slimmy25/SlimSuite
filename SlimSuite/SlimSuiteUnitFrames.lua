@@ -339,9 +339,11 @@ function SS.MakeCards()
 	local function Make(name, unit)
 		local f = CreateFrame("Button", name, UIParent);
 		f:SetWidth(unit == "player" and 160 or 180); f:SetHeight(44); f:SetFrameStrata("MEDIUM");
+		SS.OwnLook(f, function()
 		f:SetBackdrop(SU.CARD_BACKDROP);
 		f:SetBackdropColor(0.05, 0.05, 0.05, 0.9);
 		f:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+		end);
 		f.unit = unit;
 		f:EnableMouse(true);
 		f:RegisterForClicks("LeftButtonUp", "RightButtonUp");
@@ -424,7 +426,12 @@ function SS.MakePartyLines()
 		local l = CreateFrame("Button", "SlimSuitePartyLine" .. i, c);
 		l:EnableMouse(true);
 		if ( l.RegisterForClicks ) then l:RegisterForClicks("LeftButtonUp", "RightButtonUp"); end
-		l.bg = l:CreateTexture(nil, "BACKGROUND"); l.bg:SetAllPoints(l); l.bg:SetTexture(0, 0, 0, 0.55);
+		l.bg = l:CreateTexture(nil, "BACKGROUND"); l.bg:SetAllPoints(l);
+		SS.AddThemeHook(function(key)
+			local s = SS.PANEL_STYLES[key];
+			if ( key == "original" or not s ) then l.bg:SetTexture(0, 0, 0, 0.55);
+			else l.bg:SetTexture(s.color[1], s.color[2], s.color[3], s.color[4]); end
+		end, "SlimSuitePartyLines");
 		l.face = l:CreateTexture(nil, "ARTWORK");
 		l.bar = CreateFrame("StatusBar", nil, l);
 		l.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar"); l.bar:SetMinMaxValues(0, 1);

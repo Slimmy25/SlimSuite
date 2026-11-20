@@ -137,7 +137,9 @@ function SS.OpenAchievements()
  content:SetHeight(math.max(100,y)); window:Show();
 end
 local button=CreateFrame("Button","SlimSuiteAchievementsButton",UIParent); button:SetWidth(150); button:SetHeight(30); button:SetPoint("TOPLEFT",UIParent,"TOPLEFT",24,-250);
+SS.OwnLook(button, function()
 button:SetBackdrop({bgFile="Interface\\Tooltips\\UI-Tooltip-Background",edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",tile=true,tileSize=16,edgeSize=12}); button:SetBackdropColor(.04,.04,.08,.9);
+end);
 local label=button:CreateFontString(nil,"OVERLAY","GameFontNormal"); label:SetPoint("CENTER",button,"CENTER",0,0); label:SetText(SS.T("Side achievements"));
 button:SetScript("OnClick",function() SS.OpenAchievements(); end); button:Hide();
 function SS.UpdateAchievementButton()

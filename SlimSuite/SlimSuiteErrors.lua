@@ -32,10 +32,12 @@ local function Build()
 	frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
 	frame:SetFrameStrata("DIALOG");
 	frame:SetMovable(true); frame:EnableMouse(true);
+	SS.OwnLook(frame, function()
 	frame:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	frame:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
 	frame:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+	end);
 	frame:RegisterForDrag("LeftButton");
 	frame:SetScript("OnDragStart", function() this:StartMoving(); end);
 	frame:SetScript("OnDragStop", function() this:StopMovingOrSizing(); end);

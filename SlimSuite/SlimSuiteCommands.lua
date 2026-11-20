@@ -919,9 +919,11 @@ function DemoBox()
 	box = CreateFrame("Frame", "SlimSuiteDemoBox", UIParent);
 	box:SetWidth(132); box:SetHeight(52); box:SetFrameStrata("DIALOG");
 	box:SetPoint("TOP", UIParent, "TOP", 0, -90);
+	SS.OwnLook(box, function()
 	box:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	box:SetBackdropColor(0.05, 0.04, 0.02, 0.92); box:SetBackdropBorderColor(0.83, 0.66, 0.26, 1);
+	end);
 	box:EnableMouse(true); box:SetMovable(true); box:RegisterForDrag("LeftButton");
 	box:SetScript("OnDragStart", function() this:StartMoving(); end);
 	box:SetScript("OnDragStop", function() this:StopMovingOrSizing(); end);
@@ -1067,9 +1069,11 @@ end);
 function BuildRaidPanel()
 	local p = CreateFrame("Frame", "SlimSuiteRaidIconPanel", UIParent);
 	p:SetWidth(9 * 22 + 6); p:SetHeight(28); p:SetFrameStrata("DIALOG");
+	SS.OwnLook(p, function()
 	p:SetBackdrop(SU.CARD_BACKDROP);
 	p:SetBackdropColor(0.05, 0.05, 0.05, 0.95);
 	p:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
+	end);
 	for i = 1, 9 do
 		local b = CreateFrame("Button", nil, p);
 		b:SetWidth(20); b:SetHeight(20);
