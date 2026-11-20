@@ -1186,6 +1186,26 @@ ShowEditGrid = function()
 	editGrid:Show();
 end
 
+-- the Snap switch on the edit bar: grid and nearby-frame snapping together
+function SS.SetSnap(on)
+	SS.DB().gridSnap = on and true or false;
+	SetAnchorSnap(on and true or false);
+	if ( SU.snap ) then SU.snap.Refresh(); end
+	SS.RefreshToggles();
+end
+
+-- the bottom-left corner rounded to the nearest grid line, using the same cell sizes the grid draws
+function SS.GridRound(left, bottom)
+	local W, H = UIParent:GetWidth(), UIParent:GetHeight();
+	local d = tonumber(SS.DB().gridDivisions) or 64;
+	local shorter = math.min(W, H);
+	local longer = math.max(d, math.floor((math.max(W, H) / shorter) * d + 0.5));
+	local cols = W <= H and d or longer;
+	local rows = H <= W and d or longer;
+	local cw, rh = W / cols, H / rows;
+	return math.floor(left / cw + 0.5) * cw, math.floor(bottom / rh + 0.5) * rh;
+end
+
 function SS.SnapPosition(name, f)
 	local left, right, bottom, top = RootBounds(f);
 	if ( not left or not right or not bottom or not top ) then SS.SavePlace(name, f); return; end
@@ -1193,7 +1213,7 @@ function SS.SnapPosition(name, f)
 	local threshold = 18;
 	for i = 1, table.getn(MOVABLE) do
 		local otherName = MOVABLE[i][1];
-		local other = otherName ~= name and getglobal(otherName) or nil;
+		local other = (SS.DB().anchorSnap and otherName ~= name and getglobal(otherName)) or nil;
 		if ( other ) then
 			local ol, oright, ob, ot = RootBounds(other);
 			if ( ol and oright and ob and ot ) then
@@ -1222,6 +1242,7 @@ function SS.SnapPosition(name, f)
 		for k, v in pairs(best) do p[k] = v; end
 	else
 		p.x, p.y = left, bottom;
+		if ( SS.DB().gridSnap ) then p.x, p.y = SS.GridRound(left, bottom); end
 	end
 	SS.DB().places[name] = p;
 	PlaceAll();
@@ -1233,7 +1254,7 @@ function SS.FinishHandleMove(h, name)
 	local t = getglobal(name);
 	if ( not t or not h.dragging ) then return; end
 	h.dragging = nil;
-	if ( SS.DB().anchorSnap ) then SS.SnapPosition(name, t);
+	if ( SS.DB().anchorSnap or SS.DB().gridSnap ) then SS.SnapPosition(name, t);
 	else SS.SavePlace(name, t); SS.DB().places[name].relative = nil; SS.Place(name); end
 end
 

@@ -162,7 +162,7 @@ function SU.Focus(frame)
 				local o = SS.DB().styleOverrides and SS.DB().styleOverrides[cur];
 				local nextKey;
 				if ( o == nil ) then nextKey = "original"; elseif ( o == "original" ) then nextKey = "meter";
-				elseif ( o == "meter" ) then nextKey = "tooltip"; end
+				elseif ( o == "meter" ) then nextKey = "tooltip"; elseif ( o == "tooltip" ) then nextKey = "forever"; end
 				SS.SetElementLook(cur, nextKey); SU.Focus(SU.focus);
 			end);
 		end
@@ -572,11 +572,11 @@ function SU.Begin()
 	-- The former element selector is no longer presented. Keep its mode controls private for
 	-- compatibility with older callers; all editing is through the actual green handles.
 	for _,b in pairs(SU.barButtons) do b:Hide(); end
-	SU.bar:SetWidth(470);
+	SU.bar:SetWidth(520);
 	SU.bar:SetHeight(84);
 	SU.bar.demoHint:ClearAllPoints();
-	SU.bar.demoHint:SetPoint("TOPLEFT",SU.bar,"TOPLEFT",10,-36);
-	SU.bar.demoHint:SetWidth(450); SU.bar.demoHint:SetHeight(22);
+	SU.bar.demoHint:SetPoint("TOPLEFT",SU.bar,"TOPLEFT",120,-36);
+	SU.bar.demoHint:SetWidth(390); SU.bar.demoHint:SetHeight(22);
 	SU.PlaceProfiles();
 	if ( SU.bar.resetAll ) then
 		SU.bar.done:ClearAllPoints(); SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
@@ -646,6 +646,8 @@ function SU.Build()
 	-- the bar down the left of the screen: the grid on top, one toggle per element, Done at the bottom
 	SU.bar = CreateFrame("Frame", "SlimSuiteSetupBar", UIParent);
 	SU.grid = Tick(8, -8, "Grid", function() return SS.DB().showEditGrid; end, function(v) SU.SetGridSetting(v); end);
+	-- one global switch: moving an element snaps it to the grid and to nearby frames
+	SU.snap = Tick(8, -36, "Snap", function() return SS.DB().gridSnap; end, function(v) SS.SetSnap(v); end);
 	SU.sizes = {};
 	local sizes = { 8, 16, 32, 64 };
 	for i = 1, 4 do
@@ -688,7 +690,7 @@ function SU.Build()
 	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);
 	SU.bar.resetAll:SetPoint("RIGHT", SU.bar.done, "LEFT", -6, 0);
 	-- Panel style: the three looks, bottom left beside Reset All and Done; the one in effect is lit
-	local styleChoices = { { "Original", "original" }, { "RPG", "meter" }, { "New School", "tooltip" } };
+	local styleChoices = { { "Original", "original" }, { "RPG", "meter" }, { "New School", "tooltip" }, { "WoW Forever", "forever" } };
 	SU.bar.styleButtons = {};
 	for i = 1, table.getn(styleChoices) do
 		local key = styleChoices[i][2];
@@ -706,7 +708,7 @@ function SU.Build()
 	end
 	SU.RefreshStyleButtons();
 	SU.bar:SetFrameStrata("DIALOG");
-	SU.bar:SetWidth(470); SU.bar:SetHeight(84);
+	SU.bar:SetWidth(520); SU.bar:SetHeight(84);
 	SU.bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	SU.bar:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
