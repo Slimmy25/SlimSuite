@@ -165,7 +165,13 @@ function SS.WinBuild()
  K.Icon(hero.icon,"INV_Misc_Gear_02"); hero.heading:SetText("Slim Suite"); hero.line:SetText(SS.T("Choose a module to open its settings."));
  hero.version=hero:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); hero.version:SetPoint("TOPRIGHT",hero,"TOPRIGHT",-9,-8); hero.version:SetText("v"..SS.AddonVersion());
  local hub=CreateFrame("Frame","SlimSuiteModuleHub",win); hub:SetPoint("TOPLEFT",win,"TOPLEFT",14,-60); hub:SetWidth(182); hub:SetHeight(430);
- local title=win:CreateFontString(nil,"OVERLAY","GameFontNormalLarge"); title:SetPoint("TOPLEFT",win,"TOPLEFT",214,-34); title:SetTextColor(1,.82,0); SS.settingsTitle=title;
+ -- the one primary category: every subcategory below is a part of Slim Suite
+ local band=CreateFrame("Frame",nil,hub); band:SetPoint("TOPLEFT",hub,"TOPLEFT",0,0); band:SetWidth(182); band:SetHeight(24);
+ band:SetBackdrop({bgFile="Interface\\Buttons\\WHITE8X8",edgeSize=1}); band:SetBackdropColor(0.12,0.11,0.16,0.95);
+ local bandText=band:CreateFontString(nil,"OVERLAY","GameFontNormal"); bandText:SetPoint("LEFT",band,"LEFT",8,0); bandText:SetText("Slim Suite");
+ local title=win:CreateFontString(nil,"OVERLAY","GameFontNormalLarge"); title:SetPoint("TOPLEFT",win,"TOPLEFT",214,-34); title:SetTextColor(1,1,1);
+ local rule=win:CreateTexture(nil,"ARTWORK"); rule:SetTexture("Interface\\Buttons\\WHITE8X8"); rule:SetVertexColor(0.5,0.5,0.55,0.8); rule:SetPoint("TOPLEFT",win,"TOPLEFT",214,-58); rule:SetWidth(470); rule:SetHeight(1);
+ local closeButton=K.Button(win,"Close",90,function() win:Hide(); end); closeButton:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,12); SS.settingsTitle=title;
  SS.moduleHubButtons={}; local views={}; local current;
  local back=K.Button(win,"Back",75,function() SS.OpenModulePage(nil); end); back:SetPoint("TOPLEFT",win,"TOPLEFT",20,-102); back:Hide();
  local master=SS.Check(win,"Module enabled",-100,function() return current and SS.ModuleEnabled(current); end,function(v) if current then SS.SetModuleEnabled(current,v); end end);
@@ -177,8 +183,8 @@ function SS.WinBuild()
 		for i = 1, table.getn(entries) do
 			local row = entries[i];
 			if ( row.head ) then
-				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal");
-				fs:SetText(SS.T(row.head)); fs:SetTextColor(1, 0.82, 0);
+				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
+				fs:SetText(SS.T(row.head)); fs:SetTextColor(1, 1, 1);
 				table.insert(page.rows, { kind = "head", fs = fs });
 				up = nil;
    elseif row.deathMatrix then
@@ -216,7 +222,7 @@ function SS.WinBuild()
 				if ( row.choice ) then
 					r.kind = "choice";
 					r.fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
-					r.fs:SetText(SS.T(label));
+					r.fs:SetText(SS.T(label)); r.fs:SetTextColor(1, 0.82, 0);
 					r.b = SS.ChoiceButton(parent, 200);
 					r.b.entry = row; r.b:SetPoint("LEFT", r.fs, "RIGHT", 10, 0);
 					r.b:SetText(SS.ChoiceText(row) .. "  v");
@@ -225,6 +231,7 @@ function SS.WinBuild()
 				else
 					r.kind = "check";
 					r.cb = SS.Check(parent, label, startY, row[2], row[3], lead);
+					if ( r.cb.label ) then r.cb.label:SetTextColor(1, 0.82, 0); end
 					up = row[2];
 				end
 				table.insert(page.rows, r);
@@ -330,12 +337,12 @@ function SS.WinBuild()
 			{"Reduce floating combat-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end},
  };
  if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),170,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-300); end;
- local entries={chat={},sounds={},ui={},gameplay={},misc={}};
+ local entries={chat={},sounds={},ui={},gameplay={},misc={},nameplates={}};
  for _,row in ipairs(uiEntries) do table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
  local category="misc";
  for _,row in ipairs(otherEntries) do
   if row.head then
-   category=({["Chat mods"]="chat",["Enemy frames"]="gameplay",["Camera and marks"]="gameplay",["Minimap"]="ui",["Deaths and spells"]="sounds",["Accessibility"]="misc"})[row.head] or "misc";
+   category=({["Chat mods"]="chat",["Enemy frames"]="nameplates",["Camera and marks"]="gameplay",["Minimap"]="ui",["Deaths and spells"]="sounds",["Accessibility"]="misc"})[row.head] or "misc";
   end
   local destination=category; local label=row[1];
   if label=="Mark where a downed friend can be revived" or label=="Show caches on the minimap" or label=="Show bosses on the minimap" or label=="Show lairs on the minimap, with their 3:00 refill timer" or label=="Show the game's nearest Guardian lair flag on minimap" then destination="gameplay";
@@ -350,7 +357,8 @@ function SS.WinBuild()
  for i,id in ipairs(SS.MODULE_ORDER) do
   local module=id;
   local open=K.Button(hub,SS.T(SS.MODULE_TITLES[id]),170,function() SS.OpenModulePage(module); end);
-  open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-(i-1)*40); SS.sidebarButtons=SS.sidebarButtons or {}; SS.sidebarButtons[id]=open;
+  open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-30-(i-1)*40); SS.sidebarButtons=SS.sidebarButtons or {}; SS.sidebarButtons[id]=open;
+  SU.Flatten(open);
   -- the on/off switch for each module is the Module enabled line at the top of its page
   local toggle=K.Button(hub,"",10,function() SS.SetModuleEnabled(module,not SS.ModuleEnabled(module)); end);
   toggle:Hide(); SS.moduleHubButtons[id]=toggle;
@@ -375,7 +383,7 @@ function SS.WinBuild()
   hub:Show(); back:Hide(); master:Show(); master.label:Show(); views[id].scroll:Show();
   title:SetText(SS.T(SS.MODULE_TITLES[id]));
   master.label:SetText(SS.T("Module enabled"));
-  for sid, b2 in pairs(SS.sidebarButtons or {}) do if ( sid == id ) then b2:LockHighlight(); else b2:UnlockHighlight(); end end
+  for sid, b2 in pairs(SS.sidebarButtons or {}) do SU.PaintFlat(b2, sid == id, {1, 0.82, 0.2}); end
   SS.RefreshToggles(); SS.RefreshModuleHub();
  end;
  win:SetScript("OnShow",function() SS.OpenModulePage(nil); end);

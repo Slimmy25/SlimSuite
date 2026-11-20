@@ -1,9 +1,10 @@
 -- Category masters pause only SlimSuite features; installed addons are never changed.
 if ( setfenv ) then setfenv(1, SS.ENV); end
-SS.MODULE_ORDER={"chat","sounds","ui","gameplay","misc"};
-SS.MODULE_TITLES={chat="Chat Mods",sounds="Sound Effects",ui="User Interface",gameplay="Gameplay",misc="Misc"};
+SS.MODULE_ORDER={"ui","nameplates","gameplay","chat","sounds","misc"};
+SS.MODULE_TITLES={ui="Interface",nameplates="Nameplates",gameplay="Gameplay",chat="Chat",sounds="Sound",misc="Accessibility"};
 local groups={
- gameplay={"camera","bossMarks","prePullMarks","deathMarks","raidRow","modernEnemyFrames","enemyBossesOnly","enemyPlateDebuffs","minimapCaches","minimapBosses","minimapLairs","showGuardianFlag","floatingText","worldCombatMode"},
+ gameplay={"camera","bossMarks","prePullMarks","deathMarks","raidRow","minimapCaches","minimapBosses","minimapLairs","showGuardianFlag","floatingText","worldCombatMode"},
+ nameplates={"modernEnemyFrames","enemyBossesOnly","enemyPlateDebuffs","enemyPlateGroup","platerStyle","plateWidth","plateBarHeight","plateNameSize","plateHpText","plateBorder","plateColorEnemy","plateColorElite","plateColorBoss"},
  misc={"accessibilityContrast","accessibilityLargeText","accessibilityReduceMotion"}};
 function SS.ModuleEnabled(id)
  local d=SS.DB();

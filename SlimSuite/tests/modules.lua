@@ -3,7 +3,7 @@ local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..labe
 SS.SetupEnd(true)
 if not SS.ENV.win then SS.WinBuild() end
 SS.ENV.win:Show(); SS.OpenModulePage(nil)
-check("five category hub exists",SlimSuiteModuleHub:IsShown() and #SS.MODULE_ORDER==5)
+check("five category hub exists",SlimSuiteModuleHub:IsShown() and #SS.MODULE_ORDER==6)
 check("diagnostic entry point removed",SS.ShowDiagnosticsWindow==nil and SlimSuiteDiagnosticsFrame==nil)
 for _,id in ipairs(SS.MODULE_ORDER) do
  SS.SetModuleEnabled(id,true); SS.OpenModulePage(id)
@@ -24,7 +24,7 @@ check("sound master Off silences selected effects",played==0 and SS.SoundSelecti
 SS.SetModuleEnabled("sounds",true); SS.PlayBossKillSound(); check("sound master restores chosen effect",played==1)
 d.bossMarks=true; d.camera=true; d.modernEnemyFrames=true
 SS.SetModuleEnabled("gameplay",false)
-check("gameplay master stops visual extras",not d.bossMarks and not d.camera and not d.modernEnemyFrames)
+check("gameplay master stops visual extras",not d.bossMarks and not d.camera)
 SS.SetModuleEnabled("gameplay",true)
 check("gameplay settings resume",d.bossMarks and d.camera and d.modernEnemyFrames)
 d.accessibilityContrast=true
