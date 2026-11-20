@@ -170,6 +170,8 @@ SS.DEFAULTS = {
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
 	partyFaces = true, cardPortraits = true, targetDebuffs = true, showAbsorbs = false, moveLevelButton = false, moveMeter = false,
 	modernEnemyFrames = false, enemyBossesOnly = true, enemyPlateDebuffs = false,
+	platerStyle = true, plateWidth = 110, plateBarHeight = 7, plateNameSize = "normal", plateHpText = true, plateBorder = true,
+	plateColorEnemy = "Red", plateColorElite = "Gold", plateColorBoss = "Purple",
 	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, gridSnap = false, raidRow = true, layoutPerCharacter = false,

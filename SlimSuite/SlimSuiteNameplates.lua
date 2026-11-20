@@ -26,6 +26,17 @@ local function OverlayActive()
 end
 local PLATE_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
  tile = true, tileSize = 16, edgeSize = 10, insets = { left=2, right=2, top=2, bottom=2 } };
+-- Plater-style plates: a slim health bar with the name above it. Colours are chosen in the settings.
+local PLATE_COLORS = { Red = { 0.86, 0.18, 0.14 }, Gold = { 0.95, 0.78, 0.22 }, Purple = { 0.66, 0.36, 0.92 },
+ Green = { 0.35, 0.84, 0.36 }, Blue = { 0.3, 0.62, 1 }, White = { 0.94, 0.94, 0.94 } };
+local NAME_FONTS = { small = "GameFontNormalSmall", normal = "GameFontNormal", large = "GameFontNormalLarge" };
+local FLAT_TEX = "Interface\\Buttons\\WHITE8X8";
+local function PlateColor(kind)
+ local d = SS.DB(); local key = d.plateColorEnemy;
+ if ( kind == "elite" ) then key = d.plateColorElite;
+ elseif ( kind == "boss" or kind == "finalBoss" or kind == "guardian" ) then key = d.plateColorBoss; end
+ return PLATE_COLORS[key or ""] or PLATE_COLORS.Red;
+end
 local plates, freePlates, requests, registered, plateSerial = {}, {}, {}, false, 0;
 local nativeChoiceApplied;
 local function NewPlate()
@@ -58,6 +69,39 @@ local function NewPlate()
 	return f;
 end
 
+-- back to the boxed plate: its original points and size
+local function ApplyClassicLayout(f)
+	if ( not f.platerKey ) then return; end
+	f.platerKey = nil;
+	f:SetWidth(152); f:SetHeight(42);
+	f.health:ClearAllPoints(); f.health:SetPoint("TOPLEFT", f, "TOPLEFT", 5, -19); f.health:SetPoint("TOPRIGHT", f, "TOPRIGHT", -5, -19); f.health:SetHeight(7);
+	f.health:SetBackdrop(nil);
+	f.name:ClearAllPoints(); f.name:SetPoint("TOPLEFT", f, "TOPLEFT", 5, -4); f.name:SetPoint("TOPRIGHT", f, "TOPRIGHT", -5, -4);
+	f.name:SetFontObject(getglobal("GameFontNormalSmall"));
+	f.hpText:ClearAllPoints(); f.hpText:SetPoint("TOP", f.health, "BOTTOM", 0, 1);
+end
+
+-- the slim layout: size, name font, border and health text follow the settings; recomputed only when one changes
+local function ApplyPlaterLayout(f)
+	local d = SS.DB();
+	local w = tonumber(d.plateWidth) or 110; local h = tonumber(d.plateBarHeight) or 7;
+	local nameSize = NAME_FONTS[d.plateNameSize] and d.plateNameSize or "normal";
+	local border = d.plateBorder ~= false;
+	local key = w .. ":" .. h .. ":" .. nameSize .. ":" .. (border and "b" or "n");
+	if ( f.platerKey == key ) then return; end
+	f.platerKey = key;
+	f:SetWidth(w + 12); f:SetHeight(h + 28);
+	f.health:ClearAllPoints(); f.health:SetPoint("BOTTOM", f, "BOTTOM", 0, 14);
+	f.health:SetWidth(w); f.health:SetHeight(h);
+	f.name:ClearAllPoints(); f.name:SetPoint("BOTTOM", f.health, "TOP", 0, 3); f.name:SetWidth(w + 12);
+	f.name:SetFontObject(getglobal(NAME_FONTS[nameSize]));
+	if ( border ) then
+		f.health:SetBackdrop({ bgFile = FLAT_TEX, edgeFile = FLAT_TEX, edgeSize = 1, insets = { left = 1, right = 1, top = 1, bottom = 1 } });
+		f.health:SetBackdropColor(0.02, 0.02, 0.02, 0.85); f.health:SetBackdropBorderColor(0, 0, 0, 1);
+	else f.health:SetBackdrop(nil); end
+	f.hpText:ClearAllPoints(); f.hpText:SetPoint("TOP", f.health, "BOTTOM", 0, -1);
+end
+
 local function UpdatePlateData(record, unit)
 	local f = record.frame or NewPlate();
 	record.frame = f;
@@ -75,12 +119,20 @@ local function UpdatePlateData(record, unit)
 		if ( ok and type(values) == "table" ) then debuffs = values; end
 	end
  local modern = SS.DB().modernEnemyFrames and true or false;
- if ( f.modernStyle ~= modern ) then
-  f:SetBackdrop(modern and PLATE_BACKDROP or nil);
-  if ( modern ) then f.panelStyle = nil; SS.ApplyPanelStyle(f); end
-  f.modernStyle = modern;
+ local plater = modern and SS.DB().platerStyle ~= false;
+ if ( f.modernStyle ~= modern or f.platerStyle ~= plater ) then
+  if ( plater ) then f:SetBackdrop(nil); else f:SetBackdrop(modern and PLATE_BACKDROP or nil); end
+  if ( modern and not plater ) then f.panelStyle = nil; SS.ApplyPanelStyle(f); end
+  if ( not plater ) then ApplyClassicLayout(f); end
+  f.modernStyle = modern; f.platerStyle = plater;
  end
- if ( modern ) then f.name:Show();
+ if ( plater ) then
+  ApplyPlaterLayout(f); f.name:Show();
+  if ( unit and tonumber(unit.hpm) and tonumber(unit.hpm) > 0 ) then
+   f.health:SetStatusBarColor(PlateColor(record.kind)[1], PlateColor(record.kind)[2], PlateColor(record.kind)[3]);
+   if ( SS.DB().plateHpText == false ) then f.hpText:Hide(); end
+  end
+ elseif ( modern ) then f.name:Show();
  else f.name:Hide(); f.health:Hide(); f.hpText:Hide(); f.mark:Hide(); end
  record.visible = modern or table.getn(debuffs) > 0;
 	for i = 1, table.getn(f.dots) do

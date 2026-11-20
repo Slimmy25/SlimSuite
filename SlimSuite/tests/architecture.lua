@@ -44,7 +44,10 @@ check('native key binding can hide plates without being overridden',NAMEPLATES_O
 NAMEPLATES_ON=1; SS.UpdateEnemyNameplates()
 check('native key binding reactivates aura attachments',handler~=nil)
 SS.SetModernEnemyFrames(true); if handler then handler() end
-check('modern plate restores its body', plate and plate.health:IsShown() and plate.name:IsShown() and plate.backdrop)
+check('modern plate restores its body', plate and plate.health:IsShown() and plate.name:IsShown() and plate.backdrop == nil)
+SS.DB().platerStyle=false; SS.UpdateEnemyNameplates(); if handler then handler() end
+check('boxed modern plate still has its backdrop', plate and plate.backdrop and plate.health:IsShown())
+SS.DB().platerStyle=true
 SS.SetModernEnemyFrames(false); SS.SetEnemyPlateDebuffs(false)
 check('disabled attachments unregister and hide', handler == nil and not plate:IsShown())
 local bar=CreateFrame('StatusBar',nil,UIParent)
