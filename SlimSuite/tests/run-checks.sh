@@ -24,7 +24,7 @@ run "translation coverage" "python3 ../tools/build-locales.py --check"
 run "normalized audio" "python3 ../tools/check-audio.py"
 run "shared kit"      "python3 tests/kitversion.py"
 run "lua 5.0"         "python3 tests/lua50.py $sources"
-for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review edges display chat chatfilter ready attachments audit architecture auras vanilla ui-extras containment navigation minimap-chrome follow-choice identities rainfall-demo kill-sounds adaptive-sounds match-sounds modules meter-luck clock-choice side-achievements final-boss-sounds revive-sounds bounds-throttle hudedit hudchain hudlayout bagmap snaploop; do
+for s in cards movable square window menu fuzz setup selfparty choices target partyorder xpart marks api review edges display chat chatfilter ready attachments audit architecture auras vanilla ui-extras containment navigation minimap-chrome follow-choice identities rainfall-demo kill-sounds adaptive-sounds match-sounds modules meter-luck clock-choice side-achievements final-boss-sounds revive-sounds bounds-throttle hudedit hudchain hudlayout bagmap snaploop locale-lazy; do
   run "harness: $s" "cd tests && SCENARIO=$s SEED=7 STEPS=300 $LUA run.lua"
 done
 for locale in esES frFR deDE ptBR itIT; do
