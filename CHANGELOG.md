@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.68
+A small companion: a 3D copy of your character on screen, with a dance button.
+
+- /slimsuite companion shows or hides it. Drag it to move it; its place and whether it is shown are kept between logins.
+- Dance plays an animation on the companion only. It does not change your character.
+- Not yet tested in the live client: the dance animation number, which is a first guess, and whether the model shows your character.
+
 ## 1.67
 The alternative Character sheet gets a 3D character with emote buttons, and reacts to bosses and low health.
 

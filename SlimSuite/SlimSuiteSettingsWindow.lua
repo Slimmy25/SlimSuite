@@ -510,6 +510,8 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		SS.ShowErrors();
 	elseif ( cmd == "log" ) then
 		SS.ShowActionLog();
+	elseif ( cmd == "companion" ) then
+		SS.ToggleCompanion();
 	elseif ( cmd == "hud" or cmd == "recommend" ) then
 		SS.ShowHUDRecommendation();
 	elseif ( cmd == "mouse" ) then
