@@ -6,6 +6,7 @@ local groups={
  gameplay={"camera","bossMarks","prePullMarks","deathMarks","raidRow","minimapCaches","minimapBosses","minimapLairs","showGuardianFlag","floatingText","worldCombatMode"},
  nameplates={"modernEnemyFrames","enemyBossesOnly","enemyPlateDebuffs","enemyPlateGroup","platerStyle","plateWidth","plateBarHeight","plateNameSize","plateHpText","plateBorder","plateColorEnemy","plateColorElite","plateColorBoss"},
  misc={"accessibilityContrast","accessibilityLargeText","accessibilityReduceMotion"}};
+SS.MODULE_KEYS=groups;
 function SS.ModuleEnabled(id)
  local d=SS.DB();
  if d.modules[id]~=nil then return d.modules[id] and true or false; end

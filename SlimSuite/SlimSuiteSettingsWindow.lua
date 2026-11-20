@@ -171,7 +171,10 @@ function SS.WinBuild()
  local bandText=band:CreateFontString(nil,"OVERLAY","GameFontNormal"); bandText:SetPoint("LEFT",band,"LEFT",8,0); bandText:SetText("Slim Suite");
  local title=win:CreateFontString(nil,"OVERLAY","GameFontNormalLarge"); title:SetPoint("TOPLEFT",win,"TOPLEFT",214,-34); title:SetTextColor(1,1,1);
  local rule=win:CreateTexture(nil,"ARTWORK"); rule:SetTexture("Interface\\Buttons\\WHITE8X8"); rule:SetVertexColor(0.5,0.5,0.55,0.8); rule:SetPoint("TOPLEFT",win,"TOPLEFT",214,-58); rule:SetWidth(470); rule:SetHeight(1);
- local closeButton=K.Button(win,"Close",90,function() win:Hide(); end); closeButton:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,12); SS.settingsTitle=title;
+ local closeButton=K.Button(win,"Close",90,function() win:Hide(); end); closeButton:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,12);
+ -- Defaults resets the category on the page; Reset ALL asks first, then wipes the whole addon
+ local defaultsButton=K.Button(win,"Defaults",100,function() if SS.currentModule then SS.ResetCategory(SS.currentModule); end end); defaultsButton:SetPoint("BOTTOMLEFT",win,"BOTTOMLEFT",22,12);
+ local resetAllButton=K.Button(win,"Reset ALL",110,function() SS.ConfirmResetAll(); end); resetAllButton:SetPoint("LEFT",defaultsButton,"RIGHT",8,0); SS.settingsTitle=title;
  SS.moduleHubButtons={}; local views={}; local current;
  local back=K.Button(win,"Back",75,function() SS.OpenModulePage(nil); end); back:SetPoint("TOPLEFT",win,"TOPLEFT",20,-102); back:Hide();
  local master=SS.Check(win,"Module enabled",-100,function() return current and SS.ModuleEnabled(current); end,function(v) if current then SS.SetModuleEnabled(current,v); end end);
@@ -378,7 +381,7 @@ function SS.WinBuild()
  SS.OpenModulePage=function(id)
   -- the sidebar is always there; the chosen module's page fills the right side under its title
   if ( not id or not views[id] ) then id = SS.MODULE_ORDER[1]; end
-  current=id;
+  current=id; SS.currentModule=id;
   for _,view in pairs(views) do view.scroll:Hide(); end
   hub:Show(); back:Hide(); master:Show(); master.label:Show(); views[id].scroll:Show();
   title:SetText(SS.T(SS.MODULE_TITLES[id]));
@@ -553,3 +556,70 @@ function SS.CameraCommand(text)
 		K.Print(NAME, "camera distance is " .. p .. " yards.");
 	end
 end
+
+-- ---------------------------------------------------------------- defaults for each category, and Reset ALL
+-- The keys each category owns. Sounds are every default whose name mentions a sound; the rest are listed here.
+function SS.CategoryKeys(id)
+	local set = {};
+	local function add(list) for _, key in ipairs(list) do set[key] = true; end end
+	if ( id == "ui" ) then
+		add({ "cooldowns", "minimapBar", "minimapCaches", "minimapBosses", "minimapLairs", "minimapTransparent", "minimapSquare",
+		      "compassOn", "compassRunClock", "compassBosses", "compassCaches", "compassLairs", "compassStyle",
+		      "uiStyle", "uiTextScale", "styleOverrides", "zoneLine", "onTopOfScreens", "showGuardianFlag" });
+	elseif ( id == "nameplates" ) then
+		add({ "modernEnemyFrames", "enemyBossesOnly", "enemyPlateDebuffs", "enemyPlateGroup", "platerStyle", "plateWidth",
+		      "plateBarHeight", "plateNameSize", "plateHpText", "plateBorder", "plateColorEnemy", "plateColorElite", "plateColorBoss" });
+	elseif ( id == "chat" ) then
+		add({ "hideLevel", "hideNewSpells", "hideRacialInfo", "hideOpeningLine", "hideLairLine", "hideRP", "hideAddonText",
+		      "hideLocation", "hideDifficulty", "hideTalentXP" });
+	elseif ( id == "sounds" ) then
+		for key in pairs(SS.DEFAULTS) do if ( string.find(key, "Sound", 1, true) ) then set[key] = true; end end
+		set.teammateDeathSound = true;
+	elseif ( id == "gameplay" or id == "misc" ) then
+		add(SS.MODULE_KEYS[id] or {});
+	end
+	local out = {};
+	for key in pairs(set) do table.insert(out, key); end
+	return out;
+end
+
+-- Puts one category back to the defaults; nothing else moves.
+function SS.ResetCategory(id)
+	local d = SS.DB();
+	local keys = SS.CategoryKeys(id);
+	for _, key in ipairs(keys) do
+		local v = SS.DEFAULTS[key];
+		if ( type(v) == "table" ) then d[key] = SS.CopyTable(v); else d[key] = v; end
+	end
+	if ( id == "ui" ) then d.styleOverrides = {}; end
+	if ( id == "chat" or id == "nameplates" or id == "gameplay" or id == "misc" or id == "sounds" ) then
+		if ( d.modules ) then d.modules[id] = nil; end
+	end
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
+	SS.Safe(SS.UpdateEnemyNameplates);
+	SS.Safe(SS.Camera, false);
+	if ( SS.RefreshLooks ) then SS.Safe(SS.RefreshLooks); end
+	if ( SS.RefreshToggles ) then SS.RefreshToggles(); end
+	if ( SS.RelayoutAllPages ) then SS.RelayoutAllPages(); end
+	if ( SS.RefreshModuleHub ) then SS.RefreshModuleHub(); end
+	K.Print(NAME, (SS.MODULE_TITLES[id] or id) .. " is back to its defaults.");
+end
+
+-- Asks before wiping everything. Only a confirmed Reset ALL does anything.
+function SS.ConfirmResetAll()
+	if ( not StaticPopupDialogs or not StaticPopup_Show ) then K.Print(NAME, "Reset ALL needs the game's confirmation window, which is not available here."); return; end
+	StaticPopupDialogs["SLIMSUITE_RESET_ALL"] = {
+		text = "Reset ALL of Slim Suite to its defaults? This clears every setting, element position, size, look, preset and saved layout, then reloads the UI. It cannot be undone.",
+		button1 = YES or "Yes", button2 = NO or "No", timeout = 0, whileDead = 1, hideOnEscape = 1,
+		OnAccept = function() SS.ResetEverything(); end };
+	StaticPopup_Show("SLIMSUITE_RESET_ALL");
+end
+
+-- Wipes the saved settings and rebuilds them from the defaults, then reloads so the game's frames go back too.
+function SS.ResetEverything()
+	SlimSuiteDB = {};
+	SS.preparedDB = nil;
+	SS.DB();
+	if ( ReloadUI ) then ReloadUI(); end
+end
+
