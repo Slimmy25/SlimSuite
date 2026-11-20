@@ -276,7 +276,7 @@ function SS.WinBuild()
 			{head="Other addons"},
 			{"Azeroth Stats: hide its top bar (runs /azstats bar once)", function() return SS.DB().azStatsHideBar; end, function(v) SS.SetAzStatsHideBar(v); end},
 			{head="Setup"},
-			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
+			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v, true); if ( v ) then SS.OpenHUDEdit(); else SS.CloseHUDEdit(); end end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
 			{button = "Profiles & import/export", onClick = function() SS.ShowLayoutWindow(); end},
 			{button = "Recommended HUD preset", onClick = function() SS.ShowHUDRecommendation(); end},
@@ -377,6 +377,8 @@ function SS.WinBuild()
   elseif label=="Cooldown numbers on the spell squares" then destination="ui"; end
   table.insert(entries[destination],row);
  end
+ table.insert(entries.gameplay,{"Hide the Bag button", function() return SS.DB().hideBagButton; end, function(v) SS.DB().hideBagButton = v and true or false; SS.ApplyBagMapButtons(); end});
+ table.insert(entries.gameplay,{"Hide the Map button on the minimap", function() return SS.DB().hideMapButton; end, function(v) SS.DB().hideMapButton = v and true or false; SS.ApplyBagMapButtons(); end});
  if SS.AchievementsAvailable() then 
  table.insert(entries.gameplay,{button="Side achievements",onClick=function() SS.OpenAchievements(); end}); end;
  table.insert(entries.ui,{button="HUD Edit Mode",onClick=function() SS.OpenHUDEdit(); end});

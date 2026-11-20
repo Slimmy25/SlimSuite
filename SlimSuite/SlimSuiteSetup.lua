@@ -630,8 +630,6 @@ function SU.Build()
 	-- the bar down the left of the screen: the grid on top, one toggle per element, Done at the bottom
 	SU.bar = CreateFrame("Frame", "SlimSuiteSetupBar", UIParent);
 	SU.grid = Tick(8, -8, "Grid", function() return SS.DB().showEditGrid; end, function(v) SU.SetGridSetting(v); end);
-	-- one global switch: moving an element snaps it to the grid and to nearby frames
-	SU.snap = Tick(8, -36, "Snap", function() return SS.DB().gridSnap; end, function(v) SS.SetSnap(v); end);
 	SU.sizes = {};
 	local sizes = { 8, 16, 32, 64 };
 	for i = 1, 4 do

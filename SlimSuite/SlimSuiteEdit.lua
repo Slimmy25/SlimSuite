@@ -554,7 +554,7 @@ function SS.ToggleMovableOrientation(name)
 			f:SetWidth(w); f:SetHeight(h); SS.DB().sizes[name] = { w = w, h = h };
 		end
 	end
-	ApplyMovableOrientation(name);
+	if ( name == "CharacterFrame" ) then SS.ApplyCharacterLayout(); else ApplyMovableOrientation(name); end
 	PlaceAll();
 end
 
@@ -1076,14 +1076,6 @@ function SS.ShowLockPanel()
 		end
 		AddGridLineToggle(8, "gridCenterVertical", "Vertical red center line");
 		AddGridLineToggle(184, "gridCenterHorizontal", "Horizontal red center line");
-		local snap = CreateFrame("CheckButton", nil, lockPanel, "UICheckButtonTemplate");
-		snap:SetPoint("TOPLEFT", lockPanel, "TOPLEFT", 6, -111); snap:SetWidth(22); snap:SetHeight(22);
-		snap:SetScript("OnShow", function() this:SetChecked(SS.DB().anchorSnap and 1 or nil); end);
-		snap.get = function() return SS.DB().anchorSnap; end;
-		SS.TrackToggle(snap);
-		snap:SetScript("OnClick", function() SetAnchorSnap(not SS.DB().anchorSnap); SS.RefreshToggles(); end);
-		local snapLabel = lockPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-		snapLabel:SetPoint("LEFT", snap, "RIGHT", 0, 0); snapLabel:SetText(SS.T("Snap nearby frames together"));
 		local button = K.Button(lockPanel, "Done", 76, function() SS.SetUnlocked(false); end);
 		button:SetPoint("BOTTOMRIGHT", lockPanel, "BOTTOMRIGHT", -8, 7);
 		lockPanel.doneButton = button;

@@ -893,6 +893,7 @@ function SS.ApplySize(name, f)
 	if ( name == "SlimSuitePartyLines" and SS.UpdatePartyLines ) then SS.Safe(SS.UpdatePartyLines); end
 	local scale = SS.DB().scales[name];
 	if ( SS.DisplayElementScale ) then scale = SS.DisplayElementScale(name, type(scale) == "number" and scale or 1); end
+	if ( name == "MinimapCluster" and SS.bigMapOn ) then scale = SS.BIG_MAP_SCALE; end   -- the big map (Ctrl-click the minimap)
 	if ( type(scale) == "number" ) then
 		if ( name == "PartyMemberFrame1" ) then
 			for i = 1, 4 do local party = getglobal("PartyMemberFrame" .. i); if ( party and party.SetScale ) then party:SetScale(scale); end end

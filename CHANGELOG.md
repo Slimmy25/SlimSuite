@@ -2,6 +2,19 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.60
+HUD Edit Mode gets a closer look to the game's own editor, and the Talents window and the minimap do more. Everything is optional and off until you turn it on.
+
+- Toggle UI Settings opens HUD Edit Mode. The old first-time walkthrough no longer starts from that toggle; Run setup again still does.
+- HUD Edit Mode has a layout picker, a grid slider, a search box, a Collapse options button and an info icon. Elements sit in two columns, and Advanced Options turns on the chain panel.
+- Chaining moves a partner directly ahead of or behind its primary in the list, with Keep chained elements next to each other.
+- The Move UI panel and the setup bar no longer have their own Snap switch. Snap to Elements lives only in HUD Edit Mode.
+- The Character window has a vertical layout: the equipment slots stand in one column down the left, with the model beside them.
+- Talents show only the trees you have points in. With one tree, the tab row is hidden.
+- Gameplay has two new options: hide the Bag button, and hide the Map button on the minimap.
+- Ctrl-click the minimap to enlarge it to 2.5 times its size, and Ctrl-click again to shrink it back. It is not saved.
+- Not yet tested in the live client: the new HUD Edit layout, the Character vertical layout, the Talents tab filter, and the big minimap placement.
+
 ## 1.59
 New HUD Edit Mode window, in the style of the game's own HUD editor, with one tick box per element. Duplicate element settings are removed from the addon menu.
 

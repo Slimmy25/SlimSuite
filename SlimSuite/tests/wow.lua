@@ -98,6 +98,7 @@ end
 Frame.methods.HookScript = nil -- not part of the target 1.12 API
 Frame.methods.SetBackdrop = function(self, backdrop) self.backdrop = backdrop end
 Frame.methods.SetMinMaxValues = function(self, low, high) self.minimum, self.maximum = low, high end
+Frame.methods.SetValueStep = function(self, s) self.step = s end   -- real client slider method
 Frame.methods.GetMinMaxValues = function(self) return self.minimum or 0, self.maximum or 1 end
 local function finite(v) return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge end
 Frame.methods.SetWidth = function(self, value) assert(finite(value) and value >= 0, "invalid width"); self.w = value end
