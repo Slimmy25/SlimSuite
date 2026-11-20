@@ -333,6 +333,7 @@ function SS.WinBuild()
    {button="Final boss soundtracks",onClick=function() SS.OpenFinalBossSounds(); end},
    {"Match start song",group="start",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"},{"Cena","cenaStart"},{"pillar man jojo","pillarStart"},{"CSGO Okay Let’s Go","csgoStart"}}},
    {"Chest opening sound",group="chest",sounds={{"Off","off"},{"Zelda: final four notes","chestOpen"}}},
+   {"Teammate revive sound (when you helped revive them)",group="revive",sounds={{"Off","off"},{"Successful revive","reviveSuccess"}}},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
 			{head="Accessibility"},
 			{"High-contrast encounter bars", function() return SS.DB().accessibilityContrast; end, function(v) SS.DB().accessibilityContrast = v and true or false; SS.Safe(SS.UpdateBossFrames); end},

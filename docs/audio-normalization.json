@@ -155,6 +155,14 @@
       "sha256": "43a6d7baffdccedcb0c749f209bd45e70b5722c4e04fa7a2bbde8ff56936087e",
       "integrated_lufs": -12.3,
       "true_peak_dbtp": -3.14
+    },
+    {
+      "file": "af09418b-quick-revive-small.mp3",
+      "duration_seconds": 3.984,
+      "source_sha256": "1565de5445e2dea81e4506062ba41542f174022eb9b095ebde8e00d6c4fdc32c",
+      "sha256": "991884c1f23e52065a4f790661a2b982089a5ed145c469e8321eafec8fb20857",
+      "integrated_lufs": -12.5,
+      "true_peak_dbtp": -3.03
     }
   ],
   "loudness_exceptions": {

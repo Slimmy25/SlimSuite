@@ -39,7 +39,7 @@ for _,page in ipairs(SS.pages) do for _,row in ipairs(page.rows) do
   check("sound row selects exactly its choice",SS.SoundSelection(row.soundGroup)==row.soundKey)
  end
 end end
-check("all sound groups include alternatives and Off",counts.boss==4 and counts.death==5 and counts.lowHealth==2 and counts.chest==2 and counts.loss==4 and counts.start==5 and counts.victory==3 and counts.teammate==nil and counts.load==nil and previews==19)
+check("all sound groups include alternatives and Off",counts.boss==4 and counts.death==5 and counts.lowHealth==2 and counts.chest==2 and counts.revive==2 and counts.loss==4 and counts.start==5 and counts.victory==3 and counts.teammate==nil and counts.load==nil and previews==20)
 SS.previewUntil=0
 local stopped={}; StopSound=function(handle) table.insert(stopped,handle) end
 PlaySoundFile=function(path) return true,path end

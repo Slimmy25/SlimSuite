@@ -515,5 +515,7 @@
   "Final boss arrival soundtrack": "Final boss arrival soundtrack",
   "Megalovania": "Megalovania",
   "Use global soundtrack": "Use global soundtrack",
-  "Queued preview (waiting for current sound)": "Aperçu en attente (fin du son en cours)"
+  "Queued preview (waiting for current sound)": "Aperçu en attente (fin du son en cours)",
+  "Teammate revive sound (when you helped revive them)": "Son de réanimation d’un coéquipier (si vous avez aidé à le relever)",
+  "Successful revive": "Réanimation réussie"
 }

@@ -166,7 +166,7 @@ SS.DEFAULTS = {
 	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, luckPanel = false, achievementButton = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
 	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, robloxDeathSound = false, matchHaloSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchVictorySound = false, finalBossSound = false, finalBossSounds = {}, teammateDeathSound = "same", lowHealthSound = false,
-	bossHitmarkerSound = false, bossWhipSound = false, bossGotchaSound = false, chestOpenSound = false, hideTarget = false, mirrorTarget = false,
+	bossHitmarkerSound = false, bossWhipSound = false, bossGotchaSound = false, chestOpenSound = false, reviveSound = false, hideTarget = false, mirrorTarget = false,
 	mirrorSameScale = true, buffsOnTarget = false, buffsOnPlayer = false, partyLocked = false, partyLockAbove = false,
 	partyFaces = true, cardPortraits = true, targetDebuffs = true, showAbsorbs = false, moveLevelButton = false, moveMeter = false,
 	modernEnemyFrames = false, enemyBossesOnly = true, enemyPlateDebuffs = false,
@@ -562,6 +562,7 @@ SS.SOUND_FILES = {
 	bossWhip = "Interface\\AddOns\\SlimSuite\\Whip-Crack.mp3",
  bossGotcha = "Interface\\AddOns\\SlimSuite\\GotchaBIt.Dave Chapelle.mp3",
 	chestOpen = "Interface\\AddOns\\SlimSuite\\zelda-chest-opening-and-item-catch.mp3",
+ reviveSuccess = "Interface\\AddOns\\SlimSuite\\af09418b-quick-revive-small.mp3",
 };
 SS.SOUND_DURATIONS = {
  finalMegalovania=16.614,
@@ -583,6 +584,7 @@ SS.SOUND_DURATIONS = {
  bossWhip=1.051,
  bossGotcha=0.673,
  chestOpen=2.52,
+ reviveSuccess=3.984,
 };
 -- One selected sound per event. Existing flags remain compatible with saved settings.
 function SS.SoundSelection(group)
@@ -595,6 +597,7 @@ function SS.SoundSelection(group)
  if group=="start" then return (d.matchStartSound=="cenaStart" or d.matchStartSound=="pillarStart" or d.matchStartSound=="csgoStart") and d.matchStartSound or (d.matchStartSound and "matchStart" or "off"); end
  if group=="lowHealth" then return d.lowHealthSound and "lowHealth" or "off"; end
  if group=="chest" then return d.chestOpenSound and "chestOpen" or "off"; end
+ if group=="revive" then return d.reviveSound=="reviveSuccess" and "reviveSuccess" or "off"; end
  if group=="boss" then
   if d.bossHitmarkerSound then return "bossHitmarker"; end
   if d.bossWhipSound then return "bossWhip"; end
@@ -612,6 +615,7 @@ function SS.SetSoundSelection(group,key)
  elseif group=="start" then d.matchStartSound=(key=="cenaStart" or key=="pillarStart" or key=="csgoStart") and key or key=="matchStart";
  elseif group=="lowHealth" then d.lowHealthSound=key=="lowHealth";
  elseif group=="chest" then d.chestOpenSound=key=="chestOpen";
+ elseif group=="revive" then d.reviveSound=key=="reviveSuccess" and key or false;
  elseif group=="boss" then d.bossHitmarkerSound=key=="bossHitmarker"; d.bossWhipSound=key=="bossWhip"; d.bossGotchaSound=key=="bossGotcha"; end
  SS.RefreshToggles();
 end

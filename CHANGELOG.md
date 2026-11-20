@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.55
+Slim Suite can now play a sound when you help bring a downed teammate back up.
+
+- New Sounds setting: Teammate revive sound (when you helped revive them), with Off or Successful revive. It is off by default.
+- It plays only when you were reviving that teammate shortly before they got up and the game reports their fall ended in a revive. Someone else's revive, a teammate leaving, a reset bar or the run ending play nothing. It plays once per fall.
+- The new sound is normalized to the same loudness as the other Slim Suite sounds.
+
 ## 1.54
 Settings are in one Slim Suite category organised by function, enemy nameplates are slimmer, and the camera distance is adjustable.
 - Settings window: one Slim Suite category with subcategories for Interface, Nameplates, Gameplay, Chat, Sound and Accessibility, in the look of the game's options window.
