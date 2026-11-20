@@ -1916,3 +1916,37 @@ function SS.AttachBuffs()
 	if ( BuffFrame.SetScale ) then BuffFrame:SetScale(scale); end
 	SS.Safe(SS.LayoutPartyBuffs);
 end
+
+-- ---------------------------------------------------------------- default game frames in RPG and New School
+-- The game's own frame keeps its look in Original. In the other two looks its top-level background textures are hidden
+-- and the chosen panel is drawn behind it, in a child overlay that is removed from the game's frame only by hiding.
+-- Child frames (bars, portraits, text) are left alone. The minimap, chat, action bars, tooltip and cast bar are not
+-- included yet: an overlay would cover them, or they are shared with the game.
+SS.SKINNABLE_BLIZZARD = { "PlayerFrame", "TargetFrame", "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3",
+ "PartyMemberFrame4", "BuffFrame", "MainMenuExpBar" };
+function SS.SkinBlizzardFrame(name)
+	local frame = getglobal(name);
+	if ( not frame or not frame.GetRegions or getglobal("SlimSuiteSkin_" .. name) ) then return; end
+	local overlay = CreateFrame("Frame", "SlimSuiteSkin_" .. name, frame);
+	overlay.slimName = name;
+	overlay:SetAllPoints(frame);
+	overlay:EnableMouse(false);
+	overlay:Hide();
+	local textures = {};
+	local regions = { frame:GetRegions() };
+	for i = 1, table.getn(regions) do
+		local r = regions[i];
+		if ( r and r.GetObjectType and r:GetObjectType() == "Texture" ) then table.insert(textures, r); end
+	end
+	SS.AddThemeHook(function(key)
+		if ( key == "original" or not SS.PANEL_STYLES[key] ) then
+			for i = 1, table.getn(textures) do textures[i]:Show(); end
+			overlay:Hide();
+		else
+			for i = 1, table.getn(textures) do textures[i]:Hide(); end
+			SS.ApplyPanelStyle(overlay);
+			overlay:Show();
+		end
+	end, name);
+end
+for i = 1, table.getn(SS.SKINNABLE_BLIZZARD) do SS.SkinBlizzardFrame(SS.SKINNABLE_BLIZZARD[i]); end
