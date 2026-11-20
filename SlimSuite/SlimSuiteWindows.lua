@@ -26,10 +26,108 @@ local COLUMN = { "CharacterHeadSlot", "CharacterNeckSlot", "CharacterShoulderSlo
 local COLUMN_SCALE, COLUMN_LEFT, COLUMN_TOP, COLUMN_STEP = 0.5, 14, 44, 19;   -- scale, then offsets in screen pixels
 local stock = {};   -- each slot's game placement, kept before the first change
 
+-- Vertical Character: only the model box stays (the model, its turn buttons and the stats), the gear stands in one
+-- column to its right, the necklace, rings and trinkets show their names, and the set bonus shows beside them.
+local SLOT_NAME = {};
+for i = 1, table.getn(COLUMN) do SLOT_NAME[COLUMN[i]] = true; end
+local KEEP = { "CharacterModelFrame", "CharacterStat", "PaperDollFrame" };   -- kept by name; PaperDollFrame is only searched
+local hidden = {};
+local labels, panel;
+local NAMED = { CharacterNeckSlot = 1, CharacterFinger0Slot = 2, CharacterFinger1Slot = 3, CharacterTrinket0Slot = 4, CharacterTrinket1Slot = 5 };
+local GEAR_LEFT = 10;   -- gap between the model box and the gear column, in screen pixels
+
+local function Kept(name)
+	if ( not name ) then return false; end
+	if ( SLOT_NAME[name] ) then return true; end
+	for i = 1, table.getn(KEEP) do if ( string.find(name, "^" .. KEEP[i]) ) then return true; end end
+	return false;
+end
+
+-- Hides the extra pieces of the window, and searches inside the PaperDollFrame, so the stats stay.
+local function Strip(f, vertical)
+	local kids = { f:GetChildren() };
+	for i = 1, table.getn(kids) do
+		local k = kids[i];
+		local name = k.GetName and k:GetName();
+		if ( vertical and not Kept(name) ) then
+			if ( name == "PaperDollFrame" ) then Strip(k, true); end
+			if ( name ~= "PaperDollFrame" and k:IsShown() ) then k:Hide(); hidden[k] = true; end
+		elseif ( not vertical and hidden[k] ) then
+			k:Show(); hidden[k] = nil;
+		end
+	end
+end
+
+-- Reads one equipped item's tooltip: its name, and any set name and set bonus lines.
+local scan;
+local function ReadSlot(slotName)
+	local id = GetInventorySlotInfo and GetInventorySlotInfo(string.gsub(slotName, "^Character", ""));
+	if ( not id or not GetInventoryItemLink("player", id) ) then return nil; end
+	if ( not scan ) then scan = CreateFrame("GameTooltip", "SlimSuiteGearScan", UIParent, "GameTooltipTemplate"); end
+	scan:SetOwner(UIParent, "ANCHOR_NONE");
+	scan:ClearLines();
+	scan:SetInventoryItem("player", id);
+	local out = { name = nil, set = nil, bonus = {} };
+	for i = 1, 30 do
+		local fs = getglobal("SlimSuiteGearScanTextLeft" .. i);
+		local text = fs and fs:GetText();
+		if ( text ) then
+			if ( i == 1 ) then out.name = text; end
+			local _, _, set = string.find(text, "^Set: (.+)$");
+			if ( set ) then out.set = string.gsub(set, "%s*%(%d+/%d+%)$", ""); end
+			local _, _, n, bonus = string.find(text, "^%((%d+)%) Set: (.+)$");
+			if ( n ) then out.bonus[tonumber(n)] = bonus; end
+		end
+	end
+	return out;
+end
+
+-- The set summary: each set you wear, how many of its pieces are on, and its 4 and 8 piece bonuses.
+local function SetSummary(items)
+	local sets, order = {}, {};
+	for i = 1, table.getn(items) do
+		local it = items[i];
+		if ( it and it.set ) then
+			if ( not sets[it.set] ) then sets[it.set] = { count = 0, bonus = {} }; table.insert(order, it.set); end
+			sets[it.set].count = sets[it.set].count + 1;
+			for n, text in pairs(it.bonus) do sets[it.set].bonus[n] = text; end
+		end
+	end
+	local lines = {};
+	for _, name in ipairs(order) do
+		local set = sets[name];
+		table.insert(lines, name .. "  (" .. set.count .. "/8)");
+		for _, n in ipairs({ 4, 8 }) do
+			if ( set.bonus[n] ) then
+				local on = set.count >= n;
+				table.insert(lines, (on and "|cff33ff33" or "|cff888888") .. n .. "p: " .. set.bonus[n] .. "|r");
+			end
+		end
+	end
+	if ( table.getn(lines) == 0 ) then return "No set gear equipped."; end
+	return table.concat(lines, "\n");
+end
+
+local function RefreshGear()
+	local f = getglobal("CharacterFrame");
+	if ( not f or not panel ) then return; end
+	local items = {};
+	for slot, idx in pairs(NAMED) do
+		local it = ReadSlot(slot);
+		labels[slot]:SetText(it and it.name or "");
+		items[table.getn(items) + 1] = it;
+	end
+	local all = {};
+	for i = 1, table.getn(COLUMN) do all[i] = ReadSlot(COLUMN[i]); end
+	panel:SetText(SetSummary(all));
+end
+
 function SS.ApplyCharacterLayout()
 	local f = getglobal("CharacterFrame");
 	if ( not f ) then return; end
 	local vertical = SU.Mode("CharacterFrame") == "enabled" and SS.CurrentOrientation("CharacterFrame") == "vertical";
+	Strip(f, vertical);
+	local rightX = (f:GetWidth() or 340) + GEAR_LEFT;
 	for i = 1, table.getn(COLUMN) do
 		local s = getglobal(COLUMN[i]);
 		if ( s ) then
@@ -41,7 +139,7 @@ function SS.ApplyCharacterLayout()
 				-- offsets are in the slot's own scale, so divide the screen offset by it
 				s:ClearAllPoints();
 				s:SetScale(COLUMN_SCALE);
-				s:SetPoint("TOPLEFT", f, "TOPLEFT", COLUMN_LEFT / COLUMN_SCALE, -(COLUMN_TOP + (i - 1) * COLUMN_STEP) / COLUMN_SCALE);
+				s:SetPoint("TOPLEFT", f, "TOPLEFT", rightX / COLUMN_SCALE, -(COLUMN_TOP + (i - 1) * COLUMN_STEP) / COLUMN_SCALE);
 			else
 				local o = stock[COLUMN[i]];
 				s:ClearAllPoints();
@@ -49,6 +147,32 @@ function SS.ApplyCharacterLayout()
 				s:SetScale(o.scale or 1);
 			end
 		end
+	end
+	if ( vertical ) then
+		if ( not panel ) then
+			labels = {};
+			for slot, idx in pairs(NAMED) do
+				local fs = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
+				fs:SetJustifyH("LEFT"); fs:SetWidth(150);
+				labels[slot] = fs;
+			end
+			panel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+			panel:SetJustifyH("LEFT"); panel:SetWidth(180);
+		end
+		for i = 1, table.getn(COLUMN) do
+			local fs = labels[COLUMN[i]];
+			if ( fs ) then
+				fs:ClearAllPoints();
+				fs:SetPoint("TOPLEFT", f, "TOPLEFT", rightX + 22, -(COLUMN_TOP + (i - 1) * COLUMN_STEP));
+			end
+		end
+		panel:ClearAllPoints();
+		panel:SetPoint("TOPLEFT", f, "TOPLEFT", rightX, -(COLUMN_TOP + table.getn(COLUMN) * COLUMN_STEP + 10));
+		SS.Every("characterGear", 0.5, RefreshGear, f);
+		RefreshGear();
+	elseif ( panel ) then
+		for _, fs in pairs(labels) do fs:SetText(""); end
+		panel:SetText("");
 	end
 end
 -- Talent window, as an element: only the trees you have points in show as tabs. One tree (a single spec, or

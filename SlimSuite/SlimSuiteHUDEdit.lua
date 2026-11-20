@@ -1,7 +1,7 @@
 -- HUD Edit Mode: one dark window with every element in one ordered list. Each row has one tick box with three states:
 -- ticked = On, empty = Off, "D" = Default (the game's own element, Original). Clicking the name opens that element's
 -- panel: Chain to (a primary element), Ahead / Behind, Unchain, Revert Changes and Reset To Default Position.
--- A chain only changes the order of this list. With "Keep chained elements next to each other" on, the partner moves
+-- A chain only changes the order of this list. Chained elements always stay next to each other: the partner moves
 -- directly ahead of (above) or behind (below) its primary, and the other rows shift to make room.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 
@@ -45,7 +45,7 @@ end
 function SS.HUDApplyChains()
  local d = SS.DB();
  local list = SS.HUDOrder();
- if ( d.hudKeepChained and d.hudChains ) then
+ if ( d.hudChains ) then
   for _, partner in ipairs(list) do
    local link = d.hudChains[partner];
    if ( link and link.to and link.to ~= partner ) then
@@ -157,7 +157,7 @@ function SS.HUDLayout()
   end
   if ( not header ) then
    local key = sec.key;
-   header = K.Button(hud.child, "", 360, function()
+   header = K.Button(hud.child, "", 170, function()
     SS.DB().hudSections[key] = (SS.DB().hudSections[key] == false);
     SS.HUDLayout();
    end);
@@ -165,9 +165,10 @@ function SS.HUDLayout()
   end
   header:Show();
   header:ClearAllPoints();
+  header:SetHeight(16);
   header:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6, -y);
   header:SetText((open and "v  " or ">  ") .. SS.T(sec.title) .. "  (" .. table.getn(list) .. ")");
-  y = y + 26;
+  y = y + 20;
   -- three columns of elements under the header, filled top to bottom
   local n = table.getn(list);
   local perCol = math.max(1, math.ceil(n / 3));
@@ -452,11 +453,7 @@ function SS.OpenHUDEdit()
   function(v) SS.DB().hudAdvanced = v and true or false; end, 0);
  advanced:ClearAllPoints(); advanced:SetPoint("TOPLEFT", hud, "TOPLEFT", 200, -84);
  advanced:SetWidth(18); advanced:SetHeight(18);
- local keep = SS.Check(hud, "Keep chained elements next to each other", 0, function() return SS.DB().hudKeepChained; end,
-  function(v) SS.DB().hudKeepChained = v and true or false; SS.HUDLayout(); if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end end, 0);
- keep:ClearAllPoints(); keep:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -108);
- keep:SetWidth(18); keep:SetHeight(18);
-
+ 
  -- search: filters the list as you type
  local searchLabel = hud:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
  searchLabel:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -136); searchLabel:SetText(SS.T("Search"));

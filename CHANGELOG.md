@@ -2,6 +2,16 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.65
+Character sheet gets a gear column with set bonuses, the compass can show the run clock, and HUD Edit Mode is tidier.
+
+- Vertical Character layout: only the model box and its stats stay. The gear stands in one column to its right.
+- The necklace, both rings and both trinkets show their item names, and a set panel lists each set you wear with its 4 and 8 piece bonuses.
+- The run clock can be shown along the bottom of the compass, as one line of run time, next boss and zone. It is off by default, and can be turned on from the compass's or the run clock's options.
+- Chained elements always stay next to each other. The option to turn this off has been removed.
+- The HUD Edit section headers are smaller.
+- Not yet tested in the live client: the Character gear column and its frame names, the set panel, and the compass run clock.
+
 ## 1.64
 HUD Edit Mode lists its elements in three sections, each of which opens and closes.
 

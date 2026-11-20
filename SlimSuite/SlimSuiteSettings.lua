@@ -275,7 +275,7 @@ function SU.ChecksFor(frame)
 			{ "The game's nearest Guardian lair flag", short = "Guardian lair flag", function() return SS.DB().showGuardianFlag; end, function(v) SS.DB().showGuardianFlag = v and true or false; SS.ApplyGuardianFlag(); end },
 			{ "Slim Suite's gear button", short = "Gear button", function() local m = SS.DB().minimap; return not (type(m) == "table" and m.hide); end,
 				function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (type(m) == "table" and m.hide and true or false) == (v and true or false) ) then SS.Mini.Toggle(); end end end } },
-		SlimSuiteClockFrame = { { "Location and difficulty above the clock", function() return SS.DB().clockContextAbove~=false; end, function(v) SS.DB().clockContextAbove=v; SS.ApplyClockLayout(); SS.UpdateClock(); end }, { "Show location and difficulty", short = "Zone and Heroic affixes", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end } },
+		SlimSuiteClockFrame = { { "Location and difficulty above the clock", function() return SS.DB().clockContextAbove~=false; end, function(v) SS.DB().clockContextAbove=v; SS.ApplyClockLayout(); SS.UpdateClock(); end }, { "Show location and difficulty", short = "Zone and Heroic affixes", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end }, { "Run clock at the bottom of the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end, xref = true, short = "Run clock at the bottom" } },
 		MainMenuExpBar = { { "Hide XP bar border", function() return SS.DB().xpHideBorder; end, function(v) SS.DB().xpHideBorder=v; SS.StyleExpBar(SS.CurrentOrientation("MainMenuExpBar")=="vertical"); end }, { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
 			function(v) SU.SetVertical("MainMenuExpBar", v); SS.Safe(SS.LayoutXpSegments); end },
 			{ "Split into 20 segments", function() return SS.DB().xpSegments ~= false; end,
@@ -315,7 +315,8 @@ function SU.ChecksFor(frame)
  {"Compass style",function() return SS.DB().compassStyle or "rail"; end,function(v) SS.DB().compassStyle=v; SS.UpdateCompass(); end,choice={{"Compass rail","rail"},{"Free markers","free"}}},
  {"Show bosses",function() return SS.DB().compassBosses~=false; end,function(v) SS.DB().compassBosses=v; end},
  {"Show lairs",function() return SS.DB().compassLairs~=false; end,function(v) SS.DB().compassLairs=v; end},
- {"Show chests",function() return SS.DB().compassCaches~=false; end,function(v) SS.DB().compassCaches=v; end} },
+ {"Show chests",function() return SS.DB().compassCaches~=false; end,function(v) SS.DB().compassCaches=v; end},
+ { "Run clock at the bottom of the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end, xref = true, short = "Run clock at the bottom" } },
  SlimSuiteCombatTextFrame = {
 			SS.WorldCombatEntry and SS.WorldCombatEntry() or nil,
 			{ "Also write the numbers in the combat log", function() return SS.DB().keepCombatLog; end, function(v) SS.DB().keepCombatLog=v; end },

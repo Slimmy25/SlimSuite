@@ -127,7 +127,7 @@ local function CompassTick()
  local p = type(AZS_GetPlayerPosition)=="function" and AZS_GetPlayerPosition() or nil;
  if ( type(p)~="table" or type(p.x)~="number" or type(p.y)~="number" ) then SS.UpdateCompass(); compassKey = nil; return; end
  local now = GetTime();
- local key = math.floor(p.x*5)..","..math.floor(p.y*5)..","..math.floor((p.facing or 0)*57.3*2)..","..SS.DB().compassStyle..","..(SS.DB().unlocked and 1 or 0)..","..(SS.DB().compassBosses and 1 or 0)..","..(SS.DB().compassLairs and 1 or 0)..","..(SS.DB().compassCaches and 1 or 0);
+ local key = math.floor(p.x*5)..","..math.floor(p.y*5)..","..math.floor((p.facing or 0)*57.3*2)..","..SS.DB().compassStyle..","..(SS.DB().unlocked and 1 or 0)..","..(SS.DB().compassBosses and 1 or 0)..","..(SS.DB().compassLairs and 1 or 0)..","..(SS.DB().compassCaches and 1 or 0)..(SS.DB().compassRunClock and math.floor(now) or "");
  if ( key == compassKey and now - compassAt < 0.5 ) then return; end
  compassKey, compassAt = key, now;
  SS.UpdateCompass();
