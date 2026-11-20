@@ -37,5 +37,13 @@ check("a different single tree also hides the tab row", not TalentFrameTab1:IsSh
 SU.SetMode("TalentFrame","default")
 SS.ApplyTalentTrees()
 check("Original shows every tab", TalentFrameTab1:IsShown() and TalentFrameTab2:IsShown() and TalentFrameTab3:IsShown())
+-- the manual button unlocks the elements; Save writes a layout; closing locks the UI again
+SS.SetUnlocked(false, true)
+SS.OpenHUDEdit()
+check("opening by hand unlocks the elements", SS.DB().unlocked==true)
+SlimSuiteHUDEditMode:Show()
+SS.DB().hudLayoutName=nil
+SS.CloseHUDEdit()
+check("closing locks the UI again", SS.DB().unlocked==false)
 print("hud layout problems: "..bad)
 assert(bad==0 and #ERRORS==0,"HUD layout regressions")

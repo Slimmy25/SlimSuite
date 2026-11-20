@@ -118,6 +118,15 @@ local startup = CreateFrame("Frame");
 startup:RegisterEvent("PLAYER_ENTERING_WORLD");
 startup:SetScript("OnEvent", function()
 	SS.Safe(SS.ApplyBagMapButtons);
+	-- Saved anchors that loop back on themselves (from an earlier snap) are dropped, so each frame returns to its default place
+	if ( not SS.loopsRepaired ) then
+		SS.loopsRepaired = true;
+		for name, p in pairs(SS.DB().places) do
+			if ( type(p) == "table" and p.relative and SS.DependsOn(name, name) ) then
+				p.relative, p.point, p.relativePoint, p.dx, p.dy = nil, nil, nil, nil, nil;
+			end
+		end
+	end
 	if ( Minimap and not SS.bigMapHooked ) then
 		SS.bigMapHooked = true;
 		local old = Minimap:GetScript("OnMouseUp");

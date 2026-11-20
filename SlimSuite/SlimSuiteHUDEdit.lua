@@ -290,10 +290,12 @@ local function BuildRow(child, name)
  return r;
 end
 
+-- Closing the window locks the UI again, the same as turning Toggle UI Settings off.
 function SS.CloseHUDEdit()
  if ( hud ) then hud:Hide(); end
  if ( panel ) then panel:Hide(); end
  if ( picker ) then picker:Hide(); end
+ if ( SS.DB().unlocked ) then SS.SetUnlocked(false, true); end
 end
 
 -- The saved layouts, by name, in alphabetical order.
@@ -320,17 +322,21 @@ local function CycleLayout()
  if ( next > n ) then next = 1; end
  local name = names[next];
  SS.DB().hudLayoutName = name;
+ SS.activeCustomProfile = name;
  SS.LayoutApply(SS.DB().layouts[name], true);
  RefreshLayoutButton();
  RefreshAll();
  SS.HUDLayout();
 end
 
+-- Opening the window unlocks the elements, so they can be dragged, right-clicked and chained straight away.
 function SS.OpenHUDEdit()
+ if ( not SS.DB().unlocked ) then SS.SetUnlocked(true, true); end
  if ( hud ) then hud:Show(); SS.HUDLayout(); RefreshLayoutButton(); return; end
  hud = CreateFrame("Frame", "SlimSuiteHUDEditMode", UIParent);
  hud.building = true;
  hud:SetWidth(540); hud:SetHeight(620);
+ hud:SetScale(0.78);   -- the whole window at 78%, so it covers less of the screen
  hud:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
  hud:SetFrameStrata("DIALOG");
  hud:SetMovable(true); hud:RegisterForDrag("LeftButton");
@@ -438,7 +444,15 @@ function SS.OpenHUDEdit()
  revertAll:SetPoint("BOTTOMLEFT", hud, "BOTTOMLEFT", 22, 18);
  SS.hudRevertAll = revertAll;
  local save = K.Button(hud, SS.T("Save"), 220, function()
-  if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
+  -- Saves the current arrangement as the layout shown in the Layout button (created as "HUD edit" if there is none yet)
+  local d = SS.DB();
+  local name = d.hudLayoutName or SS.T("HUD edit");
+  d.hudLayoutName = name;
+  d.layouts[name] = SS.LayoutSnapshot();
+  SS.activeCustomProfile = name;
+  SS.profileDirty = nil;
+  RefreshLayoutButton();
+  K.Print(NAME, SS.T("Saved the layout") .. " \"" .. name .. "\".");
   SS.CloseHUDEdit();
  end);
  save:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -22, 18);

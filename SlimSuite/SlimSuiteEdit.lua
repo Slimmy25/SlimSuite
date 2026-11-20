@@ -1198,6 +1198,19 @@ function SS.GridRound(left, bottom)
 	return math.floor(left / cw + 0.5) * cw, math.floor(bottom / rh + 0.5) * rh;
 end
 
+-- true when following name's saved anchors leads to target (or loops back on itself): anchoring target to name then makes a loop
+function SS.DependsOn(name, target)
+	local seen, cur = {}, name;
+	for i = 1, 40 do
+		local p = SS.DB().places[cur];
+		local rel = type(p) == "table" and p.relative or nil;
+		if ( not rel ) then return false; end
+		if ( rel == target or seen[rel] ) then return true; end
+		seen[rel] = true; cur = rel;
+	end
+	return true;
+end
+
 function SS.SnapPosition(name, f)
 	local left, right, bottom, top = RootBounds(f);
 	if ( not left or not right or not bottom or not top ) then SS.SavePlace(name, f); return; end
@@ -1206,6 +1219,7 @@ function SS.SnapPosition(name, f)
 	for i = 1, table.getn(MOVABLE) do
 		local otherName = MOVABLE[i][1];
 		local other = (SS.DB().anchorSnap and otherName ~= name and getglobal(otherName)) or nil;
+		if ( other and SS.DependsOn(otherName, name) ) then other = nil; end   -- it already hangs off this frame: no loop
 		if ( other ) then
 			local ol, oright, ob, ot = RootBounds(other);
 			if ( ol and oright and ob and ot ) then

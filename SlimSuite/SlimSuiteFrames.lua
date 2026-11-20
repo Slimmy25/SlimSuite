@@ -1910,7 +1910,9 @@ function SS.AttachBuffs()
 	if ( SS.DB().partyIncludesSelf and (side == "left" or side == "right") ) then side = "above"; end   -- in the party: above your plate
 	if ( side == "above" ) then
 		local portrait = SS.DB().partyIncludesSelf and anchor or SS.UnitPortrait(anchor);
-		BuffFrame:SetPoint("BOTTOMLEFT", portrait, "TOPLEFT", portrait == anchor and x or 0, 2);
+		-- the game refuses an anchor that loops back (the portrait hangs off the buffs): fall back to a fixed spot
+		local ok = SS.Safe(BuffFrame.SetPoint, BuffFrame, "BOTTOMLEFT", portrait, "TOPLEFT", portrait == anchor and x or 0, 2);
+		if ( not ok ) then BuffFrame:ClearAllPoints(); BuffFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 200); end
 	elseif ( side == "left" ) then BuffFrame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -4, 0);
 	elseif ( side == "right" ) then BuffFrame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 4, 0);
 	else BuffFrame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x, -2); end

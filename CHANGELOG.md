@@ -2,6 +2,16 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.61
+Fixes to HUD Edit Mode and to frames that were anchored to each other in a loop.
+
+- HUD Edit Mode is smaller overall, at 78% of its previous size.
+- The HUD Edit Mode button now unlocks the elements, the same as Toggle UI Settings, so it works when opened by hand.
+- Save writes the arrangement into the layout named on the Layout button, or creates "HUD edit" if there is none. Closing the window locks the UI again.
+- Snapping no longer anchors two frames to each other. Saved anchors that looped back are cleared once at login, so those frames return to their default place.
+- The buff frame falls back to a fixed spot if the game rejects its anchor.
+- Not yet tested in the live client: the grid and element handles after a loop error, and the Save button itself.
+
 ## 1.60
 HUD Edit Mode gets a closer look to the game's own editor, and the Talents window and the minimap do more. Everything is optional and off until you turn it on.
 
