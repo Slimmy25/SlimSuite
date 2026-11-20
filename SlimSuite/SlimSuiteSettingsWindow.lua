@@ -250,6 +250,7 @@ function SS.WinBuild()
 			{head="Everywhere"},
    {"Legendary luck",function() return SS.FeatureEnabled("SlimSuiteLuckFrame"); end,function(v) SU.SetMode("SlimSuiteLuckFrame",v and "enabled" or "disabled","Legendary luck"); end},
 			{"Compass",function() return SS.DB().compassOn; end,function(v) SU.SetMode("SlimSuiteCompassFrame",v and "enabled" or "disabled","Compass"); end},
+			{"Run clock in the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end},
 			{"Show green absorb amounts on player and party frames (when the client exposes them)", function() return SS.DB().showAbsorbs; end, function(v) SS.DB().showAbsorbs = v and true or false; SS.Safe(SS.UpdateAbsorbMarkers); end},
 			worldEntry,
 			{"Build and stats beside card choices",function() return SS.DB().cardEdgeHUD~=false; end,function(v) SS.DB().cardEdgeHUD=v; end},

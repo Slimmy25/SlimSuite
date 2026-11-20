@@ -17,8 +17,48 @@ function SS.CompassOffset(x,y,facing,width)
  if ( math.abs(angle)>math.pi/2 ) then return; end
  return -angle/(math.pi/2)*math.max(0,width/2-20);
 end
+-- The run clock in the bottom of the compass (setting: Run clock in the compass). It shows the same things as the
+-- movable run clock: the run time, the countdown to the next boss and the zone. The compass grows by one strip for it.
+function SS.UpdateCompassRunClock()
+ local on = SS.DB().compassRunClock and true or false;
+ if ( not frame.baseH ) then frame.baseH = frame:GetHeight() or 88; end
+ local want = on and (frame.baseH + 22) or frame.baseH;
+ if ( frame:GetHeight() ~= want ) then frame:SetHeight(want); end
+ if ( not on ) then if ( frame.runStrip ) then frame.runStrip:Hide(); end return; end
+ if ( not frame.runStrip ) then
+  local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
+  fs:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 10, 6); fs:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 6);
+  fs:SetJustifyH("CENTER"); frame.runStrip = fs;
+ end
+ local clock = getglobal("SlimSuiteClockFrame");
+ local zone = (clock and clock.zone and clock.zone.GetText and clock.zone:GetText()) or "";
+ local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
+ local live = phase == "ready" or phase == "playing" or phase == "choosing" or phase == "paused";
+ local runText, nextText = "--:--", "--:--";
+ if ( live ) then
+  local elapsed = type(AZS_GetRunTime) == "function" and AZS_GetRunTime() or nil;
+  if ( phase == "ready" ) then elapsed = 0; end
+  runText = SS.ClockText(elapsed or 0);
+  local upcoming = {};
+  if ( type(AZS_GetUpcomingBosses) == "function" ) then
+   local ok, value = SS.Safe(AZS_GetUpcomingBosses);
+   if ( ok and type(value) == "table" ) then upcoming = value; end
+  end
+  local left = type(upcoming[1]) == "table" and upcoming[1].left or nil;
+  local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
+  if ( type(left) ~= "number" and run and type(run.nb) == "number" and run.nb >= 0 ) then left = run.nb; end
+  if ( type(left) == "number" and left >= 0 ) then nextText = SS.ClockText(math.ceil(left)); end
+ elseif ( SS.Demoing("SlimSuiteClockFrame") and SS.demoClock ) then
+  runText = SS.ClockText(math.floor(SS.demoClock.run));
+  nextText = SS.ClockText(math.ceil(SS.demoClock.nextBoss));
+ end
+ local line = SS.T("Run") .. " " .. runText .. "   " .. SS.T("next boss in") .. " " .. nextText;
+ if ( zone ~= "" ) then line = line .. "   " .. zone; end
+ frame.runStrip:SetText(line); frame.runStrip:Show();
+end
 function SS.UpdateCompass()
  local d=SS.DB();
+ SS.UpdateCompassRunClock();
  if ( (not SS.FeatureEnabled("SlimSuiteCompassFrame") and not d.unlocked) or d.vanillaUI ) then frame:Hide(); return; end
  local position=type(AZS_GetPlayerPosition)=="function" and AZS_GetPlayerPosition() or nil;
  if ( type(position)~="table" or type(position.x)~="number" or type(position.y)~="number" ) then
