@@ -3,11 +3,39 @@
 --   On: Slim Suite places it, and the saved place is applied again each time it opens.
 --   Off: it stays hidden, even when its key (C or N) is pressed.
 if ( setfenv ) then setfenv(1, SS.ENV); end
+-- Alternative sheet, kept ready: when it is closed it stays shown but invisible (alpha 0, no mouse), so its model keeps
+-- running. The C key (ToggleCharacter) makes it visible again. Parked only while the alternative layout is on.
+local parked, ownShow = false, false;
+local function AltOn()
+	return SU.Mode("CharacterFrame") == "enabled" and SS.CurrentOrientation("CharacterFrame") == "vertical";
+end
+local function Park(f)
+	if ( not f or not AltOn() ) then return; end
+	ownShow = true;
+	f:SetAlpha(0); f:EnableMouse(false); f:Show();
+	ownShow = false;
+	parked = true;
+end
+local function Unpark(f)
+	if ( not f or not parked ) then return; end
+	parked = false;
+	f:SetAlpha(1); f:EnableMouse(true);
+end
+function SS.ParkCharacterSheet()
+	local f = getglobal("CharacterFrame");
+	if ( AltOn() and f and not f:IsShown() ) then Park(f); end
+end
 local function Hook(name)
 	local f = getglobal(name);
 	if ( not f or not f.SetScript or not f.GetScript ) then return; end
 	local old = f:GetScript("OnShow");
+	local oldHide = f:GetScript("OnHide");
+	f:SetScript("OnHide", function()
+		if ( oldHide ) then oldHide(); end
+		if ( name == "CharacterFrame" and not ownShow ) then SS.Safe(SS.ParkCharacterSheet); end
+	end);
 	f:SetScript("OnShow", function()
+		if ( name == "CharacterFrame" and not ownShow ) then Unpark(this); end
 		if ( old ) then old(); end
 		local mode = SU.Mode(name);
 		if ( mode == "disabled" ) then this:Hide(); return; end
@@ -108,9 +136,20 @@ local function SetSummary(items)
 	return table.concat(lines, "\n");
 end
 
+-- Under half health the character cowers, once, when it drops below half; it is ready to do so again after healing.
+local cowering = false;
+local function CowerOnLowHealth()
+	local hp, hpm = UnitHealth("player"), UnitHealthMax("player");
+	if ( not hp or not hpm or hpm <= 0 ) then return; end
+	local low = hp / hpm < 0.5;
+	if ( low and not cowering ) then cowering = true; SS.Safe(DoEmote, "COWER");
+	elseif ( not low ) then cowering = false; end
+end
+
 local function RefreshGear()
 	local f = getglobal("CharacterFrame");
 	if ( not f or not panel ) then return; end
+	if ( SU.Mode("CharacterFrame") == "enabled" and SS.CurrentOrientation("CharacterFrame") == "vertical" ) then CowerOnLowHealth(); end
 	local items = {};
 	for slot, idx in pairs(NAMED) do
 		local it = ReadSlot(slot);
@@ -120,6 +159,26 @@ local function RefreshGear()
 	local all = {};
 	for i = 1, table.getn(COLUMN) do all[i] = ReadSlot(COLUMN[i]); end
 	panel:SetText(SetSummary(all));
+end
+
+-- A boss or guardian dies: the character on the alternative sheet cheers (the game's own cheer emote).
+function SS.CheerOnKill()
+	if ( SU.Mode("CharacterFrame") ~= "enabled" or SS.CurrentOrientation("CharacterFrame") ~= "vertical" ) then return; end
+	DoEmote("CHEER");
+end
+
+-- Emote buttons under the model in the alternative sheet. Dance and sit use the game's own emotes; the model shows them
+-- with the character. Sheathing is not wired yet (the game has no emote for it), so it is left out until a way is found.
+local emoteButtons = {};
+local function EmoteRow(f)
+	if ( emoteButtons.dance ) then return; end
+	local function make(text, token, x)
+		local b = K.Button(f, SS.T(text), 80, function() SS.Safe(DoEmote, token); end);
+		b:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", x, 14);
+		return b;
+	end
+	emoteButtons.dance = make("Dance", "DANCE", 14);
+	emoteButtons.sit = make("Sit", "SIT", 100);
 end
 
 function SS.ApplyCharacterLayout()
@@ -168,11 +227,15 @@ function SS.ApplyCharacterLayout()
 		end
 		panel:ClearAllPoints();
 		panel:SetPoint("TOPLEFT", f, "TOPLEFT", rightX, -(COLUMN_TOP + table.getn(COLUMN) * COLUMN_STEP + 10));
+		EmoteRow(f);
+		emoteButtons.dance:Show(); emoteButtons.sit:Show();
 		SS.Every("characterGear", 0.5, RefreshGear, f);
 		RefreshGear();
+		if ( not f:IsShown() ) then Park(f); end
 	elseif ( panel ) then
 		for _, fs in pairs(labels) do fs:SetText(""); end
 		panel:SetText("");
+		if ( emoteButtons.dance ) then emoteButtons.dance:Hide(); emoteButtons.sit:Hide(); end
 	end
 end
 -- Talent window, as an element: only the trees you have points in show as tabs. One tree (a single spec, or
@@ -195,6 +258,15 @@ function SS.ApplyTalentTrees()
 			local keep = not filter or spent[i] or (shown == 0 and i == 1);
 			if ( keep and tabBar ) then tab:Show(); else tab:Hide(); end
 		end
+	end
+end
+-- C opens the sheet when it is parked: show it, instead of "closing" the invisible copy
+local originalToggle = ToggleCharacter;
+if ( originalToggle ) then
+	ToggleCharacter = function(tab, ...)
+		local f = getglobal("CharacterFrame");
+		if ( parked and f and f:IsShown() ) then Unpark(f); return; end
+		return originalToggle(tab, unpack(arg or {}));
 	end
 end
 Hook("CharacterFrame");

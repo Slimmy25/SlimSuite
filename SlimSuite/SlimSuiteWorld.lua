@@ -1578,6 +1578,7 @@ local function ConfirmKillSound(source,kind,name)
  end
  table.insert(killSounds.recent,{kind=kind,name=name,time=now,run=context,sources={[source]=true}});
  SS.PlayBossKillSound();
+ if ( kind=="boss" or kind=="guardian" ) then SS.Safe(SS.CheerOnKill); end
 end
 local function SeedKillBanners()
  if type(AZS_BANNERS)~="table" then return; end

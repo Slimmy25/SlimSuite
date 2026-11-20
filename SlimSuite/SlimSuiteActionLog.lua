@@ -99,14 +99,25 @@ local function Wrap(name, describe)
 end
 Wrap("OpenHUDEdit", function() return "HUD Edit opened"; end);
 Wrap("CloseHUDEdit", function() return "HUD Edit closed"; end);
-Wrap("SetUnlocked", function(on) return "UI " .. (on and "unlocked" or "locked"); end);
+-- only a real change is logged (the same state set again is not news)
+local setUnlocked = SS.SetUnlocked;
+if ( type(setUnlocked) == "function" ) then
+	SS.SetUnlocked = function(on, quiet)
+		local was = SS.DB().unlocked and true or false;
+		local result = setUnlocked(on, quiet);
+		if ( was ~= (on and true or false) ) then SS.LogAction("UI " .. (on and "unlocked" or "locked")); end
+		return result;
+	end
+end
 Wrap("TargetEncounter", function(unit) return "Encounter target: " .. tostring(unit and unit.name or "?"); end);
 Wrap("LogError", function(msg) return "ERROR: " .. tostring(msg); end);
 Wrap("SetSnap", function(on) return "Snap to elements " .. (on and "on" or "off"); end);
 if ( type(SU) == "table" and SU.SetMode ) then
 	local setMode = SU.SetMode;
 	SU.SetMode = function(name, mode, title)
-		SS.LogAction("Element " .. tostring(name) .. " set to " .. tostring(mode));
-		return setMode(name, mode, title);
+		local was = SU.Mode(name);
+		local result = setMode(name, mode, title);
+		if ( was ~= mode ) then SS.LogAction("Element " .. tostring(name) .. " set to " .. tostring(mode)); end
+		return result;
 	end
 end

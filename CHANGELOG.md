@@ -2,6 +2,17 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.67
+The alternative Character sheet gets a 3D character with emote buttons, and reacts to bosses and low health.
+
+- The alternative Character sheet's layout button now reads "Use alternative" or "Use original".
+- Dance and Sit buttons sit under the model and use the game's own emotes.
+- The character cheers when a boss or guardian dies.
+- The character cowers once when health drops below half, and can cower again after healing.
+- The alternative sheet stays open but invisible while it is closed, so the model keeps running. C shows it again.
+- The action log only records real changes, so repeated settings no longer fill it.
+- Not yet tested in the live client: the emotes, the cower and cheer, the hidden sheet, and C.
+
 ## 1.66
 Adds an action log, so you can send recent activity when something goes wrong.
 

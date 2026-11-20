@@ -913,7 +913,12 @@ function SS.PrepareSizeTools(name, label)
 		sizeMenu.LayoutText = function()
 			local el = SS.Element(sizeTarget);
 			local orientation = el == "SlimSuiteTallyFrame" and (SS.DB().tallyVertical and "vertical" or "horizontal") or SS.CurrentOrientation(el);
-			layout:SetText(SS.T(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical"));
+			if ( sizeTarget == "CharacterFrame" ) then
+				-- the Character window's second layout is called Alternative; its first is Original
+				layout:SetText(SS.T(orientation == "vertical" and "Use original" or "Use alternative"));
+			else
+				layout:SetText(SS.T(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical"));
+			end
 		end;
 		local growth;
 		growth = K.Button(sizeMenu, SS.T("Grow") .. " " .. SS.T("down"), 68, function()
