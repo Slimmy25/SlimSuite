@@ -610,9 +610,6 @@ SS.PANEL_STYLES = {
    color = { 0.02, 0.02, 0.03, 0.9 }, border = { 0.85, 0.65, 0.2, 0.7 } },
  tooltip = { bg = "Interface\\Tooltips\\UI-Tooltip-Background", edge = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16,
    color = { 0.08, 0.12, 0.22, 0.95 }, border = { 0.75, 0.85, 1, 0.9 } },
- -- a modern retail-style panel: near-black slate fill, thin cool grey edge
- forever = { bg = "Interface\\Buttons\\WHITE8X8", edge = "Interface\\Buttons\\WHITE8X8", edgeSize = 1,
-   color = { 0.04, 0.05, 0.07, 0.94 }, border = { 0.42, 0.5, 0.6, 0.85 } },
 };
 function SS.PanelStyleKey()
  local key = SS.DB().uiStyle;
@@ -696,7 +693,7 @@ function SS.SetPanelStyle(key)
  SS.RefreshLooks();
 end
 -- One element's look from its right-click menu. key = nil goes back to the global choice.
-SS.STYLE_NAMES = { original = "Original", meter = "RPG", tooltip = "New School", forever = "WoW Forever" };
+SS.STYLE_NAMES = { original = "Original", meter = "RPG", tooltip = "New School" };
 SS.LOOK_ELEMENTS = { "SlimSuitePartyLines", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteBossFrames",
  "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame",
  "SlimSuiteLocalClockFrame", "SlimSuitePlayerCard", "SlimSuiteTargetCard", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame",

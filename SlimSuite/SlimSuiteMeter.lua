@@ -351,8 +351,7 @@ function SS.ApplyMeterSkin()
 		end
 	end
 	-- the meter's own skin shows in Original and RPG; New School hides it and draws its panel instead
-	local meterLook = SS.StyleKeyFor('SlimSuiteMeterFrame');
-	local skin = meterLook ~= 'tooltip' and meterLook ~= 'forever';
+	local skin = SS.StyleKeyFor('SlimSuiteMeterFrame') ~= 'tooltip';
 	for i = 1, table.getn(frame.meterSkin) do
 		if skin then frame.meterSkin[i]:Show(); else frame.meterSkin[i]:Hide(); end
 	end

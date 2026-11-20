@@ -37,6 +37,7 @@ function SS.OpenSizeMenu(name, label)
 	name = SS.Element(name);
 	if ( not getglobal(SS.Shown(name)) ) then return; end
 	if ( not SU.panel ) then SU.Build(); end
+	SU.ModernizeMenus();
 	SU.menuLabel = label;
 	SU.Focus(name);
 end
@@ -75,6 +76,7 @@ SU.nudge:SetScript("OnKeyDown", function()
 	if ( name and SS.SavePosition ) then SS.SavePosition(name, f); end
 end);
 function SU.Focus(frame)
+	SU.ModernizeMenus();
  if ( not frame and setupActive ) then
   SU.focus=nil; if ( SU.panel ) then SU.panel:Hide(); end
   if ( SU.glow ) then SU.glow:Hide(); end
@@ -162,7 +164,7 @@ function SU.Focus(frame)
 				local o = SS.DB().styleOverrides and SS.DB().styleOverrides[cur];
 				local nextKey;
 				if ( o == nil ) then nextKey = "original"; elseif ( o == "original" ) then nextKey = "meter";
-				elseif ( o == "meter" ) then nextKey = "tooltip"; elseif ( o == "tooltip" ) then nextKey = "forever"; end
+				elseif ( o == "meter" ) then nextKey = "tooltip"; end
 				SS.SetElementLook(cur, nextKey); SU.Focus(SU.focus);
 			end);
 		end
@@ -576,7 +578,7 @@ function SU.Begin()
 	SU.bar:SetHeight(84);
 	SU.bar.demoHint:ClearAllPoints();
 	SU.bar.demoHint:SetPoint("TOPLEFT",SU.bar,"TOPLEFT",120,-36);
-	SU.bar.demoHint:SetWidth(390); SU.bar.demoHint:SetHeight(22);
+	SU.bar.demoHint:SetWidth(270); SU.bar.demoHint:SetHeight(22);
 	SU.PlaceProfiles();
 	if ( SU.bar.resetAll ) then
 		SU.bar.done:ClearAllPoints(); SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
@@ -690,7 +692,7 @@ function SU.Build()
 	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);
 	SU.bar.resetAll:SetPoint("RIGHT", SU.bar.done, "LEFT", -6, 0);
 	-- Panel style: the three looks, bottom left beside Reset All and Done; the one in effect is lit
-	local styleChoices = { { "Original", "original" }, { "RPG", "meter" }, { "New School", "tooltip" }, { "WoW Forever", "forever" } };
+	local styleChoices = { { "Original", "original" }, { "RPG", "meter" }, { "New School", "tooltip" } };
 	SU.bar.styleButtons = {};
 	for i = 1, table.getn(styleChoices) do
 		local key = styleChoices[i][2];
@@ -748,6 +750,8 @@ function SU.Build()
 		else SU.bar.profilePanel.note:SetText(SS.T("Applying a read-only preset creates your editable copy.")); end
 	end;
 	SU.bar.profilePanel.Refresh();
+	SU.bar.elementsButton = K.Button(SU.bar, "Elements", 110, function() SU.ToggleElementBox(); end);
+	SU.bar.elementsButton:SetPoint("TOPRIGHT", SU.bar, "TOPRIGHT", -8, -36);
 	SU.bar.presetButton = K.Button(SU.bar, SS.T("Presets") .. "  v", 110, function()
 		local p = SU.bar.profilePanel;
 		if ( p:IsShown() ) then p:Hide(); else SU.PlaceProfiles(); p.Refresh(); p:Show(); end
@@ -893,3 +897,148 @@ end
 
 -- Places a settings page's visible rows top to bottom. A sub-setting whose setting is off, and a heading with nothing
 -- under it, take no room. Runs again after every change, so sub-settings appear and disappear as they are turned on.
+
+
+-- ---------------------------------------------------------------- WoW Forever: the element box and modern menus
+-- One flat slate look for the element box and every right-click menu: dark fill, thin cool-grey edge, no game art.
+SU.FOREVER_BG = { 0.04, 0.05, 0.07, 0.96 };
+SU.FOREVER_EDGE = { 0.42, 0.5, 0.6, 0.85 };
+SU.FOREVER_FILL = { 0.1, 0.12, 0.15, 0.95 };
+local FLAT = "Interface\\Buttons\\WHITE8X8";
+local STATE_TINT = { enabled = { 0.45, 0.85, 0.5 }, disabled = { 1, 0.45, 0.35 }, default = { 1, 0.82, 0.2 } };
+local STATE_LABEL = { { "enabled", "Enabled" }, { "disabled", "Disabled" }, { "default", "Default" } };
+
+function SU.FlatFrame(f, bg, edge)
+	if ( not f or not f.SetBackdrop ) then return; end
+	f:SetBackdrop({ bgFile = FLAT, edgeFile = FLAT, tile = false, edgeSize = 1, insets = { left = 1, right = 1, top = 1, bottom = 1 } });
+	f:SetBackdropColor(bg[1], bg[2], bg[3], bg[4]);
+	f:SetBackdropBorderColor(edge[1], edge[2], edge[3], edge[4]);
+end
+
+-- Strips a game button's red art once; the button keeps its click and text.
+function SU.Flatten(b)
+	if ( not b or b.flat or not b.GetNormalTexture ) then return; end
+	b.flat = true;
+	local t = { b:GetNormalTexture(), b:GetPushedTexture(), b:GetHighlightTexture() };
+	for i = 1, 3 do if ( t[i] ) then t[i]:SetAlpha(0); end end
+	SU.FlatFrame(b, SU.FOREVER_FILL, SU.FOREVER_EDGE);
+	local fs = b:GetFontString();
+	if ( fs ) then fs:SetTextColor(0.92, 0.95, 1); end
+end
+
+-- Paints a flat button lit in its tint, or dark when it is not the one in effect.
+function SU.PaintFlat(b, on, tint)
+	if ( not b or not b.flat ) then return; end
+	local fill, edge = SU.FOREVER_FILL, SU.FOREVER_EDGE;
+	if ( on and tint ) then
+		fill = { tint[1] * 0.35, tint[2] * 0.35, tint[3] * 0.35, 0.95 };
+		edge = { tint[1], tint[2], tint[3], 1 };
+	end
+	SU.FlatFrame(b, fill, edge);
+	local fs = b:GetFontString();
+	if ( fs and tint ) then if ( on ) then fs:SetTextColor(1, 1, 1); else fs:SetTextColor(0.6, 0.66, 0.74); end end
+end
+
+-- Flattens every plain button under a menu, so the right-click menus match the box.
+function SU.FlattenChildren(f)
+	if ( not f or not f.GetChildren ) then return; end
+	local kids = { f:GetChildren() };
+	for i = 1, table.getn(kids) do
+		local c = kids[i];
+		if ( c.GetObjectType and c:GetObjectType() == "Button" ) then SU.Flatten(c); end
+		SU.FlattenChildren(c);
+	end
+end
+
+function SU.ModernizeMenus()
+	if ( SU.panel ) then SU.FlatFrame(SU.panel, SU.FOREVER_BG, SU.FOREVER_EDGE); SU.FlattenChildren(SU.panel); end
+end
+
+-- Sets every element to one mode through the same path as its own buttons.
+function SU.SetElementMode(name, value)
+	local title = SS.ELEMENTS[name] and SS.ELEMENTS[name].title or name;
+	SS.Safe(SU.SetMode, name, value, title);
+end
+
+function SU.SetAllModes(value)
+	SU.batching = true;
+	for i = 1, table.getn(SS.SETUP_ORDER) do SU.SetElementMode(SS.SETUP_ORDER[i], value); end
+	SU.batching = false;
+	SU.RefreshElementBox();
+	SU.RefreshBar();
+end
+
+-- Colours each row's three buttons so the mode in effect is lit.
+function SU.RefreshElementBox()
+	if ( not SU.box or not SU.box.rows ) then return; end
+	for i = 1, table.getn(SU.box.rows) do
+		local row = SU.box.rows[i];
+		local mode = SU.Mode(row.name);
+		for j = 1, table.getn(row.states) do
+			local st = row.states[j];
+			SU.PaintFlat(st, st.modeValue == mode, STATE_TINT[st.modeValue]);
+		end
+	end
+end
+
+function SU.BuildElementBox()
+	local box = CreateFrame("Frame", "SlimSuiteElementBox", UIParent);
+	SU.box = box;
+	box:SetWidth(660); box:SetHeight(440); box:SetFrameStrata("DIALOG");
+	box:SetMovable(true); box:EnableMouse(true); box:SetClampedToScreen(true);
+	box:RegisterForDrag("LeftButton");
+	box:SetScript("OnDragStart", function() this:StartMoving(); end);
+	box:SetScript("OnDragStop", function() this:StopMovingOrSizing(); end);
+	SU.FlatFrame(box, SU.FOREVER_BG, SU.FOREVER_EDGE);
+
+	box.title = box:CreateFontString(nil, "OVERLAY", "GameFontNormal");
+	box.title:SetPoint("TOPLEFT", box, "TOPLEFT", 12, -10); box.title:SetTextColor(0.55, 0.8, 1);
+	box.title:SetText("WoW Forever");
+	box.sub = box:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+	box.sub:SetPoint("TOPLEFT", box, "TOPLEFT", 12, -28);
+	box.sub:SetText(SS.T("Turn each element on, off, or back to the game's own."));
+
+	box.close = K.Button(box, "Close", 70, function() box:Hide(); end);
+	box.close:SetPoint("TOPRIGHT", box, "TOPRIGHT", -10, -8); SU.Flatten(box.close);
+
+	local bulk = { { "All enabled", "enabled" }, { "All disabled", "disabled" }, { "All default", "default" } };
+	for i = 1, 3 do
+		local value = bulk[i][2];
+		local b = K.Button(box, bulk[i][1], 120, function() SU.SetAllModes(value); end);
+		b:SetPoint("TOPLEFT", box, "TOPLEFT", 12 + (i - 1) * 128, -52); SU.Flatten(b);
+	end
+
+	-- two columns, every managed element once; each row has its name and three buttons
+	local names = SS.SETUP_ORDER;
+	local perCol = math.ceil(table.getn(names) / 2);
+	box.rows = {};
+	for i = 1, table.getn(names) do
+		local name = names[i];
+		local col = math.floor((i - 1) / perCol);
+		local idx = (i - 1) - col * perCol;
+		local x, y = 12 + col * 324, -88 - idx * 24;
+		local row = { name = name, states = {} };
+		local label = box:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+		label:SetPoint("TOPLEFT", box, "TOPLEFT", x, y - 5); label:SetWidth(140); label:SetJustifyH("LEFT");
+		label:SetText(SS.T(SS.ELEMENTS[name] and SS.ELEMENTS[name].title or name));
+		for j = 1, 3 do
+			local st = K.Button(box, SS.T(STATE_LABEL[j][2]), 56, function() SU.SetElementMode(this.elementName, this.modeValue); SU.RefreshElementBox(); SU.RefreshBar(); end);
+			st:SetHeight(18); st:SetPoint("TOPLEFT", box, "TOPLEFT", x + 142 + (j - 1) * 58, y - 2);
+			st.elementName = name; st.modeValue = STATE_LABEL[j][1];
+			SU.Flatten(st);
+			row.states[j] = st;
+		end
+		box.rows[i] = row;
+	end
+	box:Hide();
+	SU.RefreshElementBox();
+end
+
+function SU.ToggleElementBox()
+	if ( not SU.box ) then SU.BuildElementBox(); end
+	if ( SU.box:IsShown() ) then SU.box:Hide(); return; end
+	SU.box:ClearAllPoints();
+	SU.box:SetPoint("TOPLEFT", SU.bar, "BOTTOMLEFT", 0, -6);
+	SU.RefreshElementBox();
+	SU.box:Show();
+end
