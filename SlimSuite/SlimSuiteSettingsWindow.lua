@@ -508,6 +508,8 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		K.Print(NAME, "chat lines with \"" .. rest .. "\" are shown again.");
 	elseif ( cmd == "errors" ) then
 		SS.ShowErrors();
+	elseif ( cmd == "log" ) then
+		SS.ShowActionLog();
 	elseif ( cmd == "hud" or cmd == "recommend" ) then
 		SS.ShowHUDRecommendation();
 	elseif ( cmd == "mouse" ) then

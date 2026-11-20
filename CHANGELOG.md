@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.66
+Adds an action log, so you can send recent activity when something goes wrong.
+
+- /slimsuite log opens the action log, which keeps the last 100 actions with their times. It is kept between logins.
+- Copy selects the whole log, so Ctrl+C copies it.
+- Recorded: HUD Edit opening and closing, UI locking, element changes, encounter bar target clicks, snap changes, and errors Slim Suite catches.
+- Not yet tested in the live client: the log window and its Copy button.
+
 ## 1.65
 Character sheet gets a gear column with set bonuses, the compass can show the run clock, and HUD Edit Mode is tidier.
 
