@@ -971,7 +971,7 @@ local function DrawBox()
 		l:SetPoint("TOPLEFT", box, "TOPLEFT", x, y);
 		l:SetWidth(lineWidth); l:SetHeight(h);
 		l.icon:SetWidth(e.icon and (h - 2) or 0); l.icon:SetHeight(h - 2); l.icon:SetTexture(e.icon or nil);
-		l.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",important and (e.crit and 16 or 14) or 11,"OUTLINE");
+		l.text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",important and (e.crit and 15 or 12) or 10,e.crit and "THICKOUTLINE" or "OUTLINE");
 		l.text:SetHeight(h-4);
 		SS.FitCombatText(l.text,(important and e.crit and (e.amount .. "!") or tostring(e.amount)) .. "  " .. e.name,math.max(0,l:GetWidth()-(e.icon and h+4 or 6)));
 		if ( e.heal ) then l.text:SetTextColor(0.3, 1, 0.4);
@@ -1459,8 +1459,10 @@ local function FloatText(i)
 	f:SetWidth(120); f:SetHeight(24);
 	f.text = f:CreateFontString(nil, "OVERLAY");
 	f.text:SetPoint("CENTER", f, "CENTER", 8, 0);
-	f.icon = f:CreateTexture(nil, "ARTWORK"); f.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93);
+	f.iconBack = f:CreateTexture(nil, "BACKGROUND"); f.iconBack:SetTexture(0, 0, 0, 0.7);
+	f.icon = f:CreateTexture(nil, "ARTWORK"); f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92);
 	f.icon:SetPoint("RIGHT", f.text, "LEFT", -3, 0);
+	f.iconBack:SetPoint("CENTER", f.icon, "CENTER", 0, 0);
 	floatPool[i] = f;
 	return f;
 end
@@ -1509,15 +1511,20 @@ local function DrawFloats()
 			local dist = tonumber(p.playerDistance);
 			local near = dist and math.max(0.6, math.min(1.25, 1.35 - dist / 90)) or 1;
 			local reduceMotion = DB().accessibilityReduceMotion and true or false;
-			local pop = (not reduceMotion and e.crit and t < 0.12) and (1.3 - t * 2.5) or 1;
-			local size = math.floor((e.crit and 22 or 14) * near * pop + 0.5);
+			local pop = (not reduceMotion and e.crit and t < 0.12) and (1.5 - t * 4) or 1;
+			local size = math.floor((e.crit and 20 or 11) * near * pop + 0.5);
 			size = math.max(8, size);
-			if ( f.fontSize ~= size ) then f.fontSize = size; f.text:SetFont(font, size, "OUTLINE"); end
+			local flags = e.crit and "THICKOUTLINE" or "OUTLINE";
+			if ( f.fontSize ~= size or f.flags ~= flags ) then f.fontSize = size; f.flags = flags; f.text:SetFont(font, size, flags); end
 			f.text:SetText(SS.WorldTextMode and SS.WorldTextMode()=="iconsCrits" and not e.crit and "" or (e.crit and (e.text .. "!") or e.text));
-			if ( e.crit ) then f.text:SetTextColor(1, 0.82, 0.15);
+			if ( e.crit ) then f.text:SetTextColor(1, 0.9, 0.3); f.iconBack:SetTexture(1, 0.82, 0.15, 0.9);
+			else f.iconBack:SetTexture(0, 0, 0, 0.7); end
+			if ( e.crit ) then
 			elseif ( e.kind == "boss" or e.kind == "final" ) then f.text:SetTextColor(1, 0.6, 0.3);
 			else f.text:SetTextColor(1, 1, 1); end
-			f.icon:SetWidth(size); f.icon:SetHeight(size); f.icon:SetTexture(e.icon);
+			local iconSize = e.crit and size + 4 or size;
+			f.icon:SetWidth(iconSize); f.icon:SetHeight(iconSize); f.icon:SetTexture(e.icon);
+			f.iconBack:SetWidth(iconSize + 2); f.iconBack:SetHeight(iconSize + 2);
 			f:ClearAllPoints();
 			f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale + (reduceMotion and 0 or e.drift), y / scale + 20 + (reduceMotion and 0 or t * FLOAT_RISE * near));
 			f:SetAlpha(t > 0.7 and math.max(0, (1 - t) / 0.3) or 1);

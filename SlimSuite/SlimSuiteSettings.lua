@@ -318,21 +318,17 @@ function SU.ChecksFor(frame)
  {"Show chests",function() return SS.DB().compassCaches~=false; end,function(v) SS.DB().compassCaches=v; end} },
  SlimSuiteCombatTextFrame = {
 			SS.WorldCombatEntry and SS.WorldCombatEntry() or nil,
-			{ "Keep combat log with world numbers", function() return SS.DB().keepCombatLog; end, function(v) SS.DB().keepCombatLog=v; end },
-			{ "Show heals", function() return SS.DB().ctHeals ~= false; end, function(v) SS.DB().ctHeals = v and true or false; end },
-			{ "Crits: bigger and longer", function() return SS.DB().ctCrits ~= false; end, function(v) SS.DB().ctCrits = v and true or false; end },
-			{ "Spell icons", function() return SS.DB().ctIcons ~= false; end, function(v) SS.DB().ctIcons = v and true or false; end },
-			{ "Lines stay twice as long", function() return SS.DB().ctLong ~= false; end, function(v) SS.DB().ctLong = v and true or false; end },
-			{ "Emphasize crits and your biggest hits", short = "Emphasize big hits", function() return SS.DB().ctPop ~= false; end, function(v) SS.DB().ctPop = v and true or false; end },
-			{ "Reduce floating-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end } },
+			{ "Also write the numbers in the combat log", function() return SS.DB().keepCombatLog; end, function(v) SS.DB().keepCombatLog=v; end },
+			{ "Show healing numbers", function() return SS.DB().ctHeals ~= false; end, function(v) SS.DB().ctHeals = v and true or false; end },
+			{ "Critical hits are bigger and stay longer", function() return SS.DB().ctCrits ~= false; end, function(v) SS.DB().ctCrits = v and true or false; end },
+			{ "Show the spell icon next to each number", function() return SS.DB().ctIcons ~= false; end, function(v) SS.DB().ctIcons = v and true or false; end },
+			{ "Numbers stay on screen twice as long", function() return SS.DB().ctLong ~= false; end, function(v) SS.DB().ctLong = v and true or false; end },
+			{ "Make your biggest hits stand out", short = "Big hits stand out", function() return SS.DB().ctPop ~= false; end, function(v) SS.DB().ctPop = v and true or false; end },
+			{ "Calmer motion: numbers drift instead of bouncing", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end } },
 	};
 	if ( frame=="SlimSuiteStatCounterFrame" and SS.StatSettings ) then list[frame]=SS.StatSettings(); end
 	local out = {};
-	-- "Movable?" belongs to the game's own frame: not offered while a card or the thin lines show the element
-	if ( frame and SU.NATIVE[frame] and SS.Shown(frame) == frame ) then
-		table.insert(out, { "Movable? (Disables Default UI Element)", short = "Movable? (off: default UI)", function() return not (SS.DB().frameDefault and SS.DB().frameDefault[frame]); end,
-			function(v) SU.SetMovable(frame, v); end, warn = SU.WARN_UNMOVABLE[frame] });
-	end
+	-- "Movable?" is no longer offered: everything is movable by default, and the element's own switch covers it
 	for _, c in ipairs(frame and list[frame] or {}) do table.insert(out, c); end
 	return out;
 end

@@ -61,7 +61,7 @@ end
 local function UpdatePlateData(record, unit)
 	local f = record.frame or NewPlate();
 	record.frame = f;
-	f.name:SetText(record.name or (unit and unit.name) or "Enemy");
+	f.name:SetText(record.label or record.name or (unit and unit.name) or "Enemy");
 	if ( unit and tonumber(unit.hpm) and tonumber(unit.hpm) > 0 ) then
 		local hp, max = tonumber(unit.hp) or 0, tonumber(unit.hpm);
 		f.health:SetMinMaxValues(0, max); f.health:SetValue(hp); f.health:Show();
@@ -104,6 +104,8 @@ local function ReadCatalog()
 	else kinds = { "enemy", "elite", "boss", "finalBoss", "guardian" }; end
 	local q = { kinds = kinds, states = { "alive" } };
 	local current, cursor, pages, accepted = {}, nil, 0, 0;
+	local groups = {};                  -- ordinary monsters that share a name: one plate for the whole mob
+	local grouping = d.enemyPlateGroup ~= false;
 	repeat
 		local ok, page = SS.Safe(AZS_GetWorldAnchors, q, cursor, 256);
 		if ( not ok or type(page) ~= "table" or type(page.entries) ~= "table" ) then return; end
@@ -111,7 +113,15 @@ local function ReadCatalog()
 			local entry = page.entries[i];
 			if ( type(entry) == "table" and entry.anchorId and entry.state == "alive" ) then
 				local kind = entry.kind;
-				if ( not d.enemyBossesOnly or kind == "boss" or kind == "finalBoss" or kind == "guardian" ) then
+				if ( grouping and (kind == "enemy" or kind == "elite") and type(entry.name) == "string" ) then
+					local group = groups[entry.name];
+					if ( group ) then
+						group.count = group.count + 1; table.insert(group.members, entry.unitId);
+					elseif ( accepted < 64 and not current[entry.anchorId] ) then
+						group = { anchorId = entry.anchorId, name = entry.name, kind = kind, count = 1, members = { entry.unitId } };
+						groups[entry.name] = group; current[entry.anchorId] = group; accepted = accepted + 1;
+					end
+				elseif ( not d.enemyBossesOnly or kind == "boss" or kind == "finalBoss" or kind == "guardian" ) then
 					if ( current[entry.anchorId] or accepted < 64 ) then
 						-- Do not mutate live records until every requested page has arrived.
 						local record = { anchorId = entry.anchorId };
@@ -139,7 +149,20 @@ local function ReadCatalog()
 	end
 	requests = {};
 	for id, record in pairs(current) do
-		UpdatePlateData(record, units[record.unitId]);
+		if ( record.count ) then
+			-- one plate for the mob: its count and its members' health added together
+			local hp, hpm = 0, 0;
+			for i = 1, table.getn(record.members) do
+				local member = units[record.members[i]];
+				if ( member and tonumber(member.hpm) and tonumber(member.hpm) > 0 ) then
+					hp = hp + (tonumber(member.hp) or 0); hpm = hpm + tonumber(member.hpm);
+				end
+			end
+			record.label = record.name .. (record.count > 1 and ("  x" .. record.count) or "");
+			UpdatePlateData(record, hpm > 0 and { name = record.name, hp = hp, hpm = hpm } or nil);
+		else
+			UpdatePlateData(record, units[record.unitId]);
+		end
 		table.insert(requests, { anchorId = id, attachment = "overhead" });
 	end
 	plates = current;

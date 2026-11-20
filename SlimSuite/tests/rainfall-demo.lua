@@ -59,7 +59,7 @@ end
 Tick(1,.05)
 local weak=Find("Weak crit")
 check("weak crit becomes an ordinary white line",weak and weak.text.testColor and weak.text.testColor[1]==1 and weak.text.testColor[2]==1 and weak.text.testColor[3]==1)
-check("weak crit has normal size and no critical suffix",weak and weak.text.testFontSize==11 and not string.find(weak.text:GetText(),"!",1,true))
+check("weak crit has normal size and no critical suffix",weak and weak.text.testFontSize==10 and not string.find(weak.text:GetText(),"!",1,true))
 local weakX=weak and weak.points[1][4]; Tick(2,.1); weak=Find("Weak crit")
 check("weak crit scrolls normally without drifting right",weak and weak.points[1][4]==weakX)
 Tick(1,15)

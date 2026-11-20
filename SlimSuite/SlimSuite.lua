@@ -157,6 +157,7 @@ end
 -- After that SS.DB() only hands the table back: it is asked for hundreds of times a second.
 SS.DEFAULTS = {
 	hideLevel = true, hideRP = false, hideRacialInfo = false, hideOpeningLine = false, hideLairLine = false,
+	hideAddonText = false, hideLocation = false, hideDifficulty = false, hideTalentXP = false,
 	replaceClock = false, replaceEncounters = false, replaceTally = false, replaceBanners = false,
 	camera = true, plainBar = false, cooldowns = false, bossMarks = true, deathMarks = true, prePullMarks = false,
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
@@ -170,7 +171,7 @@ SS.DEFAULTS = {
 	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
-	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false,
+	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false, enemyPlateGroup = true,
 	accessibilityLargeText = false, accessibilityReduceMotion = false,
 	tallyContext = true,
 };
@@ -297,6 +298,17 @@ end
 
 local CHAT_FILTER = { activeEvent = nil, allowPlayers = false };
 local RACIAL_INFO_WORDS = { "racial buff", "racial bonus", "racial ability", "racial effect" };
+-- every race's racial ability names, as the game lists them in a racial announcement (from the Armory tooltips)
+local RACIAL_NAMES = { "escape artist", "expansive mind", "engineering specialization",
+	"stoneform", "gun specialization", "treasure finding",
+	"blood fury", "hardiness",
+	"perception", "the human spirit", "diplomacy",
+	"will of the forsaken", "cannibalize", "shadow resistance",
+	"war stomp", "endurance",
+	"shadowmeld", "quickness", "nature resistance",
+	"berserking", "regeneration", "throwing specialization" };
+-- talent experience lines ("Your Warlocks earn 24 talent experience.")
+local TALENT_XP_WORDS = { "talent experience" };
 local cachedRacialId, cachedRacialName;
 
 function SS.RacialAbilityName()
@@ -371,7 +383,7 @@ function SS.Hidden(msg, sourceEvent)
 	if ( CHAT_FILTER.allowPlayers or CHAT_FILTER.playerEvents[sourceEvent or CHAT_FILTER.activeEvent] ) then return false; end
 	if ( string.find(msg, "|Hplayer:", 1, true) ) then return false; end   -- a player's own words
 	local d = SS.DB();
-	if ( not (d.hideLevel or d.hideNewSpells or d.hideRP or d.hideRacialInfo or d.hideOpeningLine or d.hideLairLine or d.words[1]) ) then return false; end
+	if ( not (d.hideLevel or d.hideNewSpells or d.hideRP or d.hideRacialInfo or d.hideOpeningLine or d.hideLairLine or d.hideAddonText or d.hideLocation or d.hideDifficulty or d.hideTalentXP or d.words[1]) ) then return false; end
 	local low = CHAT_FILTER.PlainText(msg);
 	if ( d.hideRacialInfo ) then
 		local racialInfo = SS.Any(low, RACIAL_INFO_WORDS);
@@ -379,8 +391,15 @@ function SS.Hidden(msg, sourceEvent)
 		-- English words "racial buff". AZS_SPELLS documents the racial as its last entry.
 		local racialName = not racialInfo and SS.RacialAbilityName() or nil;
 		if ( racialName and racialName ~= "" and string.find(low, racialName, 1, true) ) then racialInfo = true; end
+		-- a racial's own list line: "- Regeneration: +1.5 health per second"
+		if ( string.sub(low, 1, 2) == "- " and SS.Any(low, RACIAL_NAMES) ) then racialInfo = true; end
 		if ( racialInfo ) then return true; end
 	end
+	if ( d.hideAddonText and (string.find(low, "azeroth stats :", 1, true) or string.find(low, "/azstats", 1, true)) ) then return true; end
+	if ( d.hideLocation and string.find(low, "enters ", 1, true) and string.find(low, "move to begin", 1, true) ) then return true; end
+	-- a difficulty line is only the name alone: "Heroic II", "Normal"
+	if ( d.hideDifficulty and string.len(low) <= 20 and (string.find(low, "^heroic") or string.find(low, "^normal")) ) then return true; end
+	if ( d.hideTalentXP and SS.Any(low, TALENT_XP_WORDS) ) then return true; end
 	if ( d.hideOpeningLine and string.find(low, "oogax q the troll shaman enters warsong gulch", 1, true) ) then return true; end
 	if ( d.hideLairLine and string.find(low, "who dares to enter my lair", 1, true) ) then return true; end
 	if ( d.hideRP and CHAT_FILTER.IsRoleplay(msg, sourceEvent or CHAT_FILTER.activeEvent) ) then return true; end
@@ -580,14 +599,23 @@ function SS.StopPreview()
  local ok,result=SS.Safe(StopSound,soundPreviewHandle); if not ok or result==false then return false; end
  soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
 end
+-- The one global rule for sound: nothing starts while the game is paused (the pause phase or the Esc menu is open).
+-- A sound already playing finishes; the 1.12 client has no way to stop it early.
+function SS.GamePaused()
+ if GameMenuFrame and GameMenuFrame.IsShown and GameMenuFrame:IsShown() then return true; end
+ if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok and value=="paused" then return true; end end
+ return false;
+end
 function SS.PlayAddonSound(key)
  if SS.ModuleEnabled and not SS.ModuleEnabled("sounds") then return false; end
+ if SS.GamePaused() then return false; end
  local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return false; end
  if SS.PreviewActive() and not SS.StopPreview() then return false; end
  local ok,played=SS.Safe(PlaySoundFile,path); return ok and played and true or false;
 end
 function SS.PreviewSound(key)
  local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return; end
+ if SS.GamePaused() then SS.previewNext=nil; return; end
  local same=SS.PreviewActive(key);
  if not SS.StopPreview() then SS.previewNext=not same and key or nil; return; end
  SS.previewNext=nil;
@@ -650,7 +678,8 @@ function SS.UpdateMatchSounds()
  elseif type(AZS_END)=="table" and AZS_END.result=="left" then matchAudio.pending={};
  else
   for i=table.getn(matchAudio.pending),1,-1 do
-   if GetTime()>=matchAudio.pending[i].due then
+   -- a queued death sound waits for the pause to end rather than being dropped
+   if GetTime()>=matchAudio.pending[i].due and not SS.GamePaused() then
     local pending=table.remove(matchAudio.pending,i);
     local selected=SS.DeathSoundSelection(pending.group); if selected~="off" then SS.PlayAddonSound(selected); end
    end
@@ -675,7 +704,7 @@ deathSoundFrame:SetScript("OnEvent", function() SS.PlayDeathSound(); end);
 -- and rate-limit it so a player near 30% health hears it at most once every five seconds.
 local lowHealthLastPlayed = -10;
 local function PlayLowHealthSound()
-	if ( not SS.DB().lowHealthSound or not UnitHealth or not UnitHealthMax or not PlaySoundFile ) then return; end
+	if ( not SS.DB().lowHealthSound or not UnitHealth or not UnitHealthMax or not PlaySoundFile or SS.GamePaused() ) then return; end
 	local maximum = UnitHealthMax("player") or 0;
 	local health = UnitHealth("player") or maximum;
 	if ( maximum <= 0 or health <= 0 or health / maximum > 0.30 or (UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")) ) then return; end

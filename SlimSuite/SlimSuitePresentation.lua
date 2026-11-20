@@ -32,8 +32,8 @@ function SS.SetWorldCombatMode(value)
  SS.SyncNativeDamageNumbers(); SS.MarkProfileDirty();
 end
 function SS.WorldCombatEntry()
- return {"World damage display",function() return SS.DB().worldCombatMode or "off"; end,function(v) SS.SetWorldCombatMode(v); end,
- choice={{"Log only (hide native numbers)","off"},{"Keep native damage numbers","native"},{"Spell icons and critical hits","iconsCrits"},{"Boss damage only","bosses"}}};
+ return {"Where the big damage numbers appear",function() return SS.DB().worldCombatMode or "off"; end,function(v) SS.SetWorldCombatMode(v); end,
+ choice={{"Off: only the combat log","off"},{"Keep the game's own numbers too","native"},{"Only crits and spell hits","iconsCrits"},{"Only boss damage","bosses"}}};
 end
 -- A failed optional tooltip route must not add errors to the user's addon error log.
 function SS.ShowBuildSpellTooltip(button)

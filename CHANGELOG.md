@@ -2,6 +2,15 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.46
+Chat filters, a cleaner stats panel, sleeker combat text, sound silenced while paused, and grouped monster nameplates.
+- Stats panel: the category menu is gone. Every stat is in one list with its own switch, an icon, its own colour, and a hover description. Values flash green or red when they change, and any numeric stat the game sends that Slim Suite doesn't name yet is shown too.
+- Chat mods: new toggles for addon text, location lines ("enters ... Move to begin"), difficulty lines, and talent experience. The racial filter now covers every race's racial ability names from the Armory.
+- Damage text: rows renamed to say what they do, world damage choices reworded, numbers smaller, icons with a dark backing (gold ring on crits), and crits larger and heavier.
+- Sound: nothing starts while the game is paused or the Esc menu is open. Death sounds that were waiting are held until the pause ends. A sound already playing finishes.
+- Enemy nameplates: identical monsters share one plate with a count and their combined health (for example, Spider x34). A new setting turns grouping off.
+- Tests: new chat filter scenario; combat box size expectation updated.
+
 ## 1.45
 - Restyled sound previews with white play/pause-style icons and hover highlighting. Supported clients stop the previous preview before switching; legacy clients queue the latest request without overlap. True pause/resume remains unavailable on the inspected client.
 - Disabled the temporary card-selection item footer while retaining its implementation and normal build-row preferences. Independent Stats edge placement and tooltip support remain available.
