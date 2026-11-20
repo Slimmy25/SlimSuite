@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.50
+Panel styles extend to the tally and local clock, the edit bar gets its style buttons on their own row, and the legendary luck panel shows its benefits.
+- Tally and local clock follow the panel style: Original keeps their dark band, DPS meter and Tooltip draw the chosen panel behind them.
+- Edit bar: the Original, DPS meter and Tooltip buttons sit on their own bottom row. Reset All and Done moved to the middle row to stop the overlap.
+- Legendary luck: a two-step view shows your current chance and the chance with +10% luck, with the change. The grid shows six steps of 10% luck from where you are, with each chance and how many times your current chance it is.
+
 ## 1.49
 Adds panel style buttons to the edit bar and drag-and-drop ordering for stats.
 - Edit bar: Original, DPS meter and Tooltip buttons beside Reset All and Done. The one in use is highlighted, and it uses the same setting as the Panel style option.

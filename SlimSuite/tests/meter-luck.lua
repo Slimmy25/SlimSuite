@@ -19,7 +19,7 @@ check("luck prototype is optional",SS.ELEMENTS.SlimSuiteLuckFrame.optional and n
 SS.ENV.SU.SetMode("SlimSuiteLuckFrame","enabled","Legendary luck")
 AZS_STATS={luck=.3}; SS.UpdateLuck()
 check("enabled luck widget displays real current luck",SlimSuiteLuckFrame:IsShown() and string.find(SlimSuiteLuckFrame.luckTag:GetText(),"30%",1,true))
-check("luck display gives percentages without advisory statuses",SlimSuiteLuckFrame.bigTag:GetText()==SS.T("chance per card, right now") and SS.LuckTrend==nil)
+check("luck display gives percentages without advisory statuses",SlimSuiteLuckFrame.bigTag:GetText()==SS.T("now  ->  with +10% luck") and SS.LuckTrend==nil)
 SS.StartSetup(true); SS.RefreshEditHandles()
 check("luck widget participates in green mover",SS.ENV.handles.SlimSuiteLuckFrame and SS.ENV.handles.SlimSuiteLuckFrame:IsShown())
 local handle=SS.ENV.handles.SlimSuiteLuckFrame
