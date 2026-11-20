@@ -57,24 +57,6 @@ function SS.HideElementMenu()
 	SU.focus, SU.placedFor = nil, nil;
 end
 
--- Arrow keys move the element being edited one pixel (Shift for ten). Only while its menu is open.
-SU.nudge = CreateFrame("Frame", "SlimSuiteNudgeKeys", UIParent);
-if ( SU.nudge.EnableKeyboard ) then SU.nudge:EnableKeyboard(true); end
-SU.nudge:SetScript("OnKeyDown", function()
-	local f = SU.focus;
-	if ( type(f) == "string" ) then f = getglobal(f); end
-	if ( type(f) ~= "table" or not f.GetLeft or not SU.panel or not SU.panel:IsShown() ) then return; end
-	local key = arg1;
-	local step = (IsShiftKeyDown and IsShiftKeyDown()) and 10 or 1;
-	local dx, dy = 0, 0;
-	if ( key == "LEFT" ) then dx = -step; elseif ( key == "RIGHT" ) then dx = step;
-	elseif ( key == "UP" ) then dy = step; elseif ( key == "DOWN" ) then dy = -step; else return; end
-	local l, b = f:GetLeft(), f:GetBottom();
-	if ( not l or not b ) then return; end
-	f:ClearAllPoints(); f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l + dx, b + dy);
-	local name = f.GetName and f:GetName();
-	if ( name and SS.SavePosition ) then SS.SavePosition(name, f); end
-end);
 function SU.Focus(frame)
 	SU.ModernizeMenus();
  if ( not frame and setupActive ) then

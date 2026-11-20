@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.56
+Removed arrow-key nudging, so WASD and the arrow keys work normally again. The Character and Talents windows can now be placed like other Slim Suite elements.
+
+- Edit mode no longer takes the keyboard. Drag and resize still work as before.
+- Character and Talents are new movable elements. Their saved place is re-applied each time the window opens. Until you move them they keep the game's default place.
+- Not yet tested in the live client: dragging these two windows may need a handle on each window.
+
 ## 1.55
 Slim Suite can now play a sound when you help bring a downed teammate back up.
 

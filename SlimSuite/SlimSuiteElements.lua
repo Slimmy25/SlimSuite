@@ -34,6 +34,8 @@ SS.ELEMENTS = {
 	SlimSuiteStatCounterFrame = { feature = "statCounter" },
  SlimSuiteAchievementsButton = {feature="achievementButton",optional=true,title="Side achievements",label="Side achievements",text="Open your unofficial side objectives."},
  SlimSuiteLuckFrame = {feature="luckPanel",optional=true,title="Legendary luck",label="Legendary luck",text="Estimated legendary card chances from the supplied luck model."},
+	CharacterFrame = {},
+	TalentFrame = {},
 	SlimSuiteCompassFrame = { feature = "compassOn", title = "Compass", text = "Bearings to known bosses, lairs and caches. Choose a rail or free markers." },
 	SlimSuiteTargetCard = {},
 };
@@ -62,7 +64,7 @@ SS.MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "Part
 	{ "SlimSuiteReviveFrame", "Revive bar" },
 	{ "SlimSuiteLocalClockFrame", "Local clock" },
 	{ "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
-	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" }, {"SlimSuiteLuckFrame","Legendary luck"}, {"SlimSuiteAchievementsButton","Side achievements"} };
+	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" }, {"SlimSuiteLuckFrame","Legendary luck"}, {"SlimSuiteAchievementsButton","Side achievements"}, { "CharacterFrame", "Character" }, { "TalentFrame", "Talents" } };
 SS.ELEMENTS["PlayerFrame"].label = "Player";
 SS.ELEMENTS["TargetFrame"].label = "Target";
 SS.ELEMENTS["PartyMemberFrame1"].label = "Party";
@@ -84,6 +86,10 @@ SS.ELEMENTS["GameTooltip"].label = "Tooltip";
 SS.ELEMENTS["SlimSuiteReviveFrame"].label = "Revive bar";
 SS.ELEMENTS["SlimSuiteLocalClockFrame"].label = "Local clock";
 SS.ELEMENTS["SlimSuitePlayerCard"].label = "Player (new style)";
+SS.ELEMENTS["CharacterFrame"].label = "Character";
+SS.ELEMENTS["TalentFrame"].label = "Talents";
+SS.ELEMENTS["CharacterFrame"].title = "Character"; SS.ELEMENTS["CharacterFrame"].text = "Your character sheet (C).";
+SS.ELEMENTS["TalentFrame"].title = "Talents"; SS.ELEMENTS["TalentFrame"].text = "Your talent tree (N).";
 SS.ELEMENTS["SlimSuiteTargetCard"].label = "Target (new style)";
 SS.ELEMENTS["SlimSuiteCombatTextFrame"].label = "Combat text";
 SS.ELEMENTS["SlimSuiteStatCounterFrame"].label = "Stats";
