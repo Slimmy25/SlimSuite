@@ -47,12 +47,32 @@ function SS.EnforceElementBounds(owner,release)
  end
  Visit(owner,0);
 end
+-- Checked only when a frame moves, resizes, rescales, is shown or hidden, or its release state changes. A slow
+-- safety pass (SAFETY_SECONDS) still catches content that changes inside an unchanged frame.
+local SAFETY_SECONDS = .5;
+local seenState, lastFull = {}, {};
+local function StateOf(f,release)
+ local l,r,b,t=Rect(f);
+ return { l or 0, r or 0, b or 0, t or 0, f:GetScale() or 1, release and true or false, f:IsShown() and true or false };
+end
+local function Same(a,b)
+ for i=1,7 do if a[i]~=b[i] then return false; end end
+ return true;
+end
 SS.Every("contentBounds",.05,function()
+ local now=GetTime();
  for _,entry in ipairs(MOVABLE) do
   local name=entry[1]; local f=getglobal(name);
   if ( f and f.IsShown and f:IsShown() ) then
-   local d=SS.DB(); local release=d.vanillaUI or (d.frameDefault and d.frameDefault[name]);
-   SS.EnforceElementBounds(f,release);
+   local d=SS.DB(); local release=d.vanillaUI or (d.frameDefault and d.frameDefault[name]) and true or false;
+   local state=StateOf(f,release);
+   local old=seenState[name];
+   if ( not old or not Same(old,state) or now-(lastFull[name] or 0)>=SAFETY_SECONDS ) then
+    SS.EnforceElementBounds(f,release);
+    seenState[name]=state; lastFull[name]=now;
+   end
+  else
+   seenState[name]=nil;
   end
  end
 end);

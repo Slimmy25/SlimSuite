@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.58
+Slim Suite does less work while you play. Layout and behaviour are unchanged.
+
+- The check that keeps frame content inside its box now runs when a frame moves, resizes, rescales or shows or hides, plus a slow safety pass every half second. Before, it ran 20 times a second on every frame.
+- In the test client, this roughly halves Slim Suite's recurring work.
+- Trade-off: a change inside a frame that isn't moving can take up to half a second to be corrected.
+
 ## 1.57
 The settings window has an Elements page listing every element with On, Off and Original buttons. Character and Talents are now elements too.
 
