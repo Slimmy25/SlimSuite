@@ -2,6 +2,15 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.71
+Removes the companion and the alternative Character sheet, adds RPG and Modern themes to HUD Edit, and makes HUD Edit smaller.
+
+- Removed the companion.
+- Removed the alternative Character sheet. The Character element is back to Original.
+- HUD Edit has RPG and Modern theme buttons. Clicking the active theme turns it off.
+- HUD Edit is smaller (400 by 340).
+- Not yet tested in the live client: the new HUD Edit layout and themes.
+
 ## 1.70
 The companion shows the full figure and tries the game's own dance animation.
 

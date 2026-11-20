@@ -530,8 +530,6 @@ function SS.ToggleMovableOrientation(name)
 	end
 	local nextOrientation = SS.CurrentOrientation(name) == "vertical" and "horizontal" or "vertical";
 	SS.DB().orientations[name] = nextOrientation;
-	-- a vertical Character window only shows when the element is On, so choosing it turns the element on
-	if ( name == "CharacterFrame" and SU.Mode(name) ~= "enabled" ) then SU.SetMode(name, "enabled", "Character"); end
 	if ( name == "SlimSuiteClockFrame" ) then
 		local w, h = nextOrientation == "vertical" and 220 or 360, nextOrientation == "vertical" and 54 or 32;
 		clockFrame:SetWidth(w); clockFrame:SetHeight(h);
@@ -556,7 +554,7 @@ function SS.ToggleMovableOrientation(name)
 			f:SetWidth(w); f:SetHeight(h); SS.DB().sizes[name] = { w = w, h = h };
 		end
 	end
-	if ( name == "CharacterFrame" ) then SS.ApplyCharacterLayout(); else ApplyMovableOrientation(name); end
+	ApplyMovableOrientation(name);
 	PlaceAll();
 end
 
@@ -913,12 +911,7 @@ function SS.PrepareSizeTools(name, label)
 		sizeMenu.LayoutText = function()
 			local el = SS.Element(sizeTarget);
 			local orientation = el == "SlimSuiteTallyFrame" and (SS.DB().tallyVertical and "vertical" or "horizontal") or SS.CurrentOrientation(el);
-			if ( sizeTarget == "CharacterFrame" ) then
-				-- the Character window's second layout is called Alternative; its first is Original
-				layout:SetText(SS.T(orientation == "vertical" and "Use original" or "Use alternative"));
-			else
-				layout:SetText(SS.T(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical"));
-			end
+			layout:SetText(SS.T(orientation == "vertical" and "Switch to horizontal" or "Switch to vertical"));
 		end;
 		local growth;
 		growth = K.Button(sizeMenu, SS.T("Grow") .. " " .. SS.T("down"), 68, function()
@@ -988,7 +981,7 @@ function SS.PrepareSizeTools(name, label)
 	rows.scale.on, rows.last.on = true, true;
 	sizeMenuScaleInput:SetText(tostring(math.max(20, math.min(200, math.floor((SS.DB().scales[sizeTarget] or 1) * 100 + 0.5)))));
 	-- the other elements that turn have "vertical" among their settings, so it is not offered twice
-	rows.layout.on = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "BuffFrame" or name == "CharacterFrame";
+	rows.layout.on = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "BuffFrame";
 	if ( rows.layout.on ) then sizeMenu.LayoutText(); end
 	sizeMenu.growthButton.wanted = name == "BuffFrame";
 	if ( name == "BuffFrame" ) then sizeMenu.growthButton:SetText(SS.T("Grow") .. " " .. SS.T(SS.BuffGrowthDirection())); end

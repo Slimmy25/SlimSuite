@@ -157,7 +157,7 @@ function SS.HUDLayout()
   end
   if ( not header ) then
    local key = sec.key;
-   header = K.Button(hud.child, "", 170, function()
+   header = K.Button(hud.child, "", 116, function()
     SS.DB().hudSections[key] = (SS.DB().hudSections[key] == false);
     SS.HUDLayout();
    end);
@@ -178,7 +178,7 @@ function SS.HUDLayout()
     local col = math.floor((i - 1) / perCol);
     local idx = (i - 1) - col * perCol;
     r.frame:ClearAllPoints();
-    r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 170, -(y + idx * ROW));
+    r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 124, -(y + idx * ROW));
     r.frame:Show();
     RefreshRow(r);
    end
@@ -326,13 +326,13 @@ end
 -- Rows are made once; the order, the chain text and the tick boxes are refreshed from the saved data.
 local function BuildRow(child, name)
  local frame = CreateFrame("Frame", nil, child);
- frame:SetWidth(164); frame:SetHeight(ROW);
+ frame:SetWidth(118); frame:SetHeight(ROW);
  local cb = MakeTriBox(frame, name);
  cb:SetPoint("LEFT", frame, "LEFT", 0, 0);
  local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
- fs:SetPoint("LEFT", cb, "RIGHT", 6, 0); fs:SetWidth(124); fs:SetJustifyH("LEFT");
+ fs:SetPoint("LEFT", cb, "RIGHT", 6, 0); fs:SetWidth(96); fs:SetJustifyH("LEFT");
  local hit = CreateFrame("Button", nil, frame);
- hit:SetPoint("LEFT", cb, "RIGHT", 6, 0); hit:SetWidth(124); hit:SetHeight(ROW);
+ hit:SetPoint("LEFT", cb, "RIGHT", 6, 0); hit:SetWidth(96); hit:SetHeight(ROW);
  hit.elementName = name;
  -- the element panel (chain, revert, reset) is part of Advanced Options
  hit:SetScript("OnClick", function() if ( SS.DB().hudAdvanced ) then OpenElementPanel(this.elementName); end end);
@@ -382,12 +382,40 @@ end
 
 -- Opening the window unlocks the elements, so they can be dragged, right-clicked and chained straight away.
 -- Opening the window unlocks the elements, so they can be dragged, right-clicked and chained straight away.
+-- The HUD Edit window's own look: the plain dark window, or one of the panel styles (RPG, Modern).
+function SS.ApplyHudTheme()
+ if ( not hud or not hud.SetBackdrop ) then return; end
+ local key = SS.DB().hudTheme;
+ local s = key and SS.PANEL_STYLES[key];
+ if ( not s ) then
+  hud:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 16, edgeSize = 20, insets = { left = 5, right = 5, top = 5, bottom = 5 } });
+  hud:SetBackdropColor(0.03, 0.03, 0.05, 0.94);
+  return;
+ end
+ hud:SetBackdrop({ bgFile = s.bg, edgeFile = s.edge, tile = true, tileSize = 8, edgeSize = s.edgeSize,
+  insets = { left = 1, right = 1, top = 1, bottom = 1 } });
+ hud:SetBackdropColor(s.color[1], s.color[2], s.color[3], s.color[4]);
+ hud:SetBackdropBorderColor(s.border[1], s.border[2], s.border[3], s.border[4]);
+end
+function SS.RefreshHudThemeButtons()
+ if ( not hud or not hud.themeRpg ) then return; end
+ local key = SS.DB().hudTheme;
+ hud.themeRpg:SetText(key == "meter" and "[RPG]" or "RPG");
+ hud.themeModern:SetText(key == "tooltip" and "[Modern]" or "Modern");
+end
+function SS.SetHudTheme(key)
+ local d = SS.DB();
+ d.hudTheme = (d.hudTheme ~= key) and key or nil;
+ SS.ApplyHudTheme();
+ SS.RefreshHudThemeButtons();
+end
+
 function SS.OpenHUDEdit()
  if ( not SS.DB().unlocked ) then SS.SetUnlocked(true, true); end
  if ( hud ) then hud:Show(); SS.HUDLayout(); RefreshLayoutButton(); return; end
  hud = CreateFrame("Frame", "SlimSuiteHUDEditMode", UIParent);
  hud.building = true;
- hud:SetWidth(540); hud:SetHeight(380);   -- compact: well under the first version's size, with room for about eight rows
+ hud:SetWidth(400); hud:SetHeight(340);   -- compact: well under the first version's size, with room for about eight rows
  hud:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
  hud:SetFrameStrata("DIALOG");
  hud:SetMovable(true); hud:RegisterForDrag("LeftButton");
@@ -396,6 +424,7 @@ function SS.OpenHUDEdit()
  hud:EnableMouse(true);
  hud:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 16, edgeSize = 20, insets = { left = 5, right = 5, top = 5, bottom = 5 } });
  hud:SetBackdropColor(0.03, 0.03, 0.05, 0.94);
+ SS.ApplyHudTheme();
  table.insert(UISpecialFrames, "SlimSuiteHUDEditMode");
 
  -- info icon: what the window does
@@ -417,8 +446,15 @@ function SS.OpenHUDEdit()
  close:SetPoint("TOPRIGHT", hud, "TOPRIGHT", -2, -2);
  close:SetScript("OnClick", function() SS.CloseHUDEdit(); end);
 
+ -- themes: RPG and Modern (the New School look). Clicking the chosen one again goes back to the plain window.
+ hud.themeRpg = K.Button(hud, "RPG", 80, function() SS.SetHudTheme("meter"); end);
+ hud.themeRpg:SetPoint("TOPLEFT", hud, "TOPLEFT", 188, -30);
+ hud.themeModern = K.Button(hud, "Modern", 80, function() SS.SetHudTheme("tooltip"); end);
+ hud.themeModern:SetPoint("TOPLEFT", hud, "TOPLEFT", 274, -30);
+ SS.RefreshHudThemeButtons();
+
  -- layout picker: cycles the saved layouts
- hud.layoutButton = K.Button(hud, "", 200, function() CycleLayout(); end);
+ hud.layoutButton = K.Button(hud, "", 170, function() CycleLayout(); end);
  hud.layoutButton:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -30);
  RefreshLayoutButton();
 
@@ -458,7 +494,7 @@ function SS.OpenHUDEdit()
  local searchLabel = hud:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
  searchLabel:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -136); searchLabel:SetText(SS.T("Search"));
  local search = CreateFrame("EditBox", "SlimSuiteHUDSearch", hud, "InputBoxTemplate");
- search:SetWidth(300); search:SetHeight(18);
+ search:SetWidth(240); search:SetHeight(18);
  search:SetPoint("TOPLEFT", hud, "TOPLEFT", 64, -133);
  search:SetAutoFocus(false);
  search:SetScript("OnTextChanged", function()
@@ -469,7 +505,7 @@ function SS.OpenHUDEdit()
  hud.search = search;
 
  -- the element list: a bordered box that the Collapse options button shows and hides
- local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 516);
+ local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 380);
  scroll:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -158);
  scroll:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -10, 66);
  hud.child = child;
@@ -478,7 +514,7 @@ function SS.OpenHUDEdit()
  rows = {};
  for _, name in ipairs(SS.HUDOrder()) do BuildRow(child, name); end
 
- hud.collapse = K.Button(hud, SS.T("Collapse options") .. "  ^", 170, function()
+ hud.collapse = K.Button(hud, SS.T("Collapse options") .. "  ^", 130, function()
   if ( hud.box:IsShown() ) then
    hud.box:Hide(); this:SetText(SS.T("Expand options") .. "  v");
   else
@@ -487,7 +523,7 @@ function SS.OpenHUDEdit()
  end);
  hud.collapse:SetPoint("BOTTOM", hud, "BOTTOM", 0, 40);
 
- local revertAll = K.Button(hud, SS.T("Revert All Changes"), 170, function()
+ local revertAll = K.Button(hud, SS.T("Revert All Changes"), 130, function()
   SU.batching = true;
   for _, name in ipairs(ElementList()) do SU.SetMode(name, "default", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
   SU.batching = false;
@@ -495,7 +531,7 @@ function SS.OpenHUDEdit()
  end);
  revertAll:SetPoint("BOTTOMLEFT", hud, "BOTTOMLEFT", 12, 10);
  SS.hudRevertAll = revertAll;
- local save = K.Button(hud, SS.T("Save"), 170, function()
+ local save = K.Button(hud, SS.T("Save"), 130, function()
   -- Saves the current arrangement as the layout shown in the Layout button (created as "HUD edit" if there is none yet)
   local d = SS.DB();
   local name = d.hudLayoutName or SS.T("HUD edit");
