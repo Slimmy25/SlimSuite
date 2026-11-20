@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.70
+The companion shows the full figure and tries the game's own dance animation.
+
+- The companion shows the whole character, not just the head.
+- Dance plays the game's dance animation on the companion only. If this client cannot play animations on the companion, the button says so.
+- Not yet tested in the live client: whether the companion can dance, and which dance a Tauren gets.
+
 ## 1.69
 Fixes the companion, which failed to load its model.
 
