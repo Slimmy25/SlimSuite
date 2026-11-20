@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.63
+Smaller HUD Edit Mode, and the Character sheet fixes.
+
+- HUD Edit Mode is compact again: a smaller window at its normal size, with the element list in two columns, and the grid slider, search and options placed closer together.
+- The Character sheet no longer shows a gold border outside the setup.
+- Character can be set to the vertical layout, with all items in one column beside the character.
+- Not yet tested in the live client: the compact window's layout, and the Character vertical layout next to the stats pane.
+
 ## 1.62
 Slim Suite does less work while you play. Layout and behaviour are unchanged, apart from the timing notes below.
 

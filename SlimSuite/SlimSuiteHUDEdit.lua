@@ -5,7 +5,7 @@
 -- directly ahead of (above) or behind (below) its primary, and the other rows shift to make room.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 
-local ROW = 26;
+local ROW = 20;
 local hud, panel, picker, rows = nil, nil, nil, {};
 
 local function ElementList()
@@ -130,7 +130,7 @@ function SS.HUDLayout()
   local col, idx = 0, i - 1;
   if ( i > half ) then col = 1; idx = i - half - 1; end
   r.frame:ClearAllPoints();
-  r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 250, -6 - idx * ROW);
+  r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 186, -4 - idx * ROW);
   r.frame:Show();
   RefreshRow(r);
  end
@@ -160,7 +160,7 @@ local function MakeTriBox(parent, name)
   cb:SetHighlightTexture("Interface\\Buttons\\UI-CheckBox-Highlight");
   cb:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check");
  end
- cb:SetWidth(24); cb:SetHeight(24);
+ cb:SetWidth(18); cb:SetHeight(18);
  cb.elementName = name;
  cb.defaultText = cb:CreateFontString(nil, "OVERLAY", "GameFontNormal");
  cb.defaultText:SetPoint("CENTER", cb, "CENTER", 0, 0); cb.defaultText:SetText("D"); cb.defaultText:Hide();
@@ -275,13 +275,13 @@ end
 -- Rows are made once; the order, the chain text and the tick boxes are refreshed from the saved data.
 local function BuildRow(child, name)
  local frame = CreateFrame("Frame", nil, child);
- frame:SetWidth(240); frame:SetHeight(ROW);
+ frame:SetWidth(176); frame:SetHeight(ROW);
  local cb = MakeTriBox(frame, name);
  cb:SetPoint("LEFT", frame, "LEFT", 0, 0);
  local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
- fs:SetPoint("LEFT", cb, "RIGHT", 6, 0); fs:SetWidth(210); fs:SetJustifyH("LEFT");
+ fs:SetPoint("LEFT", cb, "RIGHT", 6, 0); fs:SetWidth(150); fs:SetJustifyH("LEFT");
  local hit = CreateFrame("Button", nil, frame);
- hit:SetPoint("LEFT", cb, "RIGHT", 6, 0); hit:SetWidth(210); hit:SetHeight(ROW);
+ hit:SetPoint("LEFT", cb, "RIGHT", 6, 0); hit:SetWidth(150); hit:SetHeight(ROW);
  hit.elementName = name;
  -- the element panel (chain, revert, reset) is part of Advanced Options
  hit:SetScript("OnClick", function() if ( SS.DB().hudAdvanced ) then OpenElementPanel(this.elementName); end end);
@@ -330,27 +330,27 @@ local function CycleLayout()
 end
 
 -- Opening the window unlocks the elements, so they can be dragged, right-clicked and chained straight away.
+-- Opening the window unlocks the elements, so they can be dragged, right-clicked and chained straight away.
 function SS.OpenHUDEdit()
  if ( not SS.DB().unlocked ) then SS.SetUnlocked(true, true); end
  if ( hud ) then hud:Show(); SS.HUDLayout(); RefreshLayoutButton(); return; end
  hud = CreateFrame("Frame", "SlimSuiteHUDEditMode", UIParent);
  hud.building = true;
- hud:SetWidth(540); hud:SetHeight(620);
- hud:SetScale(0.78);   -- the whole window at 78%, so it covers less of the screen
+ hud:SetWidth(400); hud:SetHeight(380);   -- compact: well under the first version's size, with room for about eight rows
  hud:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
  hud:SetFrameStrata("DIALOG");
  hud:SetMovable(true); hud:RegisterForDrag("LeftButton");
  hud:SetScript("OnDragStart", function() this:StartMoving(); end);
  hud:SetScript("OnDragStop", function() this:StopMovingOrSizing(); end);
  hud:EnableMouse(true);
- hud:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 16, edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } });
+ hud:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 16, edgeSize = 20, insets = { left = 5, right = 5, top = 5, bottom = 5 } });
  hud:SetBackdropColor(0.03, 0.03, 0.05, 0.94);
  table.insert(UISpecialFrames, "SlimSuiteHUDEditMode");
 
  -- info icon: what the window does
  local info = CreateFrame("Button", nil, hud);
- info:SetWidth(20); info:SetHeight(20); info:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -12);
- local infoText = info:CreateFontString(nil, "OVERLAY", "GameFontNormal");
+ info:SetWidth(16); info:SetHeight(16); info:SetPoint("TOPLEFT", hud, "TOPLEFT", 8, -8);
+ local infoText = info:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
  infoText:SetPoint("CENTER", info, "CENTER", 0, 0); infoText:SetText("i"); infoText:SetTextColor(1, 0.82, 0);
  info:SetScript("OnEnter", function()
   GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
@@ -359,30 +359,32 @@ function SS.OpenHUDEdit()
  end);
  info:SetScript("OnLeave", function() GameTooltip:Hide(); end);
 
- local title = hud:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
- title:SetPoint("TOP", hud, "TOP", 0, -14); title:SetText(SS.T("HUD Edit Mode"));
+ local title = hud:CreateFontString(nil, "OVERLAY", "GameFontNormal");
+ title:SetPoint("TOP", hud, "TOP", 0, -10); title:SetText(SS.T("HUD Edit Mode"));
  local close = CreateFrame("Button", nil, hud, "UIPanelCloseButton");
- close:SetPoint("TOPRIGHT", hud, "TOPRIGHT", -4, -4);
+ close:SetWidth(24); close:SetHeight(24);
+ close:SetPoint("TOPRIGHT", hud, "TOPRIGHT", -2, -2);
  close:SetScript("OnClick", function() SS.CloseHUDEdit(); end);
 
- -- layout dropdown: cycles the saved layouts
- hud.layoutButton = K.Button(hud, "", 260, function() CycleLayout(); end);
- hud.layoutButton:SetPoint("TOPLEFT", hud, "TOPLEFT", 22, -40);
+ -- layout picker: cycles the saved layouts
+ hud.layoutButton = K.Button(hud, "", 200, function() CycleLayout(); end);
+ hud.layoutButton:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -30);
  RefreshLayoutButton();
 
  local grid = SS.Check(hud, "Show Grid", 0, function() return SS.DB().showEditGrid; end, function(v) SU.SetGridSetting(v); end, 0);
- grid:ClearAllPoints(); grid:SetPoint("TOPLEFT", hud, "TOPLEFT", 22, -78);
+ grid:ClearAllPoints(); grid:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -58);
+ grid:SetWidth(18); grid:SetHeight(18);
 
  -- grid scale slider: the grid's divisions, 8 (coarse) to 64 (fine)
  local slider = CreateFrame("Slider", "SlimSuiteHUDGridSlider", hud, "OptionsSliderTemplate");
- slider:SetWidth(230); slider:SetHeight(17);
- slider:SetPoint("TOPLEFT", hud, "TOPLEFT", 190, -80);
+ slider:SetWidth(160); slider:SetHeight(14);
+ slider:SetPoint("TOPLEFT", hud, "TOPLEFT", 176, -62);
  slider:SetMinMaxValues(8, 64); slider:SetValueStep(1);
  local low, high = getglobal("SlimSuiteHUDGridSliderLow"), getglobal("SlimSuiteHUDGridSliderHigh");
  if ( low ) then low:SetText("8"); end
  if ( high ) then high:SetText("64"); end
- hud.gridValue = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
- hud.gridValue:SetPoint("TOPLEFT", hud, "TOPLEFT", 432, -82);
+ hud.gridValue = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+ hud.gridValue:SetPoint("TOPLEFT", hud, "TOPLEFT", 346, -62);
  slider:SetScript("OnValueChanged", function()
   local v = math.floor(this:GetValue() + 0.5);
   hud.gridValue:SetText(tostring(v));
@@ -394,20 +396,23 @@ function SS.OpenHUDEdit()
  hud.gridValue:SetText(tostring(tonumber(SS.DB().gridDivisions) or 64));
 
  local snap = SS.Check(hud, "Snap to Elements", 0, function() return SS.DB().gridSnap; end, function(v) SS.SetSnap(v); end, 0);
- snap:ClearAllPoints(); snap:SetPoint("TOPLEFT", hud, "TOPLEFT", 22, -108);
+ snap:ClearAllPoints(); snap:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -84);
+ snap:SetWidth(18); snap:SetHeight(18);
  local advanced = SS.Check(hud, "Advanced Options", 0, function() return SS.DB().hudAdvanced; end,
   function(v) SS.DB().hudAdvanced = v and true or false; end, 0);
- advanced:ClearAllPoints(); advanced:SetPoint("TOPLEFT", hud, "TOPLEFT", 300, -108);
+ advanced:ClearAllPoints(); advanced:SetPoint("TOPLEFT", hud, "TOPLEFT", 200, -84);
+ advanced:SetWidth(18); advanced:SetHeight(18);
  local keep = SS.Check(hud, "Keep chained elements next to each other", 0, function() return SS.DB().hudKeepChained; end,
   function(v) SS.DB().hudKeepChained = v and true or false; SS.HUDLayout(); if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end end, 0);
- keep:ClearAllPoints(); keep:SetPoint("TOPLEFT", hud, "TOPLEFT", 22, -138);
+ keep:ClearAllPoints(); keep:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -108);
+ keep:SetWidth(18); keep:SetHeight(18);
 
  -- search: filters the list as you type
- local searchLabel = hud:CreateFontString(nil, "OVERLAY", "GameFontNormal");
- searchLabel:SetPoint("TOPLEFT", hud, "TOPLEFT", 22, -172); searchLabel:SetText(SS.T("Search"));
+ local searchLabel = hud:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
+ searchLabel:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -136); searchLabel:SetText(SS.T("Search"));
  local search = CreateFrame("EditBox", "SlimSuiteHUDSearch", hud, "InputBoxTemplate");
- search:SetWidth(380); search:SetHeight(20);
- search:SetPoint("TOPLEFT", hud, "TOPLEFT", 90, -170);
+ search:SetWidth(300); search:SetHeight(18);
+ search:SetPoint("TOPLEFT", hud, "TOPLEFT", 64, -133);
  search:SetAutoFocus(false);
  search:SetScript("OnTextChanged", function()
   searchText = string.lower(this:GetText() or "");
@@ -417,33 +422,33 @@ function SS.OpenHUDEdit()
  hud.search = search;
 
  -- the element list: a bordered box that the Collapse options button shows and hides
- local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 480);
- scroll:SetPoint("TOPLEFT", hud, "TOPLEFT", 22, -204);
- scroll:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -22, 100);
+ local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 376);
+ scroll:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -158);
+ scroll:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -10, 66);
  hud.child = child;
  hud.box = scroll;
 
  rows = {};
  for _, name in ipairs(SS.HUDOrder()) do BuildRow(child, name); end
 
- hud.collapse = K.Button(hud, SS.T("Collapse options") .. "  ^", 200, function()
+ hud.collapse = K.Button(hud, SS.T("Collapse options") .. "  ^", 170, function()
   if ( hud.box:IsShown() ) then
    hud.box:Hide(); this:SetText(SS.T("Expand options") .. "  v");
   else
    hud.box:Show(); this:SetText(SS.T("Collapse options") .. "  ^");
   end
  end);
- hud.collapse:SetPoint("BOTTOM", hud, "BOTTOM", 0, 66);
+ hud.collapse:SetPoint("BOTTOM", hud, "BOTTOM", 0, 40);
 
- local revertAll = K.Button(hud, SS.T("Revert All Changes"), 220, function()
+ local revertAll = K.Button(hud, SS.T("Revert All Changes"), 170, function()
   SU.batching = true;
   for _, name in ipairs(ElementList()) do SU.SetMode(name, "default", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
   SU.batching = false;
   RefreshAll();
  end);
- revertAll:SetPoint("BOTTOMLEFT", hud, "BOTTOMLEFT", 22, 18);
+ revertAll:SetPoint("BOTTOMLEFT", hud, "BOTTOMLEFT", 12, 10);
  SS.hudRevertAll = revertAll;
- local save = K.Button(hud, SS.T("Save"), 220, function()
+ local save = K.Button(hud, SS.T("Save"), 170, function()
   -- Saves the current arrangement as the layout shown in the Layout button (created as "HUD edit" if there is none yet)
   local d = SS.DB();
   local name = d.hudLayoutName or SS.T("HUD edit");
@@ -455,7 +460,7 @@ function SS.OpenHUDEdit()
   K.Print(NAME, SS.T("Saved the layout") .. " \"" .. name .. "\".");
   SS.CloseHUDEdit();
  end);
- save:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -22, 18);
+ save:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -12, 10);
 
  SS.hudRows = rows; SS.hudBoxes = {}; for _, r in pairs(rows) do table.insert(SS.hudBoxes, r.cb); end
  hud.building = false;

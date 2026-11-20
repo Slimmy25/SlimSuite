@@ -59,6 +59,10 @@ end
 
 function SU.Focus(frame)
 	SU.ModernizeMenus();
+ if ( not frame ) then
+  -- nothing is focused any more: the gold outline goes with the focus, in setup or not
+  if ( SU.outline ) then SU.outline:Hide(); end
+ end
  if ( not frame and setupActive ) then
   SU.focus=nil; if ( SU.panel ) then SU.panel:Hide(); end
   if ( SU.glow ) then SU.glow:Hide(); end
@@ -74,7 +78,8 @@ function SU.Focus(frame)
 		SU.outline:Hide();
 	end
 	local outlineTarget = (type(frame) == "string") and getglobal(frame) or frame;
-	if ( type(outlineTarget) == "table" and outlineTarget.SetAllPoints ) then
+	-- only in the setup: right-clicking an element for its size menu must not leave a border around it
+	if ( setupActive and type(outlineTarget) == "table" and outlineTarget.SetAllPoints ) then
 		SU.outline:ClearAllPoints(); SU.outline:SetAllPoints(outlineTarget); SU.outline:Show();
 	else SU.outline:Hide(); end
 	local e;

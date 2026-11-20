@@ -530,6 +530,8 @@ function SS.ToggleMovableOrientation(name)
 	end
 	local nextOrientation = SS.CurrentOrientation(name) == "vertical" and "horizontal" or "vertical";
 	SS.DB().orientations[name] = nextOrientation;
+	-- a vertical Character window only shows when the element is On, so choosing it turns the element on
+	if ( name == "CharacterFrame" and SU.Mode(name) ~= "enabled" ) then SU.SetMode(name, "enabled", "Character"); end
 	if ( name == "SlimSuiteClockFrame" ) then
 		local w, h = nextOrientation == "vertical" and 220 or 360, nextOrientation == "vertical" and 54 or 32;
 		clockFrame:SetWidth(w); clockFrame:SetHeight(h);
@@ -981,7 +983,7 @@ function SS.PrepareSizeTools(name, label)
 	rows.scale.on, rows.last.on = true, true;
 	sizeMenuScaleInput:SetText(tostring(math.max(20, math.min(200, math.floor((SS.DB().scales[sizeTarget] or 1) * 100 + 0.5)))));
 	-- the other elements that turn have "vertical" among their settings, so it is not offered twice
-	rows.layout.on = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "BuffFrame";
+	rows.layout.on = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "BuffFrame" or name == "CharacterFrame";
 	if ( rows.layout.on ) then sizeMenu.LayoutText(); end
 	sizeMenu.growthButton.wanted = name == "BuffFrame";
 	if ( name == "BuffFrame" ) then sizeMenu.growthButton:SetText(SS.T("Grow") .. " " .. SS.T(SS.BuffGrowthDirection())); end
