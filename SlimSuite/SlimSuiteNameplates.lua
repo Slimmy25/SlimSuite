@@ -77,7 +77,7 @@ local function UpdatePlateData(record, unit)
  local modern = SS.DB().modernEnemyFrames and true or false;
  if ( f.modernStyle ~= modern ) then
   f:SetBackdrop(modern and PLATE_BACKDROP or nil);
-  if ( modern ) then f:SetBackdropColor(0.035,0.045,0.06,0.88); f:SetBackdropBorderColor(0.42,0.68,0.95,0.9); end
+  if ( modern ) then f.panelStyle = nil; SS.ApplyPanelStyle(f); end
   f.modernStyle = modern;
  end
  if ( modern ) then f.name:Show();

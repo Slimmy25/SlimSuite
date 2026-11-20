@@ -334,6 +334,28 @@ function M.Attach(frame)
 	-- the view list is made now, with the meter, so it is ready the first time "^" is pressed
 	local ok, list = SS.Safe(BuildViewList, frame);
 	if ok then M.viewList = list; end
+	SS.Safe(SS.ApplyMeterSkin);
+end
+
+-- The meter's own panel is its textures. The DPS meter style shows them; the other styles hide them and draw the
+-- chosen panel behind the same contents instead.
+function SS.ApplyMeterSkin()
+	local frame = M.frame;
+	if not frame then return; end
+	if not frame.meterSkin then
+		frame.meterSkin = {};
+		local regions = { frame:GetRegions() };
+		for i = 1, table.getn(regions) do
+			local r = regions[i];
+			if r and r.GetObjectType and r:GetObjectType() == 'Texture' then table.insert(frame.meterSkin, r); end
+		end
+	end
+	local meter = SS.PanelStyleKey() == 'meter';
+	for i = 1, table.getn(frame.meterSkin) do
+		if meter then frame.meterSkin[i]:Show(); else frame.meterSkin[i]:Hide(); end
+	end
+	frame.panelStyle = nil;
+	if meter then frame:SetBackdrop(nil); else SS.ApplyPanelStyle(frame); end
 end
 
 -- "x": the meter stays hidden for the rest of this run and comes back with the next one. Closed before a run, it

@@ -171,7 +171,7 @@ SS.DEFAULTS = {
 	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
-	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false, enemyPlateGroup = true,
+	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false, enemyPlateGroup = true, uiStyle = "original",
 	accessibilityLargeText = false, accessibilityReduceMotion = false,
 	tallyContext = true,
 };
@@ -599,6 +599,39 @@ function SS.StopPreview()
  local ok,result=SS.Safe(StopSound,soundPreviewHandle); if not ok or result==false then return false; end
  soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
 end
+-- Panel looks Slim Suite draws itself. "original" is the game's tooltip look, "meter" is the damage meter's dark panel
+-- with a gold edge, "tooltip" is the blue-tinted game tooltip panel. Blizzard's own frames are never restyled here.
+SS.PANEL_STYLES = {
+ original = { bg = "Interface\\Tooltips\\UI-Tooltip-Background", edge = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
+   color = { 0.05, 0.05, 0.12, 0.92 }, border = { 0.6, 0.6, 0.7, 1 } },
+ meter = { bg = "Interface\\Buttons\\WHITE8X8", edge = "Interface\\Buttons\\WHITE8X8", edgeSize = 1,
+   color = { 0.02, 0.02, 0.03, 0.9 }, border = { 0.85, 0.65, 0.2, 0.7 } },
+ tooltip = { bg = "Interface\\Tooltips\\UI-Tooltip-Background", edge = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16,
+   color = { 0.08, 0.12, 0.22, 0.95 }, border = { 0.75, 0.85, 1, 0.9 } },
+};
+function SS.PanelStyleKey()
+ local key = SS.DB().uiStyle;
+ return SS.PANEL_STYLES[key] and key or "original";
+end
+-- Applies the chosen look to one Slim Suite panel; cached so a panel that redraws often is only restyled on a change.
+function SS.ApplyPanelStyle(f)
+ if not f or not f.SetBackdrop then return; end
+ local key = SS.PanelStyleKey();
+ if f.panelStyle == key then return; end
+ local s = SS.PANEL_STYLES[key];
+ f:SetBackdrop({ bgFile = s.bg, edgeFile = s.edge, tile = true, tileSize = 8, edgeSize = s.edgeSize,
+   insets = { left = 1, right = 1, top = 1, bottom = 1 } });
+ f:SetBackdropColor(s.color[1], s.color[2], s.color[3], s.color[4]);
+ f:SetBackdropBorderColor(s.border[1], s.border[2], s.border[3], s.border[4]);
+ f.panelStyle = key;
+end
+function SS.SetPanelStyle(key)
+ SS.DB().uiStyle = SS.PANEL_STYLES[key] and key or "original";
+ if SS.UpdateLuck then SS.Safe(SS.UpdateLuck); end
+ if SS.UpdateEnemyNameplates then SS.Safe(SS.UpdateEnemyNameplates); end
+ if SS.ApplyMeterSkin then SS.Safe(SS.ApplyMeterSkin); end
+end
+
 -- The one global rule for sound: nothing starts while the game is paused (the pause phase or the Esc menu is open).
 -- A sound already playing finishes; the 1.12 client has no way to stop it early.
 function SS.GamePaused()

@@ -221,6 +221,8 @@ function SS.WinBuild()
 			 function(v) SS.DB().language = v; end,
 			 choice={{"auto","auto"},{"English","enUS"},{"Español","esES"},{"Français","frFR"},{"Deutsch","deDE"},{"Português (Brasil)","ptBR"},{"Italiano","itIT"}} },
 			{button="Reload for changes", onClick=function() if ( ReloadUI ) then ReloadUI(); end end},
+			{"Panel style (Slim Suite panels)", function() return SS.PanelStyleKey(); end, function(v) SS.SetPanelStyle(v); end,
+			 choice={{"Original","original"},{"DPS meter","meter"},{"Tooltip","tooltip"}}},
 			{head="Chat mods"},
 			{"No level-up stat bonuses in chat", function() return SS.DB().hideLevel;end,function(v) SS.DB().hideLevel=v;end},
 			{"No new spell lines in chat", function() return SS.DB().hideNewSpells;end,function(v) SS.DB().hideNewSpells=v;end},

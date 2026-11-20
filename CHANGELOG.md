@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.47
+Adds a Panel style setting for Slim Suite's own panels, with the damage meter and luck panel as the first group to follow it.
+- Panel style (Everywhere section): Original (game tooltip look), DPS meter (the meter's gold-edged dark panel), or Tooltip (blue-tinted game tooltip panel). Blizzard's own frames are never restyled by this setting.
+- Damage meter and legendary luck panel follow the chosen style. The enemy nameplates follow it too.
+- Other Slim Suite elements keep their current look until their group is converted.
+- Backup: git tag backup/1.46-before-panel-style marks the last 1.46 commit.
+
 ## 1.46
 Chat filters, a cleaner stats panel, sleeker combat text, sound silenced while paused, and grouped monster nameplates.
 - Stats panel: the category menu is gone. Every stat is in one list with its own switch, an icon, its own colour, and a hover description. Values flash green or red when they change, and any numeric stat the game sends that Slim Suite doesn't name yet is shown too.
