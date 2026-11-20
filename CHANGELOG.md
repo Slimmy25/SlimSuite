@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.78
+Clicking an encounter bar targets that boss or guardian again, even when it is far away.
+
+- Encounter bar clicks target the enemy by its exact name first, as they did before 1.35, then check that it is the right spawn.
+- Cycling through nearby enemies is only a fallback when an ordinary mob shares the name, so clicks no longer land on random enemies.
+
 ## 1.77
 HUD Edit shows one category at a time, party frames stop snapping by accident, and the spacing slider is easier to read.
 

@@ -27,9 +27,17 @@ local targets={{id=99,name="Guardian",kind="other"},{id=2,name="Guardian",kind="
 local cursor=0; AZS_TARGET={id=8,name="Old",kind="normal"}
 UnitCanAttack=function() return AZS_TARGET.kind~="other" end
 TargetNearestEnemy=function() cursor=cursor+1; AZS_TARGET=targets[math.mod(cursor-1,#targets)+1] end
+local byName=0
+TargetByName=function(name) byName=byName+1; AZS_TARGET={id=2,name=name,kind="normal"} end
 SS.TargetEncounter(encounters[1])
-for i=1,3 do FireEvent("CHAT_MSG_ADDON","AZSTGT"); Tick(1,.05) end
-check("encounter clicks skip friendly and ordinary namesakes",SS.encounterTargetResult==true and AZS_TARGET.id==1)
+for i=1,4 do FireEvent("CHAT_MSG_ADDON","AZSTGT"); Tick(1,.05) end
+check("encounter clicks skip friendly and ordinary namesakes",byName==1 and SS.encounterTargetResult==true and AZS_TARGET.id==1)
+AZS_TARGET={id=8,name="Old",kind="normal"}; cursor=0; local cycled=0
+TargetNearestEnemy=function() cycled=cycled+1 end
+TargetByName=function(name) AZS_TARGET={id=1,name=name,kind="guardian"} end
+SS.TargetEncounter(encounters[1]); FireEvent("CHAT_MSG_ADDON","AZSTGT"); Tick(1,.05)
+check("a unique encounter name is targeted directly, far away or not",cycled==0 and SS.encounterTargetResult==true and AZS_TARGET.id==1)
+TargetNearestEnemy=function() cursor=cursor+1; AZS_TARGET=targets[math.mod(cursor-1,#targets)+1] end
 AZS_TARGET={id=8,name="Old",kind="normal"}; cursor=0
 TargetByName=function(name) AZS_TARGET={id=8,name=name,kind="normal"} end
 ClearTarget=function() AZS_TARGET={} end

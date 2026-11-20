@@ -266,10 +266,21 @@ local function StepEncounterTarget()
  end
  if GetTime()>=request.deadline or request.attempts>=40 then RestoreEncounterTarget(); return; end
  if request.waitUntil then
-  if GetTime()>=request.waitUntil then RestoreEncounterTarget(); end
+  if GetTime()>=request.waitUntil then
+   -- no answer to the by-name try: go on to cycling instead of giving up
+   if request.byName then request.byName=nil; request.waitUntil=nil; return; end
+   RestoreEncounterTarget();
+  end
   return;
  end
  request.attempts=request.attempts+1; request.waitUntil=GetTime()+1;
+ -- first try the clicked enemy's exact name (bosses and guardians are almost always unique); cycling
+ -- through the nearest enemies only reaches enemies close to you and is the fallback for namesakes
+ if request.attempts==1 and request.name and TargetByName then
+  request.byName=true;
+  SS.Safe(TargetByName,request.name,true);
+  return;
+ end
  local ok=SS.Safe(TargetNearestEnemy);
  if not ok then RestoreEncounterTarget(); end
 end
@@ -278,7 +289,7 @@ function SS.TargetEncounter(unit)
  if ( type(AZS_TARGET)=="table" and AZS_TARGET.id==unit.id and
   (not UnitCanAttack or UnitCanAttack("player","target")) ) then return true; end
  targetRequest={id=unit.id,previousId=type(AZS_TARGET)=="table" and AZS_TARGET.id,
-  previousName=type(AZS_TARGET)=="table" and AZS_TARGET.name,seen={},attempts=0,deadline=GetTime()+6};
+  previousName=type(AZS_TARGET)=="table" and AZS_TARGET.name,name=unit.name,seen={},attempts=0,deadline=GetTime()+6};
  SS.encounterTargetResult=nil;
  SS.Every("encounterTarget",.05,StepEncounterTarget);
  StepEncounterTarget();
@@ -299,6 +310,7 @@ encounterTargetEvents:SetScript("OnEvent",function()
   return;
  end
  if AZS_TARGET.id==request.id and (not UnitCanAttack or UnitCanAttack("player","target")) then FinishEncounterTarget(true); return; end
+ if request.byName then request.byName=nil; request.waitUntil=nil; return; end -- a namesake: cycle from here
  local key=tostring(AZS_TARGET.id)..":"..tostring(AZS_TARGET.kind)..":"..tostring(AZS_TARGET.name);
  if request.seen[key] then RestoreEncounterTarget(); return; end
  request.seen[key]=true; request.waitUntil=nil; -- one more enemy on the next UI tick
