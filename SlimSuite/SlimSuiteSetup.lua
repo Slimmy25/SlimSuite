@@ -506,7 +506,7 @@ function SU.Begin()
 	SU.bar.demoHint:SetWidth(324); SU.bar.demoHint:SetHeight(22);
 	SU.PlaceProfiles();
 	if ( SU.bar.resetAll ) then
-		SU.bar.resetAll:ClearAllPoints(); SU.bar.resetAll:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -104, 7);
+		SU.bar.resetAll:ClearAllPoints(); SU.bar.resetAll:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -104, 33);
 		SU.bar.done:ClearAllPoints(); SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
 	end
 	SU.bar:Show();
@@ -611,7 +611,7 @@ function SU.Build()
 	SU.bar.demoHint:SetPoint("LEFT", SU.bar.demoOff, "RIGHT", 7, 0); SU.bar.demoHint:SetWidth(280); SU.bar.demoHint:SetHeight(24);
 	SU.bar.demoHint:SetJustifyH("LEFT"); SU.bar.demoHint:SetText(SS.T("(Right click element to change settings)"));
 	SU.bar.done = K.Button(SU.bar, "Done", 90, function() SS.ConfirmSetupDone(); end);
-	SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
+	SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 33);
 	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);
 	SU.bar.resetAll:SetPoint("RIGHT", SU.bar.done, "LEFT", -6, 0);
 	-- Panel style: the three looks, bottom left beside Reset All and Done; the one in effect is lit
@@ -620,7 +620,7 @@ function SU.Build()
 	for i = 1, table.getn(styleChoices) do
 		local key = styleChoices[i][2];
 		local button = K.Button(SU.bar, styleChoices[i][1], 80, function() SS.SetPanelStyle(key); SU.RefreshStyleButtons(); end);
-		button:SetPoint("BOTTOMLEFT", SU.bar, "BOTTOMLEFT", 8 + (i - 1) * 84, 7);
+		button:SetPoint("BOTTOMLEFT", SU.bar, "BOTTOMLEFT", 8 + (i - 1) * 96, 7);
 		button.styleKey = key;
 		table.insert(SU.bar.styleButtons, button);
 	end
@@ -633,7 +633,7 @@ function SU.Build()
 	end
 	SU.RefreshStyleButtons();
 	SU.bar:SetFrameStrata("DIALOG");
-	SU.bar:SetHeight(52);
+	SU.bar:SetHeight(80);
 	SU.bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	SU.bar:SetBackdropColor(0.04, 0.035, 0.07, 0.97);

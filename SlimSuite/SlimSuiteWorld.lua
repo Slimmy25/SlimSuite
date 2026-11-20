@@ -1384,7 +1384,7 @@ local function UpdateLocalClock()
 	SS.HideNative("localClock", true);
 	clock.text:SetText(text or "7:09 PM");
 	local band = DB().localClockBackground ~= false;
-	if ( band ) then clock.bg:Show(); clock.left:Show(); clock.right:Show(); else clock.bg:Hide(); clock.left:Hide(); clock.right:Hide(); end
+	SS.StyleBand(clock, { clock.bg, clock.left, clock.right }, band);
 	local custom = DB().sizes and DB().sizes.SlimSuiteLocalClockFrame;
 	local w, h = (clock.text:GetStringWidth() or 40) + 18, 20;
 	if ( type(custom) == "table" and custom.w and custom.h ) then w, h = custom.w, custom.h; end   -- the size set is the size

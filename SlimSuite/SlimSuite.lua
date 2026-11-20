@@ -625,6 +625,18 @@ function SS.ApplyPanelStyle(f)
  f:SetBackdropBorderColor(s.border[1], s.border[2], s.border[3], s.border[4]);
  f.panelStyle = key;
 end
+-- A frame whose band is made of textures (the tally, the local clock). Original keeps those textures exactly as they
+-- were; the other two styles hide them and draw the chosen panel behind the same frame.
+function SS.StyleBand(frame, textures, band)
+	local styled = SS.PanelStyleKey() ~= "original";
+	if ( band and styled ) then
+		for i = 1, table.getn(textures) do textures[i]:Hide(); end
+		SS.ApplyPanelStyle(frame);
+	else
+		for i = 1, table.getn(textures) do if ( band ) then textures[i]:Show(); else textures[i]:Hide(); end end
+		if ( frame.panelStyle ~= nil ) then frame:SetBackdrop(nil); frame.panelStyle = nil; end
+	end
+end
 function SS.SetPanelStyle(key)
  SS.DB().uiStyle = SS.PANEL_STYLES[key] and key or "original";
  if SS.UpdateLuck then SS.Safe(SS.UpdateLuck); end
@@ -1345,7 +1357,7 @@ function SS.DrawTally(parts)
 	local band = SS.DB().tallyBackground and true or false;
 	local fade = math.min(14, width / 4);
 	tallyFrame.bgLeft:SetWidth(fade); tallyFrame.bgRight:SetWidth(fade);
-	for _, t in ipairs({ tallyFrame.bg, tallyFrame.bgLeft, tallyFrame.bgRight }) do if ( band ) then t:Show(); else t:Hide(); end end
+	SS.StyleBand(tallyFrame, { tallyFrame.bg, tallyFrame.bgLeft, tallyFrame.bgRight }, band);
 	if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(tallyFrame); end
 end
 
