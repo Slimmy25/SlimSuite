@@ -202,6 +202,8 @@ function SS.WinBuild()
 	end
  local worldEntry=SS.WorldCombatEntry();
  local uiEntries={
+			{head="Other addons"},
+			{"Azeroth Stats: hide its top bar (runs /azstats bar once)", function() return SS.DB().azStatsHideBar; end, function(v) SS.SetAzStatsHideBar(v); end},
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v); end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},

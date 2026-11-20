@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.48
+Adds an Other addons section to the settings, starting with an option for Azeroth Stats.
+- Other addons (first section in settings): Azeroth Stats: hide its top bar. On by default. Slim Suite runs Azeroth Stats' /azstats bar command once per account after login, retrying briefly while the addon loads. Unticking does nothing; ticking again runs the command once more.
+- Slim Suite cannot read whether the bar is hidden, so if the bar is already hidden it will show again on the first run. Tick the box again, or use /azstats bar, to hide it.
+- The run-ready report cannot be turned off yet: Azeroth Stats documents no command or setting for it.
+
 ## 1.47
 Adds a Panel style setting for Slim Suite's own panels, with the damage meter and luck panel as the first group to follow it.
 - Panel style (Everywhere section): Original (game tooltip look), DPS meter (the meter's gold-edged dark panel), or Tooltip (blue-tinted game tooltip panel). Blizzard's own frames are never restyled by this setting.

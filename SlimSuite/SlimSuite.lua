@@ -171,7 +171,7 @@ SS.DEFAULTS = {
 	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, raidRow = true, layoutPerCharacter = false,
-	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false, enemyPlateGroup = true, uiStyle = "original",
+	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false, enemyPlateGroup = true, uiStyle = "original", azStatsHideBar = true,
 	accessibilityLargeText = false, accessibilityReduceMotion = false,
 	tallyContext = true,
 };
@@ -1479,3 +1479,36 @@ function SS.LayoutLevelButton()
 	b.count:SetFont(font, math.max(6, math.floor(10 * s)));
 	b.glow:SetWidth(w * 1.24); b.glow:SetHeight(h * 1.41);
 end
+
+-- ---------------------------------------------------------------- Other addons: Azeroth Stats
+-- Azeroth Stats (Maidenquinn) documents /azstats bar as a visibility command that toggles its top bar. It documents no
+-- setting for that and no state we can read back, so this runs the command once per account, never on every login.
+-- Ticking the box again runs it once more; unticking does nothing.
+function SS.RunAzStatsBarCommand()
+	if not SS.DB().azStatsHideBar or SS.DB().azStatsBarSent then return false; end
+	local handler;
+	for name, fn in pairs(SlashCmdList or {}) do
+		local first = getglobal("SLASH_" .. name .. "1");
+		if first == "/azstats" then handler = fn; break; end
+	end
+	if not handler then return false; end
+	local ok = SS.Safe(handler, "bar");
+	if ok then SS.DB().azStatsBarSent = true; end
+	return ok and true or false;
+end
+function SS.SetAzStatsHideBar(on)
+	SS.DB().azStatsHideBar = on and true or false;
+	SS.DB().azStatsBarSent = nil;   -- ticking it again runs the command again
+	if on then SS.RunAzStatsBarCommand(); end
+end
+local azStatsEvents = CreateFrame("Frame");
+azStatsEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
+local azStatsTries = 0;
+azStatsEvents:SetScript("OnEvent", function()
+	-- try a few times while the addon finishes loading, then stop (it is not installed, or it has run)
+	SS.Every("azStatsBar", 2, function()
+		azStatsTries = azStatsTries + 1;
+		SS.RunAzStatsBarCommand();
+		if SS.DB().azStatsBarSent or not SS.DB().azStatsHideBar or azStatsTries >= 10 then SS.Stop("azStatsBar"); end
+	end);
+end);
