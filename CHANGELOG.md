@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.73
+Setup in HUD Edit hides everything until you turn elements on, and HUD Edit is smaller.
+
+- Setup hides every element's handles and sample content, not only the frames. An element shows again once you enable it.
+- HUD Edit is 360 by 300.
+- Not yet tested in the live client: whether the top-left player frame and the luck panel stay hidden after Setup.
+
 ## 1.72
 HUD Edit gets a Setup button, plain-English tooltips, and themes for every element.
 

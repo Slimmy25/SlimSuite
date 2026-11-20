@@ -220,6 +220,11 @@ function SU.SetGridSetting(on)
 end
 
 -- Explicit elementModes are authoritative. These fallbacks only read unmigrated saves.
+-- While the HUD Edit window's Setup has hidden everything, an element shows its handle and sample only once it is enabled.
+SS.hudHideAll = false;
+function SS.HiddenInSetup(name)
+	return SS.hudHideAll and SU.Mode(SS.Element(name)) ~= "enabled" and true or false;
+end
 function SU.Mode(frame)
  local d = SS.DB(); local mode = d.elementModes[frame];
  if ( mode == "enabled" or mode == "disabled" or mode == "default" ) then return mode; end

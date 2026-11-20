@@ -1419,7 +1419,7 @@ end
 function SS.RefreshEditHandles()
  local available=SS.AvailableElements();
  for _,entry in ipairs(MOVABLE) do
-  local name=entry[1]; local wanted=SS.DB().unlocked and
+  local name=entry[1]; local wanted=SS.DB().unlocked and not SS.HiddenInSetup(name) and
    ((setupActive and SS.SetupShows(name)) or (not setupActive and (not editOnly or editOnly==name)));
   if wanted and SS.HandleAllowed(name,available) then
    local h=SS.Handle(name,entry[2]); if h then h:Show(); end
@@ -1480,7 +1480,7 @@ function SS.SetUnlocked(on, quiet)
 	for i = 1, table.getn(MOVABLE) do
 		local name = MOVABLE[i][1];
 		-- in the setup the elements turned on there have handles; otherwise every element (or the one chosen)
-		local wanted = (setupActive and SS.SetupShows and SS.SetupShows(name)) or (not setupActive and (not editOnly or editOnly == name));
+		local wanted = not SS.HiddenInSetup(name) and ((setupActive and SS.SetupShows and SS.SetupShows(name)) or (not setupActive and (not editOnly or editOnly == name)));
 		if ( on and wanted and SS.HandleAllowed(name, available) ) then
 			local ok, h = SS.Safe(SS.Handle, name, MOVABLE[i][2]);
 			if ( ok and h ) then h:Show(); end

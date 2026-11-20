@@ -178,7 +178,7 @@ function SS.HUDLayout()
     local col = math.floor((i - 1) / perCol);
     local idx = (i - 1) - col * perCol;
     r.frame:ClearAllPoints();
-    r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 124, -(y + idx * ROW));
+    r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 116, -(y + idx * ROW));
     r.frame:Show();
     RefreshRow(r);
    end
@@ -194,6 +194,7 @@ end
 
 local function CycleElement(name)
  local mode = SU.Mode(name);
+ SS.Safe(SS.RefreshEditHandles);
  local nextMode;
  if ( mode == "disabled" ) then nextMode = "enabled";
  elseif ( mode == "enabled" ) then nextMode = "default";
@@ -242,9 +243,11 @@ end
 
 -- Setup: hides every element, Slim Suite's, Aethus's and the game's own, so each one can be turned on by hand.
 local function SetupAllDisabled()
+ SS.hudHideAll = true;
  SU.batching = true;
  for _, name in ipairs(ElementList()) do SU.SetMode(name, "disabled", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
  SU.batching = false;
+ SS.Safe(SS.RefreshEditHandles);
  RefreshAll();
 end
 
@@ -374,13 +377,13 @@ end
 -- Rows are made once; the order, the chain text and the tick boxes are refreshed from the saved data.
 local function BuildRow(child, name)
  local frame = CreateFrame("Frame", nil, child);
- frame:SetWidth(118); frame:SetHeight(ROW);
+ frame:SetWidth(108); frame:SetHeight(ROW);
  local cb = MakeTriBox(frame, name);
  cb:SetPoint("LEFT", frame, "LEFT", 0, 0);
  local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
- fs:SetPoint("LEFT", cb, "RIGHT", 6, 0); fs:SetWidth(96); fs:SetJustifyH("LEFT");
+ fs:SetPoint("LEFT", cb, "RIGHT", 6, 0); fs:SetWidth(86); fs:SetJustifyH("LEFT");
  local hit = CreateFrame("Button", nil, frame);
- hit:SetPoint("LEFT", cb, "RIGHT", 6, 0); hit:SetWidth(96); hit:SetHeight(ROW);
+ hit:SetPoint("LEFT", cb, "RIGHT", 6, 0); hit:SetWidth(86); hit:SetHeight(ROW);
  hit.elementName = name;
  -- the element panel (chain, revert, reset) is part of Advanced Options
  hit:SetScript("OnClick", function() if ( SS.DB().hudAdvanced ) then OpenElementPanel(this.elementName); end end);
@@ -393,6 +396,7 @@ end
 
 -- Closing the window locks the UI again, the same as turning Toggle UI Settings off.
 function SS.CloseHUDEdit()
+ SS.hudHideAll = false;
  if ( hud ) then hud:Hide(); end
  if ( panel ) then panel:Hide(); end
  if ( picker ) then picker:Hide(); end
@@ -466,7 +470,7 @@ function SS.OpenHUDEdit()
  if ( hud ) then hud:Show(); SS.HUDLayout(); RefreshLayoutButton(); return; end
  hud = CreateFrame("Frame", "SlimSuiteHUDEditMode", UIParent);
  hud.building = true;
- hud:SetWidth(400); hud:SetHeight(340);   -- compact: well under the first version's size, with room for about eight rows
+ hud:SetWidth(360); hud:SetHeight(300);   -- compact: well under the first version's size, with room for about eight rows
  hud:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
  hud:SetFrameStrata("DIALOG");
  hud:SetMovable(true); hud:RegisterForDrag("LeftButton");
@@ -499,13 +503,13 @@ function SS.OpenHUDEdit()
 
  -- themes: RPG and Modern (the New School look) for every element. Clicking the chosen one again goes back to Original.
  hud.themeRpg = K.Button(hud, "RPG", 80, function() SS.SetHudTheme("meter"); end);
- hud.themeRpg:SetPoint("TOPLEFT", hud, "TOPLEFT", 188, -30);
+ hud.themeRpg:SetPoint("TOPLEFT", hud, "TOPLEFT", 182, -30);
  hud.themeModern = K.Button(hud, "Modern", 80, function() SS.SetHudTheme("tooltip"); end);
- hud.themeModern:SetPoint("TOPLEFT", hud, "TOPLEFT", 274, -30);
+ hud.themeModern:SetPoint("TOPLEFT", hud, "TOPLEFT", 268, -30);
  SS.RefreshHudThemeButtons();
 
  -- layout picker: cycles the saved layouts
- hud.layoutButton = K.Button(hud, "", 170, function() CycleLayout(); end);
+ hud.layoutButton = K.Button(hud, "", 160, function() CycleLayout(); end);
  hud.layoutButton:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -30);
  RefreshLayoutButton();
 
@@ -515,14 +519,14 @@ function SS.OpenHUDEdit()
 
  -- grid scale slider: the grid's divisions, 8 (coarse) to 64 (fine)
  local slider = CreateFrame("Slider", "SlimSuiteHUDGridSlider", hud, "OptionsSliderTemplate");
- slider:SetWidth(160); slider:SetHeight(14);
+ slider:SetWidth(140); slider:SetHeight(14);
  slider:SetPoint("TOPLEFT", hud, "TOPLEFT", 176, -62);
  slider:SetMinMaxValues(8, 64); slider:SetValueStep(1);
  local low, high = getglobal("SlimSuiteHUDGridSliderLow"), getglobal("SlimSuiteHUDGridSliderHigh");
  if ( low ) then low:SetText("8"); end
  if ( high ) then high:SetText("64"); end
  hud.gridValue = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
- hud.gridValue:SetPoint("TOPLEFT", hud, "TOPLEFT", 346, -62);
+ hud.gridValue:SetPoint("TOPLEFT", hud, "TOPLEFT", 324, -62);
  slider:SetScript("OnValueChanged", function()
   local v = math.floor(this:GetValue() + 0.5);
   hud.gridValue:SetText(tostring(v));
@@ -545,7 +549,7 @@ function SS.OpenHUDEdit()
  local searchLabel = hud:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
  searchLabel:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -136); searchLabel:SetText(SS.T("Search"));
  local search = CreateFrame("EditBox", "SlimSuiteHUDSearch", hud, "InputBoxTemplate");
- search:SetWidth(240); search:SetHeight(18);
+ search:SetWidth(220); search:SetHeight(18);
  search:SetPoint("TOPLEFT", hud, "TOPLEFT", 64, -133);
  search:SetAutoFocus(false);
  search:SetScript("OnTextChanged", function()
@@ -556,7 +560,7 @@ function SS.OpenHUDEdit()
  hud.search = search;
 
  -- the element list: a bordered box that the Collapse options button shows and hides
- local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 380);
+ local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 340);
  scroll:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -158);
  scroll:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -10, 42);
  hud.child = child;
@@ -570,7 +574,8 @@ function SS.OpenHUDEdit()
  hud.setup:SetScript("OnEnter", function() GameTooltip:SetOwner(this, "ANCHOR_TOP"); GameTooltip:SetText(SS.T("Setup")); GameTooltip:AddLine("Hides every element, including the game's own. Then turn on the ones you want, one at a time.", 1, 1, 1, true); GameTooltip:Show(); end);
  hud.setup:SetScript("OnLeave", function() GameTooltip:Hide(); end);
 
- local revertAll = K.Button(hud, SS.T("Revert All Changes"), 130, function()
+ local revertAll = K.Button(hud, SS.T("Revert All Changes"), 110, function()
+  SS.hudHideAll = false;
   SU.batching = true;
   for _, name in ipairs(ElementList()) do SU.SetMode(name, "default", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
   SU.batching = false;
@@ -578,7 +583,7 @@ function SS.OpenHUDEdit()
  end);
  revertAll:SetPoint("BOTTOMLEFT", hud, "BOTTOMLEFT", 12, 10);
  SS.hudRevertAll = revertAll;
- local save = K.Button(hud, SS.T("Save"), 130, function()
+ local save = K.Button(hud, SS.T("Save"), 110, function()
   -- Saves the current arrangement as the layout shown in the Layout button (created as "HUD edit" if there is none yet)
   local d = SS.DB();
   local name = d.hudLayoutName or SS.T("HUD edit");
