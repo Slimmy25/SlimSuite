@@ -2,6 +2,16 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.53
+Settings are in one Slim Suite category organised by function, enemy nameplates are slimmer, and the camera distance is adjustable.
+- Settings window: one Slim Suite category with subcategories for Interface, Nameplates, Gameplay, Chat, Sound and Accessibility, in the look of the game's options window.
+- Defaults: each subcategory has a Defaults button that resets only its own settings.
+- Reset ALL: resets every Slim Suite setting, element position, look, preset and saved layout to the defaults, after a confirmation prompt, then reloads the UI.
+- Element box: the Elements button on the edit bar opens a box where each element is Enabled, Disabled or Default, with all-on, all-off and all-default buttons. Right-click menus use the same flat look.
+- Edit bar: a Snap switch snaps moved elements to the grid and to nearby frames. Presets are in a drop-down, and the bar fits in two rows. Demo Mode no longer shows a floating box, and elements can be edited while it runs.
+- Enemy nameplates: a Plater-style option shows a slim health bar with the name above it. Its width, bar height, name size, border, health text and the colours for normal, elite and boss enemies can be changed. The boxed look is still available.
+- Camera: the camera distance can be set from 5 to 50 yards in settings, or with /slim camera, which also accepts +/- steps and named presets.
+
 ## 1.52
 Default game frames can take the RPG and New School looks, the settings window has a sidebar, and elements can be nudged with the arrow keys.
 - Default frames: player, target, party, buffs, experience bar, action bar and cast bar take the RPG or New School look. Original keeps the game's own frames.
