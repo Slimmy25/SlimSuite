@@ -113,28 +113,78 @@ local function Matches(name)
 end
 
 -- Lays the matching rows out in the saved order in two columns: the first half runs down the left, the rest down the right.
+-- The element groups, in the order they are shown. Anything not listed falls into Other.
+local SECTIONS = {
+ { key = "original", title = "Original Unit Frames", names = { "CharacterFrame", "TalentFrame", "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip" } },
+ { key = "aethus", title = "Aethus Design", names = { "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame" } },
+ { key = "custom", title = "Custom Design", names = { "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteLuckFrame", "SlimSuiteCompassFrame", "SlimSuiteAchievementsButton" } },
+ { key = "other", title = "Other", names = {} },
+};
+
+-- Which section an element belongs to; anything not listed goes to Other.
+local function SectionOf(name)
+ for _, sec in ipairs(SECTIONS) do
+  for _, n in ipairs(sec.names) do if ( n == name ) then return sec.key; end end
+ end
+ return "other";
+end
+
 function SS.HUDLayout()
  SS.HUDApplyChains();
  if ( not hud ) then return; end
- local list = {};
+ local d = SS.DB();
+ d.hudSections = d.hudSections or {};
+ -- group the visible rows by section, keeping the saved order inside each section
+ local groups = {};
+ for _, sec in ipairs(SECTIONS) do groups[sec.key] = {}; end
  for _, name in ipairs(SS.HUDOrder()) do
   if ( rows[name] ) then
    rows[name].frame:Hide();
-   if ( Matches(name) ) then table.insert(list, name); end
+   if ( Matches(name) ) then table.insert(groups[SectionOf(name)], name); end
   end
  end
- local n = table.getn(list);
- local half = math.ceil(n / 2);
- for i, name in ipairs(list) do
-  local r = rows[name];
-  local col, idx = 0, i - 1;
-  if ( i > half ) then col = 1; idx = i - half - 1; end
-  r.frame:ClearAllPoints();
-  r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 186, -4 - idx * ROW);
-  r.frame:Show();
-  RefreshRow(r);
+ -- clickable section headers, created once
+ hud.sections = hud.sections or {};
+ local y = 4;
+ for _, sec in ipairs(SECTIONS) do
+  local open = d.hudSections[sec.key] ~= false;
+  local list = groups[sec.key];
+  local header = hud.sections[sec.key];
+  -- Other only appears when an element is in none of the sections
+  if ( sec.key == "other" and table.getn(list) == 0 ) then
+   if ( header ) then header:Hide(); end
+   break;
+  end
+  if ( not header ) then
+   local key = sec.key;
+   header = K.Button(hud.child, "", 360, function()
+    SS.DB().hudSections[key] = (SS.DB().hudSections[key] == false);
+    SS.HUDLayout();
+   end);
+   hud.sections[sec.key] = header;
+  end
+  header:Show();
+  header:ClearAllPoints();
+  header:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6, -y);
+  header:SetText((open and "v  " or ">  ") .. SS.T(sec.title) .. "  (" .. table.getn(list) .. ")");
+  y = y + 26;
+  -- three columns of elements under the header, filled top to bottom
+  local n = table.getn(list);
+  local perCol = math.max(1, math.ceil(n / 3));
+  for i, name in ipairs(list) do
+   local r = rows[name];
+   if ( open ) then
+    local col = math.floor((i - 1) / perCol);
+    local idx = (i - 1) - col * perCol;
+    r.frame:ClearAllPoints();
+    r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 170, -(y + idx * ROW));
+    r.frame:Show();
+    RefreshRow(r);
+   end
+  end
+  if ( open and n > 0 ) then y = y + perCol * ROW + 8; else y = y + 4; end
  end
- hud.child:SetHeight(math.max(20, half * ROW + 12));
+ hud.child:SetHeight(math.max(20, y + 8));
 end
 
 local function RefreshAll()
@@ -275,13 +325,13 @@ end
 -- Rows are made once; the order, the chain text and the tick boxes are refreshed from the saved data.
 local function BuildRow(child, name)
  local frame = CreateFrame("Frame", nil, child);
- frame:SetWidth(176); frame:SetHeight(ROW);
+ frame:SetWidth(164); frame:SetHeight(ROW);
  local cb = MakeTriBox(frame, name);
  cb:SetPoint("LEFT", frame, "LEFT", 0, 0);
  local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
- fs:SetPoint("LEFT", cb, "RIGHT", 6, 0); fs:SetWidth(150); fs:SetJustifyH("LEFT");
+ fs:SetPoint("LEFT", cb, "RIGHT", 6, 0); fs:SetWidth(124); fs:SetJustifyH("LEFT");
  local hit = CreateFrame("Button", nil, frame);
- hit:SetPoint("LEFT", cb, "RIGHT", 6, 0); hit:SetWidth(150); hit:SetHeight(ROW);
+ hit:SetPoint("LEFT", cb, "RIGHT", 6, 0); hit:SetWidth(124); hit:SetHeight(ROW);
  hit.elementName = name;
  -- the element panel (chain, revert, reset) is part of Advanced Options
  hit:SetScript("OnClick", function() if ( SS.DB().hudAdvanced ) then OpenElementPanel(this.elementName); end end);
@@ -336,7 +386,7 @@ function SS.OpenHUDEdit()
  if ( hud ) then hud:Show(); SS.HUDLayout(); RefreshLayoutButton(); return; end
  hud = CreateFrame("Frame", "SlimSuiteHUDEditMode", UIParent);
  hud.building = true;
- hud:SetWidth(400); hud:SetHeight(380);   -- compact: well under the first version's size, with room for about eight rows
+ hud:SetWidth(540); hud:SetHeight(380);   -- compact: well under the first version's size, with room for about eight rows
  hud:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
  hud:SetFrameStrata("DIALOG");
  hud:SetMovable(true); hud:RegisterForDrag("LeftButton");
@@ -422,7 +472,7 @@ function SS.OpenHUDEdit()
  hud.search = search;
 
  -- the element list: a bordered box that the Collapse options button shows and hides
- local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 376);
+ local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 516);
  scroll:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -158);
  scroll:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -10, 66);
  hud.child = child;

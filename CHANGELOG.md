@@ -2,6 +2,15 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.64
+HUD Edit Mode lists its elements in three sections, each of which opens and closes.
+
+- The elements are grouped as Original Unit Frames, Aethus Design and Custom Design. Anything not in a group appears in an Other section, which is hidden while it is empty.
+- Each section header shows how many elements it holds. Click it to open or close the section.
+- Within a section, the elements sit in three columns, filled top to bottom.
+- The window is wider to fit three columns, but it is no taller.
+- Not yet tested in the live client: the section headers and how the window looks at its new width.
+
 ## 1.63
 Smaller HUD Edit Mode, and the Character sheet fixes.
 
