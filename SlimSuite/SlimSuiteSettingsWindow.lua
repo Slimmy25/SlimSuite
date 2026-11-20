@@ -155,7 +155,7 @@ function SS.SoundPreviewIcon(parent,key)
  return button;
 end
 function SS.WinBuild()
- win=K.Window("SlimSuiteFrame","Slim Suite",470,560);
+ win=K.Window("SlimSuiteFrame","Slim Suite",720,560);
  local search=CreateFrame("EditBox","SlimSuiteSettingsSearch",win,"InputBoxTemplate");
  search:SetWidth(150); search:SetHeight(20); search:SetPoint("TOPRIGHT",win,"TOPRIGHT",-22,-30);
  search:SetAutoFocus(false); search:SetMaxLetters(40);
@@ -164,11 +164,12 @@ function SS.WinBuild()
  local hero=K.Hero(win,380); hero:SetWidth(430); hero:SetPoint("TOPLEFT",win,"TOPLEFT",20,-30);
  K.Icon(hero.icon,"INV_Misc_Gear_02"); hero.heading:SetText("Slim Suite"); hero.line:SetText(SS.T("Choose a module to open its settings."));
  hero.version=hero:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); hero.version:SetPoint("TOPRIGHT",hero,"TOPRIGHT",-9,-8); hero.version:SetText("v"..SS.AddonVersion());
- local hub=CreateFrame("Frame","SlimSuiteModuleHub",win); hub:SetPoint("TOPLEFT",win,"TOPLEFT",20,-110); hub:SetWidth(422); hub:SetHeight(390);
+ local hub=CreateFrame("Frame","SlimSuiteModuleHub",win); hub:SetPoint("TOPLEFT",win,"TOPLEFT",14,-60); hub:SetWidth(182); hub:SetHeight(430);
+ local title=win:CreateFontString(nil,"OVERLAY","GameFontNormalLarge"); title:SetPoint("TOPLEFT",win,"TOPLEFT",214,-34); title:SetTextColor(1,.82,0); SS.settingsTitle=title;
  SS.moduleHubButtons={}; local views={}; local current;
- local back=K.Button(win,"Back",75,function() SS.OpenModulePage(nil); end); back:SetPoint("TOPLEFT",win,"TOPLEFT",20,-102);
+ local back=K.Button(win,"Back",75,function() SS.OpenModulePage(nil); end); back:SetPoint("TOPLEFT",win,"TOPLEFT",20,-102); back:Hide();
  local master=SS.Check(win,"Module enabled",-100,function() return current and SS.ModuleEnabled(current); end,function(v) if current then SS.SetModuleEnabled(current,v); end end);
- master:ClearAllPoints(); master:SetPoint("LEFT",back,"RIGHT",14,0); master.moduleControl=true; master.label:SetWidth(260); master.label:SetHeight(28);
+ master:ClearAllPoints(); master:SetPoint("TOPLEFT",win,"TOPLEFT",214,-62); master.moduleControl=true; master.label:SetWidth(330); master.label:SetHeight(28);
 	local function AddRows(parent, entries, startY, after, module)
 		SS.pages = SS.pages or {};
 		local page = { parent = parent, rows = {}, startY = startY, after = after, module=module };
@@ -310,7 +311,7 @@ function SS.WinBuild()
 			{"Larger encounter names", function() return SS.DB().accessibilityLargeText; end, function(v) SS.DB().accessibilityLargeText = v and true or false; SS.Safe(SS.UpdateBossFrames); end},
 			{"Reduce floating combat-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end},
  };
- if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),275,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",6,-300); end;
+ if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),170,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-300); end;
  local entries={chat={},sounds={},ui={},gameplay={},misc={}};
  for _,row in ipairs(uiEntries) do table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
  local category="misc";
@@ -330,12 +331,13 @@ function SS.WinBuild()
  table.insert(entries.ui,{button="Reset all UI",onClick=function() SS.ResetUI(); end});
  for i,id in ipairs(SS.MODULE_ORDER) do
   local module=id;
-  local open=K.Button(hub,SS.T(SS.MODULE_TITLES[id]),275,function() SS.OpenModulePage(module); end);
-  open:SetHeight(42); open:SetPoint("TOPLEFT",hub,"TOPLEFT",6,-(i-1)*58);
-  local toggle=K.Button(hub,"",110,function() SS.SetModuleEnabled(module,not SS.ModuleEnabled(module)); end);
-  toggle:SetHeight(42); toggle:SetPoint("LEFT",open,"RIGHT",8,0); SS.moduleHubButtons[id]=toggle;
-  local scroll,child=K.Scroll("SlimSuiteModule_"..id,win,422);
-  scroll:SetPoint("TOPLEFT",win,"TOPLEFT",20,-139); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-30,34);
+  local open=K.Button(hub,SS.T(SS.MODULE_TITLES[id]),170,function() SS.OpenModulePage(module); end);
+  open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-(i-1)*40); SS.sidebarButtons=SS.sidebarButtons or {}; SS.sidebarButtons[id]=open;
+  -- the on/off switch for each module is the Module enabled line at the top of its page
+  local toggle=K.Button(hub,"",10,function() SS.SetModuleEnabled(module,not SS.ModuleEnabled(module)); end);
+  toggle:Hide(); SS.moduleHubButtons[id]=toggle;
+  local scroll,child=K.Scroll("SlimSuiteModule_"..id,win,480);
+  scroll:SetPoint("TOPLEFT",win,"TOPLEFT",214,-112); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,34);
   local page=AddRows(child,entries[id],-8,nil,id); views[id]={scroll=scroll,page=page};
  end
  SS.RefreshModuleHub=function()
@@ -348,10 +350,14 @@ function SS.WinBuild()
   end
  end;
  SS.OpenModulePage=function(id)
+  -- the sidebar is always there; the chosen module's page fills the right side under its title
+  if ( not id or not views[id] ) then id = SS.MODULE_ORDER[1]; end
   current=id;
   for _,view in pairs(views) do view.scroll:Hide(); end
-  if id and views[id] then hub:Hide(); back:Show(); master:Show(); master.label:Show(); views[id].scroll:Show(); master.label:SetText(SS.T(SS.MODULE_TITLES[id]).." — "..SS.T("Module enabled"));
-  else hub:Show(); back:Hide(); master:Hide(); master.label:Hide(); end
+  hub:Show(); back:Hide(); master:Show(); master.label:Show(); views[id].scroll:Show();
+  title:SetText(SS.T(SS.MODULE_TITLES[id]));
+  master.label:SetText(SS.T("Module enabled"));
+  for sid, b2 in pairs(SS.sidebarButtons or {}) do if ( sid == id ) then b2:LockHighlight(); else b2:UnlockHighlight(); end end
   SS.RefreshToggles(); SS.RefreshModuleHub();
  end;
  win:SetScript("OnShow",function() SS.OpenModulePage(nil); end);
