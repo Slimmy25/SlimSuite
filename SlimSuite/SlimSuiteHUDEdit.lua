@@ -202,6 +202,52 @@ local function CycleElement(name)
  RefreshAll();
 end
 
+-- Plain-English tooltips for each element row, with the options it has. Shown when the mouse rests on its row.
+local HELP = {
+ PlayerFrame = "Your hero's health, power and level. Options: size, scale and placement.",
+ PartyMemberFrame1 = "Your friends' frames in co-op. Options: a column or a row, face plates or thin lines, and whether they join together.",
+ MainMenuBar = "Your spell bar. Options: size, and whether it stands upright.",
+ TargetFrame = "The enemy the game has picked for you. Options: size, scale and placement.",
+ MainMenuExpBar = "Your experience bar. Options: size, and whether it stands upright.",
+ BuffFrame = "Your buffs and debuffs. Options: a column, which way they grow, or attached to the target frame.",
+ MinimapCluster = "The minimap. Options: round or square, transparent, and placement.",
+ ChatFrame1 = "The chat window. Options: size and placement.",
+ GameTooltip = "The pop-up that describes what you point at. Options: placement.",
+ SlimSuiteStoredLevelsButton = "The Level Up button and its stored levels. Options: placement.",
+ SlimSuiteSpellRowFrame = "Your build's spell row. Options: placement and size.",
+ SlimSuiteMeterFrame = "The damage meter. Options: placement, size and look.",
+ SlimSuiteClockFrame = "The run clock and next boss. Options: placement, and the run clock at the bottom of the compass.",
+ SlimSuiteBossFrames = "The encounter bars for the current boss fight. Options: placement and size.",
+ SlimSuiteTallyFrame = "Kills, gold and cache counts. Options: placement and size.",
+ SlimSuiteAnnouncementFrame = "Event announcements shown on screen. Options: placement.",
+ SlimSuiteReviveFrame = "The revive bar. Options: placement.",
+ SlimSuiteLocalClockFrame = "The clock on your own screen. Options: placement.",
+ SlimSuiteCombatTextFrame = "Floating numbers for damage and healing. Options: placement.",
+ SlimSuiteStatCounterFrame = "Your run stats in one place. Options: placement.",
+ SlimSuiteCompassFrame = "Bearings to known bosses, lairs and caches. Options: a rail or free markers, and the run clock.",
+ SlimSuiteLuckFrame = "Estimated chances for legendary cards from the luck model. Options: placement.",
+ SlimSuiteAchievementsButton = "Side objectives you can open. Options: placement.",
+ CharacterFrame = "Your character sheet, opened with C. Options: placement.",
+ TalentFrame = "Your talent window, opened with N. Options: placement.",
+};
+local function ShowHelp(owner, name)
+ if ( not GameTooltip ) then return; end
+ local e = SS.ELEMENTS[name];
+ GameTooltip:SetOwner(owner, "ANCHOR_RIGHT");
+ GameTooltip:SetText(Label(name));
+ GameTooltip:AddLine(HELP[name] or (e and e.text) or "Turns this part of the screen on, off, or back to its default.", 1, 1, 1, true);
+ GameTooltip:AddLine("Click: enable, then disable, then D for default.", 0.6, 0.6, 0.6, true);
+ GameTooltip:Show();
+end
+
+-- Setup: hides every element, Slim Suite's, Aethus's and the game's own, so each one can be turned on by hand.
+local function SetupAllDisabled()
+ SU.batching = true;
+ for _, name in ipairs(ElementList()) do SU.SetMode(name, "disabled", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
+ SU.batching = false;
+ RefreshAll();
+end
+
 local function MakeTriBox(parent, name)
  local cb, ok = K.Templated("CheckButton", nil, parent, "UICheckButtonTemplate");
  if ( not ok or not cb.SetChecked ) then
@@ -216,6 +262,8 @@ local function MakeTriBox(parent, name)
  cb.defaultText = cb:CreateFontString(nil, "OVERLAY", "GameFontNormal");
  cb.defaultText:SetPoint("CENTER", cb, "CENTER", 0, 0); cb.defaultText:SetText("D"); cb.defaultText:Hide();
  cb:SetScript("OnClick", function() CycleElement(this.elementName); end);
+ cb:SetScript("OnEnter", function() ShowHelp(this, this.elementName); end);
+ cb:SetScript("OnLeave", function() GameTooltip:Hide(); end);
  return cb;
 end
 
@@ -336,6 +384,8 @@ local function BuildRow(child, name)
  hit.elementName = name;
  -- the element panel (chain, revert, reset) is part of Advanced Options
  hit:SetScript("OnClick", function() if ( SS.DB().hudAdvanced ) then OpenElementPanel(this.elementName); end end);
+ hit:SetScript("OnEnter", function() ShowHelp(this, this.elementName); end);
+ hit:SetScript("OnLeave", function() GameTooltip:Hide(); end);
  local r = { name = name, frame = frame, cb = cb, fs = fs };
  rows[name] = r;
  return r;
@@ -385,8 +435,8 @@ end
 -- The HUD Edit window's own look: the plain dark window, or one of the panel styles (RPG, Modern).
 function SS.ApplyHudTheme()
  if ( not hud or not hud.SetBackdrop ) then return; end
- local key = SS.DB().hudTheme;
- local s = key and SS.PANEL_STYLES[key];
+ local key = SS.PanelStyleKey();
+ local s = key ~= "original" and SS.PANEL_STYLES[key];
  if ( not s ) then
   hud:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 16, edgeSize = 20, insets = { left = 5, right = 5, top = 5, bottom = 5 } });
   hud:SetBackdropColor(0.03, 0.03, 0.05, 0.94);
@@ -399,13 +449,14 @@ function SS.ApplyHudTheme()
 end
 function SS.RefreshHudThemeButtons()
  if ( not hud or not hud.themeRpg ) then return; end
- local key = SS.DB().hudTheme;
+ local key = SS.PanelStyleKey();
  hud.themeRpg:SetText(key == "meter" and "[RPG]" or "RPG");
  hud.themeModern:SetText(key == "tooltip" and "[Modern]" or "Modern");
 end
+-- The themes set the look of every element (the same as the Panel style setting). Clicking the active one goes back to Original.
 function SS.SetHudTheme(key)
- local d = SS.DB();
- d.hudTheme = (d.hudTheme ~= key) and key or nil;
+ local chosen = (SS.PanelStyleKey() ~= key) and key or "original";
+ SS.SetPanelStyle(chosen);
  SS.ApplyHudTheme();
  SS.RefreshHudThemeButtons();
 end
@@ -446,7 +497,7 @@ function SS.OpenHUDEdit()
  close:SetPoint("TOPRIGHT", hud, "TOPRIGHT", -2, -2);
  close:SetScript("OnClick", function() SS.CloseHUDEdit(); end);
 
- -- themes: RPG and Modern (the New School look). Clicking the chosen one again goes back to the plain window.
+ -- themes: RPG and Modern (the New School look) for every element. Clicking the chosen one again goes back to Original.
  hud.themeRpg = K.Button(hud, "RPG", 80, function() SS.SetHudTheme("meter"); end);
  hud.themeRpg:SetPoint("TOPLEFT", hud, "TOPLEFT", 188, -30);
  hud.themeModern = K.Button(hud, "Modern", 80, function() SS.SetHudTheme("tooltip"); end);
@@ -507,21 +558,17 @@ function SS.OpenHUDEdit()
  -- the element list: a bordered box that the Collapse options button shows and hides
  local scroll, child = K.Scroll("SlimSuiteHUDEditScroll", hud, 380);
  scroll:SetPoint("TOPLEFT", hud, "TOPLEFT", 10, -158);
- scroll:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -10, 66);
+ scroll:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", -10, 42);
  hud.child = child;
- hud.box = scroll;
+ hud.box = scroll;  -- the element list, always shown
 
  rows = {};
  for _, name in ipairs(SS.HUDOrder()) do BuildRow(child, name); end
 
- hud.collapse = K.Button(hud, SS.T("Collapse options") .. "  ^", 130, function()
-  if ( hud.box:IsShown() ) then
-   hud.box:Hide(); this:SetText(SS.T("Expand options") .. "  v");
-  else
-   hud.box:Show(); this:SetText(SS.T("Collapse options") .. "  ^");
-  end
- end);
- hud.collapse:SetPoint("BOTTOM", hud, "BOTTOM", 0, 40);
+ hud.setup = K.Button(hud, SS.T("Setup"), 100, function() SetupAllDisabled(); end);
+ hud.setup:SetPoint("BOTTOM", hud, "BOTTOM", 0, 10);
+ hud.setup:SetScript("OnEnter", function() GameTooltip:SetOwner(this, "ANCHOR_TOP"); GameTooltip:SetText(SS.T("Setup")); GameTooltip:AddLine("Hides every element, including the game's own. Then turn on the ones you want, one at a time.", 1, 1, 1, true); GameTooltip:Show(); end);
+ hud.setup:SetScript("OnLeave", function() GameTooltip:Hide(); end);
 
  local revertAll = K.Button(hud, SS.T("Revert All Changes"), 130, function()
   SU.batching = true;

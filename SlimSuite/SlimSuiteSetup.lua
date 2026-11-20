@@ -217,9 +217,13 @@ function SU.Focus(frame)
 	if ( SU.placedFor ~= (frame or "") or not SU.panel:IsShown() ) then
 		SU.placedFor = frame or "";
 		SU.panel:ClearAllPoints();
-		if ( handle and handle:IsShown() ) then SU.panel:SetPoint("TOP", handle, "BOTTOM", 0, -14);
+		local hudWindow = getglobal("SlimSuiteHUDEditMode");
+		if ( hudWindow and hudWindow:IsShown() ) then
+			-- with HUD Edit open, the menu is attached to that window, beside it, not to the element on screen
+			SU.panel:SetPoint("TOPLEFT", hudWindow, "TOPRIGHT", 8, 0);
+		elseif ( handle and handle:IsShown() ) then SU.panel:SetPoint("TOP", handle, "BOTTOM", 0, -14);
 		else SU.panel:SetPoint("TOP", UIParent, "TOP", 0, -110); end
-		SS.Safe(SS.KeepMenuOnScreen);
+		if ( not (hudWindow and hudWindow:IsShown()) ) then SS.Safe(SS.KeepMenuOnScreen); end
 	end
 	SU.panel:Show();
 	SU.glow.handle = handle;

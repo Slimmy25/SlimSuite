@@ -2,6 +2,16 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.72
+HUD Edit gets a Setup button, plain-English tooltips, and themes for every element.
+
+- Setup hides every element, including the game's own, so you can turn on what you want one at a time.
+- Each element row has a tooltip that says what it is and what options it has.
+- The RPG and Modern theme buttons set the look of every element.
+- Element right-click menus attach to the HUD Edit window while it is open.
+- The Collapse options button is gone, and the element list uses the space.
+- Not yet tested in the live client: the new HUD Edit layout, tooltips and Setup button.
+
 ## 1.71
 Removes the companion and the alternative Character sheet, adds RPG and Modern themes to HUD Edit, and makes HUD Edit smaller.
 
