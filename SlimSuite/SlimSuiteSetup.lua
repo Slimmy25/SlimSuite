@@ -1,6 +1,7 @@
 -- Focused Slim Suite module; loaded in manifest order.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 function SU.RefreshBar()
+	if ( SU.RefreshStyleButtons ) then SU.RefreshStyleButtons(); end
 	for frame, b in pairs(SU.barButtons or {}) do
 		local mode = SU.Mode(frame);
 		local parentFrame, parentTitle = SS.ConnectedTo(frame);
@@ -93,11 +94,25 @@ function SU.Focus(frame)
 			cb:ClearAllPoints();
 			-- a setting that only works with another one is indented under it
 			local dx = (c[4] and not c.top) and 20 or 0;
+			if ( c.order ) then dx = 30; end   -- room for the grip of a stat row
 			cb.indentX = dx;
 			if ( i == 1 ) then cb:SetPoint("TOPLEFT", SU.panel.text, "BOTTOMLEFT", -2 + dx, -4);
 			else cb:SetPoint("TOPLEFT", SU.checks[i - 1], "BOTTOMLEFT", dx - (SU.checks[i - 1].indentX or 0), -(SU.checks[i - 1].warnGap or 0)); end
 			cb.warn:Hide(); cb.warnGap = 0;
 			cb.Refresh(); cb:Show();
+			-- a stat row gets a grip: hold it and move over the row you want, then let go
+			if ( c.order ) then
+				if ( not cb.grip ) then
+					local grip = CreateFrame("Button", nil, cb:GetParent());
+					grip:SetWidth(14); grip:SetHeight(16); grip:EnableMouse(true);
+					grip.text = grip:CreateFontString(nil, "OVERLAY", "GameFontNormal"); grip.text:SetAllPoints(grip); grip.text:SetText("==");
+					grip:SetScript("OnMouseDown", function() if ( arg1 == "LeftButton" ) then SU.StartStatDrag(this); end end);
+					grip:SetScript("OnMouseUp", function() SU.EndStatDrag(); end);
+					cb.grip = grip;
+				end
+				cb.grip.row = cb; cb.grip.key = c.order;
+				cb.grip:ClearAllPoints(); cb.grip:SetPoint("LEFT", cb, "LEFT", -22, 0); cb.grip:Show();
+			elseif ( cb.grip ) then cb.grip:Hide(); end
 			if ( setupActive and mode ~= "enabled" ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
 			elseif ( c[5] and not c[5]() ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
 			else cb:Enable(); cb.label:SetTextColor(1, 1, 1); end
@@ -599,6 +614,24 @@ function SU.Build()
 	SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
 	SU.bar.resetAll = K.Button(SU.bar, "Reset All", 90, function() SS.ResetUI(); end);
 	SU.bar.resetAll:SetPoint("RIGHT", SU.bar.done, "LEFT", -6, 0);
+	-- Panel style: the three looks, bottom left beside Reset All and Done; the one in effect is lit
+	local styleChoices = { { "Original", "original" }, { "DPS meter", "meter" }, { "Tooltip", "tooltip" } };
+	SU.bar.styleButtons = {};
+	for i = 1, table.getn(styleChoices) do
+		local key = styleChoices[i][2];
+		local button = K.Button(SU.bar, styleChoices[i][1], 80, function() SS.SetPanelStyle(key); SU.RefreshStyleButtons(); end);
+		button:SetPoint("BOTTOMLEFT", SU.bar, "BOTTOMLEFT", 8 + (i - 1) * 84, 7);
+		button.styleKey = key;
+		table.insert(SU.bar.styleButtons, button);
+	end
+	function SU.RefreshStyleButtons()
+		if ( not SU.bar or not SU.bar.styleButtons ) then return; end
+		for i = 1, table.getn(SU.bar.styleButtons) do
+			local button = SU.bar.styleButtons[i];
+			if ( button.styleKey == SS.PanelStyleKey() ) then button:LockHighlight(); else button:UnlockHighlight(); end
+		end
+	end
+	SU.RefreshStyleButtons();
 	SU.bar:SetFrameStrata("DIALOG");
 	SU.bar:SetHeight(52);
 	SU.bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",

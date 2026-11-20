@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.49
+Adds panel style buttons to the edit bar and drag-and-drop ordering for stats.
+- Edit bar: Original, DPS meter and Tooltip buttons beside Reset All and Done. The one in use is highlighted, and it uses the same setting as the Panel style option.
+- Stats: hold the grip (==) beside a stat in its right-click menu, move over the row you want, and let go to move it there. The stats panel follows the same order, and the order is saved with your profile.
+- Limits: the grip is a plain text button and the drop uses the row under the cursor when you let go.
+
 ## 1.48
 Adds an Other addons section to the settings, starting with an option for Azeroth Stats.
 - Other addons (first section in settings): Azeroth Stats: hide its top bar. On by default. Slim Suite runs Azeroth Stats' /azstats bar command once per account after login, retrying briefly while the addon loads. Unticking does nothing; ticking again runs the command once more.

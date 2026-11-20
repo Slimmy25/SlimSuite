@@ -62,6 +62,20 @@ function SS.StatValue(key,total,baseline)
  end
  return Format(total);
 end
+-- Every stat's key in the order the player set (drag and drop in the right-click menu). Keys not saved yet keep
+-- their default place, after the saved ones.
+function SS.StatOrder()
+ local defaults={"health"};
+ for _,field in ipairs(SS.STAT_FIELDS) do table.insert(defaults,field[1]); end
+ table.insert(defaults,"racial"); table.insert(defaults,"buffs");
+ local saved=SS.DB().statOrder or {};
+ local known,out={}, {};
+ for _,key in ipairs(defaults) do known[key]=true; end
+ local seen={};
+ for _,key in ipairs(saved) do if known[key] and not seen[key] then table.insert(out,key); seen[key]=true; end end
+ for _,key in ipairs(defaults) do if not seen[key] then table.insert(out,key); seen[key]=true; end end
+ return out;
+end
 function SS.StatEntries()
  local baseline=SS.CaptureStatBaseline();
  local stats=type(AZS_STATS)=="table" and AZS_STATS or {};
@@ -95,6 +109,11 @@ function SS.StatEntries()
  local buffs=type(AZS_BUFFS)=="table" and AZS_BUFFS or {}; local active={};
  for _,buff in ipairs(buffs) do if ( type(buff)=="table" ) then table.insert(active,tostring(buff.spell or "-").." ("..Number(buff.left).."s)"); end end
  Add("buffs","Active buffs",table.getn(active)>0 and table.concat(active,", ") or "-");
+ -- the player's order; anything not in it (extra stats) stays after, in the order it was found
+ local rank={}; local order=SS.StatOrder();
+ for i=1,table.getn(order) do rank[order[i]]=i; end
+ for i=1,table.getn(out) do out[i].seq=i; out[i].rank=rank[out[i].key] or (100+i); end
+ table.sort(out,function(a,b) if a.rank~=b.rank then return a.rank<b.rank; end return a.seq<b.seq; end);
  return out;
 end
 function SS.StatLines()
@@ -104,16 +123,67 @@ end
 function SS.StatSettings()
  local rows={{"Stat display",function() return SS.DB().statDisplayMode or "total"; end,function(v) SS.DB().statDisplayMode=v; SS.UpdateStats(); end,
   choice={{"Combined total","total"},{"Default + Bonus (since run start)","split"}} }};
- local function Add(key,label)
-  table.insert(rows,{label,function() return not (SS.DB().statHidden or {})[key]; end,function(v)
+ local labels={ health="HP", racial="Racial", buffs="Active buffs" };
+ for _,field in ipairs(SS.STAT_FIELDS) do labels[field[1]]=field[2]; end
+ -- one row per stat, in the player's order; each can be dragged by its grip to a new place
+ local order=SS.StatOrder();
+ for i=1,table.getn(order) do
+  local key=order[i];
+  table.insert(rows,{labels[key] or key,function() return not (SS.DB().statHidden or {})[key]; end,function(v)
    local d=SS.DB(); d.statHidden=d.statHidden or {}; d.statHidden[key]=not v; SS.MarkProfileDirty(); SS.UpdateStats();
-  end});
+  end, order=key});
  end
- Add("health","HP");
- for _,field in ipairs(SS.STAT_FIELDS) do Add(field[1],field[2]); end
- Add("racial","Racial"); Add("buffs","Active buffs");
  return rows;
 end
+
+-- Drag and drop: hold the grip, move over the row you want, let go. The stat moves to that row's place.
+SU.statDrag={};
+function SU.StatDragTarget()
+ local cursorX,cursorY=GetCursorPosition(); local scale=UIParent:GetEffectiveScale();
+ cursorY=cursorY/scale;
+ local hit;
+ for i=1,table.getn(SU.checks or {}) do
+  local row=SU.checks[i];
+  if row and row.drag and row:IsShown() and row.get then
+   local top,bottom=row:GetTop(),row:GetBottom();
+   if top and bottom and cursorY<=top+4 and cursorY>=bottom-4 then hit=row; end
+  end
+ end
+ return hit;
+end
+function SU.StartStatDrag(grip)
+ SU.statDrag.row=grip.row; SU.statDrag.key=grip.key;
+ grip.row:SetAlpha(.5);
+ if not SU.statDragDriver then SU.statDragDriver=CreateFrame("Frame"); end
+ SU.statDragDriver:SetScript("OnUpdate",function()
+  local hit=SU.StatDragTarget();
+  if SU.statDrag.drop and SU.statDrag.drop~=hit then SU.statDrag.drop.label:SetTextColor(1,1,1); end
+  SU.statDrag.drop=hit;
+  if hit and hit~=SU.statDrag.row then hit.label:SetTextColor(1,.82,.25); end
+ end);
+end
+function SU.EndStatDrag()
+ if not SU.statDrag.row then return; end
+ if SU.statDragDriver then SU.statDragDriver:SetScript("OnUpdate",nil); end
+ SU.statDrag.row:SetAlpha(1);
+ local target=SU.statDrag.drop;
+ if target and target.drag and target~=SU.statDrag.row then target.label:SetTextColor(1,1,1); end
+ if target and target.drag and target.drag.key~=SU.statDrag.key then
+  local order=SS.StatOrder(); local from,to;
+  for i=1,table.getn(order) do
+   if order[i]==SU.statDrag.key then from=i; end
+   if order[i]==target.drag.key then to=i; end
+  end
+  if from and to then
+   local key=table.remove(order,from);
+   table.insert(order,to,key);
+   SS.DB().statOrder=order; SS.MarkProfileDirty(); SS.UpdateStats();
+  end
+ end
+ SU.statDrag={};
+ if SU.Focus then SS.Safe(SU.Focus,"SlimSuiteStatCounterFrame"); end
+end
+
 
 function SS.UpdateStats()
  SS.CaptureStatBaseline();
