@@ -2,6 +2,15 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.57
+The settings window has an Elements page listing every element with On, Off and Original buttons. Character and Talents are now elements too.
+
+- New Elements page, first in the sidebar: each element has On, Off and Original buttons. The highlighted button shows its current state. They use the same controls as edit mode.
+- Character and Talents start as Original, so the game's windows are unchanged until you choose On or Off.
+- On: Slim Suite places the window, and its saved place is applied each time it opens.
+- Off: the window stays hidden, even when you press C or N.
+- Not yet tested in the live client: dragging these two windows, and how the new settings page is laid out.
+
 ## 1.56
 Removed arrow-key nudging, so WASD and the arrow keys work normally again. The Character and Talents windows can now be placed like other Slim Suite elements.
 

@@ -30,7 +30,14 @@ function SS.LayoutPage(page)
 			if ( any ) then r.fs:Show(); y = y - 24; else r.fs:Hide(); end
 		elseif ( show[i] ) then
 			local rowHeight = 28;
-			if ( r.kind == "button" ) then
+			if ( r.kind == "elementmode" ) then
+				r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 30, y - 6); r.fs:Show();
+				for j = 1, 3 do
+					local eb = r.buttons[j].b;
+					eb:ClearAllPoints(); eb:SetPoint("TOPLEFT", parent, "TOPLEFT", 214 + (j - 1) * 68, y); eb:Show();
+				end
+				rowHeight = 30;
+			elseif ( r.kind == "button" ) then
 				r.b:ClearAllPoints(); r.b:SetPoint("TOPLEFT", parent, "TOPLEFT", 26, y + 2);
 				r.b:Show();
 				rowHeight = 30;
@@ -51,7 +58,8 @@ function SS.LayoutPage(page)
 			end
 			y = y - rowHeight;
 		else
-			if ( r.kind == "button" ) then r.b:Hide();
+			if ( r.kind == "elementmode" ) then r.fs:Hide(); for j = 1, 3 do r.buttons[j].b:Hide(); end
+			elseif ( r.kind == "button" ) then r.b:Hide();
 			elseif ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); if r.preview then r.preview:Hide(); end end
 		end
 	end
@@ -214,6 +222,22 @@ function SS.WinBuild()
      table.insert(page.rows,{kind="check",lead=20,cb=cb,preview=preview,soundGroup=group,soundKey=key});
     end
     up=nil;
+			elseif ( row.elementMode ) then
+				local name = row.elementMode;
+				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
+				fs:SetText(SS.T(row.label or name)); fs:SetJustifyH("LEFT"); fs:SetWidth(170);
+				local r = { kind = "elementmode", fs = fs, name = name, buttons = {} };
+				local labels = { { "On", "enabled" }, { "Off", "disabled" }, { "Original", "default" } };
+				for j = 1, 3 do
+					local mode = labels[j][2];
+					local b = K.Button(parent, SS.T(labels[j][1]), 62, function()
+						SU.SetMode(name, mode, SS.ELEMENTS[name] and SS.ELEMENTS[name].title);
+						SS.RefreshElementModes();
+					end);
+					r.buttons[j] = { b = b, mode = mode };
+				end
+				table.insert(page.rows, r);
+				up = nil;
 			elseif ( row.button ) then
 				local b = K.Button(parent, SS.T(row.button), row.width or 150, row.onClick);
 				table.insert(page.rows, { kind = "button", b = b });
@@ -341,7 +365,10 @@ function SS.WinBuild()
 			{"Reduce floating combat-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end},
  };
  if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),170,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-300); end;
- local entries={chat={},sounds={},ui={},gameplay={},misc={},nameplates={}};
+ local entries={chat={},sounds={},ui={},gameplay={},misc={},nameplates={},elements={}};
+ local elementRows={};
+ for _,name in ipairs(SS.SETUP_ORDER) do table.insert(elementRows,{elementMode=name,label=(SS.ELEMENTS[name] and (SS.ELEMENTS[name].label or SS.ELEMENTS[name].title)) or name}); end
+ entries.elements=elementRows;
  for _,row in ipairs(uiEntries) do table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
  local category="misc";
  for _,row in ipairs(otherEntries) do
@@ -370,6 +397,16 @@ function SS.WinBuild()
   scroll:SetPoint("TOPLEFT",win,"TOPLEFT",214,-112); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,34);
   local page=AddRows(child,entries[id],-8,nil,id); views[id]={scroll=scroll,page=page};
  end
+ SS.RefreshElementModes=function()
+  for _,view in pairs(views) do
+   for _,row in ipairs(view.page.rows) do
+    if row.kind=="elementmode" then
+     local mode=SU.Mode(row.name);
+     for _,entry in ipairs(row.buttons) do if entry.mode==mode then entry.b:LockHighlight(); else entry.b:UnlockHighlight(); end end
+    end
+   end
+  end
+ end;
  SS.RefreshModuleHub=function()
   for id,button in pairs(SS.moduleHubButtons) do button:SetText(SS.T(SS.ModuleEnabled(id) and "On" or "Off")); end
   if current then
@@ -387,6 +424,8 @@ function SS.WinBuild()
   hub:Show(); back:Hide(); master:Show(); master.label:Show(); views[id].scroll:Show();
   title:SetText(SS.T(SS.MODULE_TITLES[id]));
   master.label:SetText(SS.T("Module enabled"));
+  if ( id=="elements" ) then master:Hide(); master.label:Hide(); else master:Show(); master.label:Show(); end
+  SS.RefreshElementModes();
   for sid, b2 in pairs(SS.sidebarButtons or {}) do SU.PaintFlat(b2, sid == id, {1, 0.82, 0.2}); end
   SS.RefreshToggles(); SS.RefreshModuleHub();
  end;
