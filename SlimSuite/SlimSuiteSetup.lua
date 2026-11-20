@@ -452,21 +452,13 @@ function SU.Click(frame)
 end
 
 -- the setup leaves Blizzard's interface visible until an element is explicitly enabled or disabled
+-- The presets list is a drop-down under its button on the bar; it opens and closes with that button.
 function SU.PlaceProfiles()
 	local panel = SU.bar and SU.bar.profilePanel;
-	if ( not panel ) then return; end
+	if ( not panel or not SU.bar.presetButton ) then return; end
 	panel:Hide();
-	local left = SU.bar:GetLeft() or 0;
-	local width = SU.bar:GetWidth() or 0;
-	local profileWidth = panel:GetWidth() or 0;
 	panel:ClearAllPoints();
-	if ( left + width + profileWidth <= (UIParent:GetWidth() or 0) ) then
-		panel:SetPoint("TOPLEFT", SU.bar, "TOPRIGHT", -2, 0);
-	elseif ( left >= profileWidth ) then
-		panel:SetPoint("TOPRIGHT", SU.bar, "TOPLEFT", 2, 0);
-	else
-		panel:SetPoint("TOPLEFT", SU.bar, "BOTTOMLEFT", 0, 2);
-	end
+	panel:SetPoint("TOPRIGHT", SU.bar.presetButton, "BOTTOMRIGHT", 0, -2);
 end
 
 function SU.Begin()
@@ -580,15 +572,15 @@ function SU.Begin()
 	-- The former element selector is no longer presented. Keep its mode controls private for
 	-- compatibility with older callers; all editing is through the actual green handles.
 	for _,b in pairs(SU.barButtons) do b:Hide(); end
-	SU.bar:SetWidth(344);
-	SU.bar:SetHeight(94);
+	SU.bar:SetWidth(470);
+	SU.bar:SetHeight(84);
 	SU.bar.demoHint:ClearAllPoints();
-	SU.bar.demoHint:SetPoint("TOPLEFT",SU.bar,"TOPLEFT",10,-34);
-	SU.bar.demoHint:SetWidth(324); SU.bar.demoHint:SetHeight(22);
+	SU.bar.demoHint:SetPoint("TOPLEFT",SU.bar,"TOPLEFT",10,-36);
+	SU.bar.demoHint:SetWidth(450); SU.bar.demoHint:SetHeight(22);
 	SU.PlaceProfiles();
 	if ( SU.bar.resetAll ) then
-		SU.bar.resetAll:ClearAllPoints(); SU.bar.resetAll:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -104, 33);
 		SU.bar.done:ClearAllPoints(); SU.bar.done:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -8, 7);
+		SU.bar.resetAll:ClearAllPoints(); SU.bar.resetAll:SetPoint("BOTTOMRIGHT", SU.bar, "BOTTOMRIGHT", -104, 7);
 	end
 	SU.bar:Show();
 	SU.Focus(nil);
@@ -700,8 +692,8 @@ function SU.Build()
 	SU.bar.styleButtons = {};
 	for i = 1, table.getn(styleChoices) do
 		local key = styleChoices[i][2];
-		local button = K.Button(SU.bar, styleChoices[i][1], 80, function() SS.SetPanelStyle(key); SU.RefreshStyleButtons(); end);
-		button:SetPoint("BOTTOMLEFT", SU.bar, "BOTTOMLEFT", 8 + (i - 1) * 96, 7);
+		local button = K.Button(SU.bar, styleChoices[i][1], 74, function() SS.SetPanelStyle(key); SU.RefreshStyleButtons(); end);
+		button:SetPoint("BOTTOMLEFT", SU.bar, "BOTTOMLEFT", 8 + (i - 1) * 80, 7);
 		button.styleKey = key;
 		table.insert(SU.bar.styleButtons, button);
 	end
@@ -714,7 +706,7 @@ function SU.Build()
 	end
 	SU.RefreshStyleButtons();
 	SU.bar:SetFrameStrata("DIALOG");
-	SU.bar:SetHeight(80);
+	SU.bar:SetWidth(470); SU.bar:SetHeight(84);
 	SU.bar:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 		tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
 	SU.bar:SetBackdropColor(0.04, 0.035, 0.07, 0.97);
@@ -741,7 +733,7 @@ function SU.Build()
 		for i = 1, math.max(table.getn(names), table.getn(SU.bar.profilePanel.buttons)) do
 			local button = SU.bar.profilePanel.buttons[i];
 			if ( not button and names[i] and K and K.Button ) then
-				button = K.Button(SU.bar.profilePanel, names[i], 164, function() SS.ApplyDefaultProfile(this.profileName); end);
+				button = K.Button(SU.bar.profilePanel, names[i], 164, function() SS.ApplyDefaultProfile(this.profileName); SU.bar.profilePanel:Hide(); end);
 				SU.bar.profilePanel.buttons[i] = button;
 			end
 			if ( button ) then
@@ -754,6 +746,11 @@ function SU.Build()
 		else SU.bar.profilePanel.note:SetText(SS.T("Applying a read-only preset creates your editable copy.")); end
 	end;
 	SU.bar.profilePanel.Refresh();
+	SU.bar.presetButton = K.Button(SU.bar, SS.T("Presets") .. "  v", 110, function()
+		local p = SU.bar.profilePanel;
+		if ( p:IsShown() ) then p:Hide(); else SU.PlaceProfiles(); p.Refresh(); p:Show(); end
+	end);
+	SU.bar.presetButton:SetHeight(18); SU.bar.presetButton:SetPoint("TOPRIGHT", SU.bar, "TOPRIGHT", -8, -9);
 	SU.bar.profilePanel:SetPoint("TOPLEFT", SU.bar, "TOPRIGHT", -2, 0);
 	-- the list can be dragged by its background; it stays where it was put
 	SU.bar:SetMovable(true); SU.bar:EnableMouse(true); SU.bar:RegisterForDrag("LeftButton");

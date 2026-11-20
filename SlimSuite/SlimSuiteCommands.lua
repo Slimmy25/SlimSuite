@@ -910,8 +910,8 @@ end
 
 -- While Demo Mode runs, Slim Suite's menus are put away so the samples can be seen, and a small "DEMO MODE" box
 -- stands in for them: "On" is lit while it runs, "Off" stops it and brings back the menus that were open.
-SS.DEMO_HIDES = { "SlimSuiteFrame", "SlimSuiteLayoutFrame", "SlimSuiteSetupPanel", "SlimSuiteSetupBar", "SlimSuiteSetupGlow",
-	"SlimSuiteMovePanel", "SlimSuiteChoiceMenu", "SlimSuiteRaidIconPanel" };
+-- The setup bar, element menu and move panel stay up during Demo Mode, so the UI can still be changed while it runs.
+SS.DEMO_HIDES = { "SlimSuiteFrame", "SlimSuiteLayoutFrame", "SlimSuiteRaidIconPanel" };
 demoHidden = {};
 function DemoBox()
 	local box = getglobal("SlimSuiteDemoBox");
@@ -942,8 +942,7 @@ function SS.ShowDemoBox(on)
 			local f = getglobal(name);
 			if ( f and f:IsShown() ) then demoHidden[name] = true; f:Hide(); end
 		end
-		-- wherever it was started (the element list too), only the small box shows; Off brings the menus back
-		local box = DemoBox(); box:Show(); box.on:LockHighlight(); box.off:UnlockHighlight();
+		-- the Demo On / Off buttons on the edit bar replace the old floating box, so no box is shown
 	else
 		local box = getglobal("SlimSuiteDemoBox");
 		if ( box ) then box:Hide(); end

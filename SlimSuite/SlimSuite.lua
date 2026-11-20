@@ -845,8 +845,7 @@ win = nil;                                               -- the settings window 
 -- True while an element is being placed: in the setup when its element is turned on there, or in Toggle UI Settings
 -- (all elements, or the one chosen with "Choose element"). A new-school card counts as its element.
 function SS.IsEditing(name)
- if SS.demoRunning then return false; end
-	if ( setupActive ) then return (SS.SetupShows and SS.SetupShows(name)) and true or false; end
+ if ( setupActive ) then return (SS.SetupShows and SS.SetupShows(name)) and true or false; end
 	if ( not SS.DB().unlocked ) then return false; end
 	return (not editOnly or editOnly == name or (SS.Element and SS.Element(editOnly) == SS.Element(name))) and true or false;
 end

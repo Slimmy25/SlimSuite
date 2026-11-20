@@ -10,10 +10,7 @@ SS.StartDemoMode()
 check("demo starts",SS.demoRunning)
 su.SetMode("SlimSuiteSpellRowFrame","enabled","Build")
 SS.RefreshItemRow(); SS.RefreshSpellRow(); Tick(20,.05)
-for _,entry in ipairs(SS.MOVABLE) do
- local h=SS.ENV.handles[entry[1]]
- check("no green demo handle after refresh "..entry[1],not h or not h:IsShown())
-end
+-- Demo Mode no longer hides the edit handles: the UI can be changed while it runs
 SS.StopDemoMode()
 check("setup handles return after demo",compass:IsShown() and su.bar:IsShown())
 su.SetMode("SlimSuiteCombatTextFrame","enabled","Combat text"); SS.SetupEnd(true)

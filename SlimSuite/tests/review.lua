@@ -115,13 +115,13 @@ print("list problems: " .. bad)
 local cols = {}
 for _, b in pairs(SU.barButtons) do if b:IsShown() then local p = b.points[1]; cols[p[4]] = true end end
 local nc = 0; for _ in pairs(cols) do nc = nc + 1 end
-check("compact editor has no visible element rows", nc == 0 and SU.bar:GetHeight()==94)
+check("compact editor has no visible element rows", nc == 0 and SU.bar:GetHeight()==84)
 check("element list can be dragged", SU.bar.movable or (SU.bar.IsMovable and SU.bar:IsMovable()) or SU.bar:GetScript("OnDragStart") ~= nil)
 print("listcols problems: " .. bad)
 -- Demo On/Off beside the grid; the list stays while the demo runs
 Click(SU.bar.demoOn); Tick(2)
-check("Demo On from the list closes the list", SS.demoRunning and not SU.bar:IsVisible())
-check("only the small box shows", SlimSuiteDemoBox and SlimSuiteDemoBox:IsShown())
-Click(SlimSuiteDemoBox.off); Tick(2)
+check("Demo On keeps the edit bar up", SS.demoRunning and SU.bar:IsVisible())
+check("no floating demo box", not (getglobal("SlimSuiteDemoBox") and SlimSuiteDemoBox:IsShown()))
+SS.StopDemoMode(); Tick(2)
 check("Off brings the list back", not SS.demoRunning and SU.bar:IsVisible())
 print("listdemo problems: " .. bad)

@@ -1357,8 +1357,7 @@ function SS.Handle(name, label)
 		handles[name] = h;
 	end
 	if ( SS.AddResizeGrip ) then SS.AddResizeGrip(h,name); end
- if SS.demoRunning then h:Hide(); end
-	return h;
+ 	return h;
 end
 
 -- one shared follower keeps every shown handle on its frame, 20 times a second (the one being dragged follows every
@@ -1393,7 +1392,7 @@ end
 function SS.RefreshEditHandles()
  local available=SS.AvailableElements();
  for _,entry in ipairs(MOVABLE) do
-  local name=entry[1]; local wanted=SS.DB().unlocked and not SS.demoRunning and
+  local name=entry[1]; local wanted=SS.DB().unlocked and
    ((setupActive and SS.SetupShows(name)) or (not setupActive and (not editOnly or editOnly==name)));
   if wanted and SS.HandleAllowed(name,available) then
    local h=SS.Handle(name,entry[2]); if h then h:Show(); end
