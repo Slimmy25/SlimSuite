@@ -1920,16 +1920,18 @@ end
 -- ---------------------------------------------------------------- default game frames in RPG and New School
 -- The game's own frame keeps its look in Original. In the other two looks its top-level background textures are hidden
 -- and the chosen panel is drawn behind it, in a child overlay that is removed from the game's frame only by hiding.
--- Child frames (bars, portraits, text) are left alone. The minimap, chat, action bars, tooltip and cast bar are not
--- included yet: an overlay would cover them, or they are shared with the game.
+-- Child frames (bars, portraits, text) are left alone. The minimap, chat and tooltip are not included yet: the minimap is
+-- round, the chat draws its text itself, and the tooltip is re-drawn by the game on every show.
 SS.SKINNABLE_BLIZZARD = { "PlayerFrame", "TargetFrame", "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3",
- "PartyMemberFrame4", "BuffFrame", "MainMenuExpBar" };
+ "PartyMemberFrame4", "BuffFrame", "MainMenuExpBar", "MainMenuBar", "CastingBarFrame" };
 function SS.SkinBlizzardFrame(name)
 	local frame = getglobal(name);
 	if ( not frame or not frame.GetRegions or getglobal("SlimSuiteSkin_" .. name) ) then return; end
 	local overlay = CreateFrame("Frame", "SlimSuiteSkin_" .. name, frame);
 	overlay.slimName = name;
 	overlay:SetAllPoints(frame);
+	-- the panel sits at the frame's own level, so the frame's bars, buttons and text (children one level up) stay on top
+	overlay:SetFrameLevel(frame:GetFrameLevel() or 1);
 	overlay:EnableMouse(false);
 	overlay:Hide();
 	local textures = {};
