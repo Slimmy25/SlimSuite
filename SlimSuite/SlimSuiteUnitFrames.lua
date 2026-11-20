@@ -134,6 +134,13 @@ function SU.SetPartyOption(key, on)
 	SU.UpdateDemo();
 end
 
+-- "Space between players": the gap between party frames, in pixels (0 to 30). Saved; the default is the old spacing.
+function SS.PartyGap()
+	local g = tonumber(SS.DB().partyGap);
+	if ( not g ) then return 4; end
+	return math.max(0, math.min(30, math.floor(g)));
+end
+
 -- a row (horizontal) or a column (vertical) of party frames
 function SU.SetPartyRow(on)
 	SS.DB().orientations.PartyMemberFrame1 = on and "horizontal" or "vertical";

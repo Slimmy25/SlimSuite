@@ -510,6 +510,25 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		SS.ShowErrors();
 	elseif ( cmd == "log" ) then
 		SS.ShowActionLog();
+	elseif ( cmd == "framesize" ) then
+		-- measures the game's own player and target frames, to build matching ones: size, and where the parts sit
+		for _, name in ipairs({ "PlayerFrame", "TargetFrame" }) do
+			local f = getglobal(name);
+			if ( f ) then
+				local w, h = f:GetWidth() or 0, f:GetHeight() or 0;
+				local scale = f:GetScale() or 1;
+				K.Print(NAME, name .. ": " .. math.floor(w + 0.5) .. " x " .. math.floor(h + 0.5) .. " at scale " .. scale);
+				for _, part in ipairs({ "Portrait", "HealthBar", "ManaBar", "Name", "HealthBarText", "ManaBarText", "Texture" }) do
+					local p = getglobal(name .. part);
+					if ( p and p.GetLeft and p:GetLeft() ) then
+						local pw, ph = p:GetWidth() or 0, p:GetHeight() or 0;
+						local left = (p:GetLeft() or 0) - (f:GetLeft() or 0);
+						local top = (f:GetTop() or 0) - (p:GetTop() or 0);
+						K.Print(NAME, "  " .. part .. ": " .. math.floor(pw + 0.5) .. " x " .. math.floor(ph + 0.5) .. ", " .. math.floor(left + 0.5) .. " from left, " .. math.floor(top + 0.5) .. " from top");
+					end
+				end
+			end
+		end
 	elseif ( cmd == "hud" or cmd == "recommend" ) then
 		SS.ShowHUDRecommendation();
 	elseif ( cmd == "mouse" ) then

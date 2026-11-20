@@ -244,8 +244,14 @@ end
 -- Setup: hides every element, Slim Suite's, Aethus's and the game's own, so each one can be turned on by hand.
 local function SetupAllDisabled()
  SS.hudHideAll = true;
+ local sections = SS.DB().hudSections or {};
+ SS.DB().hudSections = sections;
+ for _, sec in ipairs(SECTIONS) do sections[sec.key] = true; end
  SU.batching = true;
- for _, name in ipairs(ElementList()) do SU.SetMode(name, "disabled", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
+ for _, name in ipairs(ElementList()) do
+  -- the Character sheet is not hidden: its alternative layout is gone, so it stays as it is
+  if ( name ~= "CharacterFrame" ) then SU.SetMode(name, "disabled", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
+ end
  SU.batching = false;
  SS.Safe(SS.RefreshEditHandles);
  RefreshAll();

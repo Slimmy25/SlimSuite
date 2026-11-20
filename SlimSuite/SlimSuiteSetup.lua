@@ -191,6 +191,41 @@ function SU.Focus(frame)
 			rb.elementName = nil; rb:Hide();
 		end
 	end
+	-- Space between players: a sliding bar for the party frames only
+	do
+		if ( SU.gapSlider == nil ) then
+			local s = CreateFrame("Slider", "SlimSuitePartyGapSlider", SU.panel, "OptionsSliderTemplate");
+			s:SetWidth(170); s:SetHeight(14);
+			s:SetMinMaxValues(0, 30); s:SetValueStep(1);
+			local low, high = getglobal("SlimSuitePartyGapSliderLow"), getglobal("SlimSuitePartyGapSliderHigh");
+			if ( low ) then low:SetText("0"); end
+			if ( high ) then high:SetText("30"); end
+			s.titleText = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+			s.titleText:SetPoint("BOTTOMLEFT", s, "TOPLEFT", 2, 4);
+			s.titleText:SetText(SS.T("Space between players"));
+			s.valueText = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+			s.valueText:SetPoint("LEFT", s, "RIGHT", 10, 0);
+			s:SetScript("OnValueChanged", function()
+				local v = math.floor(this:GetValue() + 0.5);
+				this.valueText:SetText(tostring(v));
+				if ( this.building ) then return; end
+				SS.DB().partyGap = v; SS.MarkProfileDirty();
+				SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
+			end);
+			SU.gapSlider = s;
+		end
+		local s = SU.gapSlider;
+		local show = frame == "PartyMemberFrame1" and (not setupActive or mode == "enabled") and SS.Look("PartyMemberFrame1") ~= "thin";
+		if ( show ) then
+			s:ClearAllPoints(); s:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 22, -(h + 14));
+			s:SetParent(SU.panel);
+			s.building = true; s:SetValue(SS.PartyGap()); s.valueText:SetText(tostring(SS.PartyGap())); s.building = false;
+			s:Show(); s.titleText:Show();
+			h = h + 36;
+		else
+			s:Hide();
+		end
+	end
 	-- the size & layout tools, under the settings
 	do
 		local ok = frame and (not setupActive or SU.Mode(frame) == "enabled") and SS.PrepareSizeTools(frame, e and e.title);
@@ -219,10 +254,15 @@ function SU.Focus(frame)
 		SU.panel:ClearAllPoints();
 		local hudWindow = getglobal("SlimSuiteHUDEditMode");
 		if ( hudWindow and hudWindow:IsShown() ) then
-			-- with HUD Edit open, the menu is attached to that window, beside it, not to the element on screen
+			-- with HUD Edit open, the menu is attached to that window, beside it, not to the element on screen,
+			-- and scaled down to sit smaller than the window
+			SU.panel:SetScale(0.7);
 			SU.panel:SetPoint("TOPLEFT", hudWindow, "TOPRIGHT", 8, 0);
-		elseif ( handle and handle:IsShown() ) then SU.panel:SetPoint("TOP", handle, "BOTTOM", 0, -14);
-		else SU.panel:SetPoint("TOP", UIParent, "TOP", 0, -110); end
+		else
+			SU.panel:SetScale(1);
+			if ( handle and handle:IsShown() ) then SU.panel:SetPoint("TOP", handle, "BOTTOM", 0, -14);
+			else SU.panel:SetPoint("TOP", UIParent, "TOP", 0, -110); end
+		end
 		if ( not (hudWindow and hudWindow:IsShown()) ) then SS.Safe(SS.KeepMenuOnScreen); end
 	end
 	SU.panel:Show();

@@ -2,6 +2,17 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.74
+Adds a party spacing slider, a frame measuring command, and fixes for the action bar, mirrored frames and Setup.
+
+- Party frames have a "Space between players" slider in their right-click menu (0 to 30).
+- /slimsuite framesize prints the size and layout of the game's player and target frames.
+- Setup no longer hides the Character element, and it opens every section of the element list.
+- Action bar buttons shown at all times now work.
+- Mirrored target and player frames use the same on-screen scale.
+- The element menu is scaled down when attached to HUD Edit.
+- Not yet tested in the live client: all of the above.
+
 ## 1.73
 Setup in HUD Edit hides everything until you turn elements on, and HUD Edit is smaller.
 

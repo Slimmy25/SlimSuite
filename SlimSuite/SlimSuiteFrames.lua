@@ -1241,7 +1241,8 @@ ApplyActionSlotGrid = function()
 	local found = false;
 	for i = 1, 6 do
 		local button = getglobal("ActionButton" .. i);
-		if ( button ) then SS.Safe(action, button); found = true; end
+		-- the game's grid functions work on `this` (the button), so run them as the button, with it passed too
+		if ( button ) then SS.RunAs(button, action, button); found = true; end
 	end
 	if ( found ) then actionSlotsGridApplied = on; end
 end
@@ -1606,10 +1607,11 @@ ApplyMovableOrientation = function(name)
 			if ( frame ) then
 				if ( frame.SetUserPlaced ) then SS.UserPlace(frame); end
 				frame:ClearAllPoints();
+				local gap = SS.PartyGap();
 				if ( orientation == "horizontal" ) then
-					frame:SetPoint("LEFT", getglobal("PartyMemberFrame" .. (i - 1)), "RIGHT", 8, 0);
+					frame:SetPoint("LEFT", getglobal("PartyMemberFrame" .. (i - 1)), "RIGHT", gap, 0);
 				else
-					frame:SetPoint("TOP", getglobal("PartyMemberFrame" .. (i - 1)), "BOTTOM", 0, -4);
+					frame:SetPoint("TOP", getglobal("PartyMemberFrame" .. (i - 1)), "BOTTOM", 0, -gap);
 				end
 				if ( frame.SetUserPlaced ) then SS.UserPlace(frame); end
 			end
@@ -1838,7 +1840,8 @@ function SS.MirrorFrames(from, to)
 	SS.DB().scales[toName] = scale;
 	if ( to.SetScale ) then
 		local applied = type(scale) == "number" and scale or 1;
-		if ( SS.DisplayElementScale ) then applied = SS.DisplayElementScale(toName, applied); end
+		-- both frames take the same on-screen scale, worked out from the source frame, so the pair always matches
+		if ( SS.DisplayElementScale ) then applied = SS.DisplayElementScale(fromName, applied); end
 		to:SetScale(applied);
 	end
 	local w, h = from:GetWidth(), from:GetHeight();

@@ -223,6 +223,7 @@ end
 -- While the HUD Edit window's Setup has hidden everything, an element shows its handle and sample only once it is enabled.
 SS.hudHideAll = false;
 function SS.HiddenInSetup(name)
+	if ( SS.Element(name) == "CharacterFrame" ) then return false; end
 	return SS.hudHideAll and SU.Mode(SS.Element(name)) ~= "enabled" and true or false;
 end
 function SU.Mode(frame)
