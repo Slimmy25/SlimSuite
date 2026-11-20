@@ -2,6 +2,17 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.52
+Default game frames can take the RPG and New School looks, the settings window has a sidebar, and elements can be nudged with the arrow keys.
+- Default frames: player, target, party, buffs, experience bar, action bar and cast bar take the RPG or New School look. Original keeps the game's own frames.
+- Proc meter follows its look from the right-click menu, like the other elements.
+- Right-click menu: a Reset this element button puts an element back to its default place, size and look.
+- Editing: arrow keys move the selected element one pixel, and Shift with an arrow key moves it ten. A gold outline marks the element being edited.
+- Settings: a search box filters the settings, a Window text size choice (Normal, Large, Larger) resizes Slim Suite's windows, and a short explanation shows when you hover over some settings.
+- Settings window: modules are listed in a sidebar on the left, with the module's title above its settings. Every setting is still there.
+- Fix: the right-click menu no longer errors when it opens for an element by name.
+- Not yet: minimap, chat and tooltip default frames, and enemy nameplates follow the global look only.
+
 ## 1.51
 Every Slim Suite element can have its own look, and the panel styles are renamed RPG and New School.
 - Panel styles are now Original, RPG (the damage meter's gold-edged dark panel) and New School (the blue-tinted game tooltip panel).
