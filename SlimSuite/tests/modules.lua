@@ -7,7 +7,7 @@ check("five category hub exists",SlimSuiteModuleHub:IsShown() and #SS.MODULE_ORD
 check("diagnostic entry point removed",SS.ShowDiagnosticsWindow==nil and SlimSuiteDiagnosticsFrame==nil)
 for _,id in ipairs(SS.MODULE_ORDER) do
  SS.SetModuleEnabled(id,true); SS.OpenModulePage(id)
- check("category settings page opens "..id,not SlimSuiteModuleHub:IsShown())
+ check("category settings page opens "..id,getglobal("SlimSuiteModule_"..id) and getglobal("SlimSuiteModule_"..id):IsShown() and SlimSuiteModuleHub:IsShown())
  local exists=false; for _,page in ipairs(SS.pages) do if page.module==id then exists=true end end
  check("category owns its settings "..id,exists)
 end
