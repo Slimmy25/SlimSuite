@@ -1,6 +1,6 @@
 -- Category masters pause only SlimSuite features; installed addons are never changed.
 if ( setfenv ) then setfenv(1, SS.ENV); end
-SS.MODULE_ORDER={"elements","ui","nameplates","gameplay","chat","sounds","misc"};
+SS.MODULE_ORDER={"ui","nameplates","gameplay","chat","sounds","misc"};
 SS.MODULE_TITLES={elements="Elements",ui="Interface",nameplates="Nameplates",gameplay="Gameplay",chat="Chat",sounds="Sound",misc="Accessibility"};
 local groups={
  gameplay={"camera","bossMarks","prePullMarks","deathMarks","raidRow","minimapCaches","minimapBosses","minimapLairs","showGuardianFlag","floatingText","worldCombatMode"},

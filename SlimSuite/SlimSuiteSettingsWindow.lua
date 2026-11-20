@@ -282,8 +282,6 @@ function SS.WinBuild()
 			{button = "Recommended HUD preset", onClick = function() SS.ShowHUDRecommendation(); end},
 			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
 			{head="Everywhere"},
-   {"Legendary luck",function() return SS.FeatureEnabled("SlimSuiteLuckFrame"); end,function(v) SU.SetMode("SlimSuiteLuckFrame",v and "enabled" or "disabled","Legendary luck"); end},
-			{"Compass",function() return SS.DB().compassOn; end,function(v) SU.SetMode("SlimSuiteCompassFrame",v and "enabled" or "disabled","Compass"); end},
 			{"Run clock in the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end},
 			{"Show green absorb amounts on player and party frames (when the client exposes them)", function() return SS.DB().showAbsorbs; end, function(v) SS.DB().showAbsorbs = v and true or false; SS.Safe(SS.UpdateAbsorbMarkers); end},
 			worldEntry,
@@ -365,10 +363,8 @@ function SS.WinBuild()
 			{"Reduce floating combat-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end},
  };
  if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),170,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-300); end;
- local entries={chat={},sounds={},ui={},gameplay={},misc={},nameplates={},elements={}};
- local elementRows={};
- for _,name in ipairs(SS.SETUP_ORDER) do table.insert(elementRows,{elementMode=name,label=(SS.ELEMENTS[name] and (SS.ELEMENTS[name].label or SS.ELEMENTS[name].title)) or name}); end
- entries.elements=elementRows;
+ local entries={chat={},sounds={},ui={},gameplay={},misc={},nameplates={}};
+
  for _,row in ipairs(uiEntries) do table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
  local category="misc";
  for _,row in ipairs(otherEntries) do
@@ -381,8 +377,9 @@ function SS.WinBuild()
   elseif label=="Cooldown numbers on the spell squares" then destination="ui"; end
   table.insert(entries[destination],row);
  end
- if SS.AchievementsAvailable() then table.insert(entries.ui,{"Side achievements button",function() return SS.FeatureEnabled("SlimSuiteAchievementsButton"); end,function(v) SU.SetMode("SlimSuiteAchievementsButton",v and "enabled" or "disabled","Side achievements"); end});
+ if SS.AchievementsAvailable() then 
  table.insert(entries.gameplay,{button="Side achievements",onClick=function() SS.OpenAchievements(); end}); end;
+ table.insert(entries.ui,{button="HUD Edit Mode",onClick=function() SS.OpenHUDEdit(); end});
  table.insert(entries.ui,{button="Reset positions",onClick=function() SS.ResetPlaces(); end});
  table.insert(entries.ui,{button="Reset all UI",onClick=function() SS.ResetUI(); end});
  for i,id in ipairs(SS.MODULE_ORDER) do

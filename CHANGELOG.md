@@ -2,6 +2,15 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.59
+New HUD Edit Mode window, in the style of the game's own HUD editor, with one tick box per element. Duplicate element settings are removed from the addon menu.
+
+- HUD Edit Mode opens from the Interface page. Every element is listed under Frames, Combat or Misc.
+- Each tick box has three states: ticked is On, empty is Off, and D is Default (the game's own element).
+- Click an element's name to Revert Changes or Reset To Default Position. Revert All Changes returns every element to Default.
+- Removed from the addon menu, because HUD Edit Mode covers them: the Elements page, and the separate Legendary luck, Compass and Side achievements button toggles.
+- Not yet tested in the live client: the window's layout and its Show Grid and Snap to Elements checkboxes.
+
 ## 1.58
 Slim Suite does less work while you play. Layout and behaviour are unchanged.
 

@@ -3,7 +3,7 @@ local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..labe
 SS.SetupEnd(true)
 if not SS.ENV.win then SS.WinBuild() end
 SS.ENV.win:Show(); SS.OpenModulePage(nil)
-check("category hub exists with the Elements page first",SlimSuiteModuleHub:IsShown() and #SS.MODULE_ORDER==7 and SS.MODULE_ORDER[1]=="elements")
+check("category hub exists with six pages",SlimSuiteModuleHub:IsShown() and #SS.MODULE_ORDER==6 and SS.MODULE_ORDER[1]=="ui")
 check("diagnostic entry point removed",SS.ShowDiagnosticsWindow==nil and SlimSuiteDiagnosticsFrame==nil)
 for _,id in ipairs(SS.MODULE_ORDER) do
  SS.SetModuleEnabled(id,true); SS.OpenModulePage(id)
@@ -54,24 +54,3 @@ check("accessibility belongs to Misc",accessInMisc)
 print("module problems: "..bad)
 for _,e in ipairs(ERRORS) do print(e) end
 assert(bad==0 and #ERRORS==0,"module regressions")
--- Elements page: one row per setup element with On / Off / Original, wired to the same mode the setup uses.
-SS.OpenModulePage("elements")
-local elementRows, bad2 = 0, 0
-local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
-SU = upvalue(SS.SetupHide, "SU")
-for _, page in ipairs(SS.pages or {}) do
-  if page.module == "elements" then
-    for _, r in ipairs(page.rows) do
-      if r.kind == "elementmode" then
-        elementRows = elementRows + 1
-        RunScript(r.buttons[1].b, "OnClick")
-        if SU.Mode(r.name) ~= "enabled" then bad2 = bad2 + 1; print("On did not set", r.name) end
-        RunScript(r.buttons[3].b, "OnClick")
-        if SU.Mode(r.name) ~= "default" then bad2 = bad2 + 1; print("Original did not set", r.name) end
-      end
-    end
-  end
-end
-check("elements page has a row per setup element", elementRows == table.getn(SS.SETUP_ORDER))
-check("On and Original set each element's mode", bad2 == 0)
-print("elements page problems: " .. bad2)
