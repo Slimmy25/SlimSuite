@@ -454,7 +454,7 @@ end
 -- Markers move in the game's world-anchor frame handler, which runs after the camera has moved each frame (OnUpdate
 -- runs before, so markers would trail a frame when you turn). Older game builds: once a frame from the shared ticker.
 if ( not (A.Has("AZS_RegisterWorldAnchorFrameHandler") and SS.Safe(AZS_RegisterWorldAnchorFrameHandler, function() SS.Safe(UpdateMarkers); end)) ) then
-	SS.Every("markers", 0, function() SS.Safe(UpdateMarkers); end, overlay);
+	SS.Every("markers", 0.05, function() SS.Safe(UpdateMarkers); end, overlay);
 end
 
 -- ---------------------------------------------------------------- debuffs on the encounter bars
@@ -1288,7 +1288,7 @@ local function UpdateMinimapPins()
 	for i = pinUsed + 1, table.getn(pins) do pins[i]:Hide(); end
 end
 local pinDriver = CreateFrame("Frame");
-SS.Every("pins", 0, function() SS.Safe(UpdateMinimapPins); end, pinDriver);
+SS.Every("pins", 0.05, function() SS.Safe(UpdateMinimapPins); end, pinDriver);
 
 -- ---------------------------------------------------------------- movable local clock (0.136)
 -- AZS_GetLocalTime() gives the clock's text, hour, minute and format, even with the clock or minimap hidden and out of
@@ -1733,7 +1733,16 @@ end
 
 -- ---------------------------------------------------------------- tickers
 local ticker = CreateFrame("Frame");
-SS.Every("box", 0, function() SS.Safe(DrawBox); end);
+-- Animates while combat text is on screen; when it is empty and hidden, it is checked 4 times a second instead of every frame.
+local boxLastRun = 0;
+SS.Every("box", 0, function()
+	if ( box.entries and table.getn(box.entries) == 0 and not box:IsShown() ) then
+		local now = GetTime();
+		if ( now - boxLastRun < 0.25 ) then return; end
+		boxLastRun = now;
+	end
+	SS.Safe(DrawBox);
+end);
 SS.Every("tracker", 0.1, function()
 	SS.Safe(TrackKills);
  SS.Safe(TrackKillBanners);

@@ -834,7 +834,7 @@ function SS.UpdateMatchSounds()
  end
  matchAudio.phase=phase;
 end
-SS.Every("matchSounds",.05,function() SS.UpdateMatchSounds(); end);
+SS.Every("matchSounds",.1,function() SS.UpdateMatchSounds(); end);
 function SS.PlayBossKillSound()
  local selected=SS.SoundSelection("boss");
  if selected~="off" then SS.PlayAddonSound(selected); end

@@ -11,8 +11,8 @@ task.fn=function() SS.EnforceElementBounds=function(frame,...) if frame==f then 
 Tick(5,.1); calls=0; Tick(20,.05)
 local still=calls
 check("a still frame is checked on the safety interval, not every tick (got "..still.." in 1s)", still>=1 and still<=3)
-f:SetWidth(f:GetWidth()+10); calls=0; Tick(1,.05)
-check("a resized frame is checked straight away", calls>=1)
+f:SetWidth(f:GetWidth()+10); calls=0; Tick(2,.05)
+check("a resized frame is checked within a tenth of a second", calls>=1)
 calls=0; Tick(10,.05)
 check("after the change it settles back to the safety interval", calls<=3)
 task.fn=taskFn

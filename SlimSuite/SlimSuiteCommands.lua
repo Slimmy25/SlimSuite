@@ -1056,7 +1056,7 @@ unitEvents:SetScript("OnEvent", function()
 	unitsDirty = true;
 	if ( event == "PARTY_MEMBERS_CHANGED" or event == "PLAYER_TARGET_CHANGED" ) then marksDirty = true; end
 end);
-SS.Every("unitEvents", 0, function()
+SS.Every("unitEvents", 0.05, function()
 	if ( unitsDirty ) then
 		unitsDirty = false;
 		for i = 1, table.getn(SS.cardFrames or {}) do SS.Safe(SS.RefreshCard, SS.cardFrames[i]); end

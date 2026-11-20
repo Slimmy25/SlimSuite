@@ -215,9 +215,9 @@ print("env problems: " .. bad)
 -- unit frames redraw on the game's events, not only on the timer
 local calls = 0; local old = SS.RefreshCard
 SS.RefreshCard = function(f) calls = calls + 1; return old(f) end
-Tick(1, 0.01); calls = 0
-FireEvent("UNIT_HEALTH", "player"); Tick(1, 0.01)
-check("UNIT_HEALTH redraws the cards at once", calls > 0)
+Tick(6, 0.01); calls = 0
+FireEvent("UNIT_HEALTH", "player"); Tick(6, 0.01)
+check("UNIT_HEALTH redraws the cards within a twentieth of a second", calls > 0)
 SS.RefreshCard = old
 print("events problems: " .. bad)
 -- side by side: your buffs stop before the first friend's frame; friends' buffs show above their own plates

@@ -4,7 +4,7 @@ function SS.LocaleCode()
  if ( not locale or locale == "auto" ) then locale=GetLocale and GetLocale() or "enUS"; end
  if ( SS.LOCALE_TEXT[locale] ) then return locale; end
  local language=string.sub(tostring(locale),1,2);
- for code in pairs(SS.LOCALE_TEXT) do if ( string.sub(code,1,2)==language ) then return code; end end
+ for code in pairs(SS.LOCALE_SOURCE) do if ( string.sub(code,1,2)==language ) then return code; end end
  return "enUS";
 end
 function SS.T(text)

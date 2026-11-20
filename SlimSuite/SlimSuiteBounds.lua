@@ -51,27 +51,24 @@ end
 -- safety pass (SAFETY_SECONDS) still catches content that changes inside an unchanged frame.
 local SAFETY_SECONDS = .5;
 local seenState, lastFull = {}, {};
-local function StateOf(f,release)
- local l,r,b,t=Rect(f);
- return { l or 0, r or 0, b or 0, t or 0, f:GetScale() or 1, release and true or false, f:IsShown() and true or false };
-end
-local function Same(a,b)
- for i=1,7 do if a[i]~=b[i] then return false; end end
- return true;
-end
-SS.Every("contentBounds",.05,function()
- local now=GetTime();
- for _,entry in ipairs(MOVABLE) do
-  local name=entry[1]; local f=getglobal(name);
+-- Runs 10 times a second. Each frame keeps its last state in a table that is reused, so a check that finds no change allocates nothing.
+SS.Every("contentBounds",.1,function()
+ local now=GetTime(); local d=SS.DB();
+ for i=1,table.getn(MOVABLE) do
+  local name=MOVABLE[i][1]; local f=getglobal(name);
   if ( f and f.IsShown and f:IsShown() ) then
-   local d=SS.DB(); local release=d.vanillaUI or (d.frameDefault and d.frameDefault[name]) and true or false;
-   local state=StateOf(f,release);
-   local old=seenState[name];
-   if ( not old or not Same(old,state) or now-(lastFull[name] or 0)>=SAFETY_SECONDS ) then
+   local release=(d.vanillaUI or (d.frameDefault and d.frameDefault[name])) and true or false;
+   local l,r,b,t=Rect(f); l,r,b,t=l or 0,r or 0,b or 0,t or 0;
+   local scale=f:GetScale() or 1;
+   local s=seenState[name];
+   if ( not s ) then s={}; seenState[name]=s; end
+   local changed = s[1]~=l or s[2]~=r or s[3]~=b or s[4]~=t or s[5]~=scale or s[6]~=release or s[7]~=true;
+   if ( changed or now-(lastFull[name] or 0)>=SAFETY_SECONDS ) then
+    s[1],s[2],s[3],s[4],s[5],s[6],s[7]=l,r,b,t,scale,release,true;
     SS.EnforceElementBounds(f,release);
-    seenState[name]=state; lastFull[name]=now;
+    lastFull[name]=now;
    end
-  else
+  elseif ( seenState[name] ) then
    seenState[name]=nil;
   end
  end

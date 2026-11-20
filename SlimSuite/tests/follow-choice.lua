@@ -41,12 +41,12 @@ check("stationary player sees a moving boss cross the compass",oldX and newX and
 facing=.2; AdvanceTime(.016); SS.UpdateCompass()
 check("player turning updates bearing in the same frame",CompassX()~=newX)
 d.minimapBosses=true; d.minimapCaches=false; d.minimapLairs=false; d.showGuardianFlag=false; Minimap:Show()
-Tick(1,.016)
+Tick(5,.016)
 local function PinX()
  for _,pin in ipairs({Minimap:GetChildren()}) do if pin:IsShown() and pin.tip=="Follower" then return pin.points[1][4] end end
 end
-local oldPin=PinX(); by=5; Tick(1,.016); local newPin=PinX()
-check("boss location also moves immediately on the minimap",oldPin and newPin and oldPin>0 and newPin<0)
+local oldPin=PinX(); by=5; Tick(5,.016); local newPin=PinX()
+check("boss location moves on the minimap within a tenth of a second (pins refresh 20 times a second)",oldPin and newPin and oldPin>0 and newPin<0)
 AZS_GetWorldAnchors=function() return nil,{code="NOT_READY"} end; AdvanceTime(.016)
 check("unavailable coordinates never retain a stale chasing marker",#SlimSuiteWorld.PointsOfInterest(position,flags)==0)
 AZS_GetWorldAnchors=Anchors

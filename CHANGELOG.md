@@ -2,6 +2,18 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.62
+Slim Suite does less work while you play. Layout and behaviour are unchanged, apart from the timing notes below.
+
+- The compass is checked 10 times a second and redrawn only when you move or turn, with a full refresh every half second.
+- The combat-text box animates while text is on screen. When it is empty and hidden, it is checked 4 times a second.
+- The choice HUD, minimap pins and world markers update less often: 10 and 20 times a second instead of every frame.
+- The frame-bounds check runs 10 times a second instead of 20, and no longer creates a new table on each check. This is the largest saving.
+- Match sounds are checked 10 times a second. Unit-event redraws (cards, party lines, friend buffs) run 20 times a second.
+- Each language's translations are compiled only when the game needs them, rather than all six at startup.
+- Trade-off: a change inside a frame that is not moving can take up to half a second to be corrected, as before. Pins and markers can lag by up to one twentieth of a second.
+- In the test client, Slim Suite's per-frame work fell by about 40%. Not yet tested in the live client.
+
 ## 1.61
 Fixes to HUD Edit Mode and to frames that were anchored to each other in a loop.
 

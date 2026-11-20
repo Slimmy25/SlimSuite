@@ -114,4 +114,4 @@ function SS.UpdateChoiceHUD()
   elseif ( tooltipWas~=nil ) then SS.Safe(AZS_SetOnTopOfScreens,GameTooltip,tooltipWas); tooltipWas=nil; end
  end
 end
-SS.Every("choiceHUD",0,function() SS.UpdateChoiceHUD(); end);
+SS.Every("choiceHUD",0.1,function() SS.UpdateChoiceHUD(); end);

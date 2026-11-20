@@ -121,4 +121,15 @@ function SS.UpdateCompass()
  for i=used+1,table.getn(frame.markers) do frame.markers[i]:Hide(); end
  frame:Show(); if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(frame); end
 end
-SS.Every("compass",0,function() SS.UpdateCompass(); end);
+-- The compass is checked 10 times a second, but only redrawn when the player moves or turns (or every half second, as a safety net).
+local compassKey, compassAt = nil, 0;
+local function CompassTick()
+ local p = type(AZS_GetPlayerPosition)=="function" and AZS_GetPlayerPosition() or nil;
+ if ( type(p)~="table" or type(p.x)~="number" or type(p.y)~="number" ) then SS.UpdateCompass(); compassKey = nil; return; end
+ local now = GetTime();
+ local key = math.floor(p.x*5)..","..math.floor(p.y*5)..","..math.floor((p.facing or 0)*57.3*2)..","..SS.DB().compassStyle..","..(SS.DB().unlocked and 1 or 0)..","..(SS.DB().compassBosses and 1 or 0)..","..(SS.DB().compassLairs and 1 or 0)..","..(SS.DB().compassCaches and 1 or 0);
+ if ( key == compassKey and now - compassAt < 0.5 ) then return; end
+ compassKey, compassAt = key, now;
+ SS.UpdateCompass();
+end
+SS.Every("compass",0.1,CompassTick);
