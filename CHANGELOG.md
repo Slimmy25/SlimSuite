@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.79
+Stacked enemy plates are easier to spot.
+
+- Plates for a group of the same enemy (such as "Plagued Ghoul x24") now sit in a light box with a thin gold border.
+- They stand out more than single enemies but stay quieter than the boss and guardian cards.
+
 ## 1.78
 Clicking an encounter bar targets that boss or guardian again, even when it is far away.
 

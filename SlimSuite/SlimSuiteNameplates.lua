@@ -37,6 +37,8 @@ local function PlateColor(kind)
  elseif ( kind == "boss" or kind == "finalBoss" or kind == "guardian" ) then key = d.plateColorBoss; end
  return PLATE_COLORS[key or ""] or PLATE_COLORS.Red;
 end
+local STACK_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	tile = true, tileSize = 16, edgeSize = 8, insets = { left = 2, right = 2, top = 2, bottom = 2 } };
 local plates, freePlates, requests, registered, plateSerial = {}, {}, {}, false, 0;
 local nativeChoiceApplied;
 local function NewPlate()
@@ -121,6 +123,7 @@ local function UpdatePlateData(record, unit)
  local modern = SS.DB().modernEnemyFrames and true or false;
  local plater = modern and SS.DB().platerStyle ~= false;
  if ( f.modernStyle ~= modern or f.platerStyle ~= plater ) then
+  f.stackBox = nil;
   if ( plater ) then f:SetBackdrop(nil); else f:SetBackdrop(modern and PLATE_BACKDROP or nil); end
   if ( modern and not plater ) then f.panelStyle = nil; SS.ApplyPanelStyle(f); end
   if ( not plater ) then ApplyClassicLayout(f); end
@@ -128,6 +131,17 @@ local function UpdatePlateData(record, unit)
  end
  if ( plater ) then
   ApplyPlaterLayout(f); f.name:Show();
+  -- a stacked mob (one plate for several enemies) gets a light box with a thin border: easier to spot than a
+  -- single enemy, still quieter than the boss and guardian cards
+  local stacked = record.count and record.count > 1 and true or false;
+  if ( f.stackBox ~= stacked ) then
+   f.stackBox = stacked;
+   if ( stacked ) then
+    f:SetBackdrop(STACK_BACKDROP);
+    f:SetBackdropColor(0.03, 0.03, 0.04, 0.55);
+    f:SetBackdropBorderColor(0.85, 0.7, 0.35, 0.85);
+   else f:SetBackdrop(nil); end
+  end
   if ( unit and tonumber(unit.hpm) and tonumber(unit.hpm) > 0 ) then
    f.health:SetStatusBarColor(PlateColor(record.kind)[1], PlateColor(record.kind)[2], PlateColor(record.kind)[3]);
    if ( SS.DB().plateHpText == false ) then f.hpText:Hide(); end
