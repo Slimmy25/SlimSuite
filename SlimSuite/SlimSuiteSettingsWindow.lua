@@ -298,7 +298,9 @@ function SS.WinBuild()
 			{"Boss colour", function() return SS.DB().plateColorBoss or "Purple"; end, function(v) SS.DB().plateColorBoss = v; SS.Safe(SS.UpdateEnemyNameplates); end,
 			 choice={{"Red","Red"},{"Gold","Gold"},{"Purple","Purple"},{"Green","Green"},{"Blue","Blue"},{"White","White"}}},
 			{head="Camera and marks"},
-			{"Camera as far out as it goes (50)", function() return SS.DB().camera; end, function(v) SS.DB().camera = v; SS.Camera(v); end},
+			{"Camera zoom (off gives the game's own camera)", function() return SS.DB().camera; end, function(v) SS.DB().camera = v and true or false; SS.Camera(v); end},
+			{"Camera distance", function() return SS.CameraDistance(); end, function(v) SS.SetCameraDistance(v); end,
+			 choice={{"Close (15)",15},{"Medium (30)",30},{"Far (40)",40},{"Max (50)",50}}},
 			{"Mark pulled bosses and Guardians (Skull, X, Circle, Star)", function() return SS.DB().bossMarks; end, function(v) SS.DB().bossMarks = v; end},
 			{"   ...and Guardians and lairs before they're pulled", function() return SS.DB().prePullMarks; end, function(v) SS.DB().prePullMarks = v; end},
 			{"Raid-mark row when the mouse is over a party member (in a group)", function() return SS.DB().raidRow; end, function(v) SS.DB().raidRow = v and true or false; end},
@@ -428,6 +430,7 @@ SS.HELP = {
 	"/slim layout: manage named profiles and import/export layouts.  /slim layout save <name>, load <name>, delete <name>, list.",
 	"/slim hud: recommended positions for this display.",
 	"/slim reset places, /slim reset all: back to where everything started.",
+	"/slim camera: the distance now. /slim camera <yards>, +, -, <preset>, save <name> [yards], delete <name>, list, on, off.",
 	"/slim hide <words>, /slim unhide <words>, /slim hide: chat lines with those words.",
 	"/slim minimap: the gear button.  /slim errors: the error log.  /slim mouse: names the frame under the cursor.",
 };
@@ -471,6 +474,7 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 	elseif ( cmd == "demo" ) then
 		SS.ToggleDemoMode();
 		K.Print(NAME, SS.demoRunning and "Demo Mode is on. /slim demo turns it off." or "Demo Mode is off.");
+	elseif ( cmd == "camera" ) then SS.CameraCommand(msg and string.sub(msg, 7) or "");
 	elseif ( cmd == "levelup" ) then
 		d.moveLevelButton = not d.moveLevelButton;
 		SS.Safe(SS.UpdateLevelButton); SS.RefreshToggles();
@@ -498,5 +502,46 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		end
 	else
 		SS.Toggle();
+	end
+end
+
+-- /slim camera: the distance, a number of yards, +/- steps of 5, a named preset, or saving and deleting presets.
+function SS.CameraCommand(text)
+	local d = SS.DB();
+	local _, _, word, arg = string.find(string.lower(text or ""), "^%s*(%S*)%s*(.-)%s*$");
+	word = word or "";
+	if ( word == "" ) then
+		K.Print(NAME, "camera distance is " .. SS.CameraDistance() .. " yards (zoom " .. (d.camera and "on" or "off") .. ").");
+		K.Print(NAME, "/slim camera <yards>, +, -, <preset>, save <name> [yards], delete <name>, list, on, off.");
+	elseif ( word == "off" ) then d.camera = false; SS.Camera(false); K.Print(NAME, "camera zoom is the game's own.");
+	elseif ( word == "on" ) then SS.SetCameraDistance(SS.CameraDistance()); K.Print(NAME, "camera zoom is on at " .. SS.CameraDistance() .. " yards.");
+	elseif ( word == "+" or word == "-" ) then
+		SS.SetCameraDistance(SS.CameraDistance() + (word == "+" and 5 or -5));
+		K.Print(NAME, "camera distance is " .. SS.CameraDistance() .. " yards.");
+	elseif ( tonumber(word) ) then
+		local v = SS.SetCameraDistance(tonumber(word));
+		K.Print(NAME, "camera distance is " .. v .. " yards" .. (v ~= tonumber(word) and " (the range is " .. SS.CAMERA_MIN .. " to 50)" or "") .. ".");
+	elseif ( word == "list" ) then
+		local names = {};
+		for k, v in pairs(SS.CameraPresets()) do table.insert(names, k .. " " .. v); end
+		table.sort(names);
+		K.Print(NAME, "camera presets: " .. table.concat(names, ", ") .. ".");
+	elseif ( word == "save" ) then
+		local _, _, name, yards = string.find(arg or "", "^(%a[%w_]*)%s*(%d*)$");
+		if ( not name ) then K.Print(NAME, "usage: /slim camera save <name> [yards]. Names start with a letter."); return; end
+		d.cameraPresets = d.cameraPresets or {};
+		local v = tonumber(yards) or SS.CameraDistance();
+		if ( v < SS.CAMERA_MIN ) then v = SS.CAMERA_MIN; elseif ( v > 50 ) then v = 50; end
+		d.cameraPresets[name] = v;
+		K.Print(NAME, "saved camera preset \"" .. name .. "\" at " .. v .. " yards.");
+	elseif ( word == "delete" ) then
+		local name = string.gsub(arg or "", "%s", "");
+		if ( d.cameraPresets and d.cameraPresets[name] ) then d.cameraPresets[name] = nil; K.Print(NAME, "deleted camera preset \"" .. name .. "\".");
+		else K.Print(NAME, "no saved camera preset called \"" .. name .. "\"."); end
+	else
+		local p = SS.CameraPresets()[word];
+		if ( not p ) then K.Print(NAME, "no camera preset called \"" .. word .. "\". /slim camera list shows them."); return; end
+		SS.SetCameraDistance(p);
+		K.Print(NAME, "camera distance is " .. p .. " yards.");
 	end
 end

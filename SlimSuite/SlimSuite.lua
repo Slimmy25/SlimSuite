@@ -480,7 +480,39 @@ function SS.Camera(zoomOut)
 	end
 	SS.Safe(SetCVar, "cameraDistanceMaxFactor", string.format("%.4f", MAX_CAMERA / base));
 	-- once a session: later loading screens keep whatever zoom the player has chosen since
-	if ( zoomOut and CameraZoomOut and not SS.cameraZoomed ) then SS.cameraZoomed = true; SS.Safe(CameraZoomOut, MAX_CAMERA); end
+	if ( zoomOut and not SS.cameraZoomed ) then SS.cameraZoomed = true; SS.ZoomTo(SS.CameraDistance()); end
+end
+
+-- The chosen distance, in yards, from 5 to the game's 50.
+SS.CAMERA_MIN = 5;
+SS.BUILT_IN_CAMERA_PRESETS = { close = 15, medium = 30, max = 50 };
+function SS.CameraDistance()
+	local v = tonumber(SS.DB().cameraDistance) or MAX_CAMERA;
+	if ( v < SS.CAMERA_MIN ) then v = SS.CAMERA_MIN; elseif ( v > MAX_CAMERA ) then v = MAX_CAMERA; end
+	return v;
+end
+-- Built-in presets, with the player's own saved ones on top.
+function SS.CameraPresets()
+	local t = {};
+	for k, v in pairs(SS.BUILT_IN_CAMERA_PRESETS) do t[k] = v; end
+	for k, v in pairs(SS.DB().cameraPresets or {}) do t[k] = v; end
+	return t;
+end
+-- Zooms in to the closest view, then out to the distance, so it lands there whatever the zoom was before.
+function SS.ZoomTo(yards)
+	if ( not CameraZoomIn or not CameraZoomOut ) then return; end
+	SS.Safe(CameraZoomIn, MAX_CAMERA * 2);
+	SS.Safe(CameraZoomOut, yards);
+end
+-- Sets the distance and applies it now. Used by settings and /slim camera.
+function SS.SetCameraDistance(v)
+	local d = SS.DB();
+	v = math.floor(tonumber(v) or MAX_CAMERA + 0.5);
+	if ( v < SS.CAMERA_MIN ) then v = SS.CAMERA_MIN; elseif ( v > MAX_CAMERA ) then v = MAX_CAMERA; end
+	d.cameraDistance = v; d.camera = true;
+	SS.Camera(false);
+	SS.ZoomTo(v);
+	return v;
 end
 
 function SS.CustomGuardianFlag()
