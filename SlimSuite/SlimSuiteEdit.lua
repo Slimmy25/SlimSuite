@@ -1218,7 +1218,8 @@ function SS.SnapPosition(name, f)
 	local threshold = 18;
 	for i = 1, table.getn(MOVABLE) do
 		local otherName = MOVABLE[i][1];
-		local other = (SS.DB().anchorSnap and otherName ~= name and getglobal(otherName)) or nil;
+		-- the party frames never snap onto other elements when dropped: they jumped to them by accident
+		local other = (SS.DB().anchorSnap and otherName ~= name and name ~= "PartyMemberFrame1" and getglobal(otherName)) or nil;
 		if ( other and SS.DependsOn(otherName, name) ) then other = nil; end   -- it already hangs off this frame: no loop
 		if ( other ) then
 			local ol, oright, ob, ot = RootBounds(other);
@@ -1246,6 +1247,8 @@ function SS.SnapPosition(name, f)
 	local p = { coordinateSpace = "uiParent" };
 	if ( best ) then
 		for k, v in pairs(best) do p[k] = v; end
+		-- logged, so a snap that moved an element by accident can be seen in /slimsuite log
+		if ( SS.LogAction ) then SS.LogAction("Snapped " .. name .. " to " .. best.relative); end
 	else
 		p.x, p.y = left, bottom;
 		if ( SS.DB().gridSnap ) then p.x, p.y = SS.GridRound(left, bottom); end

@@ -20,7 +20,7 @@ check("search shows some rows", matched>0)
 check("search shows only matching rows", wrong==0)
 check("search hides the rest", matched<all)
 typed("")
-check("clearing the search shows every row", visibleRows()==all)
+check("clearing the search shows the chosen category again", visibleRows()>0 and visibleRows()<all)
 -- talents: three trees, only tree 2 has points, so only that tab shows
 GetNumTalentTabs = function() return 3 end
 GetTalentTabInfo = function(i) return "Tree"..i, "", (i==2) and 5 or 0 end

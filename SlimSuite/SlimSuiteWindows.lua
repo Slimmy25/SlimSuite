@@ -37,31 +37,7 @@ function SS.ApplyTalentTrees()
 		end
 	end
 end
--- The Character sheet follows the theme: its own art shows for Original. RPG and Modern make that art transparent and
--- draw their panel behind it. Transparency is changed, never Hide, so the art always comes back.
-local characterArt = nil;
-function SS.ThemeCharacter(f)
-	if ( not f or not f.GetRegions ) then return; end
-	if ( not characterArt ) then
-		characterArt = {};
-		local regions = { f:GetRegions() };
-		for i = 1, table.getn(regions) do
-			local r = regions[i];
-			if ( r and r.GetObjectType and r:GetObjectType() == "Texture" ) then
-				table.insert(characterArt, { tex = r, alpha = r:GetAlpha() or 1 });
-			end
-		end
-	end
-	local styled = SS.StyleKeyFor("CharacterFrame") ~= "original";
-	for i = 1, table.getn(characterArt) do
-		local a = characterArt[i];
-		a.tex:SetAlpha(styled and 0 or a.alpha);
-	end
-	if ( styled ) then SS.ApplyPanelStyle(f); elseif ( f.panelStyle ~= nil ) then f:SetBackdrop(nil); f.panelStyle = nil; end
-end
 Hook("CharacterFrame");
-SS.Safe(SS.ThemeCharacter, getglobal("CharacterFrame"));
-SS.AddThemeHook(function() SS.Safe(SS.ThemeCharacter, getglobal("CharacterFrame")); end, "CharacterFrame");
 Hook("TalentFrame");
 
 -- Optional Gameplay buttons: hide the Bag buttons and the world Map button on the minimap. The game shows them again on

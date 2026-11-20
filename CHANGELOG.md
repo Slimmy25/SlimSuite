@@ -2,6 +2,16 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.77
+HUD Edit shows one category at a time, party frames stop snapping by accident, and the spacing slider is easier to read.
+
+- HUD Edit has Original, Aethus, Custom and Other buttons side by side. One category's elements show below at a time.
+- Party frames no longer snap onto other elements when dropped.
+- Snaps are written to the action log, so accidental ones can be found with /slimsuite log.
+- The party spacing slider is larger and shows its value on a labelled line.
+- The Character sheet and the player and target cards keep their default look; they no longer follow the themes.
+- Not yet tested in the live client: all of the above. Party member 1 still shows without its name and portrait.
+
 ## 1.76
 The player and target cards use the game's frame art and follow the themes. The Character sheet follows the themes too.
 

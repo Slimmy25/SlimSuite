@@ -129,11 +129,13 @@ local function SectionOf(name)
  return "other";
 end
 
+-- Short names for the category buttons, side by side. One category shows at a time: its elements sit below the buttons.
+local SHORT = { original = "Original", aethus = "Aethus", custom = "Custom", other = "Other" };
 function SS.HUDLayout()
  SS.HUDApplyChains();
  if ( not hud ) then return; end
  local d = SS.DB();
- d.hudSections = d.hudSections or {};
+ local chosen = d.hudSection or "original";
  -- group the visible rows by section, keeping the saved order inside each section
  local groups = {};
  for _, sec in ipairs(SECTIONS) do groups[sec.key] = {}; end
@@ -143,49 +145,37 @@ function SS.HUDLayout()
    if ( Matches(name) ) then table.insert(groups[SectionOf(name)], name); end
   end
  end
- -- clickable section headers, created once
+ -- the category buttons, side by side, made once
  hud.sections = hud.sections or {};
- local y = 4;
- for _, sec in ipairs(SECTIONS) do
-  local open = d.hudSections[sec.key] ~= false;
-  local list = groups[sec.key];
-  local header = hud.sections[sec.key];
-  -- Other only appears when an element is in none of the sections
-  if ( sec.key == "other" and table.getn(list) == 0 ) then
-   if ( header ) then header:Hide(); end
-   break;
-  end
-  if ( not header ) then
+ local n = table.getn(SECTIONS);
+ local width = math.floor((340 - (n - 1) * 3) / n);
+ for i, sec in ipairs(SECTIONS) do
+  local b = hud.sections[sec.key];
+  if ( not b ) then
    local key = sec.key;
-   header = K.Button(hud.child, "", 116, function()
-    SS.DB().hudSections[key] = (SS.DB().hudSections[key] == false);
-    SS.HUDLayout();
-   end);
-   hud.sections[sec.key] = header;
+   b = K.Button(hud, "", width, function() SS.DB().hudSection = key; SS.HUDLayout(); end);
+   hud.sections[sec.key] = b;
   end
-  header:Show();
-  header:ClearAllPoints();
-  header:SetHeight(16);
-  header:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6, -y);
-  header:SetText((open and "v  " or ">  ") .. SS.T(sec.title) .. "  (" .. table.getn(list) .. ")");
-  y = y + 20;
-  -- three columns of elements under the header, filled top to bottom
-  local n = table.getn(list);
-  local perCol = math.max(1, math.ceil(n / 3));
-  for i, name in ipairs(list) do
-   local r = rows[name];
-   if ( open ) then
-    local col = math.floor((i - 1) / perCol);
-    local idx = (i - 1) - col * perCol;
-    r.frame:ClearAllPoints();
-    r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 116, -(y + idx * ROW));
-    r.frame:Show();
-    RefreshRow(r);
-   end
-  end
-  if ( open and n > 0 ) then y = y + perCol * ROW + 8; else y = y + 4; end
+  b:SetWidth(width); b:ClearAllPoints();
+  b:SetPoint("TOPLEFT", hud, "TOPLEFT", 10 + (i - 1) * (width + 3), -108);
+  local count = table.getn(groups[sec.key]);
+  b:SetText(SS.T(SHORT[sec.key] or sec.key) .. " (" .. count .. ")");
+  if ( sec.key == chosen ) then b:LockHighlight(); else b:UnlockHighlight(); end
+  if ( sec.key == "other" and count == 0 ) then b:Hide(); else b:Show(); end
  end
- hud.child:SetHeight(math.max(20, y + 8));
+ -- the chosen category's elements, in three columns, below the buttons
+ local list = groups[chosen] or {};
+ local perCol = math.max(1, math.ceil(table.getn(list) / 3));
+ for i, name in ipairs(list) do
+  local r = rows[name];
+  local col = math.floor((i - 1) / perCol);
+  local idx = (i - 1) - col * perCol;
+  r.frame:ClearAllPoints();
+  r.frame:SetPoint("TOPLEFT", hud.child, "TOPLEFT", 6 + col * 116, -(idx * ROW));
+  r.frame:Show();
+  RefreshRow(r);
+ end
+ hud.child:SetHeight(math.max(20, perCol * ROW + 8));
 end
 
 local function RefreshAll()
@@ -244,12 +234,9 @@ end
 -- Setup: hides every element, Slim Suite's, Aethus's and the game's own, so each one can be turned on by hand.
 local function SetupAllDisabled()
  SS.hudHideAll = true;
- local sections = SS.DB().hudSections or {};
- SS.DB().hudSections = sections;
- for _, sec in ipairs(SECTIONS) do sections[sec.key] = true; end
+ SS.DB().hudSection = "original";
  SU.batching = true;
  for _, name in ipairs(ElementList()) do
-  -- the Character sheet is not hidden: its alternative layout is gone, so it stays as it is
   -- the Character sheet is not hidden: its alternative layout is gone, so it stays as it is
   -- Chat stays usable, so you can always type; a chat that was disabled comes back to default
   if ( name == "ChatFrame1" ) then

@@ -370,8 +370,7 @@ function SS.MakeCards()
 		end
 		-- the game's own scale for these frames, used until the player changes this card's scale
 		if ( SS.DB().scales[name] == nil and native and native.GetScale ) then SS.DB().scales[name] = native:GetScale() or 1; end
-		-- Original shows the game's art; RPG and Modern hide it and draw their panel behind the bars instead
-		SS.OwnLook(f, function() f.art:Show(); end, { f.art });
+		f.art:Show();
 		f.unit = unit;
 		f:EnableMouse(true);
 		f:RegisterForClicks("LeftButtonUp", "RightButtonUp");

@@ -195,19 +195,20 @@ function SU.Focus(frame)
 	do
 		if ( SU.gapSlider == nil ) then
 			local s = CreateFrame("Slider", "SlimSuitePartyGapSlider", SU.panel, "OptionsSliderTemplate");
-			s:SetWidth(170); s:SetHeight(14);
+			s:SetWidth(200); s:SetHeight(18);
 			s:SetMinMaxValues(0, 30); s:SetValueStep(1);
 			local low, high = getglobal("SlimSuitePartyGapSliderLow"), getglobal("SlimSuitePartyGapSliderHigh");
 			if ( low ) then low:SetText("0"); end
 			if ( high ) then high:SetText("30"); end
-			s.titleText = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
-			s.titleText:SetPoint("BOTTOMLEFT", s, "TOPLEFT", 2, 4);
-			s.titleText:SetText(SS.T("Space between players"));
-			s.valueText = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+			-- one clear line of text above the bar, with the number it is set to: "Space between players: 4"
+			s.titleText = s:CreateFontString(nil, "OVERLAY", "GameFontNormal");
+			s.titleText:SetPoint("BOTTOMLEFT", s, "TOPLEFT", 0, 6);
+			s.valueText = s:CreateFontString(nil, "OVERLAY", "GameFontNormal");
 			s.valueText:SetPoint("LEFT", s, "RIGHT", 10, 0);
 			s:SetScript("OnValueChanged", function()
 				local v = math.floor(this:GetValue() + 0.5);
 				this.valueText:SetText(tostring(v));
+				this.titleText:SetText(SS.T("Space between players") .. ": " .. tostring(v));
 				if ( this.building ) then return; end
 				SS.DB().partyGap = v; SS.MarkProfileDirty();
 				SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
@@ -217,11 +218,12 @@ function SU.Focus(frame)
 		local s = SU.gapSlider;
 		local show = frame == "PartyMemberFrame1" and (not setupActive or mode == "enabled") and SS.Look("PartyMemberFrame1") ~= "thin";
 		if ( show ) then
-			s:ClearAllPoints(); s:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 22, -(h + 14));
+			s:ClearAllPoints(); s:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 22, -(h + 26));
 			s:SetParent(SU.panel);
-			s.building = true; s:SetValue(SS.PartyGap()); s.valueText:SetText(tostring(SS.PartyGap())); s.building = false;
+			s.building = true; s:SetValue(SS.PartyGap()); s.valueText:SetText(tostring(SS.PartyGap()));
+			s.titleText:SetText(SS.T("Space between players") .. ": " .. tostring(SS.PartyGap())); s.building = false;
 			s:Show(); s.titleText:Show();
-			h = h + 36;
+			h = h + 50;
 		else
 			s:Hide();
 		end

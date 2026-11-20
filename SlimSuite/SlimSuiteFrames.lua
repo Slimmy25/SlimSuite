@@ -1921,8 +1921,16 @@ function SS.AttachBuffs()
 	if ( side == "above" ) then
 		local portrait = SS.DB().partyIncludesSelf and anchor or SS.UnitPortrait(anchor);
 		-- the game refuses an anchor that loops back (the portrait hangs off the buffs): fall back to a fixed spot
-		local ok = SS.Safe(BuffFrame.SetPoint, BuffFrame, "BOTTOMLEFT", portrait, "TOPLEFT", portrait == anchor and x or 0, 2);
-		if ( not ok ) then BuffFrame:ClearAllPoints(); BuffFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 200); end
+		-- checked first: the game reports a looping anchor as an error it does not hand back to us
+		local loops = false;
+		if ( portrait and portrait.GetNumPoints ) then
+			for i = 1, portrait:GetNumPoints() do
+				local _, anchorTo = portrait:GetPoint(i);
+				if ( anchorTo == BuffFrame ) then loops = true; break; end
+			end
+		end
+		if ( loops or not portrait ) then BuffFrame:ClearAllPoints(); BuffFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 200);
+		else BuffFrame:SetPoint("BOTTOMLEFT", portrait, "TOPLEFT", portrait == anchor and x or 0, 2); end
 	elseif ( side == "left" ) then BuffFrame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -4, 0);
 	elseif ( side == "right" ) then BuffFrame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 4, 0);
 	else BuffFrame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x, -2); end
