@@ -173,6 +173,18 @@ end
 
 -- a card's contents follow its size: the portrait fills its height, the name and the bars take the rest
 function SS.LayoutCard(f)
+	if ( f.nativeArt ) then
+		-- the default frame's bars: the player's start 106 from the left, the target's 7; both 119 wide and 12 high
+		local left = f.unit == "target" and 7 or 106;
+		f.model:Hide();
+		f.hp:ClearAllPoints(); f.hp:SetPoint("TOPLEFT", f, "TOPLEFT", left, -41); f.hp:SetWidth(119); f.hp:SetHeight(12);
+		f.power:ClearAllPoints(); f.power:SetPoint("TOPLEFT", f, "TOPLEFT", left, -52); f.power:SetWidth(119); f.power:SetHeight(12);
+		f.name:ClearAllPoints(); f.name:SetPoint("TOPLEFT", f, "TOPLEFT", left, -26); f.name:SetWidth(119);
+		local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF";
+		f.name:SetFont(font, 10);
+		f.hpText:SetFont(font, 8);
+		return;
+	end
 	local w, h = f:GetWidth() or 180, f:GetHeight() or 44;
 	local portraits = SS.DB().cardPortraits ~= false;
 	if ( f.laidW == w and f.laidH == h and f.laidP == portraits ) then return; end
@@ -208,7 +220,7 @@ function SS.RefreshCard(f)
 	if ( mode == "disabled" or (setupActive and not SS.SetupShows(el)) ) then f:Hide(); return; end
 	SS.Safe(SS.LayoutCard, f);
 	local unit = f.unit;
-	SS.Safe(SS.UpdateCardModel, f, unit);
+	if ( not f.nativeArt ) then SS.Safe(SS.UpdateCardModel, f, unit); end
 	if ( not UnitExists(unit) ) then
 		if ( unit == "target" and SS.Previewing("TargetFrame") ) then
 			local t = SU.SAMPLE_TARGET;
@@ -345,12 +357,21 @@ function SS.MakeCards()
 	if ( getglobal("SlimSuitePlayerCard") ) then return; end
 	local function Make(name, unit)
 		local f = CreateFrame("Button", name, UIParent);
-		f:SetWidth(unit == "player" and 160 or 180); f:SetHeight(44); f:SetFrameStrata("MEDIUM");
-		SS.OwnLook(f, function()
-		f:SetBackdrop(SU.CARD_BACKDROP);
-		f:SetBackdropColor(0.05, 0.05, 0.05, 0.9);
-		f:SetBackdropBorderColor(0.85, 0.65, 0.2, 1);
-		end);
+		-- the default frame's size and art, measured from the game's own frames (232 x 100 at its usual scale)
+		f.nativeArt = true;
+		f:SetWidth(232); f:SetHeight(100); f:SetFrameStrata("MEDIUM");
+		local native = getglobal(unit == "player" and "PlayerFrame" or "TargetFrame");
+		local art = getglobal(unit == "player" and "PlayerFrameTexture" or "TargetFrameTexture");
+		f.art = f:CreateTexture(nil, "BACKGROUND"); f.art:SetAllPoints(f);
+		f.art:SetTexture((art and art.GetTexture and art:GetTexture()) or "Interface\\TargetingFrame\\UI-TargetingFrame");
+		if ( art and art.GetTexCoord ) then
+			local ok, a, b, c, d, e, g, h, i = SS.Safe(function() return art:GetTexCoord(); end);
+			if ( ok and a ) then f.art:SetTexCoord(a, b, c, d, e, g, h, i); end
+		end
+		-- the game's own scale for these frames, used until the player changes this card's scale
+		if ( SS.DB().scales[name] == nil and native and native.GetScale ) then SS.DB().scales[name] = native:GetScale() or 1; end
+		-- Original shows the game's art; RPG and Modern hide it and draw their panel behind the bars instead
+		SS.OwnLook(f, function() f.art:Show(); end, { f.art });
 		f.unit = unit;
 		f:EnableMouse(true);
 		f:RegisterForClicks("LeftButtonUp", "RightButtonUp");

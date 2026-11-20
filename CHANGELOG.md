@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.76
+The player and target cards use the game's frame art and follow the themes. The Character sheet follows the themes too.
+
+- The player and target cards match the default frames' size and bar positions.
+- The cards show the game's own art for Original, and RPG or Modern panels otherwise.
+- The Character sheet is no longer hidden by Setup, and it follows the RPG and Modern themes.
+- Not yet tested in the live client: all of the above, including the card name and portrait, which are still approximate.
+
 ## 1.75
 Fixes a repeating placement error, keeps chat usable during Setup, and sends frame sizes to the action log.
 
