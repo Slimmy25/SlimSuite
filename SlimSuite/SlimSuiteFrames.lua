@@ -1746,6 +1746,13 @@ function SS.Place(name, ignoreAnchor)
 	end
 	if ( p.displayDefault and not p.relative and SS.PlaceDisplayDefault ) then SS.PlaceDisplayDefault(name, f); return; end
 	local relative = not ignoreAnchor and p.relative and getglobal(p.relative) or nil;
+	-- A frame cannot hang off a frame that already hangs off it (the buffs joined to the player frame): skip that anchor
+	if ( relative and relative.GetNumPoints ) then
+		for i = 1, relative:GetNumPoints() do
+			local _, anchorTo = relative:GetPoint(i);
+			if ( anchorTo == f ) then relative = nil; break; end
+		end
+	end
 	if ( relative and p.point and p.relativePoint ) then
 		f:ClearAllPoints();
 		local factor = RootFactor(f);

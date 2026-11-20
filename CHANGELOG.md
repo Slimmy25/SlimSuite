@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.75
+Fixes a repeating placement error, keeps chat usable during Setup, and sends frame sizes to the action log.
+
+- Fixes the repeating "BuffFrame is dependent on this" error when the layout is restored.
+- Setup keeps the chat window and typing box usable.
+- /slimsuite framesize writes its numbers to the action log (/slimsuite log).
+- Not yet tested in the live client: all of the above.
+
 ## 1.74
 Adds a party spacing slider, a frame measuring command, and fixes for the action bar, mirrored frames and Setup.
 

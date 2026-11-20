@@ -250,7 +250,11 @@ local function SetupAllDisabled()
  SU.batching = true;
  for _, name in ipairs(ElementList()) do
   -- the Character sheet is not hidden: its alternative layout is gone, so it stays as it is
-  if ( name ~= "CharacterFrame" ) then SU.SetMode(name, "disabled", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
+  -- the Character sheet is not hidden: its alternative layout is gone, so it stays as it is
+  -- Chat stays usable, so you can always type; a chat that was disabled comes back to default
+  if ( name == "ChatFrame1" ) then
+   if ( SU.Mode(name) == "disabled" ) then SU.SetMode(name, "default", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
+  elseif ( name ~= "CharacterFrame" ) then SU.SetMode(name, "disabled", SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
  end
  SU.batching = false;
  SS.Safe(SS.RefreshEditHandles);
