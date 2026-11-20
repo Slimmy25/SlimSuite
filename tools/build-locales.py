@@ -40,7 +40,8 @@ for path in sorted((root / 'locales').glob('*.json')):
 lines.append('SS.LOCALE_TEXT = setmetatable({}, { __index = function(t, code)')
 lines.append(' local src = SS.LOCALE_SOURCE[code];')
 lines.append(' if ( not src ) then return nil; end')
-lines.append(' local chunk = loadstring(src);')
+lines.append(' local compile = loadstring or load;');
+lines.append(' local chunk = compile(src);')
 lines.append(' local dict = (chunk and chunk()) or {};')
 lines.append(' rawset(t, code, dict);')
 lines.append(' return dict;')

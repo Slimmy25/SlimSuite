@@ -9,7 +9,8 @@ SS.LOCALE_SOURCE.ptBR = "return {\n [\"   ...and Guardians and lairs before they
 SS.LOCALE_TEXT = setmetatable({}, { __index = function(t, code)
  local src = SS.LOCALE_SOURCE[code];
  if ( not src ) then return nil; end
- local chunk = loadstring(src);
+ local compile = loadstring or load;
+ local chunk = compile(src);
  local dict = (chunk and chunk()) or {};
  rawset(t, code, dict);
  return dict;
