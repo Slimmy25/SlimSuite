@@ -2,7 +2,7 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
-## 1.53
+## 1.54
 Settings are in one Slim Suite category organised by function, enemy nameplates are slimmer, and the camera distance is adjustable.
 - Settings window: one Slim Suite category with subcategories for Interface, Nameplates, Gameplay, Chat, Sound and Accessibility, in the look of the game's options window.
 - Defaults: each subcategory has a Defaults button that resets only its own settings.

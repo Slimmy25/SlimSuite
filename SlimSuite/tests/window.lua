@@ -27,5 +27,5 @@ for round = 1, 3 do
 end
 SS.ENV.win:Show(); SS.OpenModulePage(module)
 end
-assert(visited==5,"all module pages reviewed")
+assert(visited==#SS.MODULE_ORDER,"all module pages reviewed")
 print("window problems: " .. bad)
