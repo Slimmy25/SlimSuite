@@ -56,6 +56,23 @@ function SS.HideElementMenu()
 	SU.focus, SU.placedFor = nil, nil;
 end
 
+-- Arrow keys move the element being edited one pixel (Shift for ten). Only while its menu is open.
+SU.nudge = CreateFrame("Frame", "SlimSuiteNudgeKeys", UIParent);
+if ( SU.nudge.EnableKeyboard ) then SU.nudge:EnableKeyboard(true); end
+SU.nudge:SetScript("OnKeyDown", function()
+	local f = SU.focus;
+	if ( not f or not SU.panel or not SU.panel:IsShown() or not f.GetLeft ) then return; end
+	local key = arg1;
+	local step = (IsShiftKeyDown and IsShiftKeyDown()) and 10 or 1;
+	local dx, dy = 0, 0;
+	if ( key == "LEFT" ) then dx = -step; elseif ( key == "RIGHT" ) then dx = step;
+	elseif ( key == "UP" ) then dy = step; elseif ( key == "DOWN" ) then dy = -step; else return; end
+	local l, b = f:GetLeft(), f:GetBottom();
+	if ( not l or not b ) then return; end
+	f:ClearAllPoints(); f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l + dx, b + dy);
+	local name = f.GetName and f:GetName();
+	if ( name and SS.SavePosition ) then SS.SavePosition(name, f); end
+end);
 function SU.Focus(frame)
  if ( not frame and setupActive ) then
   SU.focus=nil; if ( SU.panel ) then SU.panel:Hide(); end
@@ -63,6 +80,17 @@ function SU.Focus(frame)
   return;
  end
 	SU.focus = frame;
+	-- a gold outline marks the element being edited, so it is easy to see which one the arrow keys move
+	if ( not SU.outline ) then
+		SU.outline = CreateFrame("Frame", "SlimSuiteFocusOutline", UIParent);
+		SU.outline:SetFrameStrata("TOOLTIP"); SU.outline:EnableMouse(false);
+		SU.outline:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 2 });
+		SU.outline:SetBackdropBorderColor(1, 0.82, 0.2, 1);
+		SU.outline:Hide();
+	end
+	if ( frame ) then
+		SU.outline:ClearAllPoints(); SU.outline:SetAllPoints(frame); SU.outline:Show();
+	else SU.outline:Hide(); end
 	local e;
 	for i = 1, table.getn(SU.elements or {}) do if ( SU.elements[i].frame == frame ) then e = SU.elements[i]; end end
 	if ( not e and frame and not setupActive ) then
@@ -149,6 +177,27 @@ function SU.Focus(frame)
 			h = h + 34;
 		else
 			lb.elementName = nil; lb:Hide();
+		end
+	end
+	-- one click puts this element back to its default place, size and look
+	do
+		if ( SU.resetButton == nil ) then
+			SU.resetButton = K.Button(SU.panel, "", 240, function()
+				local cur = SU.resetButton.elementName;
+				if ( not cur ) then return; end
+				SS.ResetElement(cur); SS.SetElementLook(cur, nil); SU.Focus(SU.focus);
+			end);
+		end
+		local rb = SU.resetButton;
+		local name = frame and frame.GetName and frame:GetName();
+		if ( name and SS.IsLookElement(name) and (not setupActive or mode == "enabled") ) then
+			rb.elementName = name; rb:SetText(SS.T("Reset this element"));
+			rb:ClearAllPoints();
+			rb:SetPoint("TOPLEFT", SU.lookButton, "BOTTOMLEFT", 0, -6);
+			rb:SetParent(SU.panel); rb:Show();
+			h = h + 34;
+		else
+			rb.elementName = nil; rb:Hide();
 		end
 	end
 	-- the size & layout tools, under the settings

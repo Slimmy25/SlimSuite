@@ -15,7 +15,7 @@ function SS.LayoutPage(page)
 	local show = {};
 	for i = 1, table.getn(rows) do
 		local r = rows[i];
-		show[i] = not (r.up and not r.up());
+		show[i] = not (r.up and not r.up()) and SS.RowMatches(r);
 	end
 	local y = page.startY;
 	for i = 1, table.getn(rows) do
@@ -60,6 +60,33 @@ function SS.LayoutPage(page)
 	return y;
 end
 
+-- Short explanations shown when a setting is hovered, keyed by the setting's label.
+SS.TIPS = {
+	["Panel style (Slim Suite panels)"] = "Original keeps each element as it was. RPG and New School restyle Slim Suite's panels. Each element can override this from its right-click menu.",
+	["Window text size"] = "Makes the Slim Suite windows and the setup panel bigger or smaller. Game text is not changed.",
+	["Critical hits are bigger and stay longer"] = "Critical hit numbers are drawn larger and stay on screen for longer than normal hits.",
+	["Also write the numbers in the combat log"] = "Adds each combat number to the game's combat log as well as the floating text.",
+};
+-- Keeps the text size of the Slim Suite windows in step with the chosen size.
+function SS.SetTextScale(v)
+	SS.DB().uiTextScale = v or 1;
+	local win = getglobal("SlimSuiteFrame"); if ( win and win.SetScale ) then win:SetScale(SS.DB().uiTextScale); end
+	if ( SU.panel and SU.panel.SetScale ) then SU.panel:SetScale(SS.DB().uiTextScale); end
+end
+-- A settings row is hidden while the search box does not match its label. Headings stay if a row under them shows.
+SS.searchText = "";
+function SS.RowMatches(r)
+	local q = SS.searchText;
+	if ( not q or q == "" or r.kind == "head" ) then return true; end
+	local t = "";
+	if ( r.cb and r.cb.label and r.cb.label.GetText ) then t = r.cb.label:GetText() or "";
+	elseif ( r.fs and r.fs.GetText ) then t = r.fs:GetText() or ""; end
+	return string.find(string.lower(t), q, 1, true) ~= nil;
+end
+function SS.RelayoutAllPages()
+	if ( not SS.pages ) then return; end
+	for i = 1, table.getn(SS.pages) do SS.LayoutPage(SS.pages[i]); end
+end
 function SS.Check(parent, label, y, get, set, indent)
 	local cb, ok = K.Templated("CheckButton", nil, parent, "UICheckButtonTemplate");
 	if ( not ok or not cb.SetChecked ) then
@@ -76,6 +103,10 @@ function SS.Check(parent, label, y, get, set, indent)
 	fs:SetPoint("TOPLEFT", cb, "TOPRIGHT", 4, -4);
 	fs:SetWidth(350); fs:SetHeight(28); fs:SetJustifyH("LEFT"); fs:SetText(SS.T(label));
 	cb.label = fs;
+	-- hovering a setting explains it, when a description is written in SS.TIPS
+	local tip = SS.TIPS and SS.TIPS[label];
+	cb:SetScript("OnEnter", function() if ( tip ) then SS.ShowWarnTip(this, SS.T(tip)); end end);
+	cb:SetScript("OnLeave", function() SS.HideWarnTip(); end);
 	cb:SetScript("OnShow", function() this:SetChecked(get() and 1 or nil); end);
 	cb.get = get;
 	SS.TrackToggle(cb);
@@ -125,6 +156,11 @@ function SS.SoundPreviewIcon(parent,key)
 end
 function SS.WinBuild()
  win=K.Window("SlimSuiteFrame","Slim Suite",470,560);
+ local search=CreateFrame("EditBox","SlimSuiteSettingsSearch",win,"InputBoxTemplate");
+ search:SetWidth(150); search:SetHeight(20); search:SetPoint("TOPRIGHT",win,"TOPRIGHT",-22,-30);
+ search:SetAutoFocus(false); search:SetMaxLetters(40);
+ search:SetScript("OnTextChanged",function() SS.searchText=string.lower(this:GetText() or ""); SS.RelayoutAllPages(); end);
+ search:SetScript("OnEscapePressed",function() this:SetText(""); this:ClearFocus(); end);
  local hero=K.Hero(win,380); hero:SetWidth(430); hero:SetPoint("TOPLEFT",win,"TOPLEFT",20,-30);
  K.Icon(hero.icon,"INV_Misc_Gear_02"); hero.heading:SetText("Slim Suite"); hero.line:SetText(SS.T("Choose a module to open its settings."));
  hero.version=hero:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); hero.version:SetPoint("TOPRIGHT",hero,"TOPRIGHT",-9,-8); hero.version:SetText("v"..SS.AddonVersion());
@@ -225,6 +261,8 @@ function SS.WinBuild()
 			{button="Reload for changes", onClick=function() if ( ReloadUI ) then ReloadUI(); end end},
 			{"Panel style (Slim Suite panels)", function() return SS.PanelStyleKey(); end, function(v) SS.SetPanelStyle(v); end,
 			 choice={{"Original","original"},{"RPG","meter"},{"New School","tooltip"}}},
+			{"Window text size", function() return SS.DB().uiTextScale or 1; end, function(v) SS.SetTextScale(v); end,
+			 choice={{"Normal",1},{"Large",1.25},{"Larger",1.5}}},
 			{head="Chat mods"},
 			{"No level-up stat bonuses in chat", function() return SS.DB().hideLevel;end,function(v) SS.DB().hideLevel=v;end},
 			{"No new spell lines in chat", function() return SS.DB().hideNewSpells;end,function(v) SS.DB().hideNewSpells=v;end},
