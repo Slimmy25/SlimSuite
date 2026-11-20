@@ -12,7 +12,7 @@ end
 
 local function Load()
 	if ( frame ) then return; end
-	frame = CreateFrame("Model", "SlimSuiteCompanionFrame", UIParent);
+	frame = CreateFrame("PlayerModel", "SlimSuiteCompanionFrame", UIParent);   -- PlayerModel is the type that has SetUnit
 	frame:SetWidth(120); frame:SetHeight(160);
 	local store = Store();
 	if ( store.x and store.y ) then

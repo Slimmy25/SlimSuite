@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.69
+Fixes the companion, which failed to load its model.
+
+- The companion now uses the unit model frame type, so it can show your character.
+- Not yet tested in the live client: the dance animation number, and whether the model shows your character.
+
 ## 1.68
 A small companion: a 3D copy of your character on screen, with a dance button.
 
