@@ -705,7 +705,13 @@ proc.pips = {};
 proc.bar = CreateFrame("StatusBar", nil, proc);
 proc.bar:SetAllPoints(proc);
 proc.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar");
-proc.bar.bg = proc.bar:CreateTexture(nil, "BACKGROUND"); proc.bar.bg:SetAllPoints(proc.bar); proc.bar.bg:SetTexture(0, 0, 0, 0.5);
+proc.bar.bg = proc.bar:CreateTexture(nil, "BACKGROUND"); proc.bar.bg:SetAllPoints(proc.bar);
+-- the empty part of the bar follows the chosen look; Original keeps its dark tint exactly
+SS.AddThemeHook(function(key)
+	local s = SS.PANEL_STYLES[key];
+	if ( key == "original" or not s ) then proc.bar.bg:SetTexture(0, 0, 0, 0.5);
+	else proc.bar.bg:SetTexture(s.color[1], s.color[2], s.color[3], 0.9); end
+end, "SlimSuiteProcMeter");
 proc.text = proc:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 proc.text:SetPoint("LEFT", proc, "RIGHT", 4, 0);
 proc:Hide();
