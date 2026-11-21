@@ -41,7 +41,7 @@ do
 end
 local oldLeft, oldBottom = UIParent.GetLeft, UIParent.GetBottom
 UIParent.GetLeft = function() return 100 end; UIParent.GetBottom = function() return 80 end
-SS.ENV.SetRootPosition(SlimSuiteClockFrame, 140, 110)
+SS.SetRootPosition(SlimSuiteClockFrame, 140, 110)
 local rootPoint = SlimSuiteClockFrame.points and SlimSuiteClockFrame.points[1]
 check("root placement uses UIParent-relative coordinates", rootPoint and rootPoint[4] == 140 and rootPoint[5] == 110)
 local oldWidth, oldHeight = UIParent.GetWidth, UIParent.GetHeight
@@ -129,7 +129,7 @@ check("restoring it", shown.localClock ~= false)
 
 -- Announcements have distinct Enabled/Disabled/Default semantics, including incoming events.
 do
-	local setup = SS.ENV.SU
+	local setup = SS.SU
 	setup.SetMode("SlimSuiteAnnouncementFrame", "enabled", "Announcements")
 	check("enabling announcements immediately hides native banners", shown.banners == false)
 	SS.ShowAnnouncement({ id = "visibility-enabled", text = "Enabled banner" })
@@ -161,7 +161,7 @@ check("Imp has its own line", names.Imp == 1)
 SS.StopDemoMode(); Tick(2)
 print("meter problems: " .. bad)
 -- in the setup, your player frame joined to the party says Connected and names the party
-local function upv(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
+local function upv(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS[want] end if n == want then return v end i = i + 1 end end
 local SU = upv(SS.SetupHide, "SU")
 SS.StartSetup(true); Tick(3)
 SS.SetPartySelf(true); Tick(2); SU.RefreshBar()
@@ -210,7 +210,7 @@ print("demo problems: " .. bad)
 -- the shared private names stay out of the game's globals
 local G = _G
 check("private names are not global", rawget(G, "SU") == nil and rawget(G, "win") == nil and rawget(G, "PlaceAll") == nil)
-check("they are shared between the files", SS.ENV.SU ~= nil and type(SS.ENV.PlaceAll) == "function")
+check("they are shared between the files", SS.SU ~= nil and type(SS.PlaceAll) == "function")
 print("env problems: " .. bad)
 -- unit frames redraw on the game's events, not only on the timer
 local calls = 0; local old = SS.RefreshCard
@@ -283,7 +283,7 @@ SlimSuiteMinimapBarList={collected}
 SS.LayoutMinimapBar()
 check("previously collected buttons regain their parent and anchor",collected:GetParent()==Minimap and collected.points[1][2]==Minimap and not collected.slimBarOrig)
 check("collection element is absent from setup registry",not SS.ELEMENTS.SlimSuiteMinimapBar)
-for _,entry in ipairs(SS.ENV.SU.ChecksFor("MinimapCluster")) do
+for _,entry in ipairs(SS.SU.ChecksFor("MinimapCluster")) do
  check("minimap settings have no collection control",entry[1]~="Minimap buttons")
 end
 print("corral problems: " .. bad)
@@ -351,7 +351,7 @@ SS.DB().elementModes.SlimSuiteClockFrame = "enabled"
 SS.DB().elementModes.MinimapCluster = "enabled"
 SS.DB().elementModes.SlimSuiteReviveFrame = "enabled"
 SS.StartDemoMode(); Tick(4, 0.25)
-local b1 = SS.BOSS_SAMPLE[1][2]; local k1 = SS.TALLY_SAMPLE.kills; local t1 = SS.ENV.SU.SAMPLE_TARGET.hp; local run1 = SS.demoClock.run; local nb1 = SS.demoClock.nextBoss
+local b1 = SS.BOSS_SAMPLE[1][2]; local k1 = SS.TALLY_SAMPLE.kills; local t1 = SS.SU.SAMPLE_TARGET.hp; local run1 = SS.demoClock.run; local nb1 = SS.demoClock.nextBoss
 local downOnly, tallyUp = true, true
 for i = 1, 40 do
 	local before, kb = SS.BOSS_SAMPLE[1][2], SS.TALLY_SAMPLE.kills

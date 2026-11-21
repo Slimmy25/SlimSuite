@@ -1,5 +1,5 @@
 -- Bounded unit-frame aura layout. All collision calculations use physical screen units.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 local function Rect(frame)
 	if ( not frame or not frame.GetLeft ) then return nil; end
 	local l = frame:GetLeft(); local r=frame.GetRight and frame:GetRight();
@@ -43,7 +43,7 @@ function SS.AuraObstacles(owner)
 	for i=1,4 do Add(getglobal("PartyMemberFrame"..i)); end
 	local lines=getglobal("SlimSuitePartyLines");
 	if ( Visible(lines) ) then for _, line in ipairs(lines.lines or {}) do Add(line); end end
-	for _,entry in ipairs(MOVABLE or {}) do
+	for _,entry in ipairs(SS.MOVABLE or {}) do
 		local name=entry[1];
 		-- Aura owners and the thin-party container are handled above; tooltips are intentional popovers.
 		if ( name~="BuffFrame" and name~="GameTooltip" and name~="SlimSuitePartyLines" ) then Add(getglobal(name)); end

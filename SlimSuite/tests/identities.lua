@@ -1,7 +1,7 @@
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
 SS.SetupEnd(true)
-local d=SS.DB(); SS.ENV.SU.SetMode("SlimSuiteMeterFrame","enabled","Damage meter")
+local d=SS.DB(); SS.SU.SetMode("SlimSuiteMeterFrame","enabled","Damage meter")
 local context={runId="pets",uiSessionId=1,counterEpoch=1,authorityId=1,localOwnerId="H1"}
 local snapshot={context=context,actors={H1={kind="hero",name="Player"},P1={kind="pet",name="Imp",summonKey="imp"},P2={kind="pet",name="Imp",summonKey="imp"}},sources={a={name="Melee"},b={name="Firebolt"}},rows={
  {ownerId="H1",actorId="P1",sourceKey="a",displayAmount=10},

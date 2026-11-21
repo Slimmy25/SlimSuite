@@ -1,19 +1,19 @@
 -- Slim Suite: starting up, the slash commands, Demo Mode and raid marks.
-if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one set of private names (SS.ENV, in SlimSuiteCore.lua)
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 
-loader = CreateFrame("Frame");
-loader:RegisterEvent("VARIABLES_LOADED");
-loader:RegisterEvent("PLAYER_ENTERING_WORLD");
+SS.loader = CreateFrame("Frame");
+SS.loader:RegisterEvent("VARIABLES_LOADED");
+SS.loader:RegisterEvent("PLAYER_ENTERING_WORLD");
 local firstRunSetupPending = false;
 -- The game's Interface settings (Show Run Clock, Show Boss Bars ...) can be turned off by the player. A part that is
 -- off when the game loads, and that Slim Suite did not turn off itself, was turned off by the player: Slim Suite's own
 -- movable version is switched on in its place, once (turning Slim Suite's version off afterwards is respected).
 SS.NATIVE_REPLACEMENTS = {};
 for name, element in pairs(SS.ELEMENTS) do
- if ( element.part and element.feature ) then
-  local frame, title = name, element.title;
-  SS.NATIVE_REPLACEMENTS[element.part] = { element.feature, title, function() SU.SetOn(frame, true, title); end };
- end
+	if ( element.part and element.feature ) then
+		local frame, title = name, element.title;
+		SS.NATIVE_REPLACEMENTS[element.part] = { element.feature, title, function() SU.SetOn(frame, true, title); end };
+	end
 end
 function SS.NativeIsOff(part)
 	if ( type(AZS_IsHudShown) ~= "function" ) then return nil; end
@@ -46,7 +46,7 @@ end
 
 function SS.Startup(entering, loaded)
 	SS.Safe(SS.RegisterAnnouncementHandler);
-	local ok, err = SS.Safe(HookChat);
+	local ok, err = SS.Safe(SS.HookChat);
 	if ( not ok ) then K.Print(NAME, "|cffff4040the chat could not be changed:|r " .. tostring(err)); end
 	-- The editor state is a user choice, not a leftover from an earlier session. Clear legacy
 	-- unlocked saves at load; only the explicit startup option may reopen the mover after login.
@@ -67,28 +67,28 @@ function SS.Startup(entering, loaded)
 		SS.Safe(SS.RestoreChatLayout, false);
 	elseif ( SS.ChatIsCustom and SS.ChatIsCustom() ) then SS.Safe(SS.PrepareChatWindow); end
 	SS.Safe(SS.ApplyTallyLayout, false);
-	SS.Safe(PlaceAll);
+	SS.Safe(SS.PlaceAll);
 	SS.Safe(SS.TargetFrameHidden, SS.DB().hideTarget);
 	if ( SS.DB().partyIncludesSelf ) then SS.Safe(SS.PlayerFrameHidden, true);
 	elseif ( SS.playerShow ) then SS.Safe(SS.PlayerFrameHidden, false); end
 	if ( SS.DB().plainBar ) then SS.Safe(SS.PlainBar, true); end
-	SS.Safe(ApplyMovableOrientation, "MainMenuBar");
-	SS.Safe(ApplyMovableOrientation, "MainMenuExpBar");
-	SS.Safe(ApplyMovableOrientation, "BuffFrame");
+	SS.Safe(SS.ApplyMovableOrientation, "MainMenuBar");
+	SS.Safe(SS.ApplyMovableOrientation, "MainMenuExpBar");
+	SS.Safe(SS.ApplyMovableOrientation, "BuffFrame");
 
-	SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
-	SS.Safe(ApplyActionSlotGrid);
+	SS.Safe(SS.ApplyMovableOrientation, "PartyMemberFrame1");
+	SS.Safe(SS.ApplyActionSlotGrid);
 	SS.Safe(SS.HookTooltipOwner);
-	SS.Safe(PlaceAll);
-	SS.Safe(UpdateMeter);
+	SS.Safe(SS.PlaceAll);
+	SS.Safe(SS.UpdateMeter);
 	SS.Safe(SS.UpdateEnemyNameplates);
-	if ( entering ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); end
+	if ( entering ) then SS.Safe(SS.SetUnlocked, false, true); SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments); SS.Safe(SS.MakeCards); SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.GuardTargetTooltips); SS.Safe(SS.ApplyMovableOrientation, "PartyMemberFrame1"); end
 	SS.Safe(SS.ApplyElementModes);
 	SS.Safe(SS.RefreshChatDock);
- if SS.EnforcePausedModules then SS.EnforcePausedModules(false); end
+	if SS.EnforcePausedModules then SS.EnforcePausedModules(false); end
 end
-loader:RegisterEvent("PLAYER_LOGOUT");
-loader:SetScript("OnEvent", function()
+SS.loader:RegisterEvent("PLAYER_LOGOUT");
+SS.loader:SetScript("OnEvent", function()
 	if ( event == "PLAYER_LOGOUT" ) then SS.Safe(SS.LayoutLogout); return; end
 	if ( event == "VARIABLES_LOADED" ) then
 		local d = SS.DB();
@@ -137,13 +137,13 @@ function SS.LayoutSnapshot()
 		out[key] = d[key];
 	end
 	if SS.ModuleLayoutPreferences then SS.ModuleLayoutPreferences(out); end
- return out;
+	return out;
 end
 -- puts a layout in place of the current one and draws everything again from it
 function SS.LayoutApply(layout, quiet)
 	if ( type(layout) ~= "table" ) then return false; end
 	SS.activeCustomProfile = nil;
-	if ( setupActive ) then SS.SetupEnd(true); end
+	if ( SS.setupActive ) then SS.SetupEnd(true); end
 	if ( SS.demoRunning ) then SS.StopDemoMode(); end
 	local d = SS.DB();
 	for i = 1, table.getn(SS.LAYOUT_TABLES) do
@@ -155,7 +155,7 @@ function SS.LayoutApply(layout, quiet)
 		d[key] = layout[key];
 	end
 	SS.PrepareDB(d);                                       -- anything the layout did not carry gets its default
- if SS.EnforcePausedModules then SS.EnforcePausedModules(true); end
+	if SS.EnforcePausedModules then SS.EnforcePausedModules(true); end
 	-- Older profile strings omitted this derived native-layout state.
 	for frame, mode in pairs(d.elementModes) do
 		if ( SU and SU.NATIVE[frame] ) then d.frameDefault[frame] = mode == "default" and true or nil; end
@@ -165,9 +165,9 @@ function SS.LayoutApply(layout, quiet)
 	end
 	if ( not quiet ) then
 		-- elements with no place in this layout go back to where they started
-		for i = 1, table.getn(MOVABLE) do
-			local name = MOVABLE[i][1];
-			local frame, points, base = getglobal(name), basePoints[name], baseSizes[name];
+		for i = 1, table.getn(SS.MOVABLE) do
+			local name = SS.MOVABLE[i][1];
+			local frame, points, base = getglobal(name), SS.basePoints[name], SS.baseSizes[name];
 			if ( frame and name ~= "GameTooltip" and not d.frameDefault[name] ) then
 				if ( points and type(d.places[name]) ~= "table" ) then
 					frame:ClearAllPoints();
@@ -182,9 +182,9 @@ function SS.LayoutApply(layout, quiet)
 		SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.LayoutGather); SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.LayoutXpSegments);
 		if ( SS.Mini ) then SS.Safe(SS.Mini.Place); end
 		SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.PlainBar, d.plainBar and true or false);
-		for i = 1, table.getn(MOVABLE) do SS.Safe(ApplyFeatureMute, MOVABLE[i][1]); end
+		for i = 1, table.getn(SS.MOVABLE) do SS.Safe(SS.ApplyFeatureMute, SS.MOVABLE[i][1]); end
 		SS.Safe(SS.UpdateTally); SS.Safe(SS.UpdateClock); SS.Safe(SS.UpdateBossFrames); SS.Safe(SS.ApplyBuffOrientation);
-		SS.Safe(PlaceAll);
+		SS.Safe(SS.PlaceAll);
 		SS.RefreshToggles();
 	end
 	return true;
@@ -322,16 +322,17 @@ function SS.ApplyDefaultProfile(name)
 	return true, custom;
 end
 function SS.MarkProfileDirty()
- if ( SS.activeCustomProfile ) then SS.profileDirty = true; end
+	if ( SS.activeCustomProfile ) then SS.profileDirty = true; end
 end
 function SS.TrackActiveCustomProfile()
- local name = SS.activeCustomProfile;
- if ( not name or type(SS.DB().layouts[name]) ~= "table" ) then SS.profileDirty = nil; return; end
- SS.DB().layouts[name] = SS.LayoutSnapshot();
- SS.profileDirty = nil;
+	local name = SS.activeCustomProfile;
+	if ( not name or type(SS.DB().layouts[name]) ~= "table" ) then SS.profileDirty = nil; return; end
+	SS.DB().layouts[name] = SS.LayoutSnapshot();
+	SS.profileDirty = nil;
 end
 SS.Every("trackCustomProfile", 0.25, function()
- if ( SS.profileDirty ) then SS.Safe(SS.TrackActiveCustomProfile); end
+	-- not while something is being dragged or resized: once, when it is let go
+	if ( SS.profileDirty and not SS.dragActive ) then SS.Safe(SS.TrackActiveCustomProfile); end
 end);
 function SS.LayoutBundleText()
 	local names=SS.LayoutNames();
@@ -498,9 +499,9 @@ function SS.ShowLayoutWindow()
 end
 
 
-buffLayoutUpdater = CreateFrame("Frame");
-buffLayoutUpdater:RegisterEvent("UNIT_AURA");
-buffLayoutUpdater:SetScript("OnEvent", function()
+SS.buffLayoutUpdater = CreateFrame("Frame");
+SS.buffLayoutUpdater:RegisterEvent("UNIT_AURA");
+SS.buffLayoutUpdater:SetScript("OnEvent", function()
 	if ( arg1 == "player" ) then SS.buffDirty = true; end
 end);
 SS.Every("buffLayout", 0.1, function()
@@ -508,48 +509,47 @@ SS.Every("buffLayout", 0.1, function()
 	if ( preview ~= SS.buffPreviewWas ) then SS.buffPreviewWas = preview; SS.buffDirty = true; end
 	if ( SS.buffDirty ) then SS.buffDirty = false; SS.Safe(SS.ApplyBuffOrientation); end
 end);
-SS.Safe(HookChat);                                          -- right away too, so lines printed while loading are caught
+SS.Safe(SS.HookChat);                                          -- right away too, so lines printed while loading are caught
 
 -- Compatibility cleanup for retired minimap-button collectors. No buttons are collected,
 -- sorted or reparented by Slim Suite; older callers only release previously owned buttons.
 SlimSuiteMinimapBarList = {};
 function SS.GatherRelease(f)
- if ( not f or not f.slimOrig ) then return; end
- local o=f.slimOrig; f.slimOrig=nil; f:ClearAllPoints();
- if ( o[2] ) then f:SetPoint(o[1],o[2],o[3],o[4],o[5]); end
+	if ( not f or not f.slimOrig ) then return; end
+	local o=f.slimOrig; f.slimOrig=nil; f:ClearAllPoints();
+	if ( o[2] ) then f:SetPoint(o[1],o[2],o[3],o[4],o[5]); end
 end
 function SS.ReleaseFromBar(f)
- if ( not f or not f.slimBarOrig ) then return; end
- local o=f.slimBarOrig; f.slimBarOrig=nil;
- if ( f.slimBarParent and f.SetParent ) then f:SetParent(f.slimBarParent); end
- if ( f.slimBarStrata and f.SetFrameStrata ) then f:SetFrameStrata(f.slimBarStrata); end
- f.slimBarParent,f.slimBarStrata=nil,nil;
- f:ClearAllPoints(); if ( o[2] ) then f:SetPoint(o[1],o[2],o[3],o[4],o[5]); end
+	if ( not f or not f.slimBarOrig ) then return; end
+	local o=f.slimBarOrig; f.slimBarOrig=nil;
+	if ( f.slimBarParent and f.SetParent ) then f:SetParent(f.slimBarParent); end
+	if ( f.slimBarStrata and f.SetFrameStrata ) then f:SetFrameStrata(f.slimBarStrata); end
+	f.slimBarParent,f.slimBarStrata=nil,nil;
+	f:ClearAllPoints(); if ( o[2] ) then f:SetPoint(o[1],o[2],o[3],o[4],o[5]); end
 end
 function SS.LayoutGather()
- local d=SS.DB(); d.gatherButtons=false; d.gatherSide=nil;
- for _,f in ipairs(SlimSuiteGatheredList or {}) do SS.GatherRelease(f); end
- SlimSuiteGatheredList={};
+	local d=SS.DB(); d.gatherButtons=false; d.gatherSide=nil;
+	for _,f in ipairs(SlimSuiteGatheredList or {}) do SS.GatherRelease(f); end
+	SlimSuiteGatheredList={};
 end
 function SS.LayoutMinimapBar()
- local d=SS.DB(); d.minimapBar=false;
- for _,key in ipairs({"elementModes","enabledElements","places","sizes","scales","orientations","muted","frameDefault"}) do
-  if ( type(d[key])=="table" ) then d[key].SlimSuiteMinimapBar=nil; end
- end
- for _,f in ipairs(SlimSuiteMinimapBarList) do SS.ReleaseFromBar(f); end
- SlimSuiteMinimapBarList={};
- local bar=getglobal("SlimSuiteMinimapBar"); if ( bar ) then bar:Hide(); end
- SS.LayoutGather();
- if ( SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); end
+	local d=SS.DB(); d.minimapBar=false;
+	for _,key in ipairs({"elementModes","enabledElements","places","sizes","scales","orientations","muted","frameDefault"}) do
+		if ( type(d[key])=="table" ) then d[key].SlimSuiteMinimapBar=nil; end
+	end
+	for _,f in ipairs(SlimSuiteMinimapBarList) do SS.ReleaseFromBar(f); end
+	SlimSuiteMinimapBarList={};
+	local bar=getglobal("SlimSuiteMinimapBar"); if ( bar ) then bar:Hide(); end
+	SS.LayoutGather();
+	if ( SS.Mini and SS.Mini.Place ) then SS.Safe(SS.Mini.Place); end
 end
 function SS.MinimapButtonPlace() return "ring"; end
 function SS.SetMinimapButtonPlace() SS.LayoutMinimapBar(); end
-function SS.SetGather() SS.LayoutMinimapBar(); end
 function SS.SetMinimapBar() SS.LayoutMinimapBar(); end
 
 -- the minimap button: a gear, at the left of the minimap (AZS Stats' is at the bottom, AZS Handbook's at the top
 -- left)
-okMini, errMini = SS.Safe(function()
+SS.okMini, SS.errMini = SS.Safe(function()
 	SS.Mini = K.Minimap({ name = "SlimSuiteMinimapButton", icon = "INV_Misc_Gear_02", angle = 190, db = SS.DB,
 		click = function() SS.Toggle(); end,
 		tooltip = function(tt)
@@ -560,9 +560,9 @@ okMini, errMini = SS.Safe(function()
 			tt:AddLine("Click: the settings. /slimsuite minimap hides this button.", 0.6, 0.6, 0.6);
 		end });
 end);
-if ( not okMini ) then K.Print(NAME, "|cffff4040the minimap button could not be made:|r " .. tostring(errMini)); end
+if ( not SS.okMini ) then K.Print(NAME, "|cffff4040the minimap button could not be made:|r " .. tostring(SS.errMini)); end
 
--- AZSKit (the shared look every AZS addon carries, the same file in each) places the button on the round minimap's
+-- Slim Suite's kit (SlimSuiteKit.lua) places the button on the round minimap's
 -- ring. Slim Suite adds its own rules here, so they work whichever addon's copy of that file loaded first: the button
 -- is left alone while the minimap-buttons row or the square minimap's column holds it, and on a square minimap it
 -- sits on the square's edge.
@@ -634,14 +634,14 @@ end
 -- Demo Mode: every Slim Suite element shows sample data on its own frame, moving and changing in real time, with its own
 -- size, scale and layout. Nothing is saved: the party's row/column switch is the demo's own, and everything the demo
 -- shows goes away when it stops.
-demoT = 0;
-DEMO_HITS = { { 412, "Fireball", "Spell_Fire_Fireball02", true }, { 96, "Frostbolt", "Spell_Frost_FrostBolt02", false },
+SS.demoT = 0;
+SS.DEMO_HITS = { { 412, "Fireball", "Spell_Fire_Fireball02", true }, { 96, "Frostbolt", "Spell_Frost_FrostBolt02", false },
 	{ 180, "Smite", "Spell_Holy_Smite", false }, { 55, "Mend", "Spell_Holy_Heal", false, true }, { 233, "Arcane Missiles", "Spell_Nature_StarFall", false },
 	{ 310, "Shadow Bolt", "Spell_Shadow_ShadowBolt", true } };
-demoHitIndex = 1;
-demoHitClock = 0;
+SS.demoHitIndex = 1;
+SS.demoHitClock = 0;
 -- sample minimap pins and an XP-bar glint, drawn on the real frames and removed when the demo stops
-demoPins, demoGlint = {}, nil;
+SS.demoPins, SS.demoGlint = {}, nil;
 local demoXPOriginal;
 
 local function SetDemoXP(on)
@@ -666,34 +666,34 @@ local function SetDemoXP(on)
 	end
 end
 
-function DemoTick(dt)
-	demoT = demoT + dt;
-	demoHitClock = demoHitClock + dt;
+function SS.DemoTick(dt)
+	SS.demoT = SS.demoT + dt;
+	SS.demoHitClock = SS.demoHitClock + dt;
 	SS.Safe(SS.DemoWorld, dt);
 	-- the party keeps the column or row you chose
 	if ( SS.Demoing("TargetFrame") ) then SS.Safe(SU.PreviewTarget); end
 	if ( SS.Demoing("PartyMemberFrame1") ) then SS.Safe(SU.PreviewParty); end
 	-- damage meter: the sample numbers climb
-	if ( SS.Demoing("SlimSuiteMeterFrame") and SlimSuiteMeter and SlimSuiteMeter.demoSnapshot ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(demoT); end
+	if ( SS.Demoing("SlimSuiteMeterFrame") and SlimSuiteMeter and SlimSuiteMeter.demoSnapshot ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(SS.demoT); end
 	-- Demo XP: purple progress climbs evenly and returns to empty at 100%, without changing saved XP.
 	if ( SS.Demoing("MainMenuExpBar") and MainMenuExpBar and demoXPOriginal ) then
-		MainMenuExpBar:SetValue(math.mod(demoT * 8, 100));
+		MainMenuExpBar:SetValue(math.mod(SS.demoT * 8, 100));
 	end
 	-- buffs: each sample comes and goes on its own rhythm, on the real buff frame
 	if ( SS.Demoing("BuffFrame") ) then
 		local changed = false;
 		for i = 1, table.getn(SS.BUFF_SAMPLES) do
-			local on = math.mod(math.floor(demoT / (1.5 + i * 0.4)) + i, 2) == 0;
+			local on = math.mod(math.floor(SS.demoT / (1.5 + i * 0.4)) + i, 2) == 0;
 			if ( (SS.demoBuffOn[i] and true or false) ~= on ) then SS.demoBuffOn[i] = on; changed = true; end
 		end
 		if ( changed ) then SS.buffDirty = true; end
 	end
 	-- combat text: a hit or heal arrives every 0.9 seconds
-	if ( SS.Demoing("SlimSuiteCombatTextFrame") and demoHitClock >= 0.9 and SlimSuiteWorld and SlimSuiteWorld.DemoHit ) then
-		demoHitClock = 0;
-		local h = DEMO_HITS[demoHitIndex];
+	if ( SS.Demoing("SlimSuiteCombatTextFrame") and SS.demoHitClock >= 0.9 and SlimSuiteWorld and SlimSuiteWorld.DemoHit ) then
+		SS.demoHitClock = 0;
+		local h = SS.DEMO_HITS[SS.demoHitIndex];
 		SS.Safe(SlimSuiteWorld.DemoHit, h[1], h[2], "Interface\\Icons\\" .. h[3], h[4], h[5]);
-		demoHitIndex = math.mod(demoHitIndex, table.getn(DEMO_HITS)) + 1;
+		SS.demoHitIndex = math.mod(SS.demoHitIndex, table.getn(SS.DEMO_HITS)) + 1;
 	end
 end
 
@@ -797,7 +797,7 @@ function SS.DemoWorld(dt)
 			D.news = 6;
 			local n = DEMO_NEWS[D.newsIndex];
 			D.newsIndex = math.mod(D.newsIndex, table.getn(DEMO_NEWS)) + 1;
-			SS.Safe(SS.ShowAnnouncement, { id = "demo" .. D.newsIndex .. "-" .. math.floor(demoT), text = n[1], boss = n[2] });
+			SS.Safe(SS.ShowAnnouncement, { id = "demo" .. D.newsIndex .. "-" .. math.floor(SS.demoT), text = n[1], boss = n[2] });
 		end
 	end
 	-- the minimap: caches sit still, the bosses walk slowly around you with their marks
@@ -808,7 +808,7 @@ function SS.DemoWorld(dt)
 			table.insert(pins, { x = caches[i][1], y = caches[i][2], size = 13, rim = true, crop = true, texture = "Interface\\Icons\\INV_Box_02", tip = "Cache (sample)" });
 		end
 		for i = 1, table.getn(SS.BOSS_SAMPLE) do
-			local a = demoT * (0.08 + i * 0.03) + i * 1.6;
+			local a = SS.demoT * (0.08 + i * 0.03) + i * 1.6;
 			local r = 70 + i * 25;
 			table.insert(pins, { x = math.cos(a) * r, y = math.sin(a) * r, size = 15, rim = true, texture = "Interface\\TargetingFrame\\UI-RaidTargetingIcons",
 				raid = SlimSuiteWorld.BOSS_ICONS and SlimSuiteWorld.BOSS_ICONS[i] or 8, tip = SS.BOSS_SAMPLE[i][1] .. " (sample)" });
@@ -818,7 +818,7 @@ function SS.DemoWorld(dt)
 end
 
 -- sample meter rows: the party's names and WoW spells, with damage that grows over time
-DEMO_METER = {
+SS.DEMO_METER = {
 	{ "Slimjim", "Shadow Bolt", "Spell_Shadow_ShadowBolt", 3900, 1.7, nil, "shadow" },
 	{ "Voidwalker", "Melee", "Ability_MeleeDamage", 2600, 1, "pet" },
 	{ "Voidwalker", "Torment", "Spell_Shadow_GatherShadows", 1200, 0.5, "pet" },
@@ -827,8 +827,8 @@ DEMO_METER = {
 };
 function SS.DemoMeterSnapshot(t)
 	local snap = { actors = {}, sources = {}, rows = {}, totals = { displayRate = { status = "ready", value = math.floor(1400 + 120 * math.sin(t)) } } };
-	for i = 1, table.getn(DEMO_METER) do
-		local d = DEMO_METER[i];
+	for i = 1, table.getn(SS.DEMO_METER) do
+		local d = SS.DEMO_METER[i];
 		local amount = math.floor(d[4] + t * 210 * d[5]);
 		local actorId="demo:"..d[1];
 		snap.actors[actorId] = { name = d[1], kind = d[6] or "hero" };
@@ -840,7 +840,7 @@ function SS.DemoMeterSnapshot(t)
 end
 
 -- every element that shows samples is told to draw again (starting or stopping)
-function DemoRedraw()
+function SS.DemoRedraw()
 	-- Refreshers own their enabled/default checks; call them after stop to restore live data or setup previews.
 	SS.Safe(SS.UpdateBossFrames); SS.Safe(SS.UpdateTally); SS.Safe(SS.UpdateClock); SS.Safe(SS.UpdateAnnouncementFrame);
 	SS.Safe(SS.UpdateLevelButton); SS.Safe(SS.RefreshItemRow); SS.Safe(SS.RefreshSpellRow);
@@ -867,23 +867,23 @@ function SS.StartDemoMode()
 	end
 	SS.demoElements = enabled;
 	SS.demoRunning = true;
- SS.RefreshEditHandles();
-	demoT = 0; demoHitClock = 0;
+	SS.RefreshEditHandles();
+	SS.demoT = 0; SS.demoHitClock = 0;
 	SS.demoBuffOn = {};
 	if ( SS.Demoing("SlimSuiteMeterFrame") and SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = SS.DemoMeterSnapshot(0); end
-	if ( SS.Demoing("MinimapCluster") and Minimap and Minimap.CreateTexture and table.getn(demoPins) == 0 ) then
+	if ( SS.Demoing("MinimapCluster") and Minimap and Minimap.CreateTexture and table.getn(SS.demoPins) == 0 ) then
 		for i = 1, 4 do
 			local p = Minimap:CreateTexture(nil, "OVERLAY");
 			p:SetWidth(6); p:SetHeight(6); p:SetTexture(i == 1 and 1 or 0.9, i == 2 and 0.8 or 0.4, 0.2, 1);
-			demoPins[i] = p;
+			SS.demoPins[i] = p;
 		end
 	end
-	for i = 1, table.getn(demoPins) do demoPins[i]:Hide(); end   -- the minimap's samples are real pins now (SS.DemoWorld)
+	for i = 1, table.getn(SS.demoPins) do SS.demoPins[i]:Hide(); end   -- the minimap's samples are real pins now (SS.DemoWorld)
 	SetDemoXP(SS.Demoing("MainMenuExpBar"));
-	if ( demoGlint ) then demoGlint:Hide(); end
+	if ( SS.demoGlint ) then SS.demoGlint:Hide(); end
 	SS.Safe(SU.UpdateDemo);
-	DemoRedraw();
-	SS.Every("demoMode", 0.25, function() SS.Safe(DemoTick, 0.25); end);
+	SS.DemoRedraw();
+	SS.Every("demoMode", 0.25, function() SS.Safe(SS.DemoTick, 0.25); end);
 	SS.Safe(SS.ShowDemoBox, true);
 end
 
@@ -893,31 +893,31 @@ function SS.StopDemoMode()
 	SS.demoElements = nil;
 	SS.Stop("demoMode");
 	if ( SlimSuiteMeter ) then SlimSuiteMeter.demoSnapshot = nil; end
-	for i = 1, table.getn(demoPins) do demoPins[i]:Hide(); end
+	for i = 1, table.getn(SS.demoPins) do SS.demoPins[i]:Hide(); end
 	SS.demoState, SS.demoClock = nil, nil;
 	if ( SlimSuiteWorld ) then SlimSuiteWorld.demoPins = nil; end
 	SS.TALLY_SAMPLE.kills, SS.TALLY_SAMPLE.gold, SS.TALLY_SAMPLE.chest, SS.TALLY_SAMPLE.bosses, SS.TALLY_SAMPLE.guardians = 1284, 356, 120, 2, 3;
 	SS.BOSS_SAMPLE[1][2], SS.BOSS_SAMPLE[2][2], SS.BOSS_SAMPLE[3][2], SS.BOSS_SAMPLE[4][2], SS.BOSS_SAMPLE[5][2] = 60, 40, 85, 100, 70;
-	if ( demoGlint ) then demoGlint:Hide(); end
+	if ( SS.demoGlint ) then SS.demoGlint:Hide(); end
 	SetDemoXP(false);
 	SS.demoPartyOrient = nil;
 	SS.demoBuffOn = {};
 	-- the sample row may have stepped the party aside for your plate (not saved): back to its own place
 	if ( SS.DB().partyIncludesSelf ) then SS.Safe(SS.Place, "PartyMemberFrame1"); end
-	SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");   -- the party's own layout again
+	SS.Safe(SS.ApplyMovableOrientation, "PartyMemberFrame1");   -- the party's own layout again
 	SS.Safe(SS.EndPreviewsIfDone);                           -- the sample party and target go
 	SS.Safe(SS.ApplyNewFrames);
-	DemoRedraw();
+	SS.DemoRedraw();
 	SS.Safe(SS.ShowDemoBox, false);
- SS.RefreshEditHandles();
+	SS.RefreshEditHandles();
 end
 
 -- While Demo Mode runs, Slim Suite's menus are put away so the samples can be seen, and a small "DEMO MODE" box
 -- stands in for them: "On" is lit while it runs, "Off" stops it and brings back the menus that were open.
 -- The setup bar, element menu and move panel stay up during Demo Mode, so the UI can still be changed while it runs.
 SS.DEMO_HIDES = { "SlimSuiteFrame", "SlimSuiteLayoutFrame", "SlimSuiteRaidIconPanel" };
-demoHidden = {};
-function DemoBox()
+SS.demoHidden = {};
+function SS.DemoBox()
 	local box = getglobal("SlimSuiteDemoBox");
 	if ( box ) then return box; end
 	box = CreateFrame("Frame", "SlimSuiteDemoBox", UIParent);
@@ -941,18 +941,18 @@ function DemoBox()
 end
 function SS.ShowDemoBox(on)
 	if ( on ) then
-		demoHidden = {};
+		SS.demoHidden = {};
 		for _, name in ipairs(SS.DEMO_HIDES) do
 			local f = getglobal(name);
-			if ( f and f:IsShown() ) then demoHidden[name] = true; f:Hide(); end
+			if ( f and f:IsShown() ) then SS.demoHidden[name] = true; f:Hide(); end
 		end
 		-- the Demo On / Off buttons on the edit bar replace the old floating box, so no box is shown
 	else
 		local box = getglobal("SlimSuiteDemoBox");
 		if ( box ) then box:Hide(); end
 		if ( SU and SU.RefreshDemoButtons ) then SU.RefreshDemoButtons(); end
-		for name in pairs(demoHidden) do local f = getglobal(name); if ( f ) then f:Show(); end end
-		demoHidden = {};
+		for name in pairs(SS.demoHidden) do local f = getglobal(name); if ( f ) then f:Show(); end end
+		SS.demoHidden = {};
 	end
 end
 
@@ -962,22 +962,22 @@ end
 
 -- Raid target icons: hover a party member or yourself and a row of markers opens above that frame.
 -- Click a marker to put it on that unit; the X clears it. The row stays open while the cursor is on it.
-raidPanel, raidOver = nil, nil;
+SS.raidPanel, SS.raidOver = nil, nil;
 
-function RaidCursor()
+function SS.RaidCursor()
 	local s = SS.EffectiveScale(UIParent);
 	local x, y = GetCursorPosition();
 	return (x or 0) / s, (y or 0) / s;
 end
 
-function RaidWithin(f, x, y)
+function SS.RaidWithin(f, x, y)
 	if ( not f or not f.IsShown or not f:IsShown() or (f.GetAlpha and (f:GetAlpha() or 1) < 0.05) ) then return false; end
-	local l, r, b, t = RootBounds(f);                       -- in the screen's units, whatever the frame's scale
+	local l, r, b, t = SS.RootBounds(f);                       -- in the screen's units, whatever the frame's scale
 	return l ~= nil and x >= l and x <= r and y >= b and y <= t;
 end
 
 -- the frames that stand for a unit a marker can go on: the four party members and yourself
-function RaidTargets()
+function SS.RaidTargets()
 	local list = {};
 	for i = 1, 4 do
 		local f = getglobal("PartyMemberFrame" .. i);
@@ -1013,7 +1013,7 @@ function SS.RaidMarkSize(f)
 end
 SS.raidMarked = {};
 function SS.UpdateRaidMarks()
-	local list = RaidTargets();
+	local list = SS.RaidTargets();
 	local count = table.getn(list);
 	local card, classic;
 	if ( UnitExists("target") ) then
@@ -1069,7 +1069,7 @@ SS.Every("unitEvents", 0.05, function()
 	if ( marksDirty ) then marksDirty = false; SS.Safe(SS.UpdateRaidMarks); end
 end);
 
-function BuildRaidPanel()
+function SS.BuildRaidPanel()
 	local p = CreateFrame("Frame", "SlimSuiteRaidIconPanel", UIParent);
 	p:SetWidth(9 * 22 + 6); p:SetHeight(28); p:SetFrameStrata("DIALOG");
 	SS.OwnLook(p, function()
@@ -1091,38 +1091,38 @@ function BuildRaidPanel()
 			b.text:SetPoint("CENTER", b, "CENTER", 0, 0); b.text:SetText("X");
 		end
 		b:SetScript("OnClick", function()
-			if ( raidOver and raidOver.unit and SetRaidTarget ) then SS.Safe(SetRaidTarget, raidOver.unit, this.index); end
+			if ( SS.raidOver and SS.raidOver.unit and SetRaidTarget ) then SS.Safe(SetRaidTarget, SS.raidOver.unit, this.index); end
 		end);
 	end
 	p:Hide();
 	return p;
 end
 
-raidPanel = BuildRaidPanel();                            -- made at load, so "above the level-up cards" can include it
+SS.raidPanel = SS.BuildRaidPanel();                            -- made at load, so "above the level-up cards" can include it
 SS.Every("raidIcons", 0.1, function()
-	if ( not raidPanel ) then raidPanel = BuildRaidPanel(); end
+	if ( not SS.raidPanel ) then SS.raidPanel = SS.BuildRaidPanel(); end
 	-- not while the UI is being placed (it would sit over the handles) or in Demo Mode
 	-- nor when it is turned off, or alone (marks are a group's)
 	local grouped = (GetNumPartyMembers and (GetNumPartyMembers() or 0) > 0) or (GetNumRaidMembers and (GetNumRaidMembers() or 0) > 0);
-	if ( SS.DB().unlocked or setupActive or SS.demoRunning or not SS.DB().raidRow or not grouped ) then
-		if ( raidPanel:IsShown() ) then raidPanel:Hide(); raidOver = nil; end
+	if ( SS.DB().unlocked or SS.setupActive or SS.demoRunning or not SS.DB().raidRow or not grouped ) then
+		if ( SS.raidPanel:IsShown() ) then SS.raidPanel:Hide(); SS.raidOver = nil; end
 		return;
 	end
-	local x, y = RaidCursor();
+	local x, y = SS.RaidCursor();
 	local over = nil;
-	if ( raidPanel:IsShown() and RaidWithin(raidPanel, x, y) ) then over = raidOver; end
+	if ( SS.raidPanel:IsShown() and SS.RaidWithin(SS.raidPanel, x, y) ) then over = SS.raidOver; end
 	if ( not over ) then
-		local list = RaidTargets();
+		local list = SS.RaidTargets();
 		for i = 1, table.getn(list) do
-			if ( RaidWithin(list[i].f, x, y) ) then over = list[i]; break; end
+			if ( SS.RaidWithin(list[i].f, x, y) ) then over = list[i]; break; end
 		end
 	end
 	if ( over ) then
-		raidOver = over;
-		raidPanel:ClearAllPoints();
-		raidPanel:SetPoint("BOTTOM", over.f, "TOP", 0, 2);
-		raidPanel:Show();
-	elseif ( raidPanel:IsShown() ) then
-		raidPanel:Hide(); raidOver = nil;
+		SS.raidOver = over;
+		SS.raidPanel:ClearAllPoints();
+		SS.raidPanel:SetPoint("BOTTOM", over.f, "TOP", 0, 2);
+		SS.raidPanel:Show();
+	elseif ( SS.raidPanel:IsShown() ) then
+		SS.raidPanel:Hide(); SS.raidOver = nil;
 	end
 end);

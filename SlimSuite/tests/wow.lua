@@ -236,7 +236,7 @@ local missing = {}
 setmetatable(_G, { __index = function(t, k)
 	if type(k) ~= "string" then return nil end
 	if k == "NAMEPLATES_ON" then return nil end -- nil is the real 1.12 "hidden" state
-	if string.match(k, "^AZS_") or string.match(k, "^SlimSuite") or k == "SS" or k == "SU" or k == "AZSKIT" then return nil end
+	if string.match(k, "^AZS_") or string.match(k, "^SlimSuite") or k == "SS" or k == "SU" then return nil end
 	if string.match(k, "^[A-Z]") then
 		missing[k] = true
 		local a = setmetatable({ name = k, globalName = k, shown = false, alpha = 1, w = 10, h = 10 }, Any.meta)

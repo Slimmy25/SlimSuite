@@ -1,6 +1,6 @@
 local bad = 0
 local function check(label, ok) if not ok then bad = bad + 1; print("MISMATCH " .. label) end end
-local setup, d = SS.ENV.SU, SS.DB()
+local setup, d = SS.SU, SS.DB()
 SS.firstRunSetupPending=true; d.setupDone=nil; d.firstSetupDefaultsVersion=nil
 SS.StartSetup(true)
 for _,element in ipairs(setup.elements or {}) do

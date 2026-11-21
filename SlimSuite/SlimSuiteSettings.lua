@@ -1,5 +1,5 @@
 -- Focused Slim Suite module; loaded in manifest order.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 function SU.Check(parent)
 	local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate");
 	cb:SetScript("OnEnter", function() if ( this.warnText ) then SS.ShowWarnTip(this, this.warnText); end end);
@@ -38,18 +38,18 @@ SS.WARN = SU.WARN;
 -- Legacy option checkboxes may still write feature flags. Translate those edits into a mode
 -- transition; never let a compatibility flag become a competing source of visibility state.
 function SS.ChangeSetting(get, set, value)
- local d, before = SS.DB(), {};
- for name, element in pairs(SS.ELEMENTS) do
-  if ( element.feature ) then before[name] = { value=d[element.feature], mode=d.elementModes[name] }; end
- end
- set(value);
- for name, previous in pairs(before) do
-  local element = SS.ELEMENTS[name];
-  if ( previous.value ~= d[element.feature] and previous.mode == d.elementModes[name] ) then
-   SU.SetMode(name, d[element.feature] and "enabled" or "default", element.title);
-  end
- end
- if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
+	local d, before = SS.DB(), {};
+	for name, element in pairs(SS.ELEMENTS) do
+		if ( element.feature ) then before[name] = { value=d[element.feature], mode=d.elementModes[name] }; end
+	end
+	set(value);
+	for name, previous in pairs(before) do
+		local element = SS.ELEMENTS[name];
+		if ( previous.value ~= d[element.feature] and previous.mode == d.elementModes[name] ) then
+			SU.SetMode(name, d[element.feature] and "enabled" or "default", element.title);
+		end
+	end
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
 end
 
 -- A setting with several choices ({ label, get, set, choice = { { text, value }, ... } }) shows as one button with the
@@ -101,8 +101,8 @@ function SS.AfterChoice()
 	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
 	SS.RefreshChoices();
 	SS.RefreshToggles();
-	if ( setupActive and SU.focus ) then SU.Focus(SU.focus); end
-	if ( not setupActive and SS.MenuOpen() ) then SU.Focus(SU.focus); end
+	if ( SS.setupActive and SU.focus ) then SU.Focus(SU.focus); end
+	if ( not SS.setupActive and SS.MenuOpen() ) then SU.Focus(SU.focus); end
 end
 -- a tick-box row turned into a choice row (or back): the box itself is hidden and the choice button stands beside its
 -- label ("right", the setup) or under it ("below", the narrow right-click menu)
@@ -152,17 +152,17 @@ function SU.SetMovable(frame, movable)
 	SS.DB().frameDefault[frame] = (not movable) or nil;
 	if ( not movable ) then
 		local f = getglobal(frame);
-		local pts = basePoints[frame];
+		local pts = SS.basePoints[frame];
 		if ( f and pts ) then
 			f:ClearAllPoints();
 			for i = 1, table.getn(pts) do local p = pts[i]; f:SetPoint(p[1], p[2], p[3], p[4], p[5]); end
-			local s = baseSizes[frame];
+			local s = SS.baseSizes[frame];
 			if ( s and f.SetWidth ) then f:SetWidth(s.w); f:SetHeight(s.h); end
 		end
 		if ( f and f.SetScale ) then f:SetScale((SS.nativeScales and SS.nativeScales[frame]) or 1); end
 		if ( frame == "PartyMemberFrame1" ) then
 			for i = 2, 4 do
-				local member, points = getglobal("PartyMemberFrame" .. i), partyNativePoints[i];
+				local member, points = getglobal("PartyMemberFrame" .. i), SS.partyNativePoints[i];
 				if ( member ) then
 					if ( points ) then
 						member:ClearAllPoints();
@@ -215,7 +215,7 @@ function SU.ChecksFor(frame)
 	local W = SU.WARN;
 	local function Mirror(disableWhenPlayerOff)
 		local e = { "Mirror Target", warn = W.mirror, function() return SS.DB().mirrorTarget and SS.DB().combineTarget; end,
-			function(v) SS.SetMirrorTarget(v); if ( v and setupActive and not SS.DB().hideTarget ) then SU.SetOn("TargetFrame", true, SU.titles and SU.titles.TargetFrame or "Target frame"); end if ( SS.MenuOpen() ) then SU.Focus(SU.focus); end end,
+			function(v) SS.SetMirrorTarget(v); if ( v and SS.setupActive and not SS.DB().hideTarget ) then SU.SetOn("TargetFrame", true, SU.titles and SU.titles.TargetFrame or "Target frame"); end if ( SS.MenuOpen() ) then SU.Focus(SU.focus); end end,
 			short = "Mirror Target", xref = true };
 		-- Keep the control visible in target settings, but make its dependency explicit when the player frame is off.
 		if ( disableWhenPlayerOff ) then e[5] = function() return SU.on and SU.on.PlayerFrame and true or false; end; end
@@ -249,7 +249,7 @@ function SU.ChecksFor(frame)
 		function(v) SS.SetClockDetached(v); end, function() return SS.DB().replaceLocalClock; end, short = "Detach from minimap", xref = true }; end
 	local function VerticalRow(name) return { "Vertical (off: horizontal)", function() return SS.CurrentOrientation(name) == "vertical"; end,
 		function(v) SS.SetBuildOrientation(name, v); end, short = "Vertical", xref = true }; end
-	local function MatchRows() return { "Match build row sizes", function() return SS.DB().matchBuildSizes; end, function(v) SS.DB().matchBuildSizes=v; if ( v ) then SS.MatchBuildRowSizes("SlimSuiteSpellRowFrame"); PlaceAll(); end end }; end
+	local function MatchRows() return { "Match build row sizes", function() return SS.DB().matchBuildSizes; end, function(v) SS.DB().matchBuildSizes=v; if ( v ) then SS.MatchBuildRowSizes("SlimSuiteSpellRowFrame"); SS.PlaceAll(); end end }; end
 	local function ShowSpells() return { "Show build spells", function() return not SS.DB().hideBuildSpells; end, function(v) SS.DB().hideBuildSpells=not v; SS.ApplyBuildRowReplacement(); end }; end
 	local function ShowItems() return { "Show worn items", function() return not SS.DB().hideBuildItems; end, function(v) SS.DB().hideBuildItems=not v; SS.ApplyBuildRowReplacement(); end }; end
 	local function JoinRows() return { "Join the worn-jewelry row under the build spells", function() return SS.DB().buildRowsAttached; end,
@@ -258,7 +258,7 @@ function SU.ChecksFor(frame)
 		PlayerFrame = { PlayerLook(), Portraits("PlayerFrame"), Mirror(), BuffsPlace(), TargetBuffsPlace(), ProcMeter(), SelfParty(), PartyPlace() },
 		MainMenuBar = {
 			{ "Hide the bar's artwork (only the spell squares stay)", short = "Hide the bar's artwork", function() return SS.DB().plainBar; end, function(v) SS.DB().plainBar = v; SS.Safe(SS.PlainBar, v); end },
-			{ "Show every button at all times, even empty ones", short = "Show empty buttons", function() return SS.DB().showEmptyActionSlots; end, function(v) SS.DB().showEmptyActionSlots = v; SS.Safe(ApplyActionSlotGrid); end },
+			{ "Show every button at all times, even empty ones", short = "Show empty buttons", function() return SS.DB().showEmptyActionSlots; end, function(v) SS.DB().showEmptyActionSlots = v; SS.Safe(SS.ApplyActionSlotGrid); end },
 			{ "Add your racial as a 7th button", short = "Racial as a 7th button", function() return SS.DB().showRacialAbility; end, function(v) SS.Safe(SS.SetRacialAbility, v); end },
 			{ "Turn the action bar vertical", function() return SS.DB().orientations.MainMenuBar == "vertical"; end, function(v) SU.SetVertical("MainMenuBar", v); end },
 			{ "Cooldown numbers on the spell squares", short = "Cooldown numbers", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v and true or false; end } },
@@ -288,7 +288,7 @@ function SU.ChecksFor(frame)
 			{ "Slim Suite's gear button", short = "Gear button", function() local m = SS.DB().minimap; return not (type(m) == "table" and m.hide); end,
 				function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (type(m) == "table" and m.hide and true or false) == (v and true or false) ) then SS.Mini.Toggle(); end end end } },
 		SlimSuiteClockFrame = { { "Location and difficulty above the clock", function() return SS.DB().clockContextAbove~=false; end, function(v) SS.DB().clockContextAbove=v; SS.ApplyClockLayout(); SS.UpdateClock(); end }, { "Show location and difficulty", short = "Zone and Heroic affixes", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end }, { "Run clock at the bottom of the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end, xref = true, short = "Run clock at the bottom" } },
-		MainMenuExpBar = { { "Stretch across the whole screen", function() return SS.DB().xpFullWidth; end, function(v) SS.DB().xpFullWidth = v and true or false; if ( PlaceAll ) then SS.Safe(PlaceAll); end end, short = "Full width" },
+		MainMenuExpBar = { { "Stretch across the whole screen", function() return SS.DB().xpFullWidth; end, function(v) SS.DB().xpFullWidth = v and true or false; if ( SS.PlaceAll ) then SS.Safe(SS.PlaceAll); end end, short = "Full width" },
 			{ "Hide XP bar border", function() return SS.DB().xpHideBorder; end, function(v) SS.DB().xpHideBorder=v; SS.StyleExpBar(SS.CurrentOrientation("MainMenuExpBar")=="vertical"); end }, { "Turn the XP bar vertical", function() return SS.DB().orientations.MainMenuExpBar == "vertical"; end,
 			function(v) SU.SetVertical("MainMenuExpBar", v); SS.Safe(SS.LayoutXpSegments); end },
 			{ "Split into 20 segments", function() return SS.DB().xpSegments ~= false; end,
@@ -305,7 +305,7 @@ function SU.ChecksFor(frame)
 			{ "Party members' buffs above them", function() return SS.DB().partyMemberBuffs ~= false; end, function(v) SS.DB().partyMemberBuffs = v and true or false; SS.Safe(SS.UpdateFriendBuffs); end, short = "Friends' buffs" },
 			SelfParty(), YouIn(BuffsPlace()), YouIn(ProcMeter()), PartyPlace() },
 		SlimSuiteReviveFrame = { { "Vertical", function() return SS.DB().orientations.SlimSuiteReviveFrame == "vertical"; end,
-			function(v) SU.SetVertical("SlimSuiteReviveFrame", v); SS.Safe(SS.ApplyReviveOrientation); if ( PlaceAll ) then SS.Safe(PlaceAll); end end } },
+			function(v) SU.SetVertical("SlimSuiteReviveFrame", v); SS.Safe(SS.ApplyReviveOrientation); if ( SS.PlaceAll ) then SS.Safe(SS.PlaceAll); end end } },
 		SlimSuiteBossFrames = { { "Show debuffs on the bars", function() return SS.DB().encounterDebuffs; end, function(v) SS.DB().encounterDebuffs = v; end },
 			{ "Most bars shown", function() return SS.DB().encounterMax or 0; end,
 			function(v) SS.DB().encounterMax = (v and v > 0) and v or nil; SS.Safe(SS.UpdateBossFrames); end,
@@ -321,7 +321,7 @@ function SU.ChecksFor(frame)
 			{ "Larger encounter names", function() return SS.DB().accessibilityLargeText; end,
 			function(v) SS.DB().accessibilityLargeText = v and true or false; SS.Safe(SS.UpdateBossFrames); end },
 			{ "Vertical", function() return SS.DB().orientations.SlimSuiteBossFrames == "vertical"; end,
-			function(v) SS.DB().orientations.SlimSuiteBossFrames = v and "vertical" or "horizontal"; SS.DB().sizes.SlimSuiteBossFrames = nil; SS.Safe(SS.UpdateBossFrames); SS.Safe(PlaceAll); SU.UpdateDemo(); end } },
+			function(v) SS.DB().orientations.SlimSuiteBossFrames = v and "vertical" or "horizontal"; SS.DB().sizes.SlimSuiteBossFrames = nil; SS.Safe(SS.UpdateBossFrames); SS.Safe(SS.PlaceAll); SU.UpdateDemo(); end } },
 		SlimSuiteTallyFrame = {
 			{ "Show map name and difficulty", function() return SS.DB().tallyContext; end, function(v) SS.DB().tallyContext = v and true or false; SS.UpdateTally(); end },
 			{ "Show boss and Guardian kills", function() return SS.DB().tallyBossKills; end, function(v) SS.DB().tallyBossKills = v; end },
@@ -333,12 +333,12 @@ function SU.ChecksFor(frame)
 		SlimSuiteSpellRowFrame = { VerticalRow("SlimSuiteSpellRowFrame"), JoinRows(), MatchRows(), ShowSpells(), ShowItems() },
 		SlimSuiteItemRowFrame = { VerticalRow("SlimSuiteItemRowFrame"), JoinRows(), MatchRows(), ShowSpells(), ShowItems() },
 		SlimSuiteCompassFrame = {
- {"Compass style",function() return SS.DB().compassStyle or "rail"; end,function(v) SS.DB().compassStyle=v; SS.UpdateCompass(); end,choice={{"Compass rail","rail"},{"Free markers","free"}}},
- {"Show bosses",function() return SS.DB().compassBosses~=false; end,function(v) SS.DB().compassBosses=v; end},
- {"Show lairs",function() return SS.DB().compassLairs~=false; end,function(v) SS.DB().compassLairs=v; end},
- {"Show chests",function() return SS.DB().compassCaches~=false; end,function(v) SS.DB().compassCaches=v; end},
- { "Run clock at the bottom of the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end, xref = true, short = "Run clock at the bottom" } },
- SlimSuiteCombatTextFrame = {
+	{"Compass style",function() return SS.DB().compassStyle or "rail"; end,function(v) SS.DB().compassStyle=v; SS.UpdateCompass(); end,choice={{"Compass rail","rail"},{"Free markers","free"}}},
+	{"Show bosses",function() return SS.DB().compassBosses~=false; end,function(v) SS.DB().compassBosses=v; end},
+	{"Show lairs",function() return SS.DB().compassLairs~=false; end,function(v) SS.DB().compassLairs=v; end},
+	{"Show chests",function() return SS.DB().compassCaches~=false; end,function(v) SS.DB().compassCaches=v; end},
+	{ "Run clock at the bottom of the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end, xref = true, short = "Run clock at the bottom" } },
+	SlimSuiteCombatTextFrame = {
 			SS.WorldCombatEntry and SS.WorldCombatEntry() or nil,
 			{ "Also write the numbers in the combat log", function() return SS.DB().keepCombatLog; end, function(v) SS.DB().keepCombatLog=v; end },
 			{ "Show healing numbers", function() return SS.DB().ctHeals ~= false; end, function(v) SS.DB().ctHeals = v and true or false; end },

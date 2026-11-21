@@ -1,6 +1,6 @@
 -- Optional enemy nameplates. Native plates use the same functions/state as 1.12's nameplate key binding;
 -- the modern overlay uses the game's documented world-anchor projection and AZS_UNITS data.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 
 local function ReadNativeNameplates()
 	return NAMEPLATES_ON and true or false;
@@ -21,21 +21,21 @@ function SS.SetNativeEnemyNameplates(on)
 end
 
 local function OverlayActive()
- local d = SS.DB();
- return d.modernEnemyFrames or (d.enemyPlateDebuffs and ReadNativeNameplates());
+	local d = SS.DB();
+	return d.modernEnemyFrames or (d.enemyPlateDebuffs and ReadNativeNameplates());
 end
 local PLATE_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
- tile = true, tileSize = 16, edgeSize = 10, insets = { left=2, right=2, top=2, bottom=2 } };
+	tile = true, tileSize = 16, edgeSize = 10, insets = { left=2, right=2, top=2, bottom=2 } };
 -- Slim plates: a slim health bar with the name above it. Colours are chosen in the settings.
 local PLATE_COLORS = { Red = { 0.86, 0.18, 0.14 }, Gold = { 0.95, 0.78, 0.22 }, Purple = { 0.66, 0.36, 0.92 },
- Green = { 0.35, 0.84, 0.36 }, Blue = { 0.3, 0.62, 1 }, White = { 0.94, 0.94, 0.94 } };
+	Green = { 0.35, 0.84, 0.36 }, Blue = { 0.3, 0.62, 1 }, White = { 0.94, 0.94, 0.94 } };
 local NAME_FONTS = { small = "GameFontNormalSmall", normal = "GameFontNormal", large = "GameFontNormalLarge" };
 local FLAT_TEX = "Interface\\Buttons\\WHITE8X8";
 local function PlateColor(kind)
- local d = SS.DB(); local key = d.plateColorEnemy;
- if ( kind == "elite" ) then key = d.plateColorElite;
- elseif ( kind == "boss" or kind == "finalBoss" or kind == "guardian" ) then key = d.plateColorBoss; end
- return PLATE_COLORS[key or ""] or PLATE_COLORS.Red;
+	local d = SS.DB(); local key = d.plateColorEnemy;
+	if ( kind == "elite" ) then key = d.plateColorElite;
+	elseif ( kind == "boss" or kind == "finalBoss" or kind == "guardian" ) then key = d.plateColorBoss; end
+	return PLATE_COLORS[key or ""] or PLATE_COLORS.Red;
 end
 local STACK_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 	tile = true, tileSize = 16, edgeSize = 8, insets = { left = 2, right = 2, top = 2, bottom = 2 } };
@@ -120,35 +120,35 @@ local function UpdatePlateData(record, unit)
 		local ok, values = SS.Safe(AZS_GetDebuffs, unit.id);
 		if ( ok and type(values) == "table" ) then debuffs = values; end
 	end
- local modern = SS.DB().modernEnemyFrames and true or false;
- local plater = modern and SS.DB().platerStyle ~= false;
- if ( f.modernStyle ~= modern or f.platerStyle ~= plater ) then
-  f.stackBox = nil;
-  if ( plater ) then f:SetBackdrop(nil); else f:SetBackdrop(modern and PLATE_BACKDROP or nil); end
-  if ( modern and not plater ) then f.panelStyle = nil; SS.ApplyPanelStyle(f); end
-  if ( not plater ) then ApplyClassicLayout(f); end
-  f.modernStyle = modern; f.platerStyle = plater;
- end
- if ( plater ) then
-  ApplyPlaterLayout(f); f.name:Show();
-  -- a stacked mob (one plate for several enemies) gets a light box with a thin border: easier to spot than a
-  -- single enemy, still quieter than the boss and guardian cards
-  local stacked = record.count and record.count > 1 and true or false;
-  if ( f.stackBox ~= stacked ) then
-   f.stackBox = stacked;
-   if ( stacked ) then
-    f:SetBackdrop(STACK_BACKDROP);
-    f:SetBackdropColor(0.03, 0.03, 0.04, 0.55);
-    f:SetBackdropBorderColor(0.85, 0.7, 0.35, 0.85);
-   else f:SetBackdrop(nil); end
-  end
-  if ( unit and tonumber(unit.hpm) and tonumber(unit.hpm) > 0 ) then
-   f.health:SetStatusBarColor(PlateColor(record.kind)[1], PlateColor(record.kind)[2], PlateColor(record.kind)[3]);
-   if ( SS.DB().plateHpText == false ) then f.hpText:Hide(); end
-  end
- elseif ( modern ) then f.name:Show();
- else f.name:Hide(); f.health:Hide(); f.hpText:Hide(); f.mark:Hide(); end
- record.visible = modern or table.getn(debuffs) > 0;
+	local modern = SS.DB().modernEnemyFrames and true or false;
+	local plater = modern and SS.DB().platerStyle ~= false;
+	if ( f.modernStyle ~= modern or f.platerStyle ~= plater ) then
+		f.stackBox = nil;
+		if ( plater ) then f:SetBackdrop(nil); else f:SetBackdrop(modern and PLATE_BACKDROP or nil); end
+		if ( modern and not plater ) then f.panelStyle = nil; SS.ApplyPanelStyle(f); end
+		if ( not plater ) then ApplyClassicLayout(f); end
+		f.modernStyle = modern; f.platerStyle = plater;
+	end
+	if ( plater ) then
+		ApplyPlaterLayout(f); f.name:Show();
+		-- a stacked mob (one plate for several enemies) gets a light box with a thin border: easier to spot than a
+		-- single enemy, still quieter than the boss and guardian cards
+		local stacked = record.count and record.count > 1 and true or false;
+		if ( f.stackBox ~= stacked ) then
+			f.stackBox = stacked;
+			if ( stacked ) then
+				f:SetBackdrop(STACK_BACKDROP);
+				f:SetBackdropColor(0.03, 0.03, 0.04, 0.55);
+				f:SetBackdropBorderColor(0.85, 0.7, 0.35, 0.85);
+			else f:SetBackdrop(nil); end
+		end
+		if ( unit and tonumber(unit.hpm) and tonumber(unit.hpm) > 0 ) then
+			f.health:SetStatusBarColor(PlateColor(record.kind)[1], PlateColor(record.kind)[2], PlateColor(record.kind)[3]);
+			if ( SS.DB().plateHpText == false ) then f.hpText:Hide(); end
+		end
+	elseif ( modern ) then f.name:Show();
+	else f.name:Hide(); f.health:Hide(); f.hpText:Hide(); f.mark:Hide(); end
+	record.visible = modern or table.getn(debuffs) > 0;
 	for i = 1, table.getn(f.dots) do
 		local dot, entry = f.dots[i], debuffs[i];
 		if ( entry and entry.icon ) then
@@ -283,20 +283,20 @@ function SS.UpdateEnemyNameplates()
 			if ( ReadNativeNameplates() == wanted or WriteNativeNameplates(wanted) ) then d.enemyNameplatesOriginal = nil; end
 		elseif ( d.enemyNameplates ~= nil and nativeChoiceApplied ~= d.enemyNameplates and ReadNativeNameplates() ~= (d.enemyNameplates and true or false) ) then WriteNativeNameplates(d.enemyNameplates); end
 		nativeChoiceApplied = d.enemyNameplates; -- honor subsequent native V-key changes between settings edits
- end
- if ( supported and OverlayActive() ) then
+	end
+	if ( supported and OverlayActive() ) then
 		if ( not registered and type(AZS_RegisterWorldAnchorFrameHandler) == "function" ) then
 			local ok, result = SS.Safe(AZS_RegisterWorldAnchorFrameHandler, ProjectPlates);
 			registered = ok and result == true;
 		end
 		SS.Safe(ReadCatalog);
- else
-  if ( registered and type(AZS_UnregisterWorldAnchorFrameHandler) == "function" ) then
-   local ok, result = SS.Safe(AZS_UnregisterWorldAnchorFrameHandler, ProjectPlates);
-   if ( ok and result == true ) then registered = false; end
-  end
-  for _, record in pairs(plates) do record.frame:Hide(); end
- end
+	else
+		if ( registered and type(AZS_UnregisterWorldAnchorFrameHandler) == "function" ) then
+			local ok, result = SS.Safe(AZS_UnregisterWorldAnchorFrameHandler, ProjectPlates);
+			if ( ok and result == true ) then registered = false; end
+		end
+		for _, record in pairs(plates) do record.frame:Hide(); end
+	end
 
 	if ( SlimSuiteWorld and SlimSuiteWorld.ApplyOnTop ) then SS.Safe(SlimSuiteWorld.ApplyOnTop); end
 end

@@ -1,18 +1,18 @@
 -- Focused Slim Suite module; loaded in manifest order.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 function SS.PartyBlockDepth(first)
-	if ( first and first == getglobal("SlimSuitePartyLines") ) then return (first:GetHeight() or 0) * RootFactor(first); end
+	if ( first and first == getglobal("SlimSuitePartyLines") ) then return (first:GetHeight() or 0) * SS.RootFactor(first); end
 	local depth = 0;
 	local top = first and first:GetTop();
 	if ( top ) then
-		top = top * RootFactor(first);
+		top = top * SS.RootFactor(first);
 		for i = 1, 4 do
 			local p = getglobal("PartyMemberFrame" .. i);
 			local b = p and p:GetBottom();
-			if ( b ) then depth = math.max(depth, top - b * RootFactor(p)); end
+			if ( b ) then depth = math.max(depth, top - b * SS.RootFactor(p)); end
 		end
 	end
-	if ( depth <= 0 and first ) then depth = (first:GetHeight() or 0) * RootFactor(first); end
+	if ( depth <= 0 and first ) then depth = (first:GetHeight() or 0) * SS.RootFactor(first); end
 	return depth;
 end
 
@@ -130,7 +130,7 @@ SU.CLASS_ICON = { Warrior = { 0, 0.25, 0, 0.25 }, Mage = { 0.25, 0.49, 0, 0.25 }
 function SU.SetPartyOption(key, on)
 	SS.DB()[key] = on and true or false;
 	if ( key == "partyLocked" and on ) then SS.MakeMovable("PartyMemberFrame1", "Lock to player frame moves them"); end
-	SS.Safe(PlaceAll);
+	SS.Safe(SS.PlaceAll);
 	SU.UpdateDemo();
 end
 
@@ -145,9 +145,9 @@ end
 function SU.SetPartyRow(on)
 	SS.DB().orientations.PartyMemberFrame1 = on and "horizontal" or "vertical";
 	-- Not wrapped in pcall: a failure here should reach the error log instead of silently doing nothing.
-	ApplyMovableOrientation("PartyMemberFrame1");
-	PlaceAll();
-	ApplyMovableOrientation("PartyMemberFrame1");   -- placing can re-anchor the leader, so lay the others out again
+	SS.ApplyMovableOrientation("PartyMemberFrame1");
+	SS.PlaceAll();
+	SS.ApplyMovableOrientation("PartyMemberFrame1");   -- placing can re-anchor the leader, so lay the others out again
 	SU.UpdateDemo();
 end
 
@@ -217,7 +217,7 @@ function SS.RefreshCard(f)
 	local native = getglobal(el);
 	if ( native and native.SetAlpha ) then native:SetAlpha(0); end
 	local mode = SS.DB().elementModes and SS.DB().elementModes[el];
-	if ( mode == "disabled" or (setupActive and not SS.SetupShows(el)) ) then f:Hide(); return; end
+	if ( mode == "disabled" or (SS.setupActive and not SS.SetupShows(el)) ) then f:Hide(); return; end
 	SS.Safe(SS.LayoutCard, f);
 	local unit = f.unit;
 	if ( not f.nativeArt ) then SS.Safe(SS.UpdateCardModel, f, unit);
@@ -426,7 +426,7 @@ end
 -- visibility), and the party shows face plates or thin lines
 function SS.ApplyNewFrames()
 	local cp, ct = getglobal("SlimSuitePlayerCard"), getglobal("SlimSuiteTargetCard");
-	if ( not setupActive ) then
+	if ( not SS.setupActive ) then
 		local P, T = getglobal("PlayerFrame"), getglobal("TargetFrame");
 		-- a frame hidden with Hide feature stays hidden
 		local muted = SS.DB().muted or {};
@@ -656,16 +656,16 @@ end
 function SS.KeepPartySelfOnScreen(plate)
 	local pf1 = getglobal("PartyMemberFrame1");
 	if ( not pf1 or not UIParent ) then return; end
-	local h = handles.PartyMemberFrame1;
+	local h = SS.handles.PartyMemberFrame1;
 	if ( h and h.dragging ) then return; end
-	local left, right, bottom, top = RootBounds(plate);
+	local left, right, bottom, top = SS.RootBounds(plate);
 	if ( not left or not top ) then return; end
 	local dx = left < 0 and -left or 0;
 	local dy = top > UIParent:GetHeight() and (UIParent:GetHeight() - top) or 0;
 	if ( dx == 0 and dy == 0 ) then return; end
-	local x, _, y = RootBounds(pf1);
+	local x, _, y = SS.RootBounds(pf1);
 	if ( not x or not y ) then return; end
-	SetRootPosition(pf1, x + dx, y + dy);
+	SS.SetRootPosition(pf1, x + dx, y + dy);
 	if ( not SS.demoRunning ) then SS.SavePosition("PartyMemberFrame1", pf1); end
 end
 
@@ -701,7 +701,7 @@ function SS.ApplyPartyLook()
 			elseif ( f.slimThin ) then
 				f.slimThin = nil;
 				if ( f.EnableMouse ) then f:EnableMouse(true); end
-				local hidden = (setupActive and not SS.SetupShows("PartyMemberFrame1")) or SS.DB().muted.PartyMemberFrame1;
+				local hidden = (SS.setupActive and not SS.SetupShows("PartyMemberFrame1")) or SS.DB().muted.PartyMemberFrame1;
 				f:SetAlpha(hidden and 0 or 1);
 			end
 		end
@@ -750,7 +750,7 @@ function SU.SetBuffsPlayer(on)
 		SS.Safe(SS.ApplyBuffOrientation);
 	end
 	if ( on ) then SS.DB().buffsOnTarget = false; SS.MakeMovable("BuffFrame", "they sit on the player frame"); end
-	if ( on ) then SS.Safe(SS.AttachBuffs); else SS.Safe(PlaceAll); end
+	if ( on ) then SS.Safe(SS.AttachBuffs); else SS.Safe(SS.PlaceAll); end
 	SU.RefreshBar();
 	if ( SU.focus ) then SU.Focus(SU.focus); end
 end
@@ -801,7 +801,7 @@ function SS.SetTargetHidden(on)
 	SS.DB().hideTarget = on and true or false;
 	SS.TargetFrameHidden(on);
 	SS.Safe(SS.ApplyNewFrames);
-	if ( setupActive and SU.on and (SU.on.TargetFrame and true or false) == (on and true or false) ) then
+	if ( SS.setupActive and SU.on and (SU.on.TargetFrame and true or false) == (on and true or false) ) then
 		SS.Safe(SU.SetOn, "TargetFrame", not on, SU.titles and SU.titles.TargetFrame or "Target frame");
 		SS.Safe(SU.RefreshBar);
 	end

@@ -1,7 +1,7 @@
 -- HUD Edit Mode search filters the list; the Talents window shows only the trees with points.
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
-SU = SS.ENV.SU
+SU = SS.SU
 SS.SetupEnd(true); Tick(3,.1)
 SS.OpenHUDEdit()
 local all=table.getn(SS.HUDOrder())

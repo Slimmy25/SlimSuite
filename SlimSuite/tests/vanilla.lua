@@ -4,10 +4,10 @@ local d=SS.DB(); local shown={}
 AZS_SetHudShown=function(part,on) shown[part]=on end
 AZS_IsHudShown=function(part) return shown[part]~=false end
 SS.StartSetup(true)
-for _,name in ipairs(SS.SETUP_ORDER) do SS.ENV.SU.SetMode(name,"enabled",name) end
+for _,name in ipairs(SS.SETUP_ORDER) do SS.SU.SetMode(name,"enabled",name) end
 d.floatingText=true; d.showAbsorbs=true; d.minimapSquare=true; d.minimapCaches=true
 SS.GoBackToVanilla(); Tick(3)
-check("editor and demo are off",not d.unlocked and not SS.demoRunning and not SS.ENV.setupActive)
+check("editor and demo are off",not d.unlocked and not SS.demoRunning and not SS.setupActive)
 check("vanilla selection persists without restarting onboarding",d.vanillaUI and d.setupDone and d.firstSetupDefaultsVersion==2)
 for _,name in ipairs(SS.SETUP_ORDER) do check("native mode "..name,d.elementModes[name]=="default") end
 for part in pairs(SS.NATIVE_KEYS) do check("native HUD shown "..part,shown[part]==true) end

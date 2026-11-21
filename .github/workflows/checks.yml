@@ -1,0 +1,20 @@
+# Runs every check on each push to main and on pull requests, including the real Lua 5.0 compile of every file,
+# so a problem shows up right away, not only when a new version is released. (The release workflow runs the
+# same checks again before it publishes anything.)
+name: Checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the checks
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.3 gcc
+          LUA=lua5.3 sh SlimSuite/tests/run-checks.sh

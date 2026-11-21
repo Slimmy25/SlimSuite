@@ -2,7 +2,7 @@
 --   Original: untouched, the game opens and places it.
 --   On: Slim Suite places it, and the saved place is applied again each time it opens.
 --   Off: it stays hidden, even when its key (C or N) is pressed.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 local function Hook(name)
 	local f = getglobal(name);
 	if ( not f or not f.SetScript or not f.GetScript ) then return; end

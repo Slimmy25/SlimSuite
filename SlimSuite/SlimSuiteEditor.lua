@@ -1,5 +1,5 @@
 -- Focused Slim Suite module; loaded in manifest order.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 function SU.Save(f)
 	SU.saved = SU.saved or {};
 	if ( SU.saved[f] == nil ) then SU.saved[f] = f:GetAlpha() or 1; end
@@ -38,7 +38,7 @@ function SU.HideAll()
 	local keep = { [SU.panel] = true, [SU.bar] = true, [SU.glow] = true };
 	if ( SU.confirmDone ) then keep[SU.confirmDone] = true; end
 	for name in pairs(SU.KEEP_VISIBLE) do local c = getglobal(name); if ( c ) then keep[c] = true; end end
-	for _, h in pairs(handles) do keep[h] = true; end
+	for _, h in pairs(SS.handles) do keep[h] = true; end
 	local kids = { UIParent:GetChildren() };
 	for i = 1, table.getn(kids) do
 		local f = kids[i];
@@ -56,8 +56,8 @@ end
 
 -- turn an element on or off: its frame (and the frames that move with it) and its handle
 SU.FEATURES = {
- SlimSuiteAchievementsButton=function(v) SS.DB().achievementButton=v; if SS.UpdateAchievementButton then SS.UpdateAchievementButton(); end end,
- SlimSuiteLuckFrame=function(v) SS.DB().luckPanel=v; if SS.UpdateLuck then SS.UpdateLuck(); end end,
+	SlimSuiteAchievementsButton=function(v) SS.DB().achievementButton=v; if SS.UpdateAchievementButton then SS.UpdateAchievementButton(); end end,
+	SlimSuiteLuckFrame=function(v) SS.DB().luckPanel=v; if SS.UpdateLuck then SS.UpdateLuck(); end end,
 	SlimSuiteCompassFrame = function(v) SS.DB().compassOn=v; if ( SS.UpdateCompass ) then SS.UpdateCompass(); end end,
 	SlimSuiteStatCounterFrame = function(v)
 		SS.DB().statCounter=v and true or false; if ( SS.UpdateStats ) then SS.UpdateStats(); else SU.statCounterPlaceholder:Hide(); end
@@ -197,9 +197,9 @@ function SU.ApplyOn(frame, on, title)
 		SS.SetMirrorTarget(false); SS.Notice("Mirror Target turned off: the target frame is off.");
 	end
 	local hname = SS.Shown(frame);
-	if ( hname ~= frame and handles[frame] ) then handles[frame]:Hide(); end    -- the hidden frame's handle never shows
-	if ( on and not handles[hname] and title ) then SS.Safe(SS.Handle, hname, title); end
-	if ( handles[hname] ) then if ( on and SS.HandleAllowed(hname) ) then handles[hname]:Show(); else handles[hname]:Hide(); end end
+	if ( hname ~= frame and SS.handles[frame] ) then SS.handles[frame]:Hide(); end    -- the hidden frame's handle never shows
+	if ( on and not SS.handles[hname] and title ) then SS.Safe(SS.Handle, hname, title); end
+	if ( SS.handles[hname] ) then if ( on and SS.HandleAllowed(hname) ) then SS.handles[hname]:Show(); else SS.handles[hname]:Hide(); end end
 	if ( frame == "MinimapCluster" and on ) then SS.Safe(SS.ApplyMinimapShape); end   -- round border or square edge
 	if ( frame == "ChatFrame1" and on ) then SS.Safe(SS.PrepareChatWindow); end
 	if ( frame == "PlayerFrame" or frame == "TargetFrame" ) then
@@ -214,8 +214,8 @@ end
 -- the grid: the setting, the bar button and the panel's tick box all agree
 function SU.SetGridSetting(on)
 	SS.DB().showEditGrid = on and true or false;
-	SS.Safe(ShowEditGrid);                                 -- shows it while editing, or takes it away
-	if ( setupActive ) then SU.SetOn("SlimSuiteEditGrid", on and true or false); end
+	SS.Safe(SS.ShowEditGrid);                                 -- shows it while editing, or takes it away
+	if ( SS.setupActive ) then SU.SetOn("SlimSuiteEditGrid", on and true or false); end
 	if ( SU.grid ) then SU.grid.Refresh(); end
 end
 
@@ -227,23 +227,23 @@ function SS.HiddenInSetup(name)
 	return SS.hudHideAll and SU.Mode(SS.Element(name)) ~= "enabled" and true or false;
 end
 function SU.Mode(frame)
- local d = SS.DB(); local mode = d.elementModes[frame];
- if ( mode == "enabled" or mode == "disabled" or mode == "default" ) then return mode; end
- if ( d.enabledElements and d.enabledElements[frame] ) then return "enabled"; end
- local element = SS.ELEMENTS[frame];
- if ( element and element.feature and d[element.feature] ) then return "enabled"; end
- if ( (frame == "PlayerFrame" or frame == "TargetFrame") and SS.UsesCard(frame) ) then return "enabled"; end
- if ( frame == "PartyMemberFrame1" and SS.Look(frame) == "thin" ) then return "enabled"; end
- if ( frame == "TargetFrame" and d.hideTarget ) then return "disabled"; end
- return "default";
+	local d = SS.DB(); local mode = d.elementModes[frame];
+	if ( mode == "enabled" or mode == "disabled" or mode == "default" ) then return mode; end
+	if ( d.enabledElements and d.enabledElements[frame] ) then return "enabled"; end
+	local element = SS.ELEMENTS[frame];
+	if ( element and element.feature and d[element.feature] ) then return "enabled"; end
+	if ( (frame == "PlayerFrame" or frame == "TargetFrame") and SS.UsesCard(frame) ) then return "enabled"; end
+	if ( frame == "PartyMemberFrame1" and SS.Look(frame) == "thin" ) then return "enabled"; end
+	if ( frame == "TargetFrame" and d.hideTarget ) then return "disabled"; end
+	return "default";
 end
 
 function SS.MigrateElementModes()
- local d = SS.DB();
- for i = 1, table.getn(SS.SETUP_ORDER) do
-  local name = SS.SETUP_ORDER[i]; d.elementModes[name] = SU.Mode(name);
- end
- d.enabledElements = {}; -- legacy import input only; no second saved source of enabled state
+	local d = SS.DB();
+	for i = 1, table.getn(SS.SETUP_ORDER) do
+		local name = SS.SETUP_ORDER[i]; d.elementModes[name] = SU.Mode(name);
+	end
+	d.enabledElements = {}; -- legacy import input only; no second saved source of enabled state
 end
 
 -- Detect an existing HUD setup so onboarding never resets a returning player's saved layout.
@@ -262,7 +262,7 @@ end
 
 -- Reapply explicit element choices after the game restores its native frames during login or setup exit.
 function SS.ApplyElementModes()
-	if ( setupActive ) then return; end
+	if ( SS.setupActive ) then return; end
 	local modes, steps, seen = SS.DB().elementModes or {}, SU.Steps(), {};
 	for i = 1, table.getn(steps) do
 		local frame = steps[i].frame;
@@ -290,6 +290,13 @@ function SU.SetMode(frame, mode, title)
 	local d = SS.DB();
 	d.elementModes = d.elementModes or {};
 	if ( d.elementModes[frame] ~= mode and SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
+	-- every On / Off / Default change is logged with what asked for it, so elements switching on by themselves
+	-- (several at once, with nobody touching them) can be traced to the code that did it
+	if ( (d.elementModes[frame] or "default") ~= mode and SS.LogAction ) then
+		local from = type(debugstack) == "function" and string.gsub(debugstack(2, 2, 0) or "", "\n", " | ") or "";
+		SS.LogAction("[mode] " .. tostring(frame) .. ": " .. tostring(d.elementModes[frame] or "default") .. " -> " .. mode
+			.. (SU.restoring and " (restoring a layout)" or "") .. (SU.batching and " (batch)" or "") .. "  " .. from);
+	end
 	d.elementModes[frame] = mode;
 	if ( mode == "enabled" ) then
 		SU.defaulting = false;
@@ -329,11 +336,11 @@ function SU.SetMode(frame, mode, title)
 			if ( f and f.SetAlpha and not SU.FEATURES[frame] ) then
 				f:SetAlpha(1);
 				-- Default restores native visibility rules, not empty preview placeholders.
-    local partyIndex;
-    if type(name)=="string" then local _,_,index=string.find(name,"^PartyMemberFrame(%d)$"); partyIndex=index; end
-    if ( partyIndex and not UnitExists("party"..partyIndex) ) then f:Hide();
-    elseif ( name=="TargetFrame" and not UnitExists("target") ) then f:Hide();
-    elseif ( f.Show and frame ~= "GameTooltip" ) then f:Show(); end
+				local partyIndex;
+				if type(name)=="string" then local _,_,index=string.find(name,"^PartyMemberFrame(%d)$"); partyIndex=index; end
+				if ( partyIndex and not UnitExists("party"..partyIndex) ) then f:Hide();
+				elseif ( name=="TargetFrame" and not UnitExists("target") ) then f:Hide();
+				elseif ( f.Show and frame ~= "GameTooltip" ) then f:Show(); end
 			end
 		end
 		if ( frame == "MinimapCluster" ) then SS.Safe(SS.ApplyMinimapShape); end
@@ -341,20 +348,14 @@ function SU.SetMode(frame, mode, title)
 	end
 	if ( not SU.batching ) then SU.RefreshBar(); SU.UpdateDemo(); SU.RefreshDemoButtons(); end
 	-- Selecting Enabled in setup immediately selects that element and exposes its green move handle.
-	if ( not SU.batching and setupActive and mode == "enabled" ) then SU.Focus(frame); end
+	if ( not SU.batching and SS.setupActive and mode == "enabled" ) then SU.Focus(frame); end
 	if ( frame == "ChatFrame1" ) then SS.Safe(SS.RefreshChatDock); end
 	if ( not SU.batching ) then SS.RefreshToggles(); end
 end
 
 function SU.SetOn(frame, on, title)
- if ( not SS.ELEMENTS[frame] ) then return SU.ApplyOn(frame, on, title); end
- return SU.SetMode(frame, on and "enabled" or "disabled", title);
-end
-
-function SU.CycleMode(frame)
-	local nextMode = { default = "enabled", enabled = "disabled", disabled = "default" };
-	SU.SetMode(frame, nextMode[SU.Mode(frame)] or "default", SU.titles and SU.titles[frame]);
-	if ( SU.Mode(frame) == "enabled" ) then SU.Focus(frame); elseif ( SU.focus == frame ) then SU.Focus(nil); end
+	if ( not SS.ELEMENTS[frame] ) then return SU.ApplyOn(frame, on, title); end
+	return SU.SetMode(frame, on and "enabled" or "disabled", title);
 end
 
 function SS.Demoing(name)
@@ -372,8 +373,8 @@ end
 -- the action bar: vertical or horizontal, kept until changed
 function SU.SetVertical(name, on)
 	SS.DB().orientations[name] = on and "vertical" or "horizontal";
-	SS.Safe(ApplyMovableOrientation, name);
-	SS.Safe(PlaceAll);
+	SS.Safe(SS.ApplyMovableOrientation, name);
+	SS.Safe(SS.PlaceAll);
 	SU.UpdateDemo();
 	if ( SU.checks ) then for i = 1, table.getn(SU.checks) do SU.checks[i].Refresh(); end end
 end
@@ -383,31 +384,31 @@ end
 
 -- One explicit escape hatch: restore the game's HUD, not an empty Disabled layout.
 function SS.GoBackToVanilla()
- if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
- SS.StopDemoMode();
- if ( setupActive ) then SS.SetupEnd(true); end
- SS.SetUnlocked(false,true);
- local d=SS.DB();
- SS.ResetUI();
- d.vanillaUI=true; d.setupDone=true; d.firstSetupDefaultsVersion=2;
- for _,key in ipairs({"plainBar","xpHideBorder","xpSegments","cooldowns","showRacialAbility","showEmptyActionSlots","floatingText","procMeter","showAbsorbs","targetDebuffs","partyMemberBuffs","minimapCaches","minimapBosses","minimapLairs","showGuardianFlag","showEditGrid","anchorSnap","onTopOfScreens","bossMarks","deathMarks","prePullMarks","raidRow","zoneLine","tallyContext","tallyBossKills","accessibilityContrast","accessibilityLargeText","accessibilityReduceMotion","enemyPlateDebuffs"}) do d[key]=false; end
- d.enemyNameplates=nil;
- SS.SetModernEnemyFrames(false);
- d.partyLocked,d.partyLockAbove,d.combineTarget,d.mirrorTarget=false,false,false,false;
- d.buffsOnPlayer,d.buffsOnTarget=false,false;
- d.places,d.sizes,d.scales,d.padding,d.orientations,d.muted={},{},{},{},{},{};
- d.enabledElements={};
- SU.batching=true; SU.restoring=false;
- for _,name in ipairs(SS.SETUP_ORDER) do SU.SetMode(name,"default",SS.ELEMENTS[name].title); end
- SU.batching=false;
- SS.ApplyElementModes();
- for _,name in ipairs(SS.SETUP_ORDER) do SS.Safe(SU.RestoreNative,name); end
- SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.ApplyGuardianFlag);
- SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.ApplyBuffOrientation);
- SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.UpdateEnemyNameplates);
- SS.Safe(ShowEditGrid); SS.Safe(ApplyActionSlotGrid);
- if ( SlimSuiteWorld and SlimSuiteWorld.ApplyOnTop ) then SS.Safe(SlimSuiteWorld.ApplyOnTop); end
- SS.SetUnlocked(false,true); SS.RefreshToggles();
- if ( SS.RestoreNativeDamageNumbers ) then SS.RestoreNativeDamageNumbers(); end
- if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
+	SS.StopDemoMode();
+	if ( SS.setupActive ) then SS.SetupEnd(true); end
+	SS.SetUnlocked(false,true);
+	local d=SS.DB();
+	SS.ResetUI();
+	d.vanillaUI=true; d.setupDone=true; d.firstSetupDefaultsVersion=2;
+	for _,key in ipairs({"plainBar","xpHideBorder","xpSegments","cooldowns","showRacialAbility","showEmptyActionSlots","floatingText","procMeter","showAbsorbs","targetDebuffs","partyMemberBuffs","minimapCaches","minimapBosses","minimapLairs","showGuardianFlag","showEditGrid","anchorSnap","onTopOfScreens","bossMarks","deathMarks","prePullMarks","raidRow","zoneLine","tallyContext","tallyBossKills","accessibilityContrast","accessibilityLargeText","accessibilityReduceMotion","enemyPlateDebuffs"}) do d[key]=false; end
+	d.enemyNameplates=nil;
+	SS.SetModernEnemyFrames(false);
+	d.partyLocked,d.partyLockAbove,d.combineTarget,d.mirrorTarget=false,false,false,false;
+	d.buffsOnPlayer,d.buffsOnTarget=false,false;
+	d.places,d.sizes,d.scales,d.padding,d.orientations,d.muted={},{},{},{},{},{};
+	d.enabledElements={};
+	SU.batching=true; SU.restoring=false;
+	for _,name in ipairs(SS.SETUP_ORDER) do SU.SetMode(name,"default",SS.ELEMENTS[name].title); end
+	SU.batching=false;
+	SS.ApplyElementModes();
+	for _,name in ipairs(SS.SETUP_ORDER) do SS.Safe(SU.RestoreNative,name); end
+	SS.Safe(SS.LayoutMinimapBar); SS.Safe(SS.ApplyGuardianFlag);
+	SS.Safe(SS.ApplyNewFrames); SS.Safe(SS.ApplyBuffOrientation);
+	SS.Safe(SS.ApplyMinimapShape); SS.Safe(SS.UpdateEnemyNameplates);
+	SS.Safe(SS.ShowEditGrid); SS.Safe(SS.ApplyActionSlotGrid);
+	if ( SlimSuiteWorld and SlimSuiteWorld.ApplyOnTop ) then SS.Safe(SlimSuiteWorld.ApplyOnTop); end
+	SS.SetUnlocked(false,true); SS.RefreshToggles();
+	if ( SS.RestoreNativeDamageNumbers ) then SS.RestoreNativeDamageNumbers(); end
+	if ( SS.MarkProfileDirty ) then SS.MarkProfileDirty(); end
 end

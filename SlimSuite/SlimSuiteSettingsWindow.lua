@@ -1,5 +1,5 @@
 -- Focused Slim Suite module; loaded in manifest order.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 -- Let the client measure wrapped translated text; retain the established font size.
 function SS.WrappedLabelHeight(label, width)
 	label:SetWidth(math.max(40, width)); label:SetHeight(0);
@@ -49,18 +49,12 @@ function SS.LayoutPage(page)
 				if ( rows[j].kind == "head" ) then break; end
 				if ( show[j] ) then any = true; break; end
 			end
+			if ( r.count and SS.SectionCount ) then r.fs:SetText(r.label .. "  |cffbbbbbb" .. SS.SectionCount(r.count) .. " " .. SS.T("on") .. "|r"); end
 			r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", r.deathHeader and 240 or 8, y);
 			if ( any ) then r.fs:Show(); y = y - 24; else r.fs:Hide(); end
 		elseif ( show[i] ) then
 			local rowHeight = 28;
-			if ( r.kind == "elementmode" ) then
-				r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 30, y - 6); r.fs:Show();
-				for j = 1, 3 do
-					local eb = r.buttons[j].b;
-					eb:ClearAllPoints(); eb:SetPoint("TOPLEFT", parent, "TOPLEFT", 214 + (j - 1) * 68, y); eb:Show();
-				end
-				rowHeight = 30;
-			elseif ( r.kind == "button" ) then
+			if ( r.kind == "button" ) then
 				r.b:ClearAllPoints(); r.b:SetPoint("TOPLEFT", parent, "TOPLEFT", 26, y + 2);
 				r.b:Show();
 				rowHeight = 30;
@@ -80,11 +74,11 @@ function SS.LayoutPage(page)
 				end
 				rowHeight = 26;
 			elseif r.kind=="deathmatrix" then
-    r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT",parent,"TOPLEFT",48,y-5); r.fs:SetWidth(170); r.fs:Show();
-    r.cb:ClearAllPoints(); r.cb:SetPoint("TOPLEFT",parent,"TOPLEFT",250,y); r.cb:Show(); r.cb.label:Hide();
-    r.mate:ClearAllPoints(); r.mate:SetPoint("TOPLEFT",parent,"TOPLEFT",350,y); r.mate:Show(); r.mate.label:Hide();
-    if r.preview then r.preview:ClearAllPoints(); r.preview:SetPoint("TOPLEFT",parent,"TOPLEFT",24,y-4); r.preview:Show(); end
-   elseif ( r.kind == "choice" ) then
+				r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT",parent,"TOPLEFT",48,y-5); r.fs:SetWidth(170); r.fs:Show();
+				r.cb:ClearAllPoints(); r.cb:SetPoint("TOPLEFT",parent,"TOPLEFT",250,y); r.cb:Show(); r.cb.label:Hide();
+				r.mate:ClearAllPoints(); r.mate:SetPoint("TOPLEFT",parent,"TOPLEFT",350,y); r.mate:Show(); r.mate.label:Hide();
+				if r.preview then r.preview:ClearAllPoints(); r.preview:SetPoint("TOPLEFT",parent,"TOPLEFT",24,y-4); r.preview:Show(); end
+			elseif ( r.kind == "choice" ) then
 				r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 30 + r.lead, y - 6);
 				rowHeight = math.max(28, SS.WrappedLabelHeight(r.fs, 140 - r.lead) + 10);
 				r.fs:Show(); r.b:Show();
@@ -92,12 +86,11 @@ function SS.LayoutPage(page)
 				r.cb:ClearAllPoints(); r.cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 26 + r.lead, y);
 				rowHeight = math.max(28, SS.WrappedLabelHeight(r.cb.label, 350 - r.lead) + 8);
 				r.cb:Show(); r.cb.label:Show();
-    if r.preview then r.preview:ClearAllPoints(); r.preview:SetPoint("RIGHT",r.cb,"LEFT",-2,0); r.preview:Show(); end
+				if r.preview then r.preview:ClearAllPoints(); r.preview:SetPoint("RIGHT",r.cb,"LEFT",-2,0); r.preview:Show(); end
 			end
 			y = y - rowHeight;
 		else
-			if ( r.kind == "elementmode" ) then r.fs:Hide(); for j = 1, 3 do r.buttons[j].b:Hide(); end
-			elseif ( r.kind == "button" or r.kind == "fold" ) then r.b:Hide(); if ( r.kind == "fold" ) then r.searchOpen = nil; end if ( r.sign ) then r.sign:Hide(); end for _, mb in ipairs(r.modes or {}) do mb:Hide(); end
+			if ( r.kind == "button" or r.kind == "fold" ) then r.b:Hide(); if ( r.kind == "fold" ) then r.searchOpen = nil; end if ( r.sign ) then r.sign:Hide(); end for _, mb in ipairs(r.modes or {}) do mb:Hide(); end
 			elseif ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); if r.preview then r.preview:Hide(); end end
 		end
 	end
@@ -116,7 +109,7 @@ SS.TIPS = {
 -- Keeps the text size of the Slim Suite windows in step with the chosen size.
 function SS.SetTextScale(v)
 	SS.DB().uiTextScale = v or 1;
-	local win = getglobal("SlimSuiteFrame"); if ( win and win.SetScale ) then win:SetScale(SS.DB().uiTextScale); end
+	local frame = getglobal("SlimSuiteFrame"); if ( frame and frame.SetScale ) then frame:SetScale(SS.DB().uiTextScale); end
 	if ( SU.panel and SU.panel.SetScale ) then SU.panel:SetScale(SS.DB().uiTextScale); end
 end
 -- A settings row is hidden while the search box does not match its label. Headings stay if a row under them shows.
@@ -125,6 +118,8 @@ function SS.RowMatches(r)
 	local q = SS.searchText;
 	if ( not q or q == "" or r.kind == "head" ) then return true; end
 	local t = r.full or r.title or "";
+	-- an element's section also answers to its other names (encounter finds the Encounter bars, ...)
+	if ( r.element ) then t = t .. " " .. SS.ElementWords(r.element); end
 	if ( r.full == nil and r.title == nil ) then
 		if ( r.cb and r.cb.label and r.cb.label.GetText ) then t = r.cb.label:GetText() or "";
 		elseif ( r.fs and r.fs.GetText ) then t = r.fs:GetText() or ""; end
@@ -140,6 +135,25 @@ function SS.RowMatches(r)
 		end
 	end
 	return false;
+end
+-- every name an element goes by: its label, title, frame name and the everyday words players use for it
+SS.ELEMENT_WORDS = {
+	PlayerFrame = "player me my frame unit frame portrait health", TargetFrame = "target enemy unit frame",
+	PartyMemberFrame1 = "party group team friends", SlimSuitePartyLines = "party group lines",
+	MinimapCluster = "minimap map", BuffFrame = "buffs debuffs auras", MainMenuBar = "action bar abilities buttons",
+	MainMenuExpBar = "xp experience bar level", ChatFrame1 = "chat", SlimSuiteMeterFrame = "damage meter dps",
+	SlimSuiteClockFrame = "run clock timer next boss", SlimSuiteBossFrames = "encounter boss bars bosses guardians",
+	SlimSuiteAnnouncementFrame = "announcements banners events", SlimSuiteStoredLevelsButton = "level up stored levels",
+	SlimSuiteReviveFrame = "revive bar", SlimSuiteLocalClockFrame = "local clock time",
+	SlimSuiteSpellRowFrame = "build spells spell row", SlimSuiteItemRowFrame = "rings trinkets jewelry items",
+	SlimSuiteTallyFrame = "kills gold cache tally", GameTooltip = "tooltip", SlimSuiteCombatTextFrame = "combat text numbers",
+	SlimSuitePlayerCard = "player new style card", SlimSuiteTargetCard = "target new style card",
+	SlimSuiteStatCounterFrame = "stats", SlimSuiteCompassFrame = "compass", SlimSuiteLuckFrame = "legendary luck",
+	SlimSuiteAchievementsButton = "side achievements", CharacterFrame = "character", TalentFrame = "talents",
+};
+function SS.ElementWords(name)
+	local e = SS.ELEMENTS and SS.ELEMENTS[name] or {};
+	return string.lower(table.concat({ e.label or "", e.title or "", name or "", SS.ELEMENT_WORDS[name] or "" }, " "));
 end
 SS.SEARCH_WORDS = {
 	{ "hide", "hidden", "remove", "off", "disable" }, { "opacity", "transparent", "see-through", "fade" },
@@ -177,7 +191,7 @@ function SS.Check(parent, label, y, get, set, indent)
 	SS.TrackToggle(cb);
 	cb:SetScript("OnClick", function()
 		if this.cond and not this.cond() then return; end
-  local v = not (get() and true or false);
+		local v = not (get() and true or false);
 		SS.ChangeSetting(get, set, v);
 		K.Sound(v and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff");
 		SS.RefreshToggles();
@@ -186,77 +200,76 @@ function SS.Check(parent, label, y, get, set, indent)
 end
 
 function SS.SoundPreviewIcon(parent,key)
- local button=CreateFrame("Button",nil,parent); button:SetWidth(18); button:SetHeight(18);
- -- Texture geometry keeps the media icons crisp without relying on font glyphs.
- local play,paused,playing={},{},{};
- local function bar(group,x,y,width,height)
-  local texture=button:CreateTexture(nil,"ARTWORK"); texture:SetTexture(1,1,1,1);
-  texture:SetWidth(width); texture:SetHeight(height); texture:SetPoint("CENTER",button,"CENTER",x,y);
-  table.insert(group,texture);
- end
- for i=0,7 do bar(play,-3+i,0,1,12-i*1.5); end
- bar(paused,-3,0,3,12); bar(paused,3,0,3,12);
- bar(playing,-4,0,2,5); bar(playing,0,0,2,11); bar(playing,4,0,2,7);
- local hover=button:CreateTexture(nil,"BACKGROUND"); hover:SetTexture(1,1,1,.16); hover:SetAllPoints(button); hover:Hide();
- local lastState;
- local function show(group,visible)
-  for _,texture in ipairs(group) do if visible then texture:Show(); else texture:Hide(); end end
- end
- local function refresh()
-  local active=SS.PreviewActive(key);
-  local state=active and (SS.CanStopPreview() and "pause" or "playing") or (SS.previewNext==key and "queued" or "play");
-  if state==lastState then return; end
-  lastState=state; button.isStop=state=="pause";
-  show(play,state=="play"); show(paused,state=="pause"); show(playing,state=="playing" or state=="queued");
-  for _,texture in ipairs(playing) do texture:SetAlpha(state=="queued" and .4 or 1); end
- end
- button:SetScript("OnUpdate",function() refresh(); end); refresh();
- button:SetScript("OnClick",function() SS.PreviewSound(key); refresh(); end);
- button:SetScript("OnEnter",function()
-  hover:Show();
-  if GameTooltip then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(SS.T(SS.previewNext==key and "Queued preview (waiting for current sound)" or SS.PreviewActive(key) and (SS.CanStopPreview() and "Stop sound" or "Playing (client cannot stop sounds)") or "Play sound")); GameTooltip:Show(); end
- end);
- button:SetScript("OnLeave",function() hover:Hide(); if GameTooltip then GameTooltip:Hide(); end end);
- return button;
+	local button=CreateFrame("Button",nil,parent); button:SetWidth(18); button:SetHeight(18);
+	-- Texture geometry keeps the media icons crisp without relying on font glyphs.
+	local play,paused,playing={},{},{};
+	local function bar(group,x,y,width,height)
+		local texture=button:CreateTexture(nil,"ARTWORK"); texture:SetTexture(1,1,1,1);
+		texture:SetWidth(width); texture:SetHeight(height); texture:SetPoint("CENTER",button,"CENTER",x,y);
+		table.insert(group,texture);
+	end
+	for i=0,7 do bar(play,-3+i,0,1,12-i*1.5); end
+	bar(paused,-3,0,3,12); bar(paused,3,0,3,12);
+	bar(playing,-4,0,2,5); bar(playing,0,0,2,11); bar(playing,4,0,2,7);
+	local hover=button:CreateTexture(nil,"BACKGROUND"); hover:SetTexture(1,1,1,.16); hover:SetAllPoints(button); hover:Hide();
+	local lastState;
+	local function show(group,visible)
+		for _,texture in ipairs(group) do if visible then texture:Show(); else texture:Hide(); end end
+	end
+	local function refresh()
+		local active=SS.PreviewActive(key);
+		local state=active and (SS.CanStopPreview() and "pause" or "playing") or (SS.previewNext==key and "queued" or "play");
+		if state==lastState then return; end
+		lastState=state; button.isStop=state=="pause";
+		show(play,state=="play"); show(paused,state=="pause"); show(playing,state=="playing" or state=="queued");
+		for _,texture in ipairs(playing) do texture:SetAlpha(state=="queued" and .4 or 1); end
+	end
+	button:SetScript("OnUpdate",function() refresh(); end); refresh();
+	button:SetScript("OnClick",function() SS.PreviewSound(key); refresh(); end);
+	button:SetScript("OnEnter",function()
+		hover:Show();
+		if GameTooltip then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(SS.T(SS.previewNext==key and "Queued preview (waiting for current sound)" or SS.PreviewActive(key) and (SS.CanStopPreview() and "Stop sound" or "Playing (client cannot stop sounds)") or "Play sound")); GameTooltip:Show(); end
+	end);
+	button:SetScript("OnLeave",function() hover:Hide(); if GameTooltip then GameTooltip:Hide(); end end);
+	return button;
 end
 function SS.WinBuild()
- win=K.Window("SlimSuiteFrame","Slim Suite",720,560);
- local search=CreateFrame("EditBox","SlimSuiteSettingsSearch",win,"InputBoxTemplate");
- search:SetWidth(150); search:SetHeight(20); search:SetPoint("TOPRIGHT",win,"TOPRIGHT",-22,-30);
- search:SetAutoFocus(false); search:SetMaxLetters(40);
- search:SetScript("OnTextChanged",function()
-  SS.searchText=string.lower(this:GetText() or ""); SS.RelayoutAllPages();
-  -- nothing here matches: go to the first page that has something
-  local views=SS.settingsViews; local cur=views and SS.currentModule and views[SS.currentModule];
-  if SS.searchText~="" and cur and (cur.page.matchCount or 0)==0 then
-   for _,id in ipairs(SS.MODULE_ORDER) do if views[id] and (views[id].page.matchCount or 0)>0 then SS.OpenModulePage(id); break; end end
-  end
- end);
- SS.AddTip(search,"Search: type a word (hide, clock, boss, size, party...) and every setting about it opens.");
- search:SetScript("OnEscapePressed",function() this:SetText(""); this:ClearFocus(); end);
- -- the search box says what it is; the version sits quietly in the bottom bar
- local searchLabel=win:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); searchLabel:SetPoint("RIGHT",search,"LEFT",-8,0); searchLabel:SetText(SS.T("Search"));
- local version=win:CreateFontString(nil,"OVERLAY","GameFontDisableSmall"); version:SetPoint("BOTTOM",win,"BOTTOM",60,18); version:SetText("v"..SS.AddonVersion());
- local hub=CreateFrame("Frame","SlimSuiteModuleHub",win); hub:SetPoint("TOPLEFT",win,"TOPLEFT",14,-34); hub:SetWidth(182); hub:SetHeight(470);
- -- the one primary category: every subcategory below is a part of Slim Suite
- -- (no band: the window's own title already says Slim Suite)
- local title=win:CreateFontString(nil,"OVERLAY","GameFontNormalLarge"); title:SetPoint("TOPLEFT",win,"TOPLEFT",214,-34); title:SetTextColor(1,1,1);
- local rule=win:CreateTexture(nil,"ARTWORK"); rule:SetTexture("Interface\\Buttons\\WHITE8X8"); rule:SetVertexColor(0.5,0.5,0.55,0.8); rule:SetPoint("TOPLEFT",win,"TOPLEFT",214,-58); rule:SetWidth(470); rule:SetHeight(1);
- local closeButton=K.Button(win,"Close",90,function() win:Hide(); end); closeButton:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,12);
- -- Defaults resets the category on the page; Reset ALL asks first, then wipes the whole addon
- local defaultsButton=K.Button(win,"Defaults",100,function() if SS.currentModule and SS.currentModule~="changelog" then SS.ResetCategory(SS.currentModule); end end); defaultsButton:SetPoint("BOTTOMLEFT",win,"BOTTOMLEFT",22,12);
- local resetAllButton=K.Button(win,"Reset ALL",110,function() SS.ConfirmResetAll(); end); resetAllButton:SetPoint("LEFT",defaultsButton,"RIGHT",8,0); SS.settingsTitle=title;
- SS.moduleHubButtons={}; local views={}; local current; SS.settingsViews=views;
- local undo=K.Button(win,"Undo",70,function() SS.Undo(); end); undo:SetPoint("LEFT",resetAllButton,"RIGHT",16,0);
- local redo=K.Button(win,"Redo",70,function() SS.Redo(); end); redo:SetPoint("LEFT",undo,"RIGHT",6,0);
- SS.undoButton, SS.redoButton = undo, redo;
- SS.AddTip(undo,function() local c=SS.history[SS.historyPos]; return c and (SS.T("Undo")..": "..c.what) or SS.T("Nothing to undo"); end);
- SS.AddTip(redo,function() local c=SS.history[SS.historyPos+1]; return c and (SS.T("Redo")..": "..c.what) or SS.T("Nothing to redo"); end);
- SS.RefreshHistoryButtons();
- local back=K.Button(win,"Back",75,function() SS.OpenModulePage(nil); end); back:SetPoint("TOPLEFT",win,"TOPLEFT",20,-102); back:Hide();
- local master=SS.Check(win,"Module enabled",-100,function() return current and SS.ModuleEnabled(current); end,function(v) if current then SS.SetModuleEnabled(current,v); end end);
- master:ClearAllPoints(); master:SetPoint("TOPLEFT",win,"TOPLEFT",214,-62); master.moduleControl=true; master.label:SetWidth(330); master.label:SetHeight(28);
- SS.AddTip(master,"Off pauses everything on this page. Nothing is lost: turn it back on and your settings return.");
+	SS.win=K.Window("SlimSuiteFrame","Slim Suite",720,560);
+	local search=CreateFrame("EditBox","SlimSuiteSettingsSearch",SS.win,"InputBoxTemplate");
+	search:SetWidth(150); search:SetHeight(20); search:SetPoint("TOPRIGHT",SS.win,"TOPRIGHT",-22,-30);
+	search:SetAutoFocus(false); search:SetMaxLetters(40);
+	search:SetScript("OnTextChanged",function()
+		SS.searchText=string.lower(this:GetText() or ""); SS.RelayoutAllPages();
+		-- nothing here matches: go to the first page that has something
+		local views=SS.settingsViews; local cur=views and SS.currentModule and views[SS.currentModule];
+		if SS.searchText~="" and cur and (cur.page.matchCount or 0)==0 then
+			for _,id in ipairs(SS.MODULE_ORDER) do if views[id] and (views[id].page.matchCount or 0)>0 then SS.OpenModulePage(id); break; end end
+		end
+	end);
+	SS.AddTip(search,"Search: type a word (hide, clock, boss, size, party...) and every setting about it opens.");
+	search:SetScript("OnEscapePressed",function() this:SetText(""); this:ClearFocus(); end);
+	-- the search box says what it is; the version sits quietly in the bottom bar
+	local searchLabel=SS.win:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); searchLabel:SetPoint("RIGHT",search,"LEFT",-8,0); searchLabel:SetText(SS.T("Search"));
+	local version=SS.win:CreateFontString(nil,"OVERLAY","GameFontDisableSmall"); version:SetPoint("BOTTOM",SS.win,"BOTTOM",60,18); version:SetText("v"..SS.AddonVersion());
+	local hub=CreateFrame("Frame","SlimSuiteModuleHub",SS.win); hub:SetPoint("TOPLEFT",SS.win,"TOPLEFT",14,-34); hub:SetWidth(182); hub:SetHeight(470);
+	-- the one primary category: every subcategory below is a part of Slim Suite
+	-- (no band: the window's own title already says Slim Suite)
+	local title=SS.win:CreateFontString(nil,"OVERLAY","GameFontNormalLarge"); title:SetPoint("TOPLEFT",SS.win,"TOPLEFT",214,-34); title:SetTextColor(1,1,1);
+	local rule=SS.win:CreateTexture(nil,"ARTWORK"); rule:SetTexture("Interface\\Buttons\\WHITE8X8"); rule:SetVertexColor(0.5,0.5,0.55,0.8); rule:SetPoint("TOPLEFT",SS.win,"TOPLEFT",214,-58); rule:SetWidth(470); rule:SetHeight(1);
+	local closeButton=K.Button(SS.win,"Close",90,function() SS.win:Hide(); end); closeButton:SetPoint("BOTTOMRIGHT",SS.win,"BOTTOMRIGHT",-22,12);
+	-- Defaults resets the category on the page; Reset ALL asks first, then wipes the whole addon
+	local defaultsButton=K.Button(SS.win,"Defaults",100,function() if SS.currentModule and SS.currentModule~="changelog" then SS.ResetCategory(SS.currentModule); end end); defaultsButton:SetPoint("BOTTOMLEFT",SS.win,"BOTTOMLEFT",22,12);
+	local resetAllButton=K.Button(SS.win,"Reset ALL",110,function() SS.ConfirmResetAll(); end); resetAllButton:SetPoint("LEFT",defaultsButton,"RIGHT",8,0); SS.settingsTitle=title;
+	SS.moduleHubButtons={}; local views={}; local current; SS.settingsViews=views;
+	local undo=K.Button(SS.win,"Undo",70,function() SS.Undo(); end); undo:SetPoint("LEFT",resetAllButton,"RIGHT",16,0);
+	local redo=K.Button(SS.win,"Redo",70,function() SS.Redo(); end); redo:SetPoint("LEFT",undo,"RIGHT",6,0);
+	SS.undoButton, SS.redoButton = undo, redo;
+	SS.AddTip(undo,function() local c=SS.history[SS.historyPos]; return c and (SS.T("Undo")..": "..c.what) or SS.T("Nothing to undo"); end);
+	SS.AddTip(redo,function() local c=SS.history[SS.historyPos+1]; return c and (SS.T("Redo")..": "..c.what) or SS.T("Nothing to redo"); end);
+	SS.RefreshHistoryButtons();
+	local back=K.Button(SS.win,"Back",75,function() SS.OpenModulePage(nil); end); back:SetPoint("TOPLEFT",SS.win,"TOPLEFT",20,-102); back:Hide();
+	local master=SS.Check(SS.win,"Module enabled",-100,function() return current and SS.ModuleEnabled(current); end,function(v) if current then SS.SetModuleEnabled(current,v); end end);
+	master:ClearAllPoints(); master:SetPoint("TOPLEFT",SS.win,"TOPLEFT",214,-62); master.moduleControl=true; master.label:SetWidth(330); master.label:SetHeight(28);
 	local function AddRows(parent, entries, startY, after, module)
 		SS.pages = SS.pages or {};
 		local page = { parent = parent, rows = {}, startY = startY, after = after, module=module };
@@ -310,48 +323,32 @@ function SS.WinBuild()
 				fold = nil;
 				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
 				fs:SetText(SS.T(row.head)); fs:SetTextColor(1, 1, 1);
-				table.insert(page.rows, { kind = "head", fs = fs });
+				table.insert(page.rows, { kind = "head", fs = fs, label = SS.T(row.head), count = row.count });
 				up = nil;
-   elseif row.deathMatrix then
-    local title=parent:CreateFontString(nil,"OVERLAY","GameFontNormal"); title:SetText(SS.T("Your Death Sound")); table.insert(page.rows,{kind="head",fs=title});
-    local header=parent:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); header:SetText(SS.T("Your Death").."     "..SS.T("Teammate Death"));
-    header:SetPoint("TOPLEFT",parent,"TOPLEFT",242,0);
-    local headerRow={kind="head",fs=header,deathHeader=true}; table.insert(page.rows,headerRow);
-    for _,option in ipairs(row.deathMatrix) do
-     local key=option[2]; local fs=parent:CreateFontString(nil,"OVERLAY","GameFontHighlight"); fs:SetText(SS.T(option[1])); fs:SetHeight(24); fs:SetJustifyH("LEFT");
-     local cb=SS.Check(parent,"",startY,function() return SS.SoundSelection("death")==key; end,function() SS.SetSoundSelection("death",key); end);
-     cb.soundGroup="death"; cb.soundKey=key;
-     local mate=SS.Check(parent,"",startY,function() return SS.DeathSoundSelection("teammate")==key; end,function() SS.SetSoundSelection("teammate",key); end); mate.soundGroup="teammate"; mate.soundKey=key; mate.cond=function() return SS.ModuleEnabled(module); end
-     table.insert(page.rows,{kind="deathmatrix",fs=fs,cb=cb,mate=mate,preview=key~="off" and SS.SoundPreviewIcon(parent,key) or nil,soundGroup="death",soundKey=key});
-    end
-    up=nil;
-   elseif row.sounds then
-    local fs=parent:CreateFontString(nil,"OVERLAY","GameFontNormal"); fs:SetText(SS.T(row[1])); fs:SetTextColor(1,.82,0);
-    table.insert(page.rows,{kind="head",fs=fs});
-    for _,option in ipairs(row.sounds) do
-     local key=option[2]; local group=row.group;
-     local cb=SS.Check(parent,option[1],startY,function() return SS.SoundSelection(group)==key; end,function() SS.SetSoundSelection(group,key); end,20);
-     cb.soundGroup=group; cb.soundKey=key;
-     local preview=key~="off" and key~="same" and SS.SoundPreviewIcon(parent,key) or nil;
-     table.insert(page.rows,{kind="check",lead=20,cb=cb,preview=preview,soundGroup=group,soundKey=key});
-    end
-    up=nil;
-			elseif ( row.elementMode ) then
-				local name = row.elementMode;
-				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
-				fs:SetText(SS.T(row.label or name)); fs:SetJustifyH("LEFT"); fs:SetWidth(170);
-				local r = { kind = "elementmode", fs = fs, name = name, buttons = {} };
-				local labels = { { "On", "enabled" }, { "Off", "disabled" }, { "Original", "default" } };
-				for j = 1, 3 do
-					local mode = labels[j][2];
-					local b = K.Button(parent, SS.T(labels[j][1]), 62, function()
-						SU.SetMode(name, mode, SS.ELEMENTS[name] and SS.ELEMENTS[name].title);
-						SS.RefreshElementModes();
-					end);
-					r.buttons[j] = { b = b, mode = mode };
+			elseif row.deathMatrix then
+				local title=parent:CreateFontString(nil,"OVERLAY","GameFontNormal"); title:SetText(SS.T("Your Death Sound")); table.insert(page.rows,{kind="head",fs=title});
+				local header=parent:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); header:SetText(SS.T("Your Death").."     "..SS.T("Teammate Death"));
+				header:SetPoint("TOPLEFT",parent,"TOPLEFT",242,0);
+				local headerRow={kind="head",fs=header,deathHeader=true}; table.insert(page.rows,headerRow);
+				for _,option in ipairs(row.deathMatrix) do
+					local key=option[2]; local fs=parent:CreateFontString(nil,"OVERLAY","GameFontHighlight"); fs:SetText(SS.T(option[1])); fs:SetHeight(24); fs:SetJustifyH("LEFT");
+					local cb=SS.Check(parent,"",startY,function() return SS.SoundSelection("death")==key; end,function() SS.SetSoundSelection("death",key); end);
+					cb.soundGroup="death"; cb.soundKey=key;
+					local mate=SS.Check(parent,"",startY,function() return SS.DeathSoundSelection("teammate")==key; end,function() SS.SetSoundSelection("teammate",key); end); mate.soundGroup="teammate"; mate.soundKey=key; mate.cond=function() return SS.ModuleEnabled(module); end
+					table.insert(page.rows,{kind="deathmatrix",fs=fs,cb=cb,mate=mate,preview=key~="off" and SS.SoundPreviewIcon(parent,key) or nil,soundGroup="death",soundKey=key});
 				end
-				table.insert(page.rows, r);
-				up = nil;
+				up=nil;
+			elseif row.sounds then
+				local fs=parent:CreateFontString(nil,"OVERLAY","GameFontNormal"); fs:SetText(SS.T(row[1])); fs:SetTextColor(1,.82,0);
+				table.insert(page.rows,{kind="head",fs=fs});
+				for _,option in ipairs(row.sounds) do
+					local key=option[2]; local group=row.group;
+					local cb=SS.Check(parent,option[1],startY,function() return SS.SoundSelection(group)==key; end,function() SS.SetSoundSelection(group,key); end,20);
+					cb.soundGroup=group; cb.soundKey=key;
+					local preview=key~="off" and key~="same" and SS.SoundPreviewIcon(parent,key) or nil;
+					table.insert(page.rows,{kind="check",lead=20,cb=cb,preview=preview,soundGroup=group,soundKey=key});
+				end
+				up=nil;
 			elseif ( row.button ) then
 				local b = K.Button(parent, SS.T(row.button), row.width or 150, row.onClick);
 				table.insert(page.rows, { kind = "button", b = b });
@@ -397,48 +394,48 @@ function SS.WinBuild()
 			end
 		end
 		for _,r in ipairs(page.rows) do
-   if r.cb then r.cb.cond=function() return SS.ModuleEnabled(module); end end
-  end
-  table.insert(SS.pages, page);
+			if r.cb then r.cb.cond=function() return SS.ModuleEnabled(module); end end
+		end
+		table.insert(SS.pages, page);
 		SS.LayoutPage(page);
 		return page;
 	end
- local worldEntry=SS.WorldCombatEntry();
- -- every element's right-click settings, each under its own name that opens and closes
- local function ElementSections()
-  local out={};
-  -- the setup's order first, then any element it does not list (in the order elements can be moved)
-  local order,seen={}, {};
-  for _,name in ipairs(SS.SETUP_ORDER or {}) do if not seen[name] then seen[name]=true; table.insert(order,name); end end
-  for _,m in ipairs(SS.MOVABLE or {}) do if SS.ELEMENTS[m[1]] and not seen[m[1]] then seen[m[1]]=true; table.insert(order,m[1]); end end
-  for name in pairs(SS.ELEMENTS) do if not seen[name] then seen[name]=true; table.insert(order,name); end end
-  -- grouped: Aethus creations, my creations, then the default WoW / Blizzard ones (anything unlisted last)
-  local groupOf={};
-  for _,sec in ipairs(SS.ELEMENT_SECTIONS or {}) do for _,n in ipairs(sec.names or {}) do groupOf[n]=sec.key; end end
-  local GROUPS={{"aethus","Aethus creations"},{"custom","My creations"},{"original","Default WoW / Blizzard ideas"},{"other","Other"}};
-  local grouped={};
-  for _,g in ipairs(GROUPS) do
-   local names={};
-   for _,name in ipairs(order) do if (groupOf[name] or "other")==g[1] and name~="SlimSuiteEditGrid" then table.insert(names,name); end end
-   if table.getn(names)>0 then table.insert(grouped,{head=g[2]}); for _,n in ipairs(names) do table.insert(grouped,n); end end
-  end
-  for _,name in ipairs(grouped) do
-   if type(name)=="table" then table.insert(out,name); end
-   local element=type(name)=="string" and SS.ELEMENTS[name];
-   local ok,checks=SS.Safe(SU.ChecksFor,name);
-   if element and name~="SlimSuiteEditGrid" then
-    if not ok or type(checks)~="table" then checks={}; end
-    table.insert(out,{fold=element.label or element.title or name,element=name});
-    for _,e in ipairs(checks) do
-     if type(e)=="table" and type(e[1])=="string" and e[2] and e[3] then
-      table.insert(out,{e[1],e[2],e[3],choice=e.choice,short=e.short,when=type(e[4])=="function" and e[4] or nil});
-     end
-    end
-   end
-  end
-  return out;
- end
- local uiEntries={
+	local worldEntry=SS.WorldCombatEntry();
+	-- every element's right-click settings, each under its own name that opens and closes
+	local function ElementSections()
+		local out={};
+		-- the setup's order first, then any element it does not list (in the order elements can be moved)
+		local order,seen={}, {};
+		for _,name in ipairs(SS.SETUP_ORDER or {}) do if not seen[name] then seen[name]=true; table.insert(order,name); end end
+		for _,m in ipairs(SS.MOVABLE or {}) do if SS.ELEMENTS[m[1]] and not seen[m[1]] then seen[m[1]]=true; table.insert(order,m[1]); end end
+		for name in pairs(SS.ELEMENTS) do if not seen[name] then seen[name]=true; table.insert(order,name); end end
+		-- grouped: Aethus creations, my creations, then the default WoW / Blizzard ones (anything unlisted last)
+		local groupOf={};
+		for _,sec in ipairs(SS.ELEMENT_SECTIONS or {}) do for _,n in ipairs(sec.names or {}) do groupOf[n]=sec.key; end end
+		local GROUPS={{"aethus","Aethus creations"},{"custom","My creations"},{"original","Default WoW / Blizzard ideas"},{"other","Other"}};
+		local grouped={};
+		for _,g in ipairs(GROUPS) do
+			local names={};
+			for _,name in ipairs(order) do if (groupOf[name] or "other")==g[1] and name~="SlimSuiteEditGrid" then table.insert(names,name); end end
+			if table.getn(names)>0 then table.insert(grouped,{head=g[2],count=g[1]}); for _,n in ipairs(names) do table.insert(grouped,n); end end
+		end
+		for _,name in ipairs(grouped) do
+			if type(name)=="table" then table.insert(out,name); end
+			local element=type(name)=="string" and SS.ELEMENTS[name];
+			local ok,checks=SS.Safe(SU.ChecksFor,name);
+			if element and name~="SlimSuiteEditGrid" then
+				if not ok or type(checks)~="table" then checks={}; end
+				table.insert(out,{fold=element.label or element.title or name,element=name});
+				for _,e in ipairs(checks) do
+					if type(e)=="table" and type(e[1])=="string" and e[2] and e[3] then
+						table.insert(out,{e[1],e[2],e[3],choice=e.choice,short=e.short,when=type(e[4])=="function" and e[4] or nil});
+					end
+				end
+			end
+		end
+		return out;
+	end
+	local uiEntries={
 			{head="Setup"},
 			{"HUD Edit Mode (move, resize and turn elements on or off)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v, true); if ( v ) then SS.OpenHUDEdit(); else SS.CloseHUDEdit(); end end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
@@ -460,8 +457,8 @@ function SS.WinBuild()
 			worldEntry,
 			{"Build and stats beside card choices",function() return SS.DB().cardEdgeHUD~=false; end,function(v) SS.DB().cardEdgeHUD=v; end},
 			{"Show every element above the level-up and new-item cards (each element can still be set on its own)", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; SS.DB().onTop = {}; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
- };
- local otherEntries={
+	};
+	local otherEntries={
 			{"Language (reload UI)", function() return SS.DB().language or "auto"; end,
 			 function(v) SS.DB().language = v; end,
 			 choice={{"auto","auto"},{"English","enUS"},{"Español","esES"},{"Français","frFR"},{"Deutsch","deDE"},{"Português (Brasil)","ptBR"},{"Italiano","itIT"}} },
@@ -510,137 +507,116 @@ function SS.WinBuild()
 			{"   ...and Guardians and lairs before they're pulled", function() return SS.DB().prePullMarks; end, function(v) SS.DB().prePullMarks = v; end},
 			{"Raid-mark row when the mouse is over a party member (in a group)", function() return SS.DB().raidRow; end, function(v) SS.DB().raidRow = v and true or false; end},
 			{head="Minimap"},
-			{"Show caches on the minimap", function() return SS.DB().minimapCaches; end, function(v) SS.DB().minimapCaches = v; end},
-			{"Show bosses on the minimap", function() return SS.DB().minimapBosses; end, function(v) SS.DB().minimapBosses = v; end},
-			{"   Show their raid icon", function() return SS.DB().minimapBossIcons ~= false; end, function(v) SS.DB().minimapBossIcons = v and true or false; end},
-			{"   Show their name", function() return SS.DB().minimapBossNames ~= false; end, function(v) SS.DB().minimapBossNames = v and true or false; end},
-			{"Show lairs on the minimap, with their 3:00 refill timer", function() return SS.DB().minimapLairs; end, function(v) SS.DB().minimapLairs = v; end},
-			{"Show the game's nearest Guardian lair flag on minimap", function() return SS.DB().showGuardianFlag; end, function(v) SS.DB().showGuardianFlag = v; SS.ApplyGuardianFlag(); end},
-			{"Minimap shape", function() return SS.DB().minimapSquare and "square" or "circle"; end, function(v) SS.SetMinimapSquare(v == "square"); end, choice={{"Square","square"},{"Circle","circle"}}},
-			{"Hide the day / night (sun and moon) button", function() return SS.DB().minimapHideDayNight; end, function(v) SS.DB().minimapHideDayNight = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end},
-			{"Hide the zone name and its X button", function() return SS.DB().minimapHideZone; end, function(v) SS.DB().minimapHideZone = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end},
-			{"Hide the + / - zoom buttons", function() return SS.DB().minimapHideZoom; end, function(v) SS.DB().minimapHideZoom = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end},
+			-- (the minimap's own settings live in its element section and its right-click menu)
 			{"Minimap button", function() local m = SS.DB().minimap; return not (m and m.hide); end, function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (m and m.hide and true or false) == v ) then SS.Mini.Toggle(); end end end},
 			{head="Deaths and spells"},
 			{"Mark where a downed friend can be revived", function() return SS.DB().deathMarks; end, function(v) SS.DB().deathMarks = v; end},
-   {deathMatrix={{"Off","off"},{"Baby Crying","death"},{"LEGO die","legoDeath"},{"duck toy sound","duckDeath"},{"Roblox death sound","robloxDeath"}}},
-   {"Low health sound (30% or lower)",group="lowHealth",sounds={{"Off","off"},{"Low Health Sound","lowHealth"}}},
-   {"Boss / guardian / lair kill sound",group="boss",sounds={{"Off","off"},{"Hitmarker","bossHitmarker"},{"Whip Crack","bossWhip"},{"Gotcha — Dave Chappelle","bossGotcha"}}},
-   {"Match loss sound",group="loss",sounds={{"Off","off"},{"The Price Is Right: losing horn","matchLoss"},{"GTA V: Wasted","matchWasted"},{'Halo "Game Over"',"haloLoss"}}},
-   {"Victory sound",group="victory",sounds={{"Off","off"},{"GTA San Andreas","matchVictory"},{"To Be Continued JoJo","jojoVictory"}}},
-   {"Final boss arrival soundtrack",group="finalBoss",sounds={{"Off","off"},{"Megalovania","finalMegalovania"}}},
-   {button="Final boss soundtracks",onClick=function() SS.OpenFinalBossSounds(); end},
-   {"Match start song",group="start",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"},{"Cena","cenaStart"},{"pillar man jojo","pillarStart"},{"CSGO Okay Let’s Go","csgoStart"}}},
-   {"Chest opening sound",group="chest",sounds={{"Off","off"},{"Zelda: final four notes","chestOpen"}}},
-   {"Teammate revive sound (when you helped revive them)",group="revive",sounds={{"Off","off"},{"Successful revive","reviveSuccess"}}},
+			{deathMatrix={{"Off","off"},{"Baby Crying","death"},{"LEGO die","legoDeath"},{"duck toy sound","duckDeath"},{"Roblox death sound","robloxDeath"}}},
+			{"Low health sound (30% or lower)",group="lowHealth",sounds={{"Off","off"},{"Low Health Sound","lowHealth"}}},
+			{"Boss / guardian / lair kill sound",group="boss",sounds={{"Off","off"},{"Hitmarker","bossHitmarker"},{"Whip Crack","bossWhip"},{"Gotcha — Dave Chappelle","bossGotcha"}}},
+			{"Match loss sound",group="loss",sounds={{"Off","off"},{"The Price Is Right: losing horn","matchLoss"},{"GTA V: Wasted","matchWasted"},{'Halo "Game Over"',"haloLoss"}}},
+			{"Victory sound",group="victory",sounds={{"Off","off"},{"GTA San Andreas","matchVictory"},{"To Be Continued JoJo","jojoVictory"}}},
+			{"Final boss arrival soundtrack",group="finalBoss",sounds={{"Off","off"},{"Megalovania","finalMegalovania"}}},
+			{button="Final boss soundtracks",onClick=function() SS.OpenFinalBossSounds(); end},
+			{"Match start song",group="start",sounds={{"Off","off"},{"Kit Kit Kit","matchStart"},{"Cena","cenaStart"},{"pillar man jojo","pillarStart"},{"CSGO Okay Let’s Go","csgoStart"}}},
+			{"Chest opening sound",group="chest",sounds={{"Off","off"},{"Zelda: final four notes","chestOpen"}}},
+			{"Teammate revive sound (when you helped revive them)",group="revive",sounds={{"Off","off"},{"Successful revive","reviveSuccess"}}},
 			{"Cooldown numbers on the spell squares", function() return SS.DB().cooldowns; end, function(v) SS.DB().cooldowns = v; end},
 			{head="Accessibility"},
 			{"High-contrast encounter bars", function() return SS.DB().accessibilityContrast; end, function(v) SS.DB().accessibilityContrast = v and true or false; SS.Safe(SS.UpdateBossFrames); end},
 			{"Larger encounter names", function() return SS.DB().accessibilityLargeText; end, function(v) SS.DB().accessibilityLargeText = v and true or false; SS.Safe(SS.UpdateBossFrames); end},
 			{"Reduce floating combat-text motion", function() return SS.DB().accessibilityReduceMotion; end, function(v) SS.DB().accessibilityReduceMotion = v and true or false; end},
- };
- if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),170,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-300); end;
- local entries={chat={},sounds={},ui={},gameplay={},misc={},nameplates={}};
+	};
+	if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),170,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-300); end;
+	local entries={chat={},sounds={},ui={},gameplay={},misc={},nameplates={}};
 
- for _,row in ipairs(uiEntries) do
-  if row.elementSections then
-   table.insert(entries.ui,{head="Elements"});
-   for _,r in ipairs(ElementSections()) do table.insert(entries.ui,r); end
-  else table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
- end
- local category="misc";
- for _,row in ipairs(otherEntries) do
-  if row.head then
-   category=({["Chat mods"]="chat",["Enemy frames"]="nameplates",["Camera and marks"]="gameplay",["Minimap"]="ui",["Deaths and spells"]="sounds",["Accessibility"]="misc"})[row.head] or "misc";
-  end
-  local destination=category; local label=row[1];
-  if label=="Mark where a downed friend can be revived" or label=="Show caches on the minimap" or label=="Show bosses on the minimap" or label=="Show lairs on the minimap, with their 3:00 refill timer" or label=="Show the game's nearest Guardian lair flag on minimap" then destination="gameplay";
-  elseif label=="Minimap button" then destination="misc";
-  elseif label=="Cooldown numbers on the spell squares" then destination="ui"; end
-  table.insert(entries[destination],row);
- end
- table.insert(entries.gameplay,{"Hide the Bag button", function() return SS.DB().hideBagButton; end, function(v) SS.DB().hideBagButton = v and true or false; SS.ApplyBagMapButtons(); end});
- table.insert(entries.gameplay,{"Hide the Map button on the minimap", function() return SS.DB().hideMapButton; end, function(v) SS.DB().hideMapButton = v and true or false; SS.ApplyBagMapButtons(); end});
- if SS.AchievementsAvailable() then 
- table.insert(entries.gameplay,{button="Side achievements",onClick=function() SS.OpenAchievements(); end}); end;
- table.insert(entries.ui,{button="Reset positions",onClick=function() SS.ResetPlaces(); end});
- table.insert(entries.ui,{button="Reset all UI",onClick=function() SS.ResetUI(); end});
- for i,id in ipairs(SS.MODULE_ORDER) do
-  local module=id;
-  local open=K.Button(hub,SS.T(SS.MODULE_TITLES[id]),170,function() SS.OpenModulePage(module); end);
-  open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-(i-1)*40); SS.sidebarButtons=SS.sidebarButtons or {}; SS.sidebarButtons[id]=open;
-  SU.Flatten(open);
-  -- the on/off switch for each module is the Module enabled line at the top of its page
-  local toggle=K.Button(hub,"",10,function() SS.SetModuleEnabled(module,not SS.ModuleEnabled(module)); end);
-  toggle:Hide(); SS.moduleHubButtons[id]=toggle;
-  local scroll,child=K.Scroll("SlimSuiteModule_"..id,win,480);
-  scroll:SetPoint("TOPLEFT",win,"TOPLEFT",214,-70); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,34);
-  local page=AddRows(child,entries[id],-8,nil,id); views[id]={scroll=scroll,page=page};
- end
- -- Changelog, under Accessibility: every release from the first to now, read only
- do
-  local n=table.getn(SS.MODULE_ORDER)+1;
-  local open=K.Button(hub,SS.T("Changelog"),170,function() SS.OpenModulePage("changelog"); end);
-  open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-(n-1)*40); SS.sidebarButtons.changelog=open; SU.Flatten(open);
-  local scroll,child=K.Scroll("SlimSuiteModule_changelog",win,480);
-  scroll:SetPoint("TOPLEFT",win,"TOPLEFT",214,-70); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,34);
-  local page={rows={},parent=child,matchCount=0};
-  local y=-8;
-  for _,s in ipairs(SS.CHANGELOG or {}) do
-   local fs=child:CreateFontString(nil,"OVERLAY","GameFontHighlight"); fs:SetJustifyH("LEFT");
-   local parts={"|cffffd100"..s.v.."|r"};
-   if s.summary~="" then table.insert(parts,s.summary); end
-   for _,item in ipairs(s.items) do table.insert(parts,"|cffffd100-|r "..item); end
-   fs:SetText(table.concat(parts,"\n"));
-   fs:SetPoint("TOPLEFT",child,"TOPLEFT",8,y);
-   y=y-SS.WrappedLabelHeight(fs,440)-14;
-   table.insert(page.rows,{kind="text",fs=fs});
-  end
-  child:SetHeight(math.max(20,-y+12));
-  scroll:Hide(); views.changelog={scroll=scroll,page=page};
- end
- SS.RefreshElementModes=function()
-  for _,view in pairs(views) do
-   for _,row in ipairs(view.page.rows) do
-    if row.kind=="elementmode" then
-     local mode=SU.Mode(row.name);
-     for _,entry in ipairs(row.buttons) do if entry.mode==mode then entry.b:LockHighlight(); else entry.b:UnlockHighlight(); end end
-    end
-   end
-  end
- end;
- SS.RefreshModuleHub=function()
-  for id,button in pairs(SS.moduleHubButtons) do button:SetText(SS.T(SS.ModuleEnabled(id) and "On" or "Off")); end
-  if current then
-   for _,row in ipairs(views[current].page.rows) do
-    local enabled=SS.ModuleEnabled(current);
-    if row.b then if enabled then row.b:Enable(); else row.b:Disable(); end end
-   end
-  end
- end;
- SS.OpenModulePage=function(id)
-  -- the sidebar is always there; the chosen module's page fills the right side under its title
-  if ( not id or not views[id] ) then id = SS.MODULE_ORDER[1]; end
-  current=id; SS.currentModule=id;
-  for _,view in pairs(views) do view.scroll:Hide(); end
-  hub:Show(); back:Hide(); views[id].scroll:Show();
-  title:SetText(SS.T(SS.MODULE_TITLES[id]));
-  master.label:SetText(SS.T("Use Slim Suite's").." "..SS.T(SS.MODULE_TITLES[id]).." "..SS.T("features"));
-  master:Hide(); master.label:Hide();   -- the page on/off switch is retired: every element has its own On / Off
-  SS.RefreshElementModes();
-  for sid, b2 in pairs(SS.sidebarButtons or {}) do SU.PaintFlat(b2, sid == id, {1, 0.82, 0.2}); end
-  SS.RefreshToggles(); SS.RefreshModuleHub();
- end;
- win:SetScript("OnShow",function() SS.OpenModulePage(nil); end);
- SS.OpenModulePage(nil);
+	for _,row in ipairs(uiEntries) do
+		if row.elementSections then
+			table.insert(entries.ui,{head="Elements"});
+			for _,r in ipairs(ElementSections()) do table.insert(entries.ui,r); end
+		else table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
+	end
+	local category="misc";
+	for _,row in ipairs(otherEntries) do
+		if row.head then
+			category=({["Chat mods"]="chat",["Enemy frames"]="nameplates",["Camera and marks"]="gameplay",["Minimap"]="ui",["Deaths and spells"]="sounds",["Accessibility"]="misc"})[row.head] or "misc";
+		end
+		local destination=category; local label=row[1];
+		if label=="Mark where a downed friend can be revived" or label=="Show caches on the minimap" or label=="Show bosses on the minimap" or label=="Show lairs on the minimap, with their 3:00 refill timer" or label=="Show the game's nearest Guardian lair flag on minimap" then destination="gameplay";
+		elseif label=="Minimap button" then destination="misc";
+		elseif label=="Cooldown numbers on the spell squares" then destination="ui"; end
+		table.insert(entries[destination],row);
+	end
+	table.insert(entries.gameplay,{"Hide the Bag button", function() return SS.DB().hideBagButton; end, function(v) SS.DB().hideBagButton = v and true or false; SS.ApplyBagMapButtons(); end});
+	table.insert(entries.gameplay,{"Hide the Map button on the minimap", function() return SS.DB().hideMapButton; end, function(v) SS.DB().hideMapButton = v and true or false; SS.ApplyBagMapButtons(); end});
+	if SS.AchievementsAvailable() then 
+	table.insert(entries.gameplay,{button="Side achievements",onClick=function() SS.OpenAchievements(); end}); end;
+	table.insert(entries.ui,{button="Reset positions",onClick=function() SS.ResetPlaces(); end});
+	table.insert(entries.ui,{button="Reset all UI",onClick=function() SS.ResetUI(); end});
+	for i,id in ipairs(SS.MODULE_ORDER) do
+		local module=id;
+		local open=K.Button(hub,SS.T(SS.MODULE_TITLES[id]),170,function() SS.OpenModulePage(module); end);
+		open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-(i-1)*40); SS.sidebarButtons=SS.sidebarButtons or {}; SS.sidebarButtons[id]=open;
+		SU.Flatten(open);
+		-- the on/off switch for each module is the Module enabled line at the top of its page
+		local toggle=K.Button(hub,"",10,function() SS.SetModuleEnabled(module,not SS.ModuleEnabled(module)); end);
+		toggle:Hide(); SS.moduleHubButtons[id]=toggle;
+		local scroll,child=K.Scroll("SlimSuiteModule_"..id,SS.win,480);
+		scroll:SetPoint("TOPLEFT",SS.win,"TOPLEFT",214,-70); scroll:SetPoint("BOTTOMRIGHT",SS.win,"BOTTOMRIGHT",-22,34);
+		local page=AddRows(child,entries[id],-8,nil,id); views[id]={scroll=scroll,page=page};
+	end
+	-- Changelog, under Accessibility: every release, newest first, read only
+	do
+		local n=table.getn(SS.MODULE_ORDER)+1;
+		local open=K.Button(hub,SS.T("Changelog"),170,function() SS.OpenModulePage("changelog"); end);
+		open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-(n-1)*40); SS.sidebarButtons.changelog=open; SU.Flatten(open);
+		local scroll,child=K.Scroll("SlimSuiteModule_changelog",SS.win,480);
+		scroll:SetPoint("TOPLEFT",SS.win,"TOPLEFT",214,-70); scroll:SetPoint("BOTTOMRIGHT",SS.win,"BOTTOMRIGHT",-22,34);
+		local page={rows={},parent=child,matchCount=0};
+		local y=-8;
+		for _,s in ipairs(SS.CHANGELOG or {}) do
+			local fs=child:CreateFontString(nil,"OVERLAY","GameFontHighlight"); fs:SetJustifyH("LEFT");
+			local parts={"|cffffd100"..s.v.."|r"};
+			if s.summary~="" then table.insert(parts,s.summary); end
+			for _,item in ipairs(s.items) do table.insert(parts,"|cffffd100-|r "..item); end
+			fs:SetText(table.concat(parts,"\n"));
+			fs:SetPoint("TOPLEFT",child,"TOPLEFT",8,y);
+			y=y-SS.WrappedLabelHeight(fs,440)-14;
+			table.insert(page.rows,{kind="text",fs=fs});
+		end
+		child:SetHeight(math.max(20,-y+12));
+		scroll:Hide(); views.changelog={scroll=scroll,page=page};
+	end
+	SS.RefreshModuleHub=function()
+		for id,button in pairs(SS.moduleHubButtons) do button:SetText(SS.T(SS.ModuleEnabled(id) and "On" or "Off")); end
+		if current then
+			for _,row in ipairs(views[current].page.rows) do
+				local enabled=SS.ModuleEnabled(current);
+				if row.b then if enabled then row.b:Enable(); else row.b:Disable(); end end
+			end
+		end
+	end;
+	SS.OpenModulePage=function(id)
+		-- the sidebar is always there; the chosen module's page fills the right side under its title
+		if ( not id or not views[id] ) then id = SS.MODULE_ORDER[1]; end
+		current=id; SS.currentModule=id;
+		for _,view in pairs(views) do view.scroll:Hide(); end
+		hub:Show(); back:Hide(); views[id].scroll:Show();
+		title:SetText(SS.T(SS.MODULE_TITLES[id]));
+		master:Hide(); master.label:Hide();   -- the page on/off switch is retired: every element has its own On / Off
+		for sid, b2 in pairs(SS.sidebarButtons or {}) do SU.PaintFlat(b2, sid == id, {1, 0.82, 0.2}); end
+		SS.RefreshToggles(); SS.RefreshModuleHub();
+	end;
+	SS.win:SetScript("OnShow",function() SS.OpenModulePage(nil); end);
+	SS.OpenModulePage(nil);
 end
 
 function SS.Toggle()
-	if ( not win ) then
+	if ( not SS.win ) then
 		local ok, err = SS.Safe(SS.WinBuild);
-		if ( not ok ) then K.Print(NAME, "|cffff4040the settings window could not be made:|r " .. tostring(err)); win = nil; return; end
+		if ( not ok ) then K.Print(NAME, "|cffff4040the settings window could not be made:|r " .. tostring(err)); SS.win = nil; return; end
 	end
-	if ( win:IsShown() ) then win:Hide(); else win:Show(); end
+	if ( SS.win:IsShown() ) then SS.win:Hide(); else SS.win:Show(); end
 end
 
 -- "/slimsuite mouse": a small label by the cursor names the frame under it (and the frame that frame belongs to), so a
@@ -690,6 +666,7 @@ SS.HELP = {
 	"/slim reset places, /slim reset all: back to where everything started.",
 	"/slim camera: the distance now. /slim camera <yards>, +, -, <preset>, save <name> [yards], delete <name>, list, on, off.",
 	"/slim hide <words>, /slim unhide <words>, /slim hide: chat lines with those words.",
+	"/slim perf: measures what each part of Slim Suite costs for 10 seconds (or /slim perf <seconds>) and lists the busiest.",
 	"/slim minimap: the gear button.  /slim errors: the error log.  /slim mouse: names the frame under the cursor.",
 };
 SLASH_SLIMSUITE1 = "/slimsuite";
@@ -700,7 +677,8 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 	cmd = string.lower(cmd or "");
 	rest = string.lower(rest or "");
 	local d = SS.DB();
-	if ( cmd == "undo" ) then SS.Undo();
+	if ( cmd == "perf" ) then SS.StartPerf(tonumber(rest) or 10);
+	elseif ( cmd == "undo" ) then SS.Undo();
 	elseif ( cmd == "redo" ) then SS.Redo();
 	elseif ( cmd == "help" or cmd == "?" ) then
 		for _, line in ipairs(SS.HELP) do K.Print(NAME, line); end
@@ -766,8 +744,6 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		SS.SetUnlocked(false);
 	elseif ( cmd == "setup" ) then
 		SS.StartSetup(true);
-	elseif ( cmd == "quick" and SS.QUICK_SETUP_ON ) then
-		SS.OpenQuickSetup();
 	elseif ( cmd == "demo" ) then
 		SS.ToggleDemoMode();
 		K.Print(NAME, SS.demoRunning and "Demo Mode is on. /slim demo turns it off." or "Demo Mode is off.");
@@ -921,12 +897,18 @@ function SS.AddTip(w, text)
 	end);
 	w:SetScript("OnLeave", function() if ( leave ) then leave(); end if ( GameTooltip ) then GameTooltip:Hide(); end end);
 end
-SS.MODE_TIPS = {
-	enabled = function(n) return "On: use Slim Suite's " .. n .. ". Its settings open with the + next to its name."; end,
-	disabled = function(n) return "Off: hide " .. n .. " completely."; end,
-	default = function(n) return "Default: give " .. n .. " back to the game, as it looks without Slim Suite."; end,
-	reset = function(n) return "Reset: put " .. n .. " back where it started: its place, size, opacity and cards setting (Undo brings it back)."; end,
+-- each says what the button does to the named element (%s), so the whole sentence can be translated
+SS.MODE_TIP_TEXT = {
+	enabled = "On: use Slim Suite's %s. Its settings open with the + next to its name.",
+	disabled = "Off: hide %s completely.",
+	default = "Default: give %s back to the game, as it looks without Slim Suite.",
+	reset = "Reset: put %s back where it started: its place, size, opacity and cards setting (Undo brings it back).",
 };
+SS.MODE_TIPS = {};
+for key, text in pairs(SS.MODE_TIP_TEXT) do
+	local sentence = text;
+	SS.MODE_TIPS[key] = function(n) return string.format(SS.T(sentence), n); end;
+end
 SS.SHORT_LABELS = {
 	["Buffs leave their own place and join the player frame"] = "Buffs join the player frame",
 	["Group identical monsters into one plate (e.g. Spider x34)"] = "Group identical monsters",
@@ -1029,7 +1011,7 @@ function SS.CheckWarnings()
 	local function Title(n) local e = SS.ELEMENTS and SS.ELEMENTS[n]; return e and (e.label or e.title) or n; end
 	for name in pairs(SS.ELEMENTS or {}) do
 		if ( SU.Mode(name) == "enabled" and SS.ElementOpacity and SS.ElementOpacity(name) == 0 ) then
-			list["opacity" .. name] = Title(name) .. " is On but at 0% opacity, so it can't be seen.";
+			list["opacity" .. name] = string.format(SS.T("%s is On but at 0%% opacity, so it can't be seen."), SS.T(Title(name)));
 		end
 	end
 	if ( d.partyIncludesSelf and SU.Mode("PartyMemberFrame1") == "disabled" ) then
@@ -1046,7 +1028,7 @@ function SS.CheckWarnings()
 	end
 	for key, text in pairs(list) do
 		if ( not warned[key] ) then
-			K.Print(NAME, "|cffffd000" .. SS.T("Heads up") .. ":|r " .. SS.T(text));
+			K.Print(NAME, "|cffffd000" .. SS.T("Heads up") .. ":|r " .. (string.find(key, "^opacity") and text or SS.T(text)));
 			if ( SS.LogAction ) then SS.LogAction("[warning] " .. text); end
 		end
 	end

@@ -22,7 +22,7 @@ SS.RefreshAchievementStats(); check("Stats goals appear only with supported addo
 check("missing revive credit never earns objective",not d.unlocked.helpingHand)
 AzerothStats=nil; check("Stats achievements stay hidden when addon is absent",table.getn(SS.SideAchievementRows())==native)
 SS.OpenAchievements(); check("achievement menu opens",SlimSuiteAchievementsWindow:IsShown())
-SS.StartSetup(true); SS.RefreshEditHandles(); SS.UpdateAchievementButton(); check("WIP build never registered achievement mover",not SS.ENV.handles.SlimSuiteAchievementsButton)
+SS.StartSetup(true); SS.RefreshEditHandles(); SS.UpdateAchievementButton(); check("WIP build never registered achievement mover",not SS.handles.SlimSuiteAchievementsButton)
 SS.SetupEnd(true); SS.SetModuleEnabled("gameplay",false); SS.UpdateSideAchievements(); AZS_RUN.kills=100; SS.SetModuleEnabled("gameplay",true); SS.UpdateSideAchievements();
 check("paused tracking does not backfill unseen kills",d.totals.kills==10004)
 SS.ACHIEVEMENTS_WIP=true

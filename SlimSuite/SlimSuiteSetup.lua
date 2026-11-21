@@ -1,5 +1,5 @@
 -- Focused Slim Suite module; loaded in manifest order.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 function SU.RefreshBar()
 	if ( SU.RefreshStyleButtons ) then SU.RefreshStyleButtons(); end
 	for frame, b in pairs(SU.barButtons or {}) do
@@ -45,13 +45,13 @@ function SS.MenuOpen()
 	return SU.panel and SU.panel:IsShown() and SU.focus and true or false;
 end
 function SS.HideElementMenu()
-	if ( not SU.panel ) then if ( sizeMenu ) then sizeMenu:Hide(); end return; end
+	if ( not SU.panel ) then if ( SS.sizeMenu ) then SS.sizeMenu:Hide(); end return; end
 	-- in the setup the panel stays: it is drawn again for its element (a Reset there leaves no empty space)
-	if ( setupActive ) then
-		if ( SU.panel:IsShown() and SU.focus ) then SU.Focus(SU.focus); elseif ( sizeMenu ) then sizeMenu:Hide(); end
+	if ( SS.setupActive ) then
+		if ( SU.panel:IsShown() and SU.focus ) then SU.Focus(SU.focus); elseif ( SS.sizeMenu ) then SS.sizeMenu:Hide(); end
 		return;
 	end
-	if ( sizeMenu ) then sizeMenu:Hide(); end
+	if ( SS.sizeMenu ) then SS.sizeMenu:Hide(); end
 	SU.panel:Hide();
 	if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
 	SU.focus, SU.placedFor = nil, nil;
@@ -59,15 +59,15 @@ end
 
 function SU.Focus(frame)
 	SU.ModernizeMenus();
- if ( not frame ) then
-  -- nothing is focused any more: the gold outline goes with the focus, in setup or not
-  if ( SU.outline ) then SU.outline:Hide(); end
- end
- if ( not frame and setupActive ) then
-  SU.focus=nil; if ( SU.panel ) then SU.panel:Hide(); end
-  if ( SU.glow ) then SU.glow:Hide(); end
-  return;
- end
+	if ( not frame ) then
+		-- nothing is focused any more: the gold outline goes with the focus, in setup or not
+		if ( SU.outline ) then SU.outline:Hide(); end
+	end
+	if ( not frame and SS.setupActive ) then
+		SU.focus=nil; if ( SU.panel ) then SU.panel:Hide(); end
+		if ( SU.glow ) then SU.glow:Hide(); end
+		return;
+	end
 	SU.focus = frame;
 	-- a gold outline marks the element being edited, so it is easy to see which one the arrow keys move
 	if ( not SU.outline ) then
@@ -79,12 +79,12 @@ function SU.Focus(frame)
 	end
 	local outlineTarget = (type(frame) == "string") and getglobal(frame) or frame;
 	-- only in the setup: right-clicking an element for its size menu must not leave a border around it
-	if ( setupActive and type(outlineTarget) == "table" and outlineTarget.SetAllPoints ) then
+	if ( SS.setupActive and type(outlineTarget) == "table" and outlineTarget.SetAllPoints ) then
 		SU.outline:ClearAllPoints(); SU.outline:SetAllPoints(outlineTarget); SU.outline:Show();
 	else SU.outline:Hide(); end
 	local e;
 	for i = 1, table.getn(SU.elements or {}) do if ( SU.elements[i].frame == frame ) then e = SU.elements[i]; end end
-	if ( not e and frame and not setupActive ) then
+	if ( not e and frame and not SS.setupActive ) then
 		local steps = SU.Steps();
 		for i = 1, table.getn(steps) do if ( steps[i].frame == frame ) then e = steps[i]; end end
 		e = e or { frame = frame, title = SU.menuLabel or frame, text = "" };
@@ -92,7 +92,7 @@ function SU.Focus(frame)
 	local checks, mode = {}, nil;
 	if ( e ) then
 		SU.panel.title:SetText(SS.T and SS.T(e.title) or e.title);
-		mode = setupActive and frame and SU.Mode(frame) or nil;
+		mode = SS.setupActive and frame and SU.Mode(frame) or nil;
 		SU.panel.text:SetText(SS.T(e.text) .. (mode and mode ~= "enabled" and "\n" .. SS.T("Enable this element to show and move it before changing its settings.") or ""));
 		-- a sub-setting shows only while the setting it depends on is on
 		local all, shown = SU.ChecksFor(frame), {};
@@ -132,7 +132,7 @@ function SU.Focus(frame)
 				cb.grip.row = cb; cb.grip.key = c.order;
 				cb.grip:ClearAllPoints(); cb.grip:SetPoint("LEFT", cb, "LEFT", -22, 0); cb.grip:Show();
 			elseif ( cb.grip ) then cb.grip:Hide(); end
-			if ( setupActive and mode ~= "enabled" ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
+			if ( SS.setupActive and mode ~= "enabled" ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
 			elseif ( c[5] and not c[5]() ) then cb:Disable(); cb.label:SetTextColor(0.45, 0.45, 0.45);
 			else cb:Enable(); cb.label:SetTextColor(1, 1, 1); end
 			h = h + 24 + cb.warnGap;
@@ -156,7 +156,7 @@ function SU.Focus(frame)
 			end);
 		end
 		local lb = SU.lookButton;
-		if ( name and SS.IsLookElement(name) and (not setupActive or mode == "enabled") ) then
+		if ( name and SS.IsLookElement(name) and (not SS.setupActive or mode == "enabled") ) then
 			local o = SS.DB().styleOverrides and SS.DB().styleOverrides[name];
 			local shownName = o and SS.STYLE_NAMES[o] or ("Global (" .. SS.STYLE_NAMES[SS.PanelStyleKey()] .. ")");
 			lb.elementName = name;
@@ -181,7 +181,7 @@ function SU.Focus(frame)
 		end
 		local rb = SU.resetButton;
 		local name = (type(frame) == "string" and frame) or (type(frame) == "table" and frame.GetName and frame:GetName()) or nil;
-		if ( name and SS.IsLookElement(name) and (not setupActive or mode == "enabled") ) then
+		if ( name and SS.IsLookElement(name) and (not SS.setupActive or mode == "enabled") ) then
 			rb.elementName = name; rb:SetText(SS.T("Reset this element"));
 			rb:ClearAllPoints();
 			rb:SetPoint("TOPLEFT", SU.lookButton, "BOTTOMLEFT", 0, -6);
@@ -211,12 +211,12 @@ function SU.Focus(frame)
 				this.titleText:SetText(SS.T("Space between players") .. ": " .. tostring(v));
 				if ( this.building ) then return; end
 				SS.DB().partyGap = v; SS.MarkProfileDirty();
-				SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
+				SS.Safe(SS.ApplyMovableOrientation, "PartyMemberFrame1");
 			end);
 			SU.gapSlider = s;
 		end
 		local s = SU.gapSlider;
-		local show = frame == "PartyMemberFrame1" and (not setupActive or mode == "enabled") and SS.Look("PartyMemberFrame1") ~= "thin";
+		local show = frame == "PartyMemberFrame1" and (not SS.setupActive or mode == "enabled") and SS.Look("PartyMemberFrame1") ~= "thin";
 		if ( show ) then
 			s:ClearAllPoints(); s:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 22, -(h + 26));
 			s:SetParent(SU.panel);
@@ -230,17 +230,17 @@ function SU.Focus(frame)
 	end
 	-- the size & layout tools, under the settings
 	do
-		local ok = frame and (not setupActive or SU.Mode(frame) == "enabled") and SS.PrepareSizeTools(frame, e and e.title);
-		if ( ok and sizeMenu ) then
-			sizeMenu:SetParent(SU.panel);
-			sizeMenu:SetScale(1);
-			sizeMenu:SetFrameLevel((SU.panel:GetFrameLevel() or 1) + 2);
-			sizeMenu:ClearAllPoints();
-			sizeMenu:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 2, -(h - 40));
-			sizeMenu:Show();
-			h = h + (sizeMenu:GetHeight() or 0);               -- Exit/Complete or Done stay under it
-		elseif ( sizeMenu ) then
-			sizeMenu:Hide();
+		local ok = frame and (not SS.setupActive or SU.Mode(frame) == "enabled") and SS.PrepareSizeTools(frame, e and e.title);
+		if ( ok and SS.sizeMenu ) then
+			SS.sizeMenu:SetParent(SU.panel);
+			SS.sizeMenu:SetScale(1);
+			SS.sizeMenu:SetFrameLevel((SU.panel:GetFrameLevel() or 1) + 2);
+			SS.sizeMenu:ClearAllPoints();
+			SS.sizeMenu:SetPoint("TOPLEFT", SU.panel, "TOPLEFT", 2, -(h - 40));
+			SS.sizeMenu:Show();
+			h = h + (SS.sizeMenu:GetHeight() or 0);               -- Exit/Complete or Done stay under it
+		elseif ( SS.sizeMenu ) then
+			SS.sizeMenu:Hide();
 		end
 	end
 	if ( SU.panel.done ) then
@@ -249,7 +249,7 @@ function SU.Focus(frame)
 	SU.panel:SetHeight(h);
 	if ( SU.grid ) then SU.grid.Refresh(); end
 	SU.RefreshGridButtons();
-	local handle = frame and handles[SS.Shown(frame)];
+	local handle = frame and SS.handles[SS.Shown(frame)];
 	-- placed when it opens for an element (it can be dragged after that and stays where it was put)
 	if ( SU.placedFor ~= (frame or "") or not SU.panel:IsShown() ) then
 		SU.placedFor = frame or "";
@@ -277,7 +277,7 @@ function SU.Focus(frame)
 	else
 		SU.glow:Hide();
 	end
-	if ( setupActive ) then SU.RefreshBar(); end
+	if ( SS.setupActive ) then SU.RefreshBar(); end
 end
 
 -- a menu under an element near the screen's bottom would run off it: it goes above the element then, or as high as fits
@@ -298,7 +298,7 @@ end
 
 -- rebuilds the setup's top bar after an element was added or removed from it, keeping the open questions
 function SU.Rebuild()
-	if ( not setupActive ) then return; end
+	if ( not SS.setupActive ) then return; end
 	local f = SU.focus;
 	SS.Safe(SU.Begin);
 	SU.batching, SU.restoring, SU.cascading = false, false, false;   -- never left stuck by a failure part-way
@@ -315,19 +315,19 @@ end
 function SS.CarryPlace(el, fromName, toName)
 	local from, to = getglobal(fromName), getglobal(toName);
 	if ( not from or not to ) then return; end
-	local l, r, b, t = RootBounds(from);
+	local l, r, b, t = SS.RootBounds(from);
 	if ( l and r and b and t ) then
-		local factor = RootFactor(to);
+		local factor = SS.RootFactor(to);
 		local w, h = (to:GetWidth() or 0) * factor, (to:GetHeight() or 0) * factor;
 		SS.UserPlace(to);
-		if ( el == "PartyMemberFrame1" ) then SetRootPosition(to, l, t - h);
-		else SetRootPosition(to, (l + r) / 2 - w / 2, (b + t) / 2 - h / 2); end
+		if ( el == "PartyMemberFrame1" ) then SS.SetRootPosition(to, l, t - h);
+		else SS.SetRootPosition(to, (l + r) / 2 - w / 2, (b + t) / 2 - h / 2); end
 		SS.Safe(SS.SavePosition, toName, to);
 	end
 	local muted = SS.DB().muted[fromName] and true or false;
 	if ( (SS.DB().muted[toName] and true or false) ~= muted ) then
 		SS.DB().muted[toName] = muted;
-		SS.Safe(ApplyFeatureMute, toName);
+		SS.Safe(SS.ApplyFeatureMute, toName);
 	end
 end
 
@@ -342,23 +342,23 @@ function SS.ChangeLooks(change)
 		local old, new = before[el], SS.Shown(el);
 		if ( old ~= new ) then
 			SS.Safe(SS.CarryPlace, el, old, new);
-			if ( setupActive and SU.on and SU.on[el] ) then
+			if ( SS.setupActive and SU.on and SU.on[el] ) then
 				local of = getglobal(old);
 				if ( of ) then SU.Save(of); of:SetAlpha(0); end
-				if ( handles[old] ) then handles[old]:Hide(); end
+				if ( SS.handles[old] ) then SS.handles[old]:Hide(); end
 			end
 		end
 	end
 	SS.Safe(SS.ApplyNewFrames);
 	SS.Safe(SS.UpdatePartyLines);
 	SS.Safe(SS.LayoutPartySelf, true);
-	if ( setupActive and SU.on ) then
+	if ( SS.setupActive and SU.on ) then
 		for i = 1, 3 do if ( SU.on[els[i]] ) then SU.SetOn(els[i], true, SU.titles and SU.titles[els[i]]); end end
 	end
 	if ( SS.DB().mirrorTarget ) then SS.Safe(SS.MirrorTarget); end
 	if ( SS.DB().unlocked ) then SS.Safe(SS.SetUnlocked, true, true); end
-	SS.Safe(PlaceAll);
-	if ( setupActive and SU.focus ) then SU.Focus(SU.focus); end
+	SS.Safe(SS.PlaceAll);
+	if ( SS.setupActive and SU.focus ) then SU.Focus(SU.focus); end
 end
 
 -- a frame's own look: the player ("classic" or "new"), the target ("classic" or "new"), the party ("classic" or "thin")
@@ -368,7 +368,7 @@ function SS.SetLook(el, look)
 		elseif ( el == "TargetFrame" ) then SS.DB().targetLook = look == "new" and "new" or "classic";
 		elseif ( el == "PartyMemberFrame1" ) then SS.DB().partyLook = look == "thin" and "thin" or "classic"; end
 	end);
-	if ( el == "PartyMemberFrame1" ) then SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1"); SU.UpdateDemo(); end
+	if ( el == "PartyMemberFrame1" ) then SS.Safe(SS.ApplyMovableOrientation, "PartyMemberFrame1"); SU.UpdateDemo(); end
 end
 
 -- Where the party sits: anywhere ("free"), or held just under or above the player frame. Holding it there takes you
@@ -384,7 +384,7 @@ function SS.SetPartyPosition(v)
 	d.partyLocked = v ~= "free";
 	d.partyLockAbove = v == "above";
 	if ( d.partyLocked ) then SS.MakeMovable("PartyMemberFrame1", "they sit by the player frame"); end
-	SS.Safe(PlaceAll);
+	SS.Safe(SS.PlaceAll);
 	SU.UpdateDemo();
 end
 
@@ -403,7 +403,7 @@ function SS.ClaimTarget(by)
 		if ( d.elementModes ) then d.elementModes.PlayerFrame = "default"; end
 		if ( d.enabledElements ) then d.enabledElements.PlayerFrame = nil; end
 		if ( SU.on ) then SU.on.PlayerFrame = nil; end
-		if ( handles.PlayerFrame ) then handles.PlayerFrame:Hide(); end
+		if ( SS.handles.PlayerFrame ) then SS.handles.PlayerFrame:Hide(); end
 		SS.Notice("The player frame turned off: you are in the party frames now.");
 		SS.Safe(SS.PlayerFrameHidden, true);
 		return;
@@ -412,7 +412,7 @@ function SS.ClaimTarget(by)
 		d.partyIncludesSelf = false;
 		SS.Notice("Add yourself to party turned off: the player frame is back.");
 		SS.Safe(SS.PlayerFrameHidden, false);
-		SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
+		SS.Safe(SS.ApplyMovableOrientation, "PartyMemberFrame1");
 	end
 	if ( by == "mirror" and d.hideTarget ) then d.hideTarget = false; SS.Safe(SS.TargetFrameHidden, false); end
 end
@@ -444,15 +444,15 @@ function SS.SetPartySelf(on)
 			SS.Safe(SS.PlayerFrameHidden, false);
 			SS.Notice("The player frame is back: you left the party frames.");
 			-- in the setup the player frame's element comes back on with it
-			if ( setupActive and SU.on and not SU.on.PlayerFrame ) then SU.SetMode("PlayerFrame", "enabled", SU.titles and SU.titles.PlayerFrame or "Unit frame"); end
+			if ( SS.setupActive and SU.on and not SU.on.PlayerFrame ) then SU.SetMode("PlayerFrame", "enabled", SU.titles and SU.titles.PlayerFrame or "Unit frame"); end
 		end
 	end);
 	-- Choosing to join the party frames also turns that frame on in the UI setup; otherwise the option
 	-- would hide the player plate without giving the user a party-frame handle to place.
-	if ( on and setupActive and SU.on and not SU.on.PartyMemberFrame1 ) then
+	if ( on and SS.setupActive and SU.on and not SU.on.PartyMemberFrame1 ) then
 		SU.SetMode("PartyMemberFrame1", "enabled", SU.titles and SU.titles.PartyMemberFrame1 or "Party frames");
 	end
-	SS.Safe(ApplyMovableOrientation, "PartyMemberFrame1");
+	SS.Safe(SS.ApplyMovableOrientation, "PartyMemberFrame1");
 	SU.Rebuild();
 	SU.UpdateDemo();
 end
@@ -465,7 +465,7 @@ end
 
 function SS.SetLocalClockOn(on)
 	local wanted = on and "enabled" or "default";
-	if ( setupActive and SU.Mode and SU.SetMode and SU.Mode("SlimSuiteLocalClockFrame") ~= wanted ) then
+	if ( SS.setupActive and SU.Mode and SU.SetMode and SU.Mode("SlimSuiteLocalClockFrame") ~= wanted ) then
 		SU.SetMode("SlimSuiteLocalClockFrame", wanted, SU.titles and SU.titles.SlimSuiteLocalClockFrame or "Local clock");
 	end
 	SS.DB().replaceLocalClock = on and true or false;
@@ -503,7 +503,7 @@ function SU.Begin()
 		local c = getglobal(name);
 		if ( c and c.SetAlpha and c.GetAlpha and c:GetAlpha() == 0 ) then c:SetAlpha(1); end
 	end
-	editOnly = "SlimSuiteSetupNothing";                  -- no handles until an element is turned on
+	SS.editOnly = "SlimSuiteSetupNothing";                  -- no handles until an element is turned on
 	SU.on = {};
 	SS.SetUnlocked(true, true);
 	SU.elements = {};
@@ -560,7 +560,7 @@ function SU.Begin()
 			b.label:SetPoint("LEFT", b, "LEFT", 0, 0); b.label:SetWidth(102); b.label:SetJustifyH("LEFT");
 			b.nameHit:SetScript("OnMouseUp", function()
 				if ( arg1 ~= "RightButton" ) then return; end
-				if ( setupActive ) then SU.Focus(this.ownerFrame); else SS.OpenSizeMenu(this.ownerFrame, this.elementTitle); end
+				if ( SS.setupActive ) then SU.Focus(this.ownerFrame); else SS.OpenSizeMenu(this.ownerFrame, this.elementTitle); end
 			end);
 			b.nameHit:SetScript("OnEnter", function()
 				if ( not GameTooltip ) then return; end
@@ -700,7 +700,7 @@ function SU.Build()
 	SU.panel.complete:SetPoint("BOTTOMRIGHT", SU.panel, "BOTTOMRIGHT", -10, 8);
 	-- the same panel is every element's right-click menu outside the setup: Done closes it
 	SU.panel.done = K.Button(SU.panel, "Done", 90, function()
-		if ( setupActive ) then
+		if ( SS.setupActive ) then
 			SU.panel:Hide(); if ( SU.glow ) then SU.glow:Hide(); SU.glow.handle = nil; end
 			SU.focus, SU.placedFor = nil, nil;
 		else SS.HideElementMenu(); end
@@ -823,20 +823,20 @@ function SS.SetupRescue(err)
 	SS.Report(err);
 	pcall(SU.Unreveal);
 	pcall(SS.SetupHide);
-	setupActive = false;
-	editOnly = nil;
+	SS.setupActive = false;
+	SS.editOnly = nil;
 	pcall(SS.SetUnlocked, false, true);
-	pcall(PlaceAll);
+	pcall(SS.PlaceAll);
 	K.Print(NAME, "the setup hit a problem and closed; your UI is back as it was. /slim errors shows what happened.");
 end
 function SS.StartSetup(fromStart)
- if SS.ModuleEnabled and not SS.ModuleEnabled("ui") then SS.SetModuleEnabled("ui",true); end
+	if SS.ModuleEnabled and not SS.ModuleEnabled("ui") then SS.SetModuleEnabled("ui",true); end
 	local d=SS.DB();
 	if ( d.vanillaUI ) then
 		d.vanillaUI=false; d.setupDone=nil; d.firstSetupDefaultsVersion=nil;
 		SS.firstRunSetupPending=true;
 	end
-	setupActive = true;
+	SS.setupActive = true;
 	local ok, err = pcall(SU.Begin);
 	if ( not ok ) then SS.SetupRescue(err); end
 end
@@ -846,7 +846,7 @@ SU.COMPANIONS = SS.ELEMENT_COMPANIONS;
 
 -- an element turned on in the setup, or a frame that comes with one (the jewelry row with the build spells)
 function SS.SetupShows(name)
-	if ( not setupActive or not SU.on or not name ) then return false; end
+	if ( not SS.setupActive or not SU.on or not name ) then return false; end
 	if ( name=="SlimSuiteCompassFrame" or name=="SlimSuiteLuckFrame" or name=="SlimSuiteAchievementsButton" or SU.on[name] or SU.on[SS.Element(name)] ) then return true; end
 	for parent in pairs(SU.on) do
 		local list = SU.CompanionsOf(parent);
@@ -880,7 +880,7 @@ function SU.Unreveal()
 end
 
 function SS.SetupHide()
-	setupActive = false;
+	SS.setupActive = false;
 	SU.on = {};                                            -- nothing is "on in the setup" outside it
 	SU.Unreveal();
 	SS.Safe(SS.ApplyElementModes);
@@ -914,13 +914,13 @@ function SS.ConfirmSetupDone()
 end
 
 function SS.SetupEnd(finished)
- -- Restore Demo-hidden menus before teardown, so they cannot reopen after Done/module pause.
- if SS.demoRunning then SS.StopDemoMode(); end
+	-- Restore Demo-hidden menus before teardown, so they cannot reopen after Done/module pause.
+	if SS.demoRunning then SS.StopDemoMode(); end
 	if ( SU.confirmDone ) then SU.confirmDone:Hide(); end
 	SS.DB().setupDone = true;
 	local ok, err = pcall(SS.SetupHide);
 	if ( not ok ) then SS.SetupRescue(err); return; end
-	editOnly = nil;
+	SS.editOnly = nil;
 	SS.SetUnlocked(false, true);   -- Done (or Exit) leaves Edit mode
 end
 

@@ -1,5 +1,5 @@
 local bad = 0
-local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
+local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS[want] end if n == want then return v end i = i + 1 end end
 SU = upvalue(SS.SetupHide, "SU")
 local function check(label, ok) if not ok then bad = bad + 1; print("  MISMATCH " .. label) end end
 for k, fn in pairs(SlashCmdList or {}) do if string.find(k, "SLIM") then fn("") break end end
@@ -91,7 +91,15 @@ check("open in settings finds it", SS.OpenElementSettings("MinimapCluster") and 
 SS.OpenModulePage("changelog"); Tick(1)
 local cl = SS.settingsViews.changelog
 check("changelog page opens", cl and cl.scroll:IsShown() and table.getn(cl.page.rows) == table.getn(SS.CHANGELOG))
-check("oldest release first", SS.CHANGELOG[1].v == "1.06" and string.find(cl.page.rows[1].fs:GetText(), "1.06", 1, true))
+check("newest release first", SS.CHANGELOG[table.getn(SS.CHANGELOG)].v == "1.06" and string.find(cl.page.rows[1].fs:GetText(), SS.CHANGELOG[1].v, 1, true))
+local enc; for _, r in ipairs(page.rows) do if r.kind == "fold" and r.element == "SlimSuiteBossFrames" then enc = r end end
+SS.searchText = "encounter"; SS.LayoutPage(page)
+check("searching encounter finds the Encounter bars", enc and enc.searchOpen)
+SS.searchText = "dps"; SS.LayoutPage(page)
+local meter; for _, r in ipairs(page.rows) do if r.kind == "fold" and r.element == "SlimSuiteMeterFrame" then meter = r end end
+check("searching dps finds the damage meter", meter and meter.searchOpen)
+SS.searchText = ""; SS.LayoutPage(page)
+check("group count reads on/total", string.find(SS.SectionCount("aethus"), "^%d+/%d+$") ~= nil)
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print(e) end
 print("fold problems: " .. bad)
 if bad > 0 or #ERRORS > 0 then error("folds") end

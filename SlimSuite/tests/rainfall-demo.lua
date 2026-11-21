@@ -1,6 +1,6 @@
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
-SS.StartSetup(true); local su,d=SS.ENV.SU,SS.DB()
+SS.StartSetup(true); local su,d=SS.SU,SS.DB()
 local compass=SS.Handle("SlimSuiteCompassFrame","Compass")
 SS.RefreshEditHandles()
 check("compass has a setup handle even in older profiles",compass:IsShown())

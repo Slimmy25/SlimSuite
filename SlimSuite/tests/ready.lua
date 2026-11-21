@@ -9,7 +9,7 @@ AZS_GetRunTime = function() return 900 end -- a stale previous-run timer must no
 AZS_GetStoredLevels = function() return 0 end
 AZS_UNITS = {}
 AZS_RUN = { kills = 0, gold = 0, chest = 20, nb = 180 }
-local setup = SS.ENV.SU
+local setup = SS.SU
 for _, name in ipairs({ "SlimSuiteTallyFrame", "SlimSuiteClockFrame", "SlimSuiteMeterFrame", "SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteStoredLevelsButton" }) do
     setup.SetMode(name, "enabled", name)
 end

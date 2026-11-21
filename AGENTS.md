@@ -8,3 +8,6 @@
 
 ## In-game changelog
 After editing CHANGELOG.md, run `python3 tools/make-changelog.py` to rebuild SlimSuite/SlimSuiteChangelog.lua. run-checks.sh fails while it is out of date.
+
+## Shared names
+Anything one Slim Suite file shares with another goes on SS (SS.Name). Each file starts with `local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;`. Never create a new global: the test harness fails on any global name that is not SlimSuite..., SLASH_SLIM... or SS.

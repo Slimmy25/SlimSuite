@@ -4,8 +4,6 @@
 --   SS.Every(name, s, fn, watch)  runs fn every s seconds (0 = every frame) from one shared ticker;
 --                      skipped while the optional watch frame is hidden, as WoW never sends OnUpdate to a hidden frame
 --   SS.Stop(name)      stops a timed task
---   SS.ENV             the private names shared by Slim Suite's main files (SlimSuite.lua, SlimSuiteFrames.lua,
---                      SlimSuiteEdit.lua, SlimSuiteSetup.lua, SlimSuiteCommands.lua)
 SS = SS or {};
 local MAX_ENTRIES = 200;
 
@@ -42,17 +40,12 @@ function SS.EffectiveScale(frame, seen)
 	return own;
 end
 
--- Slim Suite's main code is in several files that share names no other addon should see (its frames, the setup's
--- table, its state). Each of those files runs with SS.ENV as its globals: a name listed in SS.PRIVATE lives in SS.ENV,
--- anything else is read from and written to the game's globals as usual. Reading the game's globals goes straight
--- through __index (a table, so it costs about as much as a normal global).
-do
-	local G = getfenv and getfenv(0) or _G;
-	SS.PRIVATE = SS.PRIVATE or {};
-	SS.ENV = setmetatable({}, { __index = G, __newindex = function(t, k, v)
-		if ( SS.PRIVATE[k] ) then rawset(t, k, v); else G[k] = v; end
-	end });
-end
+-- Everything Slim Suite's files share lives in SS itself (SS.PlaceAll, SS.MOVABLE, ...), so nothing Slim Suite
+-- makes can clash with another addon. Each file starts with short local names for the three used everywhere:
+--   local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;
+-- A check in the tests fails if any file creates a new global name by mistake.
+SS.SU = SS.SU or {};                                   -- the setup and element editor (SlimSuiteOnboarding.lua and on)
+SS.NAME = "Slim Suite";
 
 -- The saved variables can be replaced by the game after this file runs, so the log is looked up every time
 -- rather than kept from load. Creates the saved table and the log if they are missing.
@@ -208,10 +201,11 @@ end
 
 -- Runs one of the game's own frame functions as that frame: the 1.12 FrameXML functions (TargetFrame_Update,
 -- UnitFrame_Update...) work on the global `this`, which is otherwise whatever frame's script is running now
-function SS.RunAs(frame, fn, ...)
+-- (up to two arguments, passed through SS.Safe: no "..." table is made per call)
+function SS.RunAs(frame, fn, a1, a2)
 	local was = this;
 	this = frame;
-	local ok = SS.Safe(fn, unpack(arg));
+	local ok = SS.Safe(fn, a1, a2);
 	this = was;
 	return ok;
 end
@@ -225,7 +219,7 @@ local driver = CreateFrame("Frame");
 function SS.Every(name, seconds, fn, watch)
 	local old = tasks[name];
 	if ( old ) then old.stopped = true; end
-	local t = { interval = seconds or 0, elapsed = 0, fn = fn, watch = watch };
+	local t = { name = name, interval = seconds or 0, elapsed = 0, fn = fn, watch = watch };
 	tasks[name] = t;
 	table.insert(list, t);
 end
@@ -247,10 +241,62 @@ driver:SetScript("OnUpdate", function()
 		else
 			t.elapsed = t.elapsed + dt;
 			if ( t.elapsed >= t.interval ) then
-				t.elapsed = 0;
-				local ok, err = pcall(t.fn);                  -- called directly: nothing is made just to run a timer
+				-- keep the remainder so a timer keeps its rhythm instead of running a little late every time;
+				-- after a long stall it runs once and starts over rather than catching up
+				t.elapsed = t.elapsed - t.interval;
+				if ( t.elapsed >= t.interval ) then t.elapsed = 0; end
+				local ok, err;
+				if ( SS.perf ) then ok, err = SS.PerfRun(t);
+				else ok, err = pcall(t.fn); end               -- called directly: nothing is made just to run a timer
 				if ( not ok ) then SS.Report(err); end
 			end
 		end
 	end
 end);
+
+-- ---------------------------------------------------------------- /slim perf
+-- While on (10 seconds), every timer is measured: how often it ran, how long it took and how much memory it used up
+-- (garbage the game has to clean up later, which is what causes small hitches). Off, it costs nothing.
+local clock = type(debugprofilestop) == "function" and function() return debugprofilestop(); end
+	or function() return GetTime() * 1000; end         -- milliseconds
+local function MemoryKB() if ( type(gcinfo) == "function" ) then return (gcinfo()); end return 0; end
+function SS.PerfRun(t)
+	local p = SS.perf.tasks[t.name];
+	if ( not p ) then p = { runs = 0, ms = 0, kb = 0 }; SS.perf.tasks[t.name] = p; end
+	local m0, c0 = MemoryKB(), clock();
+	local ok, err = pcall(t.fn);
+	local c1, m1 = clock(), MemoryKB();
+	p.runs = p.runs + 1; p.ms = p.ms + (c1 - c0);
+	if ( m1 > m0 ) then p.kb = p.kb + (m1 - m0); end   -- a drop is the game cleaning up, not this timer
+	return ok, err;
+end
+function SS.StartPerf(seconds)
+	seconds = seconds or 10;
+	SS.perf = { tasks = {}, started = GetTime(), memory = MemoryKB(), seconds = seconds };
+	if ( SS.Kit ) then SS.Kit.Print(SS.NAME, "measuring every timer for " .. seconds .. " seconds; play normally..."); end
+	SS.Every("perfReport", seconds, function() SS.Stop("perfReport"); SS.ReportPerf(); end);
+end
+function SS.ReportPerf()
+	local p = SS.perf; if ( not p ) then return; end
+	SS.perf = nil;
+	local span = math.max(0.1, GetTime() - p.started);
+	local list = {};
+	for name, r in pairs(p.tasks) do if ( name ~= "perfReport" ) then table.insert(list, { name = name, runs = r.runs, ms = r.ms, kb = r.kb }); end end
+	table.sort(list, function(a, b) return a.ms + a.kb > b.ms + b.kb; end);
+	local totalMs, totalKb = 0, 0;
+	for _, r in ipairs(list) do totalMs, totalKb = totalMs + r.ms, totalKb + r.kb; end
+	local lines = {
+		string.format("Slim Suite over %.0fs: %.1f ms of work per second (%.2f%% of the time), %.1f KB of garbage per second, %d KB in use.",
+			span, totalMs / span, totalMs / span / 10, totalKb / span, MemoryKB()),
+		"Busiest timers (runs per second, ms per second, KB of garbage per second):",
+	};
+	for i = 1, math.min(10, table.getn(list)) do
+		local r = list[i];
+		table.insert(lines, string.format("  %d. %s: %.1f runs, %.2f ms, %.1f KB", i, r.name, r.runs / span, r.ms / span, r.kb / span));
+	end
+	for _, line in ipairs(lines) do
+		if ( SS.Kit ) then SS.Kit.Print(SS.NAME, line); end
+		if ( SS.LogAction ) then SS.LogAction("[perf] " .. line); end
+	end
+	return lines;
+end

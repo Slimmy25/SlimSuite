@@ -3,7 +3,7 @@ local bad = 0
 local function check(label, ok)
     if not ok then bad = bad + 1; print("MISMATCH " .. label) end
 end
-local setup, d = SS.ENV.SU, SS.DB()
+local setup, d = SS.SU, SS.DB()
 SS.SetupEnd(true)
 
 -- Profiles must round-trip HUD options, native ownership and untrusted input safely.
@@ -52,7 +52,7 @@ setup.SetMode("BuffFrame", "enabled", "Buffs")
 local button = getglobal("BuffButton0") or CreateFrame("Button", "BuffButton0", BuffFrame)
 button:ClearAllPoints(); button:SetPoint("TOPRIGHT", BuffFrame, "TOPRIGHT", -3, -4); button:Show()
 SS.ApplyBuffOrientation()
-local original = SS.ENV.buffButtonOriginalPoints[0][1]
+local original = SS.buffButtonOriginalPoints[0][1]
 d.buffCustomLayout, d.buffsOnPlayer = true, true
 d.orientations.BuffFrame, d.sizes.BuffFrame = "vertical", { w = 40, h = 100 }
 SS.ApplyBuffOrientation(); setup.SetMode("BuffFrame", "default", "Buffs"); SS.ApplyBuffOrientation()
@@ -64,9 +64,9 @@ MainMenuExpBar.SetOrientation = function(self, orientation) self.layoutOrientati
 MainMenuExpBar.SetClipsChildren = function(self, enabled) self.clipsChildren = enabled end
 setup.SetMode("MainMenuExpBar", "enabled", "XP")
 SS.DetachExperienceBar(); d.orientations.MainMenuExpBar = "vertical"
-SS.ENV.ApplyMovableOrientation("MainMenuExpBar")
+SS.ApplyMovableOrientation("MainMenuExpBar")
 setup.SetMode("MainMenuExpBar", "default", "XP")
-check("Default restores horizontal native XP", MainMenuExpBar.layoutOrientation == "HORIZONTAL" and not SS.ENV.xpBarDetached)
+check("Default restores horizontal native XP", MainMenuExpBar.layoutOrientation == "HORIZONTAL" and not SS.xpBarDetached)
 check("Default XP allows its native border outside the fill", MainMenuExpBar.clipsChildren == false)
 check("Default hides custom XP segments", not SlimSuiteXpSegments or not SlimSuiteXpSegments:IsShown())
 SS.SetupEnd(true)

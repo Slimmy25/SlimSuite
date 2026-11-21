@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds SlimSuite/SlimSuiteChangelog.lua from CHANGELOG.md, oldest release first, for the in-game Changelog page.
+"""Builds SlimSuite/SlimSuiteChangelog.lua from CHANGELOG.md, newest release first, for the in-game Changelog page.
 Run with --check to fail when the Lua file is out of date."""
 import os, re, sys
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,9 +26,8 @@ def build():
             cur["items"][-1] += " " + text
         else:
             cur["summary"] = (cur["summary"] + " " + text).strip()
-    sections.reverse()   # chronological: the first release first
     lines = ["-- Made by tools/make-changelog.py from CHANGELOG.md; do not edit by hand.",
-             "if ( setfenv ) then setfenv(1, SS.ENV); end", "SS.CHANGELOG = {"]
+             "SS.CHANGELOG = {"]
     for s in sections:
         items = ", ".join(q(i) for i in s["items"])
         lines.append("\t{ v = %s, summary = %s, items = { %s } }," % (q(s["v"]), q(s["summary"]), items))

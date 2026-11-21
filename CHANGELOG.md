@@ -2,6 +2,35 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.91
+Each group of elements shows how many are On, such as 3/5, and moving an element can no longer change its size.
+
+- The category buttons in HUD Edit Mode and the group headings in the Interface settings show how many of their elements are On out of all of them, for example "Aethus 3/9".
+- Moving an element never changes its size. If anything changes its size or scale during a move, it is put back when you let go, and the action log notes it with the sizes before and after.
+- The resize corner (+) does nothing until the mouse really moves, so grabbing near the corner to move an element can't shrink it. Its hover text says what it does, every resize is in the action log, and Undo can take it back.
+- The in-game Changelog lists the newest release first.
+- The search boxes in the settings and in HUD Edit Mode find elements by name and by everyday words: player, party, encounter, dps, xp, buffs and so on.
+- While HUD Edit Mode is open, every scale change of an element is written to the action log with the code that made it, to track down the player and party frames shrinking at the screen edge.
+- While HUD Edit Mode is open, the action log also notes when parts of an element are hidden for reaching outside its box, which can make a frame look smaller.
+- The shared AZS Kit is now Slim Suite's own (SlimSuiteKit.lua). AZS Stats and AZS Handbook are discontinued, so nothing is shared with other addons any more.
+- Performance: the check that keeps each element's parts inside its box runs every 2 seconds instead of twice a second while you are not editing (moves and resizes are still caught at once). Dragging the resize corner redoes only that element instead of the whole HUD every frame. Timers keep an even rhythm, and the Level Up button asks the game for its count once instead of twice.
+- Every On / Off / Default change of an element is written to the action log with what asked for it, to track down elements that switch on by themselves. The action log keeps 300 lines instead of 100.
+- Code cleanup: the old move panel from before HUD Edit Mode, the unused element-mode row in the settings, and nine functions nothing used any more are removed.
+- The three biggest files are split by job, so each file does one thing:
+  - SlimSuiteWorld.lua keeps markers, encounter and target debuffs, the revive bar and the proc meter. The minimap pins, lairs and local clock moved to SlimSuiteMinimapPins.lua, combat text to SlimSuiteCombatText.lua, and boss and Guardian kills to SlimSuiteKills.lua.
+  - SlimSuiteFrames.lua keeps the HUD frames (Level Up, clock, encounter bars, announcements, tally). Placement and sizing moved to SlimSuitePlacement.lua, the buff frame, action bar and XP bar to SlimSuiteBars.lua, and saved places, Mirror Target and frame looks to SlimSuiteAnchors.lua.
+  - SlimSuiteEdit.lua keeps party and friend buffs, setting check boxes and Mirror Target. The minimap's look moved to SlimSuiteMinimapShape.lua, layouts, chat and the XP bar to SlimSuiteLayoutTools.lua, HUD Edit's size menu, grid, snapping and handles to SlimSuiteHandles.lua, and the tooltip, Reset and the target frame to SlimSuiteGameFrames.lua.
+- One-time upgrades of saved settings are now one numbered list (SlimSuiteUpgrades.lua) that runs once per character after login, instead of separate timers in different files. Each upgrade is written to the action log.
+- New /slim perf: measures every part of Slim Suite for 10 seconds (or /slim perf <seconds>) while you play, then lists the busiest timers with how often they ran, how long they took and how much garbage they made, plus total memory. The report also goes to the action log.
+- Every push to GitHub now runs all the checks, including the real Lua 5.0 compile of every file, not only pushes that make a release.
+- Every file uses the same indentation (tabs).
+- Everything Slim Suite's files share now lives in Slim Suite's own table (SS.PlaceAll, SS.MOVABLE and about 100 more) instead of a hand-kept list of private names, so nothing Slim Suite makes can clash with another addon. The checks now fail if any file creates a new global name by mistake.
+- About 200 lines of text that were English only are translated into Spanish, French, German, Portuguese and Italian: the hover text, short labels, warnings, help lines, element groups, Undo and Redo, the search, and older settings and messages that had been missed. The new text uses the same words as each language's existing translations (for example the German Stärkungen for buffs and Rundenzeit for the run clock, the French Chronomètre de partie, and fenêtres / avisos / telas / schermate for the level-up cards).
+- Quick setup and the preset designs are removed entirely. Layouts are made by hand in HUD Edit Mode.
+- The retired "buffs on the target frame" setting is turned off once for anyone who still had it, and the buffs go back to their own place.
+- Performance: a full re-placement places only attached elements again (not every element four times). The minimap boss pins read the boss and guardian lists once a second instead of 20 times, and the kill tracker reuses its tables and saves only when a count changes, for less garbage (and fewer hitches) during a run. After login only your language's translations stay in memory. An active custom profile is saved once when a drag or resize ends instead of four times a second during it.
+- The separate Minimap list in the Interface settings is removed. All of those settings are in the Minimap's own section and its right-click menu.
+
 ## 1.90
 A new list shows every setting that joins one element into another, each element can sit over the level-up cards on its own, and the settings gain a smarter search, Reset, Undo / Redo and hover help.
 

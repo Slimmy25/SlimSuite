@@ -1,7 +1,7 @@
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
 SS.StartSetup(true)
-local d=SS.DB(); local setup=SS.ENV.SU
+local d=SS.DB(); local setup=SS.SU
 setup.SetMode("SlimSuiteStatCounterFrame","enabled","Stats")
 AZS_STATS={hp=100,dmg=1.5,crit=10}; AZS_RUN={hp=90,hpm=120,sh=25}; AZS_SPELLS={{key="racial_test",cd=3}}; AZS_BUFFS={{spell=123,left=8}}
 local lines=SS.StatLines()
@@ -9,7 +9,7 @@ check("HP includes authoritative temporary max and shield",string.find(lines[1],
 check("racial is reported",string.find(table.concat(lines,"|"),"racial_test",1,true))
 AZS_STATS.dmg=2; AZS_RUN.hpm=150; SS.UpdateStats()
 check("stats update from live totals without stacking gear twice",string.find(SS.StatLines()[3],"2",1,true))
-check("stat counter is a real movable element",SS.ENV.handles.SlimSuiteStatCounterFrame~=nil)
+check("stat counter is a real movable element",SS.handles.SlimSuiteStatCounterFrame~=nil)
 check("no stored-level setting is created",not getglobal("SlimSuiteStoreLevelsToggle"))
 d.xpHideBorder=true; SS.StyleExpBar(false)
 check("XP copies hide when border is disabled",not SS.XpArtShown())

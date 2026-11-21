@@ -1,6 +1,6 @@
 -- the settings window: every tick box flips its setting, and no box is left showing an old value
 local function errs(tag) if #ERRORS > 0 then print("ERR " .. tag .. ": " .. table.concat(ERRORS, " | ")); ERRORS = {} end end
-if not SS.ENV.win then SS.WinBuild() end; SS.ENV.win:Show(); Tick(2); errs("open window")
+if not SS.win then SS.WinBuild() end; SS.win:Show(); Tick(2); errs("open window")
 local bad=0
 local visited=0
 for _,module in ipairs(SS.MODULE_ORDER) do
@@ -25,7 +25,7 @@ for round = 1, 3 do
 		end
 	end
 end
-SS.ENV.win:Show(); SS.OpenModulePage(module)
+SS.win:Show(); SS.OpenModulePage(module)
 end
 assert(visited==#SS.MODULE_ORDER,"all module pages reviewed")
 print("window problems: " .. bad)

@@ -1,7 +1,7 @@
 -- The action log: the last 100 things Slim Suite did (element changes, HUD Edit, target requests, errors), kept between
 -- logins. /slimsuite log opens it; Copy selects all of it, then Ctrl+C copies it to paste into a message.
-if ( setfenv ) then setfenv(1, SS.ENV); end
-local MAX_ACTIONS = 100;
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
+local MAX_ACTIONS = 300;   -- room for a whole layout change (every element's mode line) without losing earlier lines
 local frame, box;
 
 local function Entries()

@@ -2,11 +2,11 @@
 ## Title: Slim Suite
 ## Notes: A Swiss-army knife of useful gameplay tools and movable, resizable interface controls. /slimsuite or the minimap button.
 ## Author: Slimjim
-## Version: 1.90
+## Version: 1.91
 ## SavedVariables: SlimSuiteDB, SlimSuiteAchievementsDB
 SlimSuiteElements.lua
 SlimSuiteCore.lua
-AZSKit.lua
+SlimSuiteKit.lua
 SlimSuiteErrors.lua
 SlimSuiteItems.lua
 SlimSuiteMeter.lua
@@ -15,8 +15,15 @@ SlimSuiteLocale.lua
 SlimSuiteLocaleExtra.lua
 SlimSuiteDisplay.lua
 SlimSuiteFrames.lua
+SlimSuitePlacement.lua
+SlimSuiteBars.lua
+SlimSuiteAnchors.lua
 SlimSuiteAuras.lua
 SlimSuiteEdit.lua
+SlimSuiteMinimapShape.lua
+SlimSuiteLayoutTools.lua
+SlimSuiteHandles.lua
+SlimSuiteGameFrames.lua
 SlimSuiteOnboarding.lua
 SlimSuiteSettings.lua
 SlimSuiteEditor.lua
@@ -26,6 +33,9 @@ SlimSuiteModules.lua
 SlimSuiteSettingsWindow.lua
 SlimSuiteCommands.lua
 SlimSuiteWorld.lua
+SlimSuiteMinimapPins.lua
+SlimSuiteCombatText.lua
+SlimSuiteKills.lua
 SlimSuiteNameplates.lua
 SlimSuiteSizing.lua
 SlimSuiteBounds.lua
@@ -41,7 +51,6 @@ SlimSuiteReviveSounds.lua
 SlimSuitePartyStatus.lua
 SlimSuiteWindows.lua
 SlimSuiteHUDEdit.lua
-SlimSuitePresets.lua
-SlimSuiteQuickSetup.lua
 SlimSuiteActionLog.lua
 SlimSuiteChangelog.lua
+SlimSuiteUpgrades.lua

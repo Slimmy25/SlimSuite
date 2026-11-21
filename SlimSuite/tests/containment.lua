@@ -1,7 +1,7 @@
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
 SS.StartSetup(true)
-local d=SS.DB(); local setup=SS.ENV.SU
+local d=SS.DB(); local setup=SS.SU
 local function Rect(f,l,r,b,t)
  f.GetLeft=function() return l end; f.GetRight=function() return r end
  f.GetBottom=function() return b end; f.GetTop=function() return t end
@@ -45,12 +45,12 @@ check("stat preferences survive profile export",exported and exported.statDispla
 d.tallyVertical=false; d.tallyContext=true; d.sizes.SlimSuiteTallyFrame={w=40,h=20}
 SS.DrawTally(SS.TallyParts({kills=123456,gold=999999,chest=1234}))
 local tally=SlimSuiteTallyFrame; local fitted=tally:GetWidth()
-SS.ENV.PlaceAll()
+SS.PlaceAll()
 check("subsequent placement cannot undo tally fit",tally:GetWidth()==fitted and d.sizes.SlimSuiteTallyFrame.w==fitted)
 d.zoneLine=true; d.clockContextAbove=true; SS.ApplyClockLayout()
-check("clock location has an inside top anchor",SS.ENV.clockFrame.zone.points[1][1]=="TOP" and SS.ENV.clockFrame.zone.points[1][2]==SS.ENV.clockFrame)
+check("clock location has an inside top anchor",SS.clockFrame.zone.points[1][1]=="TOP" and SS.clockFrame.zone.points[1][2]==SS.clockFrame)
 d.clockContextAbove=false; SS.ApplyClockLayout()
-check("clock location can move below but remains inside",SS.ENV.clockFrame.zone.points[1][1]=="BOTTOM" and SS.ENV.clockFrame.zone.points[1][2]==SS.ENV.clockFrame)
+check("clock location can move below but remains inside",SS.clockFrame.zone.points[1][1]=="BOTTOM" and SS.clockFrame.zone.points[1][2]==SS.clockFrame)
 -- Exercise every animation stage at small/large box sizes and inherited scales.
 setup.SetMode("SlimSuiteCombatTextFrame","enabled","Combat text"); SS.SetupEnd(true)
 local box=SlimSuiteCombatTextFrame

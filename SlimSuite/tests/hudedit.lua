@@ -1,7 +1,7 @@
 -- HUD Edit Mode: one tick box per element; click cycles Off -> On -> Default -> Off; Revert All sets Default.
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
-SU = SS.ENV.SU
+SU = SS.SU
 SS.SetupEnd(true); Tick(3,.1)
 print("SU", SU ~= nil); SS.OpenHUDEdit(); print("hud", SlimSuiteHUDEditMode ~= nil)
 check("window opens", SlimSuiteHUDEditMode:IsShown())

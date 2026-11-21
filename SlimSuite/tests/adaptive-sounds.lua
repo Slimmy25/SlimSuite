@@ -25,7 +25,7 @@ SS.SetSoundSelection("death","legoDeath")
 check("death alternatives are mutually exclusive",SS.SoundSelection("death")=="legoDeath")
 SS.PlayDeathSound(); Tick(10,.1); check("LEGO selected audio",paths[#paths]==SS.SOUND_FILES.legoDeath)
 SS.SetSoundSelection("death","off"); local n=#paths; SS.PlayDeathSound(); check("death Off is silent",#paths==n)
-if not SS.ENV.win then SS.WinBuild() end
+if not SS.win then SS.WinBuild() end
 local counts={}; local previews=0
 for _,page in ipairs(SS.pages) do for _,row in ipairs(page.rows) do
  if row.soundGroup then

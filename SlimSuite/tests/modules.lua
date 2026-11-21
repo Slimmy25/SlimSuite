@@ -1,8 +1,8 @@
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
 SS.SetupEnd(true)
-if not SS.ENV.win then SS.WinBuild() end
-SS.ENV.win:Show(); SS.OpenModulePage(nil)
+if not SS.win then SS.WinBuild() end
+SS.win:Show(); SS.OpenModulePage(nil)
 check("category hub exists with six pages",SlimSuiteModuleHub:IsShown() and #SS.MODULE_ORDER==6 and SS.MODULE_ORDER[1]=="ui")
 check("diagnostic entry point removed",SS.ShowDiagnosticsWindow==nil and SlimSuiteDiagnosticsFrame==nil)
 for _,id in ipairs(SS.MODULE_ORDER) do
@@ -33,7 +33,7 @@ SS.SetModuleEnabled("misc",true); check("Misc On restores accessibility",d.acces
 SS.StartSetup(true); SS.StartDemoMode(); SS.SetupEnd(true)
 check("ending setup during Demo leaves no toolbar or samples",not SS.demoRunning and not SlimSuiteSetupBar:IsShown())
 d.places.SlimSuiteMeterFrame={x=123,y=234,coordinateSpace="uiParent"}; d.muted.SlimSuiteMeterFrame=true
-SS.ENV.PlaceAll(); local beforeTable=SS.LayoutSnapshot(); local before=SS.LayoutText(beforeTable)
+SS.PlaceAll(); local beforeTable=SS.LayoutSnapshot(); local before=SS.LayoutText(beforeTable)
 SS.SetModuleEnabled("ui",false); Tick(3)
 local allDefault=true
 for _,id in ipairs(SS.SETUP_ORDER) do if d.elementModes[id]~="default" then allDefault=false end end

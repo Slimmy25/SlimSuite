@@ -12,7 +12,7 @@ end
 MOCK_TARGET = false
 SS.SetUnlocked(true, true); Tick(2); SS.SetUnlocked(false, true); Tick(2)
 SS.SetLook("TargetFrame", "classic"); Tick(1)
-local setup = SS.ENV.SU
+local setup = SS.SU
 for _, playerLook in ipairs({ "classic", "new" }) do
     SS.StartSetup(true)
     setup.SetMode("PlayerFrame", "enabled", "Player")

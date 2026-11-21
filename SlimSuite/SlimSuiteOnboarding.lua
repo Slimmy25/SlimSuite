@@ -1,5 +1,5 @@
 -- Slim Suite: the setup and the settings window.
-if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one set of private names (SS.ENV, in SlimSuiteCore.lua)
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 
 -- ---------------------------------------------------------------- first-time setup of the movable UI
 -- The first time "Toggle UI Settings" is turned on, Slim Suite walks the player through the interface one element
@@ -8,7 +8,7 @@ if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one se
 -- rest of the game's frames and every Slim Suite replacement that is turned on. Locking the UI part way through
 -- picks the setup up at the same step next time; "Skip setup" or finishing it ends it for good, and the move
 -- panel's "Run setup again" starts it over.
-SU = {};                                           -- the setup's panel, outline and steps
+-- SU (SS.SU, made in SlimSuiteCore.lua) holds the setup's panel, outline and steps
 SU.statCounterPlaceholder = CreateFrame("Frame", "SlimSuiteStatCounterFrame", UIParent);
 SU.statCounterPlaceholder:SetWidth(150); SU.statCounterPlaceholder:SetHeight(28);
 SS.OwnLook(SU.statCounterPlaceholder, function()
@@ -20,16 +20,16 @@ SU.statCounterPlaceholder.label:SetPoint("CENTER", SU.statCounterPlaceholder, "C
 SU.statCounterPlaceholder:Hide();
 
 function SU.Steps()
- local d, steps = SS.DB(), {};
- for i = 1, table.getn(SS.SETUP_ORDER) do
-  local name = SS.SETUP_ORDER[i]; local element = SS.ELEMENTS[name];
-  if ( getglobal(name) and not (d.setupDisabled and d.setupDisabled[name]) ) then
-   local title = name == "PlayerFrame" and d.combineTarget and "Player + target" or element.title;
-   table.insert(steps, { frame=name, title=title, text=element.text });
-  end
- end
- table.insert(steps, { title="All set", text="That's everything. Press Finish to lock the UI. You can move anything again with HUD Edit Mode. Done closes the list." });
- if ( SS.TranslateRecord ) then for i=1,table.getn(steps) do SS.TranslateRecord(steps[i]); end end
- return steps;
+	local d, steps = SS.DB(), {};
+	for i = 1, table.getn(SS.SETUP_ORDER) do
+		local name = SS.SETUP_ORDER[i]; local element = SS.ELEMENTS[name];
+		if ( getglobal(name) and not (d.setupDisabled and d.setupDisabled[name]) ) then
+			local title = name == "PlayerFrame" and d.combineTarget and "Player + target" or element.title;
+			table.insert(steps, { frame=name, title=title, text=element.text });
+		end
+	end
+	table.insert(steps, { title="All set", text="That's everything. Press Finish to lock the UI. You can move anything again with HUD Edit Mode. Done closes the list." });
+	if ( SS.TranslateRecord ) then for i=1,table.getn(steps) do SS.TranslateRecord(steps[i]); end end
+	return steps;
 end
 

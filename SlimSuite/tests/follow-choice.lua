@@ -1,7 +1,7 @@
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
 SS.SetupEnd(true)
-local d,su=SS.DB(),SS.ENV.SU
+local d,su=SS.DB(),SS.SU
 local bx,by=10,-5; local facing=0; local queries=0
 AZS_GetPhase=function() return "playing" end
 local position={x=0,y=0,facing=0,spaceId="s",mapId=1,runId="r"}
@@ -57,7 +57,7 @@ local item=SlimSuiteItemRowFrame
 d.muted.SlimSuiteItemRowFrame=true; d.orientations.SlimSuiteItemRowFrame="vertical"
 d.sizes.SlimSuiteItemRowFrame={w=24,h=160}; d.scales.SlimSuiteItemRowFrame=.6
 d.places.SlimSuiteItemRowFrame={x=200,y=180,coordinateSpace="uiParent"}
-SS.ENV.PlaceAll(); SS.RefreshItemRow(); SS.ApplyBuildRowReplacement(); SS.ENV.ApplyFeatureMute("SlimSuiteItemRowFrame")
+SS.PlaceAll(); SS.RefreshItemRow(); SS.ApplyBuildRowReplacement(); SS.ApplyFeatureMute("SlimSuiteItemRowFrame")
 local normalScale,normalWidth=item:GetScale(),d.sizes.SlimSuiteItemRowFrame.w
 local snapshot=SS.LayoutText(SS.LayoutSnapshot())
 AZS_GetPhase=function() return "choosing" end; d.cardEdgeHUD=true; d.unlocked=false
@@ -71,7 +71,7 @@ check("selection items match native spell icon size",item:GetHeight()==icon and 
 check("selection row sits under the native spell footer",item.points[1][1]=="BOTTOMLEFT" and item.points[1][4]==x and item.points[1][5]==y)
 check("custom spells do not duplicate the native spell strip",not SlimSuiteSpellRowFrame:IsShown())
 check("temporary selection layout does not modify saved preferences",SS.LayoutText(SS.LayoutSnapshot())==snapshot)
-SS.RefreshItemRow(); SS.ApplyBuildRowReplacement(); SS.ENV.ApplyFeatureMute("SlimSuiteItemRowFrame")
+SS.RefreshItemRow(); SS.ApplyBuildRowReplacement(); SS.ApplyFeatureMute("SlimSuiteItemRowFrame")
 check("normal renderer cannot hide the temporary items",item:IsShown() and item:GetAlpha()==1 and item:GetHeight()==icon)
 AZS_GetPhase=function() return "playing" end; SS.UpdateChoiceHUD()
 check("leaving selection restores disabled and hidden state",not item:IsShown() and item:GetAlpha()==0 and d.hideBuildItems and not d.buildRowsAttached)
@@ -80,7 +80,7 @@ check("normal profile remains byte-for-byte unchanged",SS.LayoutText(SS.LayoutSn
 for _,joined in ipairs({true,false}) do for _,hidden in ipairs({true,false}) do for _,mode in ipairs({"enabled","default","disabled"}) do
  su.SetMode("SlimSuiteSpellRowFrame",mode,"Build")
  d.buildRowsAttached=joined; d.hideBuildItems=hidden; d.muted.SlimSuiteItemRowFrame=nil
- SS.ENV.PlaceAll(); SS.RefreshItemRow(); SS.ApplyBuildRowReplacement()
+ SS.PlaceAll(); SS.RefreshItemRow(); SS.ApplyBuildRowReplacement()
  local normal=SS.LayoutText(SS.LayoutSnapshot())
  AZS_GetPhase=function() return "choosing" end; SS.UpdateChoiceHUD()
  check("all normal build modes get selection-only items",item:IsShown() and item:GetHeight()==icon)

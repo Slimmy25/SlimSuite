@@ -5,7 +5,7 @@
 --   2. That fall's downed anchor then expired with reason "revived" in AZS_ProjectWorldAnchors.
 -- A reset bar, the teammate leaving, the run ending or an empty/not-ready list never plays it.
 -- This is a sound only: it is not revive credit, and someone else may have finished the revive with you.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 local HELP_WINDOW = 3;     -- your progress must have been seen this recently before the fall ended
 local ANSWER_WAIT = 5;     -- how long an ended fall is asked about before it is dropped
 local falls, played, lastRun = {}, {}, nil;   -- anchor id -> { name, helped, gone }; anchor id -> true

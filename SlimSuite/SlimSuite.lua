@@ -43,12 +43,8 @@
 -- /slimsuite (or the gear by the minimap) opens the settings window: every one of these on or off. /slim help lists
 -- the commands.
 -- Lua 5.0 / 1.12 interface: scripts read `this`, `event`, `arg1`, `arg2`; no # operator; only the 1.12 API.
--- names shared by Slim Suite's own files and no one else (see SS.ENV in SlimSuiteCore.lua)
-SS.PRIVATE = { ApplyActionSlotGrid = true, ApplyFeatureMute = true, ApplyMovableOrientation = true, BUFF_BUTTONS = true, BUILD = true, BuffButtons = true, BuildRaidPanel = true, CaptureActionBarLayout = true, DEATH_SOUND = true, DEMO_HITS = true, DEMO_METER = true, DemoBox = true, DemoRedraw = true, DemoTick = true, HookChat = true, ITEM_EQUIP_SLOTS = true, K = true, LEVEL_CLASS_ICON_COORDS = true, MAX_CAMERA = true, MOVABLE = true, NAME = true, PLAIN_HIDE = true, PlaceAll = true, RaidCursor = true, RaidTargets = true, RaidWithin = true, RootBounds = true, RootFactor = true, SU = true, SetAnchorSnap = true, SetRootPosition = true, ShowEditGrid = true, TALLY = true, TagLook = true, UnitKind = true, UpdateMeter = true, VisualInsets = true, actionBarOriginal = true, actionSlotsGridApplied = true, announcementDuration = true, announcementFade = true, announcementFrame = true, announcementStarted = true, bannerHandler = true, bannerHandlerRegistered = true, basePoints = true, baseSizes = true, bossFrame = true, buffButtonOriginalPoints = true, buffLayoutApplying = true, buffLayoutUpdater = true, buffSamples = true, cdText = true, clockFrame = true, deathSoundFrame = true, demoGlint = true, demoHidden = true, demoHitClock = true, demoHitIndex = true, demoPins = true, demoT = true, editGrid = true, editGridLines = true, editOnly = true, encounterRows = true, encounterUpdates = true, errMini = true, handleList = true, handles = true, itemRow = true, itemRowButtons = true, itemRowEvents = true, lastBannerId = true, levelButton = true, loader = true, lockPanel = true, meterFrame = true, mutedBaseAlphas = true, mutedBaseMouse = true, nativeHudShutdown = true, okMini = true, partyNativePoints = true, plainShow = true, raidOver = true, raidPanel = true, setupActive = true, sizeMenu = true, sizeMenuHeight = true, sizeMenuPadding = true, sizeMenuScale = true, sizeMenuScaleInput = true, sizeMenuText = true, sizeMenuWidth = true, sizeTarget = true, spellRow = true, spellRowButtons = true, spellRowEvents = true, tallyFrame = true, targetShow = true, tooltipOwnerOriginal = true, tooltipShowOriginal = true, win = true, xpBarDetached = true, xpStyle = true };
-if ( setfenv ) then setfenv(1, SS.ENV); end   -- Slim Suite's files share one set of private names (SS.ENV, in SlimSuiteCore.lua)
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 
-K = AZSKIT;
-NAME = "Slim Suite";
 
 -- Inventory/world events can refresh rows before SlimSuiteSetup.lua is loaded.
 -- Setup replaces this safe default with the live demo-state lookup later.
@@ -64,17 +60,17 @@ end
 -- Shrinks a font string's font until its text fits the width (its normal size when it fits): used where the player can
 -- make an element smaller than its text. The smallest size is minSize (7 by default).
 function SS.FitText(fs, width, minSize, height, fullText)
- if ( not fs or not fs.GetFont or not fs.SetFont or not width ) then return; end
- if ( not fs.slimBase ) then local font,size,flags=fs:GetFont(); if ( not font ) then return; end; fs.slimBase={font,size or 12,flags}; end
- local text=fullText or (fs.GetText and fs:GetText()) or "";
- if ( not fullText and fs.slimOverflowShown==text ) then text=fs.slimOverflowSource or text; end
- local b=fs.slimBase; local size=b[2];
- if ( height ) then size=math.min(size,math.max(1,height-2)); end
- fs:SetFont(b[1],size,b[3]); fs:SetText(text);
- local smallest=math.min(size,minSize or 7);
- while ( size>smallest and (fs:GetStringWidth() or 0)>math.max(0,width-2) ) do size=size-1; fs:SetFont(b[1],size,b[3]); end
- if ( SS.FitCombatText ) then SS.FitCombatText(fs,text,math.max(0,width-2)); end
- fs.slimOverflowSource=text; fs.slimOverflowShown=fs:GetText();
+	if ( not fs or not fs.GetFont or not fs.SetFont or not width ) then return; end
+	if ( not fs.slimBase ) then local font,size,flags=fs:GetFont(); if ( not font ) then return; end; fs.slimBase={font,size or 12,flags}; end
+	local text=fullText or (fs.GetText and fs:GetText()) or "";
+	if ( not fullText and fs.slimOverflowShown==text ) then text=fs.slimOverflowSource or text; end
+	local b=fs.slimBase; local size=b[2];
+	if ( height ) then size=math.min(size,math.max(1,height-2)); end
+	fs:SetFont(b[1],size,b[3]); fs:SetText(text);
+	local smallest=math.min(size,minSize or 7);
+	while ( size>smallest and (fs:GetStringWidth() or 0)>math.max(0,width-2) ) do size=size-1; fs:SetFont(b[1],size,b[3]); end
+	if ( SS.FitCombatText ) then SS.FitCombatText(fs,text,math.max(0,width-2)); end
+	fs.slimOverflowSource=text; fs.slimOverflowShown=fs:GetText();
 end
 
 -- a small warning box beside a control, for the right-click menu's own Mirror and Buffs boxes
@@ -141,7 +137,6 @@ function SS.UnitKind(unit)
 	end
 	return nil;
 end
-UnitKind = SS.UnitKind;
 
 -- the class colours, by class token ("MAGE") or English class name ("Mage")
 SS.CLASS_COLORS = { WARRIOR = { 0.78, 0.61, 0.43 }, MAGE = { 0.41, 0.8, 0.94 }, ROGUE = { 1, 0.96, 0.41 }, DRUID = { 1, 0.49, 0.04 },
@@ -195,9 +190,9 @@ function SS.PrepareDB(d)
 			if ( ok and shown ~= nil ) then d.showGuardianFlag = SS.HudShown(shown); end
 		end
 	end
- -- Retired early-load audio now uses the supported first-movement song setting.
- if d.matchLoadSound then d.matchStartSound=true; end
- d.matchLoadSound=nil;
+	-- Retired early-load audio now uses the supported first-movement song setting.
+	if d.matchLoadSound then d.matchStartSound=true; end
+	d.matchLoadSound=nil;
 	-- retired settings
 	d.box, d.bloat, d.x, d.y, d.helloOnStart = nil, nil, nil, nil, nil;          -- the Say & Party box and "Remove bloat"
 	d.partyMeter = nil;                                     -- the party meter is now the damage meter's Party tab
@@ -255,7 +250,7 @@ end
 
 -- Keep chat-only helpers in their own lexical scope. The WoW 1.12 Lua runtime allows at
 -- most 200 active locals in the addon chunk; the UI and mover code below needs that budget.
-HookChat = nil;
+SS.HookChat = nil;
 do
 local STAT_WORDS = { "maximum health and", "maximale gesundheit und", "de salud máxima y", "de vida máxima e",
 	"points de vie maximum et", "maksymalnego zdrowia i", "maximálního zdraví a", "до макс. здоров'я і",
@@ -382,7 +377,7 @@ CHAT_FILTER.IsRoleplay = function(msg, sourceEvent)
 end;
 
 function SS.Hidden(msg, sourceEvent)
- if SS.ModuleEnabled and not SS.ModuleEnabled("chat") then return false; end
+	if SS.ModuleEnabled and not SS.ModuleEnabled("chat") then return false; end
 	if ( type(msg) ~= "string" ) then return false; end
 	if ( CHAT_FILTER.allowPlayers or CHAT_FILTER.playerEvents[sourceEvent or CHAT_FILTER.activeEvent] ) then return false; end
 	if ( string.find(msg, "|Hplayer:", 1, true) ) then return false; end   -- a player's own words
@@ -433,7 +428,7 @@ function SS.HookFrame(cf)
 	end;
 end
 
-HookChat = function()
+SS.HookChat = function()
 	for i = 1, 7 do SS.Safe(SS.HookFrame, getglobal("ChatFrame" .. i)); end
 	SS.Safe(SS.HookFrame, DEFAULT_CHAT_FRAME);
 	if ( type(ChatFrame_OnEvent) == "function" and not hooked.event ) then
@@ -460,7 +455,7 @@ end -- scoped chat filter helpers
 -- The game's Max Camera Distance slider is cameraDistanceMaxFactor, a factor of cameraDistanceMax (15 yards): its
 -- top, 3.33, is 50 yards. Slim Suite sets it to 50 yards when the game starts (and zooms out to it once a session); turned off
 -- in /slimsuite, the game's own setting stays.
-MAX_CAMERA = 50;
+SS.MAX_CAMERA = 50;
 
 function SS.Camera(zoomOut)
 	if ( not SetCVar ) then return; end
@@ -478,7 +473,7 @@ function SS.Camera(zoomOut)
 		local ok, v = SS.Safe(GetCVar, "cameraDistanceMax");
 		if ( ok and tonumber(v) and tonumber(v) > 0 ) then base = tonumber(v); end
 	end
-	SS.Safe(SetCVar, "cameraDistanceMaxFactor", string.format("%.4f", MAX_CAMERA / base));
+	SS.Safe(SetCVar, "cameraDistanceMaxFactor", string.format("%.4f", SS.MAX_CAMERA / base));
 	-- once a session: later loading screens keep whatever zoom the player has chosen since
 	if ( zoomOut and not SS.cameraZoomed ) then SS.cameraZoomed = true; SS.ZoomTo(SS.CameraDistance()); end
 end
@@ -487,8 +482,8 @@ end
 SS.CAMERA_MIN = 5;
 SS.BUILT_IN_CAMERA_PRESETS = { close = 15, medium = 30, max = 50 };
 function SS.CameraDistance()
-	local v = tonumber(SS.DB().cameraDistance) or MAX_CAMERA;
-	if ( v < SS.CAMERA_MIN ) then v = SS.CAMERA_MIN; elseif ( v > MAX_CAMERA ) then v = MAX_CAMERA; end
+	local v = tonumber(SS.DB().cameraDistance) or SS.MAX_CAMERA;
+	if ( v < SS.CAMERA_MIN ) then v = SS.CAMERA_MIN; elseif ( v > SS.MAX_CAMERA ) then v = SS.MAX_CAMERA; end
 	return v;
 end
 -- Built-in presets, with the player's own saved ones on top.
@@ -501,14 +496,14 @@ end
 -- Zooms in to the closest view, then out to the distance, so it lands there whatever the zoom was before.
 function SS.ZoomTo(yards)
 	if ( not CameraZoomIn or not CameraZoomOut ) then return; end
-	SS.Safe(CameraZoomIn, MAX_CAMERA * 2);
+	SS.Safe(CameraZoomIn, SS.MAX_CAMERA * 2);
 	SS.Safe(CameraZoomOut, yards);
 end
 -- Sets the distance and applies it now. Used by settings and /slim camera.
 function SS.SetCameraDistance(v)
 	local d = SS.DB();
-	v = math.floor(tonumber(v) or MAX_CAMERA + 0.5);
-	if ( v < SS.CAMERA_MIN ) then v = SS.CAMERA_MIN; elseif ( v > MAX_CAMERA ) then v = MAX_CAMERA; end
+	v = math.floor(tonumber(v) or SS.MAX_CAMERA + 0.5);
+	if ( v < SS.CAMERA_MIN ) then v = SS.CAMERA_MIN; elseif ( v > SS.MAX_CAMERA ) then v = SS.MAX_CAMERA; end
 	d.cameraDistance = v; d.camera = true;
 	SS.Camera(false);
 	SS.ZoomTo(v);
@@ -516,122 +511,122 @@ function SS.SetCameraDistance(v)
 end
 
 function SS.CustomGuardianFlag()
- local d=SS.DB();
- return (not SS.ModuleEnabled or SS.ModuleEnabled("gameplay")) and not d.vanillaUI and d.showGuardianFlag and (SS.FeatureEnabled("MinimapCluster") or d.minimapLairs or d.minimapBosses or d.minimapCaches);
+	local d=SS.DB();
+	return (not SS.ModuleEnabled or SS.ModuleEnabled("gameplay")) and not d.vanillaUI and d.showGuardianFlag and (SS.FeatureEnabled("MinimapCluster") or d.minimapLairs or d.minimapBosses or d.minimapCaches);
 end
 function SS.RestoreGuardianFlag()
- local d=SS.DB();
- if ( d.guardianFlagNativeOriginal~=nil and type(AZS_SetHudShown)=="function" ) then
-  SS.Safe(AZS_SetHudShown,"flag",d.guardianFlagNativeOriginal); d.guardianFlagNativeOriginal=nil;
- end
+	local d=SS.DB();
+	if ( d.guardianFlagNativeOriginal~=nil and type(AZS_SetHudShown)=="function" ) then
+		SS.Safe(AZS_SetHudShown,"flag",d.guardianFlagNativeOriginal); d.guardianFlagNativeOriginal=nil;
+	end
 end
 function SS.ApplyGuardianFlag()
- if SS.ModuleEnabled and not SS.ModuleEnabled("gameplay") then SS.RestoreGuardianFlag(); return; end
- if ( type(AZS_SetHudShown)~="function" ) then return; end
- local d=SS.DB();
- if ( d.vanillaUI ) then SS.RestoreGuardianFlag(); return; end
- local custom=SS.CustomGuardianFlag();
- if ( custom and d.guardianFlagNativeOriginal==nil ) then
-  if ( type(AZS_IsHudShown)=="function" ) then d.guardianFlagNativeOriginal=SS.HudShown(AZS_IsHudShown("flag")); else d.guardianFlagNativeOriginal=true; end
- end
- local desired=d.showGuardianFlag and not custom and true or false;
- if ( type(AZS_IsHudShown)~="function" or SS.HudShown(AZS_IsHudShown("flag"))~=desired ) then SS.Safe(AZS_SetHudShown,"flag",desired); end
- if ( not custom ) then d.guardianFlagNativeOriginal=nil; end
+	if SS.ModuleEnabled and not SS.ModuleEnabled("gameplay") then SS.RestoreGuardianFlag(); return; end
+	if ( type(AZS_SetHudShown)~="function" ) then return; end
+	local d=SS.DB();
+	if ( d.vanillaUI ) then SS.RestoreGuardianFlag(); return; end
+	local custom=SS.CustomGuardianFlag();
+	if ( custom and d.guardianFlagNativeOriginal==nil ) then
+		if ( type(AZS_IsHudShown)=="function" ) then d.guardianFlagNativeOriginal=SS.HudShown(AZS_IsHudShown("flag")); else d.guardianFlagNativeOriginal=true; end
+	end
+	local desired=d.showGuardianFlag and not custom and true or false;
+	if ( type(AZS_IsHudShown)~="function" or SS.HudShown(AZS_IsHudShown("flag"))~=desired ) then SS.Safe(AZS_SetHudShown,"flag",desired); end
+	if ( not custom ) then d.guardianFlagNativeOriginal=nil; end
 end
 
 -- ---------------------------------------------------------------- the death sound
 -- Boss, guardian and downed-friend markers live in SlimSuiteWorld.lua. They draw their own markers through the
 -- game's world-anchor API and never change your target.
 SS.SOUND_FILES = {
- finalMegalovania = "Interface\\AddOns\\SlimSuite\\undertale-megalovania.mp3",
- csgoStart = "Interface\\AddOns\\SlimSuite\\csgo-okay-lets-go.mp3",
- haloLoss = "Interface\\AddOns\\SlimSuite\\game_over.mp3",
- cenaStart = "Interface\\AddOns\\SlimSuite\\cena.mp3",
- pillarStart = "Interface\\AddOns\\SlimSuite\\pillarman song.mp3",
- jojoVictory = "Interface\\AddOns\\SlimSuite\\to be continued jojo.mp3",
+	finalMegalovania = "Interface\\AddOns\\SlimSuite\\undertale-megalovania.mp3",
+	csgoStart = "Interface\\AddOns\\SlimSuite\\csgo-okay-lets-go.mp3",
+	haloLoss = "Interface\\AddOns\\SlimSuite\\game_over.mp3",
+	cenaStart = "Interface\\AddOns\\SlimSuite\\cena.mp3",
+	pillarStart = "Interface\\AddOns\\SlimSuite\\pillarman song.mp3",
+	jojoVictory = "Interface\\AddOns\\SlimSuite\\to be continued jojo.mp3",
 	death = "Interface\\AddOns\\SlimSuite\\Baby Crying.mp3",
 	legoDeath = "Interface\\AddOns\\SlimSuite\\lego-die.mp3",
- duckDeath = "Interface\\AddOns\\SlimSuite\\duck-toy-sound.mp3",
- matchLoss = "Interface\\AddOns\\SlimSuite\\the-price-is-right-losing-horn.mp3",
- matchWasted = "Interface\\AddOns\\SlimSuite\\gta-v-wasted-death-sound.mp3",
- matchStart = "Interface\\AddOns\\SlimSuite\\Kit-kit-kit-kit-song.mp3",
- robloxDeath = "Interface\\AddOns\\SlimSuite\\roblox-death-sound_1.mp3",
- matchVictory = "Interface\\AddOns\\SlimSuite\\gta-san-andreas-abertura-oficial.mp3",
+	duckDeath = "Interface\\AddOns\\SlimSuite\\duck-toy-sound.mp3",
+	matchLoss = "Interface\\AddOns\\SlimSuite\\the-price-is-right-losing-horn.mp3",
+	matchWasted = "Interface\\AddOns\\SlimSuite\\gta-v-wasted-death-sound.mp3",
+	matchStart = "Interface\\AddOns\\SlimSuite\\Kit-kit-kit-kit-song.mp3",
+	robloxDeath = "Interface\\AddOns\\SlimSuite\\roblox-death-sound_1.mp3",
+	matchVictory = "Interface\\AddOns\\SlimSuite\\gta-san-andreas-abertura-oficial.mp3",
 	lowHealth = "Interface\\AddOns\\SlimSuite\\Low Health Sound.mp3",
 	bossHitmarker = "Interface\\AddOns\\SlimSuite\\hitmarker.mp3",
 	bossWhip = "Interface\\AddOns\\SlimSuite\\Whip-Crack.mp3",
- bossGotcha = "Interface\\AddOns\\SlimSuite\\GotchaBIt.Dave Chapelle.mp3",
+	bossGotcha = "Interface\\AddOns\\SlimSuite\\GotchaBIt.Dave Chapelle.mp3",
 	chestOpen = "Interface\\AddOns\\SlimSuite\\zelda-chest-opening-and-item-catch.mp3",
- reviveSuccess = "Interface\\AddOns\\SlimSuite\\af09418b-quick-revive-small.mp3",
+	reviveSuccess = "Interface\\AddOns\\SlimSuite\\af09418b-quick-revive-small.mp3",
 };
 SS.SOUND_DURATIONS = {
- finalMegalovania=16.614,
- csgoStart=1.927,
- haloLoss=1.48,
- cenaStart=13.027,
- pillarStart=10.215,
- jojoVictory=10.92,
- death=4.584,
- legoDeath=1.649,
- duckDeath=0.961,
- matchLoss=5.068,
- matchWasted=7.758,
- matchStart=12.428,
- robloxDeath=1.0,
- matchVictory=10.031,
- lowHealth=1.0,
- bossHitmarker=0.12,
- bossWhip=1.051,
- bossGotcha=0.673,
- chestOpen=2.52,
- reviveSuccess=3.984,
+	finalMegalovania=16.614,
+	csgoStart=1.927,
+	haloLoss=1.48,
+	cenaStart=13.027,
+	pillarStart=10.215,
+	jojoVictory=10.92,
+	death=4.584,
+	legoDeath=1.649,
+	duckDeath=0.961,
+	matchLoss=5.068,
+	matchWasted=7.758,
+	matchStart=12.428,
+	robloxDeath=1.0,
+	matchVictory=10.031,
+	lowHealth=1.0,
+	bossHitmarker=0.12,
+	bossWhip=1.051,
+	bossGotcha=0.673,
+	chestOpen=2.52,
+	reviveSuccess=3.984,
 };
 -- One selected sound per event. Existing flags remain compatible with saved settings.
 function SS.SoundSelection(group)
- local d=SS.DB();
- if group=="finalBoss" then return d.finalBossSound=="finalMegalovania" and "finalMegalovania" or "off"; end
- if group=="death" then return d.deathSound and (d.robloxDeathSound and "robloxDeath" or (d.duckDeathSound and "duckDeath" or (d.legoDeathSound and "legoDeath" or "death"))) or "off"; end
- if group=="teammate" then return d.teammateDeathSound or "same"; end
- if group=="victory" then return d.matchVictorySound=="jojoVictory" and "jojoVictory" or (d.matchVictorySound and "matchVictory" or "off"); end
- if group=="loss" then return d.matchHaloSound and "haloLoss" or (d.matchWastedSound and "matchWasted" or (d.matchLossSound and "matchLoss" or "off")); end
- if group=="start" then return (d.matchStartSound=="cenaStart" or d.matchStartSound=="pillarStart" or d.matchStartSound=="csgoStart") and d.matchStartSound or (d.matchStartSound and "matchStart" or "off"); end
- if group=="lowHealth" then return d.lowHealthSound and "lowHealth" or "off"; end
- if group=="chest" then return d.chestOpenSound and "chestOpen" or "off"; end
- if group=="revive" then return d.reviveSound=="reviveSuccess" and "reviveSuccess" or "off"; end
- if group=="boss" then
-  if d.bossHitmarkerSound then return "bossHitmarker"; end
-  if d.bossWhipSound then return "bossWhip"; end
-  if d.bossGotchaSound then return "bossGotcha"; end
- end
- return "off";
+	local d=SS.DB();
+	if group=="finalBoss" then return d.finalBossSound=="finalMegalovania" and "finalMegalovania" or "off"; end
+	if group=="death" then return d.deathSound and (d.robloxDeathSound and "robloxDeath" or (d.duckDeathSound and "duckDeath" or (d.legoDeathSound and "legoDeath" or "death"))) or "off"; end
+	if group=="teammate" then return d.teammateDeathSound or "same"; end
+	if group=="victory" then return d.matchVictorySound=="jojoVictory" and "jojoVictory" or (d.matchVictorySound and "matchVictory" or "off"); end
+	if group=="loss" then return d.matchHaloSound and "haloLoss" or (d.matchWastedSound and "matchWasted" or (d.matchLossSound and "matchLoss" or "off")); end
+	if group=="start" then return (d.matchStartSound=="cenaStart" or d.matchStartSound=="pillarStart" or d.matchStartSound=="csgoStart") and d.matchStartSound or (d.matchStartSound and "matchStart" or "off"); end
+	if group=="lowHealth" then return d.lowHealthSound and "lowHealth" or "off"; end
+	if group=="chest" then return d.chestOpenSound and "chestOpen" or "off"; end
+	if group=="revive" then return d.reviveSound=="reviveSuccess" and "reviveSuccess" or "off"; end
+	if group=="boss" then
+		if d.bossHitmarkerSound then return "bossHitmarker"; end
+		if d.bossWhipSound then return "bossWhip"; end
+		if d.bossGotchaSound then return "bossGotcha"; end
+	end
+	return "off";
 end
 function SS.SetSoundSelection(group,key)
- local d=SS.DB();
- if group=="finalBoss" then d.finalBossSound=key=="finalMegalovania" and key or false; SS.RefreshToggles(); return; end
- if group=="death" then d.deathSound=key=="death" or key=="legoDeath" or key=="duckDeath" or key=="robloxDeath"; d.robloxDeathSound=key=="robloxDeath"; d.legoDeathSound=key=="legoDeath"; d.duckDeathSound=key=="duckDeath";
- elseif group=="teammate" then d.teammateDeathSound=key;
- elseif group=="victory" then d.matchVictorySound=key=="jojoVictory" and key or key=="matchVictory";
- elseif group=="loss" then d.matchHaloSound=key=="haloLoss"; d.matchLossSound=key=="matchLoss"; d.matchWastedSound=key=="matchWasted";
- elseif group=="start" then d.matchStartSound=(key=="cenaStart" or key=="pillarStart" or key=="csgoStart") and key or key=="matchStart";
- elseif group=="lowHealth" then d.lowHealthSound=key=="lowHealth";
- elseif group=="chest" then d.chestOpenSound=key=="chestOpen";
- elseif group=="revive" then d.reviveSound=key=="reviveSuccess" and key or false;
- elseif group=="boss" then d.bossHitmarkerSound=key=="bossHitmarker"; d.bossWhipSound=key=="bossWhip"; d.bossGotchaSound=key=="bossGotcha"; end
- SS.RefreshToggles();
+	local d=SS.DB();
+	if group=="finalBoss" then d.finalBossSound=key=="finalMegalovania" and key or false; SS.RefreshToggles(); return; end
+	if group=="death" then d.deathSound=key=="death" or key=="legoDeath" or key=="duckDeath" or key=="robloxDeath"; d.robloxDeathSound=key=="robloxDeath"; d.legoDeathSound=key=="legoDeath"; d.duckDeathSound=key=="duckDeath";
+	elseif group=="teammate" then d.teammateDeathSound=key;
+	elseif group=="victory" then d.matchVictorySound=key=="jojoVictory" and key or key=="matchVictory";
+	elseif group=="loss" then d.matchHaloSound=key=="haloLoss"; d.matchLossSound=key=="matchLoss"; d.matchWastedSound=key=="matchWasted";
+	elseif group=="start" then d.matchStartSound=(key=="cenaStart" or key=="pillarStart" or key=="csgoStart") and key or key=="matchStart";
+	elseif group=="lowHealth" then d.lowHealthSound=key=="lowHealth";
+	elseif group=="chest" then d.chestOpenSound=key=="chestOpen";
+	elseif group=="revive" then d.reviveSound=key=="reviveSuccess" and key or false;
+	elseif group=="boss" then d.bossHitmarkerSound=key=="bossHitmarker"; d.bossWhipSound=key=="bossWhip"; d.bossGotchaSound=key=="bossGotcha"; end
+	SS.RefreshToggles();
 end
 function SS.DeathSoundSelection(group)
- local selected=SS.SoundSelection(group=="teammate" and "teammate" or "death");
- if selected=="same" then return SS.SoundSelection("death"); end
- return selected;
+	local selected=SS.SoundSelection(group=="teammate" and "teammate" or "death");
+	if selected=="same" then return SS.SoundSelection("death"); end
+	return selected;
 end
 local soundPreviewHandle;
 SS.previewUntil=0;
 function SS.PreviewActive(key)
- if SS.previewKey and GetTime()>=SS.previewUntil then
-  if SS.previewOnMusic and type(StopMusic)=="function" then SS.Safe(StopMusic); end   -- music loops: end it on time
-  SS.previewKey=nil; soundPreviewHandle=nil; SS.previewOnMusic=nil;
- end
- return SS.previewKey~=nil and (key==nil or SS.previewKey==key);
+	if SS.previewKey and GetTime()>=SS.previewUntil then
+		if SS.previewOnMusic and type(StopMusic)=="function" then SS.Safe(StopMusic); end   -- music loops: end it on time
+		SS.previewKey=nil; soundPreviewHandle=nil; SS.previewOnMusic=nil;
+	end
+	return SS.previewKey~=nil and (key==nil or SS.previewKey==key);
 end
 -- The client has no StopSound, so a sound started with PlaySoundFile cannot be cut short. Previews therefore play on
 -- the music channel (PlayMusic / StopMusic), which can be stopped at any moment: pause stops the preview, and a new
@@ -639,64 +634,64 @@ end
 -- turned off or at zero volume nothing would be heard there, so previews fall back to the effects channel (and the old
 -- one-at-a-time queue).
 function SS.PreviewOnMusic()
- if type(PlayMusic)~="function" or type(StopMusic)~="function" then return false; end
- if type(GetCVar)=="function" then
-  local enabled=GetCVar("EnableMusic"); local volume=tonumber(GetCVar("MusicVolume"));
-  if enabled=="0" or (volume and volume<=0) then return false; end
- end
- return true;
+	if type(PlayMusic)~="function" or type(StopMusic)~="function" then return false; end
+	if type(GetCVar)=="function" then
+		local enabled=GetCVar("EnableMusic"); local volume=tonumber(GetCVar("MusicVolume"));
+		if enabled=="0" or (volume and volume<=0) then return false; end
+	end
+	return true;
 end
 function SS.CanStopPreview()
- return SS.PreviewActive() and (SS.previewOnMusic or (soundPreviewHandle and type(StopSound)=="function")) and true or false;
+	return SS.PreviewActive() and (SS.previewOnMusic or (soundPreviewHandle and type(StopSound)=="function")) and true or false;
 end
 function SS.StopPreview()
- if not SS.PreviewActive() then return true; end
- if SS.previewOnMusic then
-  SS.Safe(StopMusic);
-  SS.previewOnMusic=nil; soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
- end
- if not soundPreviewHandle or type(StopSound)~="function" then return false; end
- local ok,result=SS.Safe(StopSound,soundPreviewHandle); if not ok or result==false then return false; end
- soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
+	if not SS.PreviewActive() then return true; end
+	if SS.previewOnMusic then
+		SS.Safe(StopMusic);
+		SS.previewOnMusic=nil; soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
+	end
+	if not soundPreviewHandle or type(StopSound)~="function" then return false; end
+	local ok,result=SS.Safe(StopSound,soundPreviewHandle); if not ok or result==false then return false; end
+	soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
 end
 -- Panel looks Slim Suite draws itself. "original" is the game's tooltip look, "meter" is the damage meter's dark panel
 -- with a gold edge, "tooltip" is the blue-tinted game tooltip panel. Blizzard's own frames are never restyled here.
 SS.PANEL_STYLES = {
- original = { bg = "Interface\\Tooltips\\UI-Tooltip-Background", edge = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
-   color = { 0.05, 0.05, 0.12, 0.92 }, border = { 0.6, 0.6, 0.7, 1 } },
- meter = { bg = "Interface\\Buttons\\WHITE8X8", edge = "Interface\\Buttons\\WHITE8X8", edgeSize = 1,
-   color = { 0.02, 0.02, 0.03, 0.9 }, border = { 0.85, 0.65, 0.2, 0.7 } },
- tooltip = { bg = "Interface\\Tooltips\\UI-Tooltip-Background", edge = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16,
-   color = { 0.08, 0.12, 0.22, 0.95 }, border = { 0.75, 0.85, 1, 0.9 } },
+	original = { bg = "Interface\\Tooltips\\UI-Tooltip-Background", edge = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
+			color = { 0.05, 0.05, 0.12, 0.92 }, border = { 0.6, 0.6, 0.7, 1 } },
+	meter = { bg = "Interface\\Buttons\\WHITE8X8", edge = "Interface\\Buttons\\WHITE8X8", edgeSize = 1,
+			color = { 0.02, 0.02, 0.03, 0.9 }, border = { 0.85, 0.65, 0.2, 0.7 } },
+	tooltip = { bg = "Interface\\Tooltips\\UI-Tooltip-Background", edge = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16,
+			color = { 0.08, 0.12, 0.22, 0.95 }, border = { 0.75, 0.85, 1, 0.9 } },
 };
 function SS.PanelStyleKey()
- local key = SS.DB().uiStyle;
- return SS.PANEL_STYLES[key] and key or "original";
+	local key = SS.DB().uiStyle;
+	return SS.PANEL_STYLES[key] and key or "original";
 end
 -- Names an element's look in the saved overrides: its own frame name, or slimName for an unnamed frame.
 function SS.FrameLookName(f)
- if ( not f ) then return nil; end
- if ( f.slimName ) then return f.slimName; end
- if ( f.GetName ) then return f:GetName(); end
- return nil;
+	if ( not f ) then return nil; end
+	if ( f.slimName ) then return f.slimName; end
+	if ( f.GetName ) then return f:GetName(); end
+	return nil;
 end
 -- The look an element uses: its own override from its right-click menu if it has one, otherwise the global choice.
 function SS.StyleKeyFor(name)
- local o = name and SS.DB().styleOverrides and SS.DB().styleOverrides[name];
- if ( o and SS.PANEL_STYLES[o] ) then return o; end
- return SS.PanelStyleKey();
+	local o = name and SS.DB().styleOverrides and SS.DB().styleOverrides[name];
+	if ( o and SS.PANEL_STYLES[o] ) then return o; end
+	return SS.PanelStyleKey();
 end
 -- Applies the chosen look to one Slim Suite panel; cached so a panel that redraws often is only restyled on a change.
 function SS.ApplyPanelStyle(f)
- if not f or not f.SetBackdrop then return; end
- local key = SS.StyleKeyFor(SS.FrameLookName(f));
- if f.panelStyle == key then return; end
- local s = SS.PANEL_STYLES[key];
- f:SetBackdrop({ bgFile = s.bg, edgeFile = s.edge, tile = true, tileSize = 8, edgeSize = s.edgeSize,
-   insets = { left = 1, right = 1, top = 1, bottom = 1 } });
- f:SetBackdropColor(s.color[1], s.color[2], s.color[3], s.color[4]);
- f:SetBackdropBorderColor(s.border[1], s.border[2], s.border[3], s.border[4]);
- f.panelStyle = key;
+	if not f or not f.SetBackdrop then return; end
+	local key = SS.StyleKeyFor(SS.FrameLookName(f));
+	if f.panelStyle == key then return; end
+	local s = SS.PANEL_STYLES[key];
+	f:SetBackdrop({ bgFile = s.bg, edgeFile = s.edge, tile = true, tileSize = 8, edgeSize = s.edgeSize,
+			insets = { left = 1, right = 1, top = 1, bottom = 1 } });
+	f:SetBackdropColor(s.color[1], s.color[2], s.color[3], s.color[4]);
+	f:SetBackdropBorderColor(s.border[1], s.border[2], s.border[3], s.border[4]);
+	f.panelStyle = key;
 end
 -- A frame whose band is made of textures (the tally, the local clock). Original keeps those textures exactly as they
 -- were; the other two styles hide them and draw the chosen panel behind the same frame.
@@ -714,163 +709,163 @@ end
 -- Meter and Tooltip draw the chosen panel instead. hides = textures the element draws over its backdrop.
 SS.themedPanels = {};
 function SS.ThemePanel(f, look, hides)
- if ( not f ) then return; end
- if ( look and not f.slimOriginal ) then f.slimOriginal = look; table.insert(SS.themedPanels, f); end
- if ( hides ) then f.styleHide = hides; end
- local styled = SS.StyleKeyFor(SS.FrameLookName(f)) ~= "original";
- if ( styled ) then
-  SS.ApplyPanelStyle(f);
- elseif ( f.panelStyle and f.slimOriginal ) then
-  f.slimOriginal(); f.panelStyle = nil;
- end
- if ( f.styleHide ) then for i = 1, table.getn(f.styleHide) do if ( styled ) then f.styleHide[i]:Hide(); else f.styleHide[i]:Show(); end end end
+	if ( not f ) then return; end
+	if ( look and not f.slimOriginal ) then f.slimOriginal = look; table.insert(SS.themedPanels, f); end
+	if ( hides ) then f.styleHide = hides; end
+	local styled = SS.StyleKeyFor(SS.FrameLookName(f)) ~= "original";
+	if ( styled ) then
+		SS.ApplyPanelStyle(f);
+	elseif ( f.panelStyle and f.slimOriginal ) then
+		f.slimOriginal(); f.panelStyle = nil;
+	end
+	if ( f.styleHide ) then for i = 1, table.getn(f.styleHide) do if ( styled ) then f.styleHide[i]:Hide(); else f.styleHide[i]:Show(); end end end
 end
 function SS.OwnLook(f, look, hides)
- look(); SS.ThemePanel(f, look, hides);
+	look(); SS.ThemePanel(f, look, hides);
 end
 -- Looks that are not a backdrop (a plain texture) register a hook; it is handed the look its element uses.
 SS.themeHooks = {};
 function SS.AddThemeHook(fn, name)
- table.insert(SS.themeHooks, { fn = fn, name = name }); fn(SS.StyleKeyFor(name));
+	table.insert(SS.themeHooks, { fn = fn, name = name }); fn(SS.StyleKeyFor(name));
 end
 function SS.RethemePanels()
- for _, f in ipairs(SS.themedPanels) do SS.ThemePanel(f); end
- for _, h in ipairs(SS.themeHooks) do h.fn(SS.StyleKeyFor(h.name)); end
+	for _, f in ipairs(SS.themedPanels) do SS.ThemePanel(f); end
+	for _, h in ipairs(SS.themeHooks) do h.fn(SS.StyleKeyFor(h.name)); end
 end
 -- Re-draws everything that reads the looks. Called after the global choice or one element's override changes.
 function SS.RefreshLooks()
- SS.RethemePanels();
- if SS.UpdateLuck then SS.Safe(SS.UpdateLuck); end
- if SS.UpdateEnemyNameplates then SS.Safe(SS.UpdateEnemyNameplates); end
- if SS.ApplyMeterSkin then SS.Safe(SS.ApplyMeterSkin); end
+	SS.RethemePanels();
+	if SS.UpdateLuck then SS.Safe(SS.UpdateLuck); end
+	if SS.UpdateEnemyNameplates then SS.Safe(SS.UpdateEnemyNameplates); end
+	if SS.ApplyMeterSkin then SS.Safe(SS.ApplyMeterSkin); end
 end
 -- The global buttons set every element to one look, so they clear each element's own override first.
 function SS.SetPanelStyle(key)
- SS.DB().uiStyle = SS.PANEL_STYLES[key] and key or "original";
- SS.DB().styleOverrides = {};
- SS.RefreshLooks();
+	SS.DB().uiStyle = SS.PANEL_STYLES[key] and key or "original";
+	SS.DB().styleOverrides = {};
+	SS.RefreshLooks();
 end
 -- One element's look from its right-click menu. key = nil goes back to the global choice.
 SS.STYLE_NAMES = { original = "Original", meter = "RPG", tooltip = "New School" };
 SS.LOOK_ELEMENTS = { "SlimSuitePartyLines", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteBossFrames",
- "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame",
- "SlimSuiteLocalClockFrame", "SlimSuitePlayerCard", "SlimSuiteTargetCard", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame",
- "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton", "SlimSuiteProcMeter" };
+	"SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame",
+	"SlimSuiteLocalClockFrame", "SlimSuitePlayerCard", "SlimSuiteTargetCard", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame",
+	"SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton", "SlimSuiteProcMeter" };
 function SS.IsLookElement(name)
- for i = 1, table.getn(SS.LOOK_ELEMENTS) do if ( SS.LOOK_ELEMENTS[i] == name ) then return true; end end
- return false;
+	for i = 1, table.getn(SS.LOOK_ELEMENTS) do if ( SS.LOOK_ELEMENTS[i] == name ) then return true; end end
+	return false;
 end
 function SS.SetElementLook(name, key)
- local d = SS.DB(); d.styleOverrides = d.styleOverrides or {};
- d.styleOverrides[name] = (key and SS.PANEL_STYLES[key]) and key or nil;
- SS.RefreshLooks();
+	local d = SS.DB(); d.styleOverrides = d.styleOverrides or {};
+	d.styleOverrides[name] = (key and SS.PANEL_STYLES[key]) and key or nil;
+	SS.RefreshLooks();
 end
 
 -- The one global rule for sound: nothing starts while the game is paused (the pause phase or the Esc menu is open).
 -- A sound already playing finishes; the 1.12 client has no way to stop it early.
 function SS.GamePaused()
- if GameMenuFrame and GameMenuFrame.IsShown and GameMenuFrame:IsShown() then return true; end
- if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok and value=="paused" then return true; end end
- return false;
+	if GameMenuFrame and GameMenuFrame.IsShown and GameMenuFrame:IsShown() then return true; end
+	if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok and value=="paused" then return true; end end
+	return false;
 end
 function SS.PlayAddonSound(key)
- if SS.ModuleEnabled and not SS.ModuleEnabled("sounds") then return false; end
- if SS.GamePaused() then return false; end
- local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return false; end
- if SS.PreviewActive() and not SS.StopPreview() then return false; end
- local ok,played=SS.Safe(PlaySoundFile,path); return ok and played and true or false;
+	if SS.ModuleEnabled and not SS.ModuleEnabled("sounds") then return false; end
+	if SS.GamePaused() then return false; end
+	local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return false; end
+	if SS.PreviewActive() and not SS.StopPreview() then return false; end
+	local ok,played=SS.Safe(PlaySoundFile,path); return ok and played and true or false;
 end
 function SS.PreviewSound(key)
- local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return; end
- if SS.GamePaused() then SS.previewNext=nil; return; end
- local same=SS.PreviewActive(key);
- if not SS.StopPreview() then SS.previewNext=not same and key or nil; return; end
- SS.previewNext=nil;
- if same then return; end
- local length=(SS.SOUND_DURATIONS and SS.SOUND_DURATIONS[key]) or 5;
- if SS.PreviewOnMusic() then
-  local ok=SS.Safe(PlayMusic,path);
-  if ok then SS.previewOnMusic=true; soundPreviewHandle=nil; SS.previewKey=key; SS.previewUntil=GetTime()+length; return; end
- end
- local ok,played,handle=SS.Safe(PlaySoundFile,path);
- -- Legacy clients may return nothing despite playing successfully.
- if ok and played~=false then
-  soundPreviewHandle=handle; SS.previewKey=key;
-  SS.previewUntil=GetTime()+length;
- end
+	local path=SS.SOUND_FILES[key]; if not path or not PlaySoundFile then return; end
+	if SS.GamePaused() then SS.previewNext=nil; return; end
+	local same=SS.PreviewActive(key);
+	if not SS.StopPreview() then SS.previewNext=not same and key or nil; return; end
+	SS.previewNext=nil;
+	if same then return; end
+	local length=(SS.SOUND_DURATIONS and SS.SOUND_DURATIONS[key]) or 5;
+	if SS.PreviewOnMusic() then
+		local ok=SS.Safe(PlayMusic,path);
+		if ok then SS.previewOnMusic=true; soundPreviewHandle=nil; SS.previewKey=key; SS.previewUntil=GetTime()+length; return; end
+	end
+	local ok,played,handle=SS.Safe(PlaySoundFile,path);
+	-- Legacy clients may return nothing despite playing successfully.
+	if ok and played~=false then
+		soundPreviewHandle=handle; SS.previewKey=key;
+		SS.previewUntil=GetTime()+length;
+	end
 end
 -- Legacy effects have no pause/stop API. Keep only the latest requested preview and
 -- start it when the current effect finishes, rather than overlap or lose the click.
 SS.Every("soundPreviewQueue",.05,function()
- if SS.previewNext and not SS.PreviewActive() then
-  local key=SS.previewNext; SS.previewNext=nil; SS.PreviewSound(key);
- end
+	if SS.previewNext and not SS.PreviewActive() then
+		local key=SS.previewNext; SS.previewNext=nil; SS.PreviewSound(key);
+	end
 end);
 local matchAudio={phase=nil,started=false,lost=false,won=false,pending={}};
 local function MatchPhase()
- if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok then return value; end end
- return type(AZS_RUN)=="table" and AZS_RUN.ph or nil;
+	if type(AZS_GetPhase)=="function" then local ok,value=SS.Safe(AZS_GetPhase); if ok then return value; end end
+	return type(AZS_RUN)=="table" and AZS_RUN.ph or nil;
 end
 local function MatchLost(phase)
- local summary=type(AZS_END)=="table" and AZS_END or nil;
- if type(AZS_GetRunSummary)=="function" then local ok,value=SS.Safe(AZS_GetRunSummary); if ok and type(value)=="table" then summary=value; end end
- if summary and (summary.result=="left" or summary.result=="victory") then return false; end
- return phase=="dead" or (phase~="ready" and summary and summary.result=="defeat");
+	local summary=type(AZS_END)=="table" and AZS_END or nil;
+	if type(AZS_GetRunSummary)=="function" then local ok,value=SS.Safe(AZS_GetRunSummary); if ok and type(value)=="table" then summary=value; end end
+	if summary and (summary.result=="left" or summary.result=="victory") then return false; end
+	return phase=="dead" or (phase~="ready" and summary and summary.result=="defeat");
 end
 function SS.PlayDeathSound(group)
- -- Wait for the end result before choosing an ordinary death vs. final game-over sound.
- if SS.DeathSoundSelection(group)=="off" then return; end
- table.insert(matchAudio.pending,{due=GetTime()+.75,group=group});
+	-- Wait for the end result before choosing an ordinary death vs. final game-over sound.
+	if SS.DeathSoundSelection(group)=="off" then return; end
+	table.insert(matchAudio.pending,{due=GetTime()+.75,group=group});
 end
 function SS.UpdateMatchSounds()
- local phase=MatchPhase(); local previous=matchAudio.phase;
- if not previous then
-  -- Loading into an old end screen or an active match must not replay its music.
-  if table.getn(matchAudio.pending)==0 then matchAudio.lost=MatchLost(phase) and true or false; matchAudio.won=phase=="victory"; end
- end
- if phase=="ready" and previous~="ready" then
-  matchAudio.started=false; matchAudio.lost=false; matchAudio.won=false; matchAudio.pending={};
- end
- if phase=="playing" and previous=="ready" and not matchAudio.started then
-  matchAudio.started=true;
-  local selected=SS.SoundSelection("start"); if selected~="off" then SS.PlayAddonSound(selected); end
- end
- if MatchLost(phase) then
-  matchAudio.pending={};
-  if not matchAudio.lost then
-   matchAudio.lost=true;
-   local selected=SS.SoundSelection("loss"); if selected~="off" then SS.PlayAddonSound(selected); end
-  end
- elseif phase=="victory" then
-  matchAudio.pending={};
-  if not matchAudio.won then
-   matchAudio.won=true;
-   local selected=SS.SoundSelection("victory"); if selected~="off" then SS.PlayAddonSound(selected); end
-  end
- elseif type(AZS_END)=="table" and AZS_END.result=="left" then matchAudio.pending={};
- else
-  for i=table.getn(matchAudio.pending),1,-1 do
-   -- a queued death sound waits for the pause to end rather than being dropped
-   if GetTime()>=matchAudio.pending[i].due and not SS.GamePaused() then
-    local pending=table.remove(matchAudio.pending,i);
-    local selected=SS.DeathSoundSelection(pending.group); if selected~="off" then SS.PlayAddonSound(selected); end
-   end
-  end
- end
- matchAudio.phase=phase;
+	local phase=MatchPhase(); local previous=matchAudio.phase;
+	if not previous then
+		-- Loading into an old end screen or an active match must not replay its music.
+		if table.getn(matchAudio.pending)==0 then matchAudio.lost=MatchLost(phase) and true or false; matchAudio.won=phase=="victory"; end
+	end
+	if phase=="ready" and previous~="ready" then
+		matchAudio.started=false; matchAudio.lost=false; matchAudio.won=false; matchAudio.pending={};
+	end
+	if phase=="playing" and previous=="ready" and not matchAudio.started then
+		matchAudio.started=true;
+		local selected=SS.SoundSelection("start"); if selected~="off" then SS.PlayAddonSound(selected); end
+	end
+	if MatchLost(phase) then
+		matchAudio.pending={};
+		if not matchAudio.lost then
+			matchAudio.lost=true;
+			local selected=SS.SoundSelection("loss"); if selected~="off" then SS.PlayAddonSound(selected); end
+		end
+	elseif phase=="victory" then
+		matchAudio.pending={};
+		if not matchAudio.won then
+			matchAudio.won=true;
+			local selected=SS.SoundSelection("victory"); if selected~="off" then SS.PlayAddonSound(selected); end
+		end
+	elseif type(AZS_END)=="table" and AZS_END.result=="left" then matchAudio.pending={};
+	else
+		for i=table.getn(matchAudio.pending),1,-1 do
+			-- a queued death sound waits for the pause to end rather than being dropped
+			if GetTime()>=matchAudio.pending[i].due and not SS.GamePaused() then
+				local pending=table.remove(matchAudio.pending,i);
+				local selected=SS.DeathSoundSelection(pending.group); if selected~="off" then SS.PlayAddonSound(selected); end
+			end
+		end
+	end
+	matchAudio.phase=phase;
 end
 SS.Every("matchSounds",.1,function() SS.UpdateMatchSounds(); end);
 function SS.PlayBossKillSound()
- local selected=SS.SoundSelection("boss");
- if selected~="off" then SS.PlayAddonSound(selected); end
+	local selected=SS.SoundSelection("boss");
+	if selected~="off" then SS.PlayAddonSound(selected); end
 end
 function SS.PlayChestOpenSound()
 	if ( SS.DB().chestOpenSound ) then SS.PlayAddonSound("chestOpen"); end
 end
 
-deathSoundFrame = CreateFrame("Frame");
-deathSoundFrame:RegisterEvent("PLAYER_DEAD");
-deathSoundFrame:SetScript("OnEvent", function() SS.PlayDeathSound(); end);
+SS.deathSoundFrame = CreateFrame("Frame");
+SS.deathSoundFrame:RegisterEvent("PLAYER_DEAD");
+SS.deathSoundFrame:SetScript("OnEvent", function() SS.PlayDeathSound(); end);
 
 -- Optional low-health alert. Keep the warning short where the client exposes a stoppable sound handle,
 -- and rate-limit it so a player near 30% health hears it at most once every five seconds.
@@ -899,68 +894,66 @@ SS.Every("lowHealthAlert", 0.25, PlayLowHealthSound);
 -- ---------------------------------------------------------------- moving the UI, and the target frame
 -- Unlocked, each of these frames gets a handle over it (its name on a green panel): drag the handle and the frame
 -- follows. The current lock state and every moved position are retained in SavedVariables across /reload.
-MOVABLE = SS.MOVABLE;
-handles = {};
-handleList = {};
-editOnly = nil;
-setupActive = nil;                                       -- the first-time setup is walking through the UI
-win = nil;                                               -- the settings window (made the first time it opens)
+SS.handles = {};
+SS.handleList = {};
+SS.editOnly = nil;
+SS.setupActive = nil;                                       -- the first-time setup is walking through the UI
+SS.win = nil;                                               -- the settings window (made the first time it opens)
 -- True while an element is being placed: in the setup when its element is turned on there, or in Toggle UI Settings
 -- (all elements, or the one chosen with "Choose element"). A new-school card counts as its element.
 function SS.IsEditing(name)
- if ( SS.HiddenInSetup and SS.HiddenInSetup(name) ) then return false; end
- if ( setupActive ) then return (SS.SetupShows and SS.SetupShows(name)) and true or false; end
+	if ( SS.HiddenInSetup and SS.HiddenInSetup(name) ) then return false; end
+	if ( SS.setupActive ) then return (SS.SetupShows and SS.SetupShows(name)) and true or false; end
 	if ( not SS.DB().unlocked ) then return false; end
-	return (not editOnly or editOnly == name or (SS.Element and SS.Element(editOnly) == SS.Element(name))) and true or false;
+	return (not SS.editOnly or SS.editOnly == name or (SS.Element and SS.Element(SS.editOnly) == SS.Element(name))) and true or false;
 end
 -- True while an element shows sample data: while it is being placed (above) or in Demo Mode
 function SS.Previewing(name)
 	return (SS.Demoing and SS.Demoing(name) or SS.IsEditing(name)) and true or false;
 end
-baseSizes = {};
-basePoints = {};
-mutedBaseAlphas = {};
-mutedBaseMouse = {};
+SS.baseSizes = {};
+SS.basePoints = {};
+SS.mutedBaseAlphas = {};
+SS.mutedBaseMouse = {};
 -- Forward declarations are required because placement and the update ticker are
 -- defined before the implementations later in this file.
-VisualInsets = nil;
-RootBounds, SetRootPosition, RootFactor = nil, nil, nil;
-ApplyFeatureMute = nil;
-ApplyMovableOrientation = nil;
-CaptureActionBarLayout = nil;
-sizeMenu, sizeMenuText, sizeMenuWidth, sizeMenuHeight, sizeMenuScale, sizeMenuScaleInput, sizeMenuPadding = nil, nil, nil, nil, nil, nil, nil;
-editGrid, editGridLines = nil, {};
-sizeTarget = nil;
-lockPanel = nil;
-ShowEditGrid = nil;
-PlaceAll, ApplyActionSlotGrid = nil, nil;
-SetAnchorSnap = nil;
-xpBarDetached = false;
-buffButtonOriginalPoints = {};
-partyNativePoints = {};                            -- party frames 2-4 as the game anchors them
-buffLayoutApplying = false;
-actionSlotsGridApplied = false;
-tallyFrame = nil;
-meterFrame = nil;
-UpdateMeter = nil;
-clockFrame = nil;
-levelButton = nil;
-bossFrame = nil;
-announcementFrame = nil;
-announcementStarted = nil;
-announcementDuration = 10;
-announcementFade = 0.6;
-lastBannerId = nil;
-encounterRows = {};
-actionBarOriginal = nil;
-itemRow = nil;
-itemRowButtons = {};
-spellRow = nil;
-spellRowButtons = {};
+SS.VisualInsets = nil;
+SS.RootBounds, SS.SetRootPosition, SS.RootFactor = nil, nil, nil;
+SS.ApplyFeatureMute = nil;
+SS.ApplyMovableOrientation = nil;
+SS.CaptureActionBarLayout = nil;
+SS.sizeMenu, SS.sizeMenuText, SS.sizeMenuWidth, SS.sizeMenuHeight, SS.sizeMenuScale, SS.sizeMenuScaleInput, SS.sizeMenuPadding = nil, nil, nil, nil, nil, nil, nil;
+SS.editGrid, SS.editGridLines = nil, {};
+SS.sizeTarget = nil;
+SS.ShowEditGrid = nil;
+SS.PlaceAll, SS.ApplyActionSlotGrid = nil, nil;
+SS.SetAnchorSnap = nil;
+SS.xpBarDetached = false;
+SS.buffButtonOriginalPoints = {};
+SS.partyNativePoints = {};                            -- party frames 2-4 as the game anchors them
+SS.buffLayoutApplying = false;
+SS.actionSlotsGridApplied = false;
+SS.tallyFrame = nil;
+SS.meterFrame = nil;
+SS.UpdateMeter = nil;
+SS.clockFrame = nil;
+SS.levelButton = nil;
+SS.bossFrame = nil;
+SS.announcementFrame = nil;
+SS.announcementStarted = nil;
+SS.announcementDuration = 10;
+SS.announcementFade = 0.6;
+SS.lastBannerId = nil;
+SS.encounterRows = {};
+SS.actionBarOriginal = nil;
+SS.itemRow = nil;
+SS.itemRowButtons = {};
+SS.spellRow = nil;
+SS.spellRowButtons = {};
 
 -- The item deck reads the five real 1.12 jewelry equipment slots. The inventory API supplies
 -- the currently worn icon and tooltip. API slot IDs are 1-based; ammo is slot 0.
-ITEM_EQUIP_SLOTS = { 2, 11, 12, 13, 14 };
+SS.ITEM_EQUIP_SLOTS = { 2, 11, 12, 13, 14 };
 -- Demo Mode's sample build: six spells and five pieces of jewelry (icons from the game's own jewelry list)
 SS.DEMO_SPELLS = { "Spell_Fire_Fireball02", "Spell_Frost_FrostBolt02", "Spell_Holy_Smite", "Spell_Shadow_ShadowBolt", "Spell_Nature_StarFall", "Spell_Holy_Heal" };
 SS.DEMO_JEWELRY = { "INV_Jewelry_Necklace_01", "INV_Jewelry_Ring_15", "INV_Jewelry_Ring_07", "INV_Jewelry_Talisman_01", "INV_Misc_Horn_01" };
@@ -971,48 +964,48 @@ end
 
 -- The game's own build cluster (measured from its default UI): 28-pixel icons with a 1-pixel silver border,
 -- spells in one row and the worn jewelry 8 pixels below it, both starting at the same left edge.
-BUILD = { ICON = 28, GAP = 4, ROW_GAP = 8 };
+SS.BUILD = { ICON = 28, GAP = 4, ROW_GAP = 8 };
 
 function SS.LayoutItemRow()
-	if ( not itemRow ) then return; end
+	if ( not SS.itemRow ) then return; end
 	if ( SS.ChoiceItemsActive and SS.ChoiceItemsActive() and SS.LayoutChoiceItems ) then SS.LayoutChoiceItems(); return; end
-	local gap = BUILD.GAP;
+	local gap = SS.BUILD.GAP;
 	if ( not SS.DB().sizes.SlimSuiteItemRowFrame ) then
 		if ( SS.DB().orientations.SlimSuiteItemRowFrame == "vertical" ) then
-			itemRow:SetWidth(BUILD.ICON); itemRow:SetHeight(5 * BUILD.ICON + 4 * gap);
-		else itemRow:SetWidth(5 * BUILD.ICON + 4 * gap); itemRow:SetHeight(BUILD.ICON); end
+			SS.itemRow:SetWidth(SS.BUILD.ICON); SS.itemRow:SetHeight(5 * SS.BUILD.ICON + 4 * gap);
+		else SS.itemRow:SetWidth(5 * SS.BUILD.ICON + 4 * gap); SS.itemRow:SetHeight(SS.BUILD.ICON); end
 	end
 	local vertical = SS.DB().orientations.SlimSuiteItemRowFrame == "vertical";
-	local width, height = itemRow:GetWidth() or BUILD.ICON, itemRow:GetHeight() or BUILD.ICON;
+	local width, height = SS.itemRow:GetWidth() or SS.BUILD.ICON, SS.itemRow:GetHeight() or SS.BUILD.ICON;
 	local iconSize = vertical and math.max(12, math.min(width, (height - gap * 4) / 5))
 		or math.max(12, math.min(height, (width - gap * 4) / 5));
-	for i = 1, table.getn(itemRowButtons) do
-		local button = itemRowButtons[i];
+	for i = 1, table.getn(SS.itemRowButtons) do
+		local button = SS.itemRowButtons[i];
 		button:ClearAllPoints();
 		button:SetWidth(iconSize); button:SetHeight(iconSize);
-		if ( vertical ) then button:SetPoint("TOPLEFT", itemRow, "TOPLEFT", 0, -((i - 1) * (iconSize + gap)));
-		else button:SetPoint("TOPLEFT", itemRow, "TOPLEFT", (i - 1) * (iconSize + gap), 0); end
+		if ( vertical ) then button:SetPoint("TOPLEFT", SS.itemRow, "TOPLEFT", 0, -((i - 1) * (iconSize + gap)));
+		else button:SetPoint("TOPLEFT", SS.itemRow, "TOPLEFT", (i - 1) * (iconSize + gap), 0); end
 	end
 end
 
 function SS.LayoutSpellRow()
-	if ( not spellRow ) then return; end
-	local gap = BUILD.GAP;
+	if ( not SS.spellRow ) then return; end
+	local gap = SS.BUILD.GAP;
 	if ( not SS.DB().sizes.SlimSuiteSpellRowFrame ) then
 		if ( SS.DB().orientations.SlimSuiteSpellRowFrame == "vertical" ) then
-			spellRow:SetWidth(BUILD.ICON); spellRow:SetHeight(6 * BUILD.ICON + 5 * gap);
-		else spellRow:SetWidth(6 * BUILD.ICON + 5 * gap); spellRow:SetHeight(BUILD.ICON); end
+			SS.spellRow:SetWidth(SS.BUILD.ICON); SS.spellRow:SetHeight(6 * SS.BUILD.ICON + 5 * gap);
+		else SS.spellRow:SetWidth(6 * SS.BUILD.ICON + 5 * gap); SS.spellRow:SetHeight(SS.BUILD.ICON); end
 	end
 	local vertical = SS.DB().orientations.SlimSuiteSpellRowFrame == "vertical";
-	local width, height = spellRow:GetWidth() or BUILD.ICON, spellRow:GetHeight() or BUILD.ICON;
+	local width, height = SS.spellRow:GetWidth() or SS.BUILD.ICON, SS.spellRow:GetHeight() or SS.BUILD.ICON;
 	local iconSize = vertical and math.max(12, math.min(width, (height - gap * 5) / 6))
 		or math.max(12, math.min(height, (width - gap * 5) / 6));
 	for i = 1, 6 do
-		local button = spellRowButtons[i];
+		local button = SS.spellRowButtons[i];
 		if ( button ) then
 			button:ClearAllPoints(); button:SetWidth(iconSize); button:SetHeight(iconSize);
-			if ( vertical ) then button:SetPoint("TOPLEFT", spellRow, "TOPLEFT", 0, -((i - 1) * (iconSize + gap)));
-			else button:SetPoint("TOPLEFT", spellRow, "TOPLEFT", (i - 1) * (iconSize + gap), 0); end
+			if ( vertical ) then button:SetPoint("TOPLEFT", SS.spellRow, "TOPLEFT", 0, -((i - 1) * (iconSize + gap)));
+			else button:SetPoint("TOPLEFT", SS.spellRow, "TOPLEFT", (i - 1) * (iconSize + gap), 0); end
 		end
 	end
 end
@@ -1064,9 +1057,9 @@ function SS.BuildRowDefaultPlace(name)
 	if ( name == "SlimSuiteItemRowFrame" ) then
 		if ( SS.DB().buildRowsAttached ) then
 			if ( SS.DB().orientations.SlimSuiteSpellRowFrame == "vertical" ) then   -- read directly: this runs while the file loads
-				return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "TOPRIGHT", dx = BUILD.ROW_GAP, dy = 0 };
+				return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "TOPRIGHT", dx = SS.BUILD.ROW_GAP, dy = 0 };
 			end
-			return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -BUILD.ROW_GAP };
+			return { relative = "SlimSuiteSpellRowFrame", point = "TOPLEFT", relativePoint = "BOTTOMLEFT", dx = 0, dy = -SS.BUILD.ROW_GAP };
 		end
 		return { x = x, y = y - 40, coordinateSpace = "uiParent", displayDefault = true };
 	end
@@ -1074,11 +1067,11 @@ function SS.BuildRowDefaultPlace(name)
 end
 
 function SS.RefreshItemRow()
-	if ( not itemRow ) then return; end
+	if ( not SS.itemRow ) then return; end
 	local d = SS.DB();
 	local equipped, visible = {}, {};
-	for i = 1, table.getn(ITEM_EQUIP_SLOTS) do
-		local slot = ITEM_EQUIP_SLOTS[i];
+	for i = 1, table.getn(SS.ITEM_EQUIP_SLOTS) do
+		local slot = SS.ITEM_EQUIP_SLOTS[i];
 		local texture = GetInventoryItemTexture and GetInventoryItemTexture("player", slot) or nil;
 		local link = GetInventoryItemLink and GetInventoryItemLink("player", slot) or nil;
 		if ( texture ) then
@@ -1102,8 +1095,8 @@ function SS.RefreshItemRow()
 		end
 	end
 	table.sort(visible, function(a, b) return a.item.order < b.item.order; end);
-	for i = 1, table.getn(itemRowButtons) do
-		local button = itemRowButtons[i];
+	for i = 1, table.getn(SS.itemRowButtons) do
+		local button = SS.itemRowButtons[i];
 		local entry = visible[i];
 		if ( button ) then
 			if ( entry ) then
@@ -1125,14 +1118,14 @@ function SS.RefreshItemRow()
 		end
 	end
 	SS.LayoutItemRow();
-	if ( (SS.ChoiceItemsActive and SS.ChoiceItemsActive()) or (d.replaceBuildRows and not d.hideBuildItems) ) then itemRow:Show(); else itemRow:Hide(); end
-	if ( SS.IsEditing("SlimSuiteItemRowFrame") and d.replaceBuildRows and handles.SlimSuiteItemRowFrame ) then handles.SlimSuiteItemRowFrame:Show(); end
+	if ( (SS.ChoiceItemsActive and SS.ChoiceItemsActive()) or (d.replaceBuildRows and not d.hideBuildItems) ) then SS.itemRow:Show(); else SS.itemRow:Hide(); end
+	if ( SS.IsEditing("SlimSuiteItemRowFrame") and d.replaceBuildRows and SS.handles.SlimSuiteItemRowFrame ) then SS.handles.SlimSuiteItemRowFrame:Show(); end
 end
 
 function SS.CreateItemRow()
-	if ( itemRow or not UIParent ) then return; end
-	itemRow = CreateFrame("Frame", "SlimSuiteItemRowFrame", UIParent);
-	itemRow:SetWidth(176); itemRow:SetHeight(36);
+	if ( SS.itemRow or not UIParent ) then return; end
+	SS.itemRow = CreateFrame("Frame", "SlimSuiteItemRowFrame", UIParent);
+	SS.itemRow:SetWidth(176); SS.itemRow:SetHeight(36);
 	local d = SS.DB();
 	local oldItemPlace = d.places.SlimSuiteItemRowFrame;
 	if ( d.buildRowsAttached and type(oldItemPlace) == "table" and oldItemPlace.relative == "MainMenuBar"
@@ -1142,11 +1135,11 @@ function SS.CreateItemRow()
 	if ( not d.places.SlimSuiteItemRowFrame ) then
 		d.places.SlimSuiteItemRowFrame = SS.BuildRowDefaultPlace("SlimSuiteItemRowFrame");
 	end
-	itemRow:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 8, -130);
-	itemRow:SetFrameStrata("MEDIUM");
-	for i = 1, table.getn(ITEM_EQUIP_SLOTS) do
-		local button = CreateFrame("Button", "SlimSuiteItemButton" .. i, itemRow);
-		button:SetWidth(BUILD.ICON); button:SetHeight(BUILD.ICON);
+	SS.itemRow:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 8, -130);
+	SS.itemRow:SetFrameStrata("MEDIUM");
+	for i = 1, table.getn(SS.ITEM_EQUIP_SLOTS) do
+		local button = CreateFrame("Button", "SlimSuiteItemButton" .. i, SS.itemRow);
+		button:SetWidth(SS.BUILD.ICON); button:SetHeight(SS.BUILD.ICON);
 		SS.BuildIconLook(button);
 		button:EnableMouse(true);
 		button:SetScript("OnEnter", function()
@@ -1156,7 +1149,7 @@ function SS.CreateItemRow()
 			elseif ( this.itemName ) then GameTooltip:AddLine(this.itemName); GameTooltip:Show(); end
 		end);
 		button:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
-		itemRowButtons[i] = button;
+		SS.itemRowButtons[i] = button;
 	end
 	SS.RefreshItemRow();
 end
@@ -1184,7 +1177,7 @@ function SS.SourceHasSpellId(source, spellId)
 end
 
 function SS.RefreshSpellRow()
-	if ( not spellRow ) then return; end
+	if ( not SS.spellRow ) then return; end
 	local spells = type(AZS_SPELLS) == "table" and AZS_SPELLS or {};
 	local learnedCount = math.max(0, table.getn(spells) - 1); -- racial spell is last
 	-- The live loadout API carries exact selected ability icons, including talent-granted spells
@@ -1222,7 +1215,7 @@ function SS.RefreshSpellRow()
 		end
 	end
 	for i = 1, 6 do
-		local button = spellRowButtons[i];
+		local button = SS.spellRowButtons[i];
 		local spell = spells[i];
 		local loadoutIcon = loadoutIcons[i];
 		local iconLoaded = false;
@@ -1252,14 +1245,14 @@ function SS.RefreshSpellRow()
 	end
 	SS.LayoutSpellRow();
 	if ( SS.ChoiceItemsActive and SS.ChoiceItemsActive() and SS.HideChoiceSpellRow ) then SS.HideChoiceSpellRow(); return; end
-	if ( SS.DB().replaceBuildRows and not SS.DB().hideBuildSpells ) then spellRow:Show(); else spellRow:Hide(); end
-	if ( SS.IsEditing("SlimSuiteSpellRowFrame") and SS.DB().replaceBuildRows and handles.SlimSuiteSpellRowFrame ) then handles.SlimSuiteSpellRowFrame:Show(); end
+	if ( SS.DB().replaceBuildRows and not SS.DB().hideBuildSpells ) then SS.spellRow:Show(); else SS.spellRow:Hide(); end
+	if ( SS.IsEditing("SlimSuiteSpellRowFrame") and SS.DB().replaceBuildRows and SS.handles.SlimSuiteSpellRowFrame ) then SS.handles.SlimSuiteSpellRowFrame:Show(); end
 end
 
 function SS.CreateSpellRow()
-	if ( spellRow or not UIParent ) then return; end
-	spellRow = CreateFrame("Frame", "SlimSuiteSpellRowFrame", UIParent);
-	spellRow:SetWidth(212); spellRow:SetHeight(36); spellRow:SetFrameStrata("MEDIUM");
+	if ( SS.spellRow or not UIParent ) then return; end
+	SS.spellRow = CreateFrame("Frame", "SlimSuiteSpellRowFrame", UIParent);
+	SS.spellRow:SetWidth(212); SS.spellRow:SetHeight(36); SS.spellRow:SetFrameStrata("MEDIUM");
 	local d = SS.DB();
 	local oldSpellPlace = d.places.SlimSuiteSpellRowFrame;
 	if ( type(oldSpellPlace) == "table" and oldSpellPlace.relative == "MainMenuBar"
@@ -1272,11 +1265,11 @@ function SS.CreateSpellRow()
 	if ( not d.places.SlimSuiteSpellRowFrame ) then
 		d.places.SlimSuiteSpellRowFrame = SS.BuildRowDefaultPlace("SlimSuiteSpellRowFrame");
 	end
-	spellRow:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 8, 170);
+	SS.spellRow:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 8, 170);
 	for i = 1, 6 do
-		local button = CreateFrame("Button", "SlimSuiteSpellButton" .. i, spellRow);
+		local button = CreateFrame("Button", "SlimSuiteSpellButton" .. i, SS.spellRow);
 		button:SetID(i);
-		button:SetWidth(BUILD.ICON); button:SetHeight(BUILD.ICON);
+		button:SetWidth(SS.BUILD.ICON); button:SetHeight(SS.BUILD.ICON);
 		SS.BuildIconLook(button);
 		button:EnableMouse(true);
 		button:SetScript("OnEnter", function()
@@ -1297,7 +1290,7 @@ function SS.CreateSpellRow()
 			end
 		end);
 		button:SetScript("OnLeave", function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
-		spellRowButtons[i] = button;
+		SS.spellRowButtons[i] = button;
 	end
 	SS.RefreshSpellRow();
 end
@@ -1306,18 +1299,18 @@ SS.CreateSpellRow();
 function SS.ApplyBuildRowReplacement()
 	local enabled = SS.FeatureEnabled("SlimSuiteSpellRowFrame");
 	SS.HideNative("build", enabled);
-	if ( spellRow ) then if ( enabled and not SS.DB().hideBuildSpells ) then spellRow:Show(); else spellRow:Hide(); end end
-	if ( itemRow ) then if ( enabled and not SS.DB().hideBuildItems ) then itemRow:Show(); else itemRow:Hide(); end end
+	if ( SS.spellRow ) then if ( enabled and not SS.DB().hideBuildSpells ) then SS.spellRow:Show(); else SS.spellRow:Hide(); end end
+	if ( SS.itemRow ) then if ( enabled and not SS.DB().hideBuildItems ) then SS.itemRow:Show(); else SS.itemRow:Hide(); end end
 	if ( SS.ChoiceItemsActive and SS.ChoiceItemsActive() ) then
-		SS.HideChoiceSpellRow(); SS.LayoutChoiceItems(); itemRow:Show();
+		SS.HideChoiceSpellRow(); SS.LayoutChoiceItems(); SS.itemRow:Show();
 	end
 end
 SS.ApplyBuildRowReplacement();
 
-itemRowEvents = CreateFrame("Frame");
-itemRowEvents:RegisterEvent("UNIT_INVENTORY_CHANGED");
-itemRowEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
-itemRowEvents:SetScript("OnEvent", function()
+SS.itemRowEvents = CreateFrame("Frame");
+SS.itemRowEvents:RegisterEvent("UNIT_INVENTORY_CHANGED");
+SS.itemRowEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
+SS.itemRowEvents:SetScript("OnEvent", function()
 	if ( event == "UNIT_INVENTORY_CHANGED" and arg1 ~= "player" ) then return; end
 	SS.Safe(SS.RefreshItemRow);
 end);
@@ -1325,12 +1318,12 @@ end);
 -- event misses, for both the spell row and the worn-jewelry row (SS.ApplyBuildRowReplacement).
 SS.Every("itemRowPoll", 2, function() SS.Safe(SS.RefreshSpellRow); SS.Safe(SS.RefreshItemRow); SS.Safe(SS.ApplyBuildRowReplacement); end);
 
-spellRowEvents = CreateFrame("Frame");
-spellRowEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
-spellRowEvents:RegisterEvent("ACTIONBAR_SLOT_CHANGED");
-spellRowEvents:RegisterEvent("ACTIONBAR_PAGE_CHANGED");
-spellRowEvents:RegisterEvent("CHAT_MSG_ADDON");
-spellRowEvents:SetScript("OnEvent", function()
+SS.spellRowEvents = CreateFrame("Frame");
+SS.spellRowEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
+SS.spellRowEvents:RegisterEvent("ACTIONBAR_SLOT_CHANGED");
+SS.spellRowEvents:RegisterEvent("ACTIONBAR_PAGE_CHANGED");
+SS.spellRowEvents:RegisterEvent("CHAT_MSG_ADDON");
+SS.spellRowEvents:SetScript("OnEvent", function()
 	if ( event == "CHAT_MSG_ADDON" and arg1 ~= "AZSSPELLS" ) then return; end
 	SS.Safe(SS.RefreshSpellRow);
 	SS.Safe(SS.ApplyBuildRowReplacement);
@@ -1353,7 +1346,7 @@ end
 -- Kills / Gold / Cache in the game's own style (measured from its HUD): muted tan labels, gold numbers, a lowercase
 -- gold "cache" for the next cache's cost, and a soft dark band behind that fades out at both ends. The band can be
 -- turned off completely. Boss and Guardian kills sit next to Kills by default.
-TALLY = { LABEL = { 0.69, 0.63, 0.47 }, VALUE = { 0.97, 0.82, 0.41 }, FONT_SIZE = 15, WORD_GAP = 6, PART_GAP = 16, LINE = 19 };
+SS.TALLY = { LABEL = { 0.69, 0.63, 0.47 }, VALUE = { 0.97, 0.82, 0.41 }, FONT_SIZE = 15, WORD_GAP = 6, PART_GAP = 16, LINE = 19 };
 
 function SS.TallyValue(value)
 	if ( type(value) ~= "number" ) then return "-"; end
@@ -1395,15 +1388,15 @@ function SS.LocationContext(sample)
 end
 
 function SS.TallyContext(sample)
- if ( not SS.DB().tallyContext ) then return ""; end
- return SS.LocationContext(sample);
+	if ( not SS.DB().tallyContext ) then return ""; end
+	return SS.LocationContext(sample);
 end
 
 function SS.TallyString(list, i, justify)
 	local fs = list[i];
 	if ( not fs ) then
-		fs = tallyFrame:CreateFontString(nil, "OVERLAY");
-		fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", TALLY.FONT_SIZE);
+		fs = SS.tallyFrame:CreateFontString(nil, "OVERLAY");
+		fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", SS.TALLY.FONT_SIZE);
 		fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1);
 		list[i] = fs;
 	end
@@ -1422,25 +1415,25 @@ function SS.DrawTally(parts)
 	local hasContext = context ~= "";
 	local sig = (vertical and "v" or "h") .. pad .. (SS.DB().tallyBackground and "b" or "") .. context .. (fixed and (custom.w .. "x" .. custom.h) or "");
 	for i = 1, n do sig = sig .. "|" .. parts[i][1] .. parts[i][2]; end
-	if ( tallyFrame.sig == sig ) then return; end           -- nothing it shows has changed
-	tallyFrame.sig = sig;
+	if ( SS.tallyFrame.sig == sig ) then return; end           -- nothing it shows has changed
+	SS.tallyFrame.sig = sig;
 	-- the text at a given size: the widest part (a column) and the whole row
 	local function Measure(size)
 		local widest, total = 0, 0;
 		for i = 1, n do
-			local label, value = SS.TallyString(tallyFrame.labels, i), SS.TallyString(tallyFrame.values, i, vertical and "RIGHT" or "LEFT");
+			local label, value = SS.TallyString(SS.tallyFrame.labels, i), SS.TallyString(SS.tallyFrame.values, i, vertical and "RIGHT" or "LEFT");
 			label:SetFont(font, size); value:SetFont(font, size);
 			label:SetText(parts[i][1]); value:SetText(parts[i][2]);
-			local c = parts[i][3] and TALLY.VALUE or TALLY.LABEL;
-			label:SetTextColor(c[1], c[2], c[3]); value:SetTextColor(TALLY.VALUE[1], TALLY.VALUE[2], TALLY.VALUE[3]);
-			local part = (label:GetStringWidth() or 0) + TALLY.WORD_GAP + (value:GetStringWidth() or 0);
+			local c = parts[i][3] and SS.TALLY.VALUE or SS.TALLY.LABEL;
+			label:SetTextColor(c[1], c[2], c[3]); value:SetTextColor(SS.TALLY.VALUE[1], SS.TALLY.VALUE[2], SS.TALLY.VALUE[3]);
+			local part = (label:GetStringWidth() or 0) + SS.TALLY.WORD_GAP + (value:GetStringWidth() or 0);
 			widest = math.max(widest, part);
-			total = total + part + TALLY.PART_GAP;
+			total = total + part + SS.TALLY.PART_GAP;
 			label:Show(); value:Show();
 		end
-		return widest, total - TALLY.PART_GAP;
+		return widest, total - SS.TALLY.PART_GAP;
 	end
-	local size, line = TALLY.FONT_SIZE, TALLY.LINE;
+	local size, line = SS.TALLY.FONT_SIZE, SS.TALLY.LINE;
 	local widest, total = Measure(size);
 	-- a size set in the resize menu is the size: the band keeps it exactly, and the text shrinks to fit inside it
 	if ( fixed ) then
@@ -1450,61 +1443,61 @@ function SS.DrawTally(parts)
 		if ( vertical ) then fit = math.min(fit, math.floor((custom.h - (hasContext and 28 or 14)) / n) - 4); else fit = math.min(fit, math.floor(custom.h) - (hasContext and 34 or 16)); end
 		fit = math.max(7, fit);
 		if ( fit ~= size ) then size = fit; widest, total = Measure(size); end
-		line = math.min(TALLY.LINE, size + 4);
+		line = math.min(SS.TALLY.LINE, size + 4);
 	end
-	for i = n + 1, table.getn(tallyFrame.labels) do tallyFrame.labels[i]:Hide(); tallyFrame.values[i]:Hide(); end
+	for i = n + 1, table.getn(SS.tallyFrame.labels) do SS.tallyFrame.labels[i]:Hide(); SS.tallyFrame.values[i]:Hide(); end
 	local width, height;
 	if ( fixed ) then width, height = custom.w, custom.h;
 	elseif ( vertical ) then width, height = widest + pad * 2, n * line + (hasContext and 24 or 8);
 	else width, height = total + pad * 2, size + (hasContext and 24 or 8); end
 	height=math.max(height,(vertical and n*line or size)+(hasContext and 24 or 8));
 	width=math.max(width,(vertical and widest or total)+pad*2);
-	tallyFrame:SetWidth(width); tallyFrame:SetHeight(height);
+	SS.tallyFrame:SetWidth(width); SS.tallyFrame:SetHeight(height);
 	if ( fixed ) then custom.w,custom.h=width,height; end
-	if ( not tallyFrame.context ) then
-		tallyFrame.context = tallyFrame:CreateFontString(nil, "OVERLAY");
-		tallyFrame.context:SetJustifyH("CENTER"); tallyFrame.context:SetJustifyV("MIDDLE");
-		tallyFrame.context:SetShadowColor(0, 0, 0, 1); tallyFrame.context:SetShadowOffset(1, -1);
+	if ( not SS.tallyFrame.context ) then
+		SS.tallyFrame.context = SS.tallyFrame:CreateFontString(nil, "OVERLAY");
+		SS.tallyFrame.context:SetJustifyH("CENTER"); SS.tallyFrame.context:SetJustifyV("MIDDLE");
+		SS.tallyFrame.context:SetShadowColor(0, 0, 0, 1); SS.tallyFrame.context:SetShadowOffset(1, -1);
 	end
 	local contextSize = 10;
-	tallyFrame.context:SetFont(font, contextSize); tallyFrame.context:SetText(context);
+	SS.tallyFrame.context:SetFont(font, contextSize); SS.tallyFrame.context:SetText(context);
 	local contextWidth = width - 10;
-	if ( contextWidth > 0 and (tallyFrame.context:GetStringWidth() or 0) > contextWidth ) then
-		contextSize = math.max(7, math.floor(contextSize * contextWidth / tallyFrame.context:GetStringWidth()));
-		tallyFrame.context:SetFont(font, contextSize);
+	if ( contextWidth > 0 and (SS.tallyFrame.context:GetStringWidth() or 0) > contextWidth ) then
+		contextSize = math.max(7, math.floor(contextSize * contextWidth / SS.tallyFrame.context:GetStringWidth()));
+		SS.tallyFrame.context:SetFont(font, contextSize);
 	end
-	SS.FitText(tallyFrame.context,width-10,7,14);
-	tallyFrame.context:ClearAllPoints(); tallyFrame.context:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", 3, -2);
-	tallyFrame.context:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", -3, -2); tallyFrame.context:SetHeight(14);
-	tallyFrame.context:SetTextColor(0.95, 0.78, 0.35);
-	if ( context ~= "" ) then tallyFrame.context:Show(); else tallyFrame.context:Hide(); end
+	SS.FitText(SS.tallyFrame.context,width-10,7,14);
+	SS.tallyFrame.context:ClearAllPoints(); SS.tallyFrame.context:SetPoint("TOPLEFT", SS.tallyFrame, "TOPLEFT", 3, -2);
+	SS.tallyFrame.context:SetPoint("TOPRIGHT", SS.tallyFrame, "TOPRIGHT", -3, -2); SS.tallyFrame.context:SetHeight(14);
+	SS.tallyFrame.context:SetTextColor(0.95, 0.78, 0.35);
+	if ( context ~= "" ) then SS.tallyFrame.context:Show(); else SS.tallyFrame.context:Hide(); end
 	local x = pad;
 	for i = 1, n do
-		local label, value = tallyFrame.labels[i], tallyFrame.values[i];
+		local label, value = SS.tallyFrame.labels[i], SS.tallyFrame.values[i];
 		label:ClearAllPoints(); value:ClearAllPoints();
 		if ( vertical ) then
 			local y = -(hasContext and 18 or 4) - (i - 1) * line;
-			label:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", pad, y);
-			value:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", -pad, y);
+			label:SetPoint("TOPLEFT", SS.tallyFrame, "TOPLEFT", pad, y);
+			value:SetPoint("TOPRIGHT", SS.tallyFrame, "TOPRIGHT", -pad, y);
 		else
 			local y = -(hasContext and 20 or 4);
-			label:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", x, y);
-			x = x + (label:GetStringWidth() or 0) + TALLY.WORD_GAP;
-			value:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", x, y);
-			x = x + (value:GetStringWidth() or 0) + TALLY.PART_GAP;
+			label:SetPoint("TOPLEFT", SS.tallyFrame, "TOPLEFT", x, y);
+			x = x + (label:GetStringWidth() or 0) + SS.TALLY.WORD_GAP;
+			value:SetPoint("TOPLEFT", SS.tallyFrame, "TOPLEFT", x, y);
+			x = x + (value:GetStringWidth() or 0) + SS.TALLY.PART_GAP;
 		end
 	end
 	-- the band: flat in the middle, fading out over its last 14 pixels on each side; nothing at all when turned off
 	local band = SS.DB().tallyBackground and true or false;
 	local fade = math.min(14, width / 4);
-	tallyFrame.bgLeft:SetWidth(fade); tallyFrame.bgRight:SetWidth(fade);
-	SS.StyleBand(tallyFrame, { tallyFrame.bg, tallyFrame.bgLeft, tallyFrame.bgRight }, band);
-	if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(tallyFrame); end
+	SS.tallyFrame.bgLeft:SetWidth(fade); SS.tallyFrame.bgRight:SetWidth(fade);
+	SS.StyleBand(SS.tallyFrame, { SS.tallyFrame.bg, SS.tallyFrame.bgLeft, SS.tallyFrame.bgRight }, band);
+	if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(SS.tallyFrame); end
 end
 
 function SS.UpdateTally()
-	if not SS.FeatureEnabled("SlimSuiteTallyFrame") then if tallyFrame then tallyFrame:Hide();end;SS.HideNative("tally", false);return;end
-	if ( not tallyFrame ) then return; end
+	if not SS.FeatureEnabled("SlimSuiteTallyFrame") then if SS.tallyFrame then SS.tallyFrame:Hide();end;SS.HideNative("tally", false);return;end
+	if ( not SS.tallyFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local active = phase and phase ~= "ready";
 	local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
@@ -1512,92 +1505,87 @@ function SS.UpdateTally()
 	if ( ready ) then run = { kills = run and run.kills or 0, gold = run and run.gold or 0, chest = run and run.chest }; end
 	if ( (active or ready) and run ) then
 		SS.DrawTally(SS.TallyParts(run, false, ready));
-		tallyFrame:Show();
+		SS.tallyFrame:Show();
 		SS.HideNative("tally", true);
 	elseif ( SS.Previewing("SlimSuiteTallyFrame") ) then
 		-- while it is placed (or in Demo Mode) it shows sample counts, so the element is there to see and move
 		SS.DrawTally(SS.TallyParts(nil, true));
-		tallyFrame:Show();
+		SS.tallyFrame:Show();
 		SS.HideNative("tally", false);
 	else
 		-- before a run there is nothing to count
-		tallyFrame:Hide();
+		SS.tallyFrame:Hide();
 		SS.HideNative("tally", false);
 	end
 end
 
 function SS.CreateTallyFrame()
-	tallyFrame = CreateFrame("Frame", "SlimSuiteTallyFrame", UIParent);
-	tallyFrame:SetWidth(252);
-	tallyFrame:SetHeight(28);
+	SS.tallyFrame = CreateFrame("Frame", "SlimSuiteTallyFrame", UIParent);
+	SS.tallyFrame:SetWidth(252);
+	SS.tallyFrame:SetHeight(28);
 	-- Match the centered lower-HUD cluster: above the action bar, without inheriting its frame.
-	tallyFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 145);
-	tallyFrame:SetFrameStrata("HIGH");
-	tallyFrame:EnableMouse(false);
-	tallyFrame.labels, tallyFrame.values = {}, {};
+	SS.tallyFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 145);
+	SS.tallyFrame:SetFrameStrata("HIGH");
+	SS.tallyFrame:EnableMouse(false);
+	SS.tallyFrame.labels, SS.tallyFrame.values = {}, {};
 	local BAND = 0.5;
-	tallyFrame.bgLeft = tallyFrame:CreateTexture(nil, "BACKGROUND");
-	tallyFrame.bgLeft:SetPoint("TOPLEFT", tallyFrame, "TOPLEFT", 0, 0); tallyFrame.bgLeft:SetPoint("BOTTOMLEFT", tallyFrame, "BOTTOMLEFT", 0, 0);
-	tallyFrame.bgRight = tallyFrame:CreateTexture(nil, "BACKGROUND");
-	tallyFrame.bgRight:SetPoint("TOPRIGHT", tallyFrame, "TOPRIGHT", 0, 0); tallyFrame.bgRight:SetPoint("BOTTOMRIGHT", tallyFrame, "BOTTOMRIGHT", 0, 0);
-	tallyFrame.bg = tallyFrame:CreateTexture(nil, "BACKGROUND");
-	tallyFrame.bg:SetPoint("TOPLEFT", tallyFrame.bgLeft, "TOPRIGHT", 0, 0); tallyFrame.bg:SetPoint("BOTTOMRIGHT", tallyFrame.bgRight, "BOTTOMLEFT", 0, 0);
-	for _, t in ipairs({ tallyFrame.bg, tallyFrame.bgLeft, tallyFrame.bgRight }) do t:SetTexture(1, 1, 1, 1); t:SetVertexColor(0, 0, 0, BAND); end
-	if ( tallyFrame.bgLeft.SetGradientAlpha ) then
-		tallyFrame.bgLeft:SetGradientAlpha("HORIZONTAL", 0, 0, 0, 0, 0, 0, 0, BAND);
-		tallyFrame.bgRight:SetGradientAlpha("HORIZONTAL", 0, 0, 0, BAND, 0, 0, 0, 0);
+	SS.tallyFrame.bgLeft = SS.tallyFrame:CreateTexture(nil, "BACKGROUND");
+	SS.tallyFrame.bgLeft:SetPoint("TOPLEFT", SS.tallyFrame, "TOPLEFT", 0, 0); SS.tallyFrame.bgLeft:SetPoint("BOTTOMLEFT", SS.tallyFrame, "BOTTOMLEFT", 0, 0);
+	SS.tallyFrame.bgRight = SS.tallyFrame:CreateTexture(nil, "BACKGROUND");
+	SS.tallyFrame.bgRight:SetPoint("TOPRIGHT", SS.tallyFrame, "TOPRIGHT", 0, 0); SS.tallyFrame.bgRight:SetPoint("BOTTOMRIGHT", SS.tallyFrame, "BOTTOMRIGHT", 0, 0);
+	SS.tallyFrame.bg = SS.tallyFrame:CreateTexture(nil, "BACKGROUND");
+	SS.tallyFrame.bg:SetPoint("TOPLEFT", SS.tallyFrame.bgLeft, "TOPRIGHT", 0, 0); SS.tallyFrame.bg:SetPoint("BOTTOMRIGHT", SS.tallyFrame.bgRight, "BOTTOMLEFT", 0, 0);
+	for _, t in ipairs({ SS.tallyFrame.bg, SS.tallyFrame.bgLeft, SS.tallyFrame.bgRight }) do t:SetTexture(1, 1, 1, 1); t:SetVertexColor(0, 0, 0, BAND); end
+	if ( SS.tallyFrame.bgLeft.SetGradientAlpha ) then
+		SS.tallyFrame.bgLeft:SetGradientAlpha("HORIZONTAL", 0, 0, 0, 0, 0, 0, 0, BAND);
+		SS.tallyFrame.bgRight:SetGradientAlpha("HORIZONTAL", 0, 0, 0, BAND, 0, 0, 0, 0);
 	end
-	tallyFrame:Hide();
+	SS.tallyFrame:Hide();
 end
 
 SS.CreateTallyFrame();
 
 function SS.CreateMeterFrame()
-	meterFrame = CreateFrame("Frame", "SlimSuiteMeterFrame", UIParent);
-	meterFrame:SetWidth(250); meterFrame:SetHeight(180);
-	meterFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -8, 44);
-	meterFrame:SetFrameStrata("HIGH");
-	meterFrame:EnableMouse(false);
-	SlimSuiteMeter.Attach(meterFrame);
-	meterFrame:Hide();
+	SS.meterFrame = CreateFrame("Frame", "SlimSuiteMeterFrame", UIParent);
+	SS.meterFrame:SetWidth(250); SS.meterFrame:SetHeight(180);
+	SS.meterFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -8, 44);
+	SS.meterFrame:SetFrameStrata("HIGH");
+	SS.meterFrame:EnableMouse(false);
+	SlimSuiteMeter.Attach(SS.meterFrame);
+	SS.meterFrame:Hide();
 end
 
 SS.CreateMeterFrame();
 
-UpdateMeter = function()
-	if ( not meterFrame ) then return; end
+SS.UpdateMeter = function()
+	if ( not SS.meterFrame ) then return; end
 	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
 	local active = phase and phase ~= "ready";
 	local editing = SS.IsEditing("SlimSuiteMeterFrame") and SS.DB().moveMeter;
 	if ( not SS.FeatureEnabled("SlimSuiteMeterFrame") ) then
-		meterFrame:Hide();
-		if ( not setupActive ) then SS.HideNative("meter", false); end   -- the setup keeps the game's meter hidden
+		SS.meterFrame:Hide();
+		if ( not SS.setupActive ) then SS.HideNative("meter", false); end   -- the setup keeps the game's meter hidden
 		return;
 	end
 	-- Shown before a run too, like the game's own meter (it reads "No damage yet." until the run starts).
 	-- closed with its "x": hidden for the rest of this run (the game's meter stays hidden too)
 	if ( not editing and SlimSuiteMeter.IsClosed and SlimSuiteMeter.IsClosed() ) then
-		meterFrame:Hide(); SS.HideNative("meter", true); return;
+		SS.meterFrame:Hide(); SS.HideNative("meter", true); return;
 	end
 	SS.HideNative("meter", true);
-	meterFrame:Show();
+	SS.meterFrame:Show();
 	SlimSuiteMeter.Draw(active, editing);
 end
 
-SS.Every("meterPoll", 0.35, function() SS.Safe(UpdateMeter); end);
+SS.Every("meterPoll", 0.35, function() SS.Safe(SS.UpdateMeter); end);
 
 function SS.UpdateLevelButton()
-	if ( not levelButton ) then return; end
+	if ( not SS.levelButton ) then return; end
 	local canReplace = type(AZS_OpenStoredLevels) == "function";
 	local replacing = SS.FeatureEnabled("SlimSuiteStoredLevelsButton") and canReplace;
 	SS.HideNative("levels", replacing);
-	local storedCount = 0;
-	if ( type(AZS_GetStoredLevels) == "function" ) then
-		local okCount, value = SS.Safe(AZS_GetStoredLevels);
-		if ( okCount and type(value) == "number" ) then storedCount = math.max(0, math.floor(value)); end
-	end
 
-	if ( not replacing ) then levelButton:Hide(); return; end
+	if ( not replacing ) then SS.levelButton:Hide(); return; end
 	local count = 0;
 	if ( type(AZS_GetStoredLevels) == "function" ) then
 		local ok, value = SS.Safe(AZS_GetStoredLevels);
@@ -1605,16 +1593,16 @@ function SS.UpdateLevelButton()
 	end
 	local level = type(UnitLevel) == "function" and UnitLevel("player") or nil;
 	local preview = count == 0 and SS.Previewing("SlimSuiteStoredLevelsButton");
-	levelButton.level:SetText(SS.T("LEVEL") .. " " .. (level and tostring(level) or ""));
-	levelButton.count:SetText((count > 0 and tostring(count)) or (preview and "2") or "");   -- a sample count while it is placed
+	SS.levelButton.level:SetText(SS.T("LEVEL") .. " " .. (level and tostring(level) or ""));
+	SS.levelButton.count:SetText((count > 0 and tostring(count)) or (preview and "2") or "");   -- a sample count while it is placed
 	SS.Safe(SS.LayoutLevelButton);
 	-- the game's stored-level count says when there is something to spend; it is also shown while being placed
-	if ( count > 0 or preview ) then levelButton:Show(); else levelButton:Hide(); end
+	if ( count > 0 or preview ) then SS.levelButton:Show(); else SS.levelButton:Hide(); end
 end
 
 -- the button's contents follow its size: the class symbol, the level line and LEVEL UP! grow and shrink with it
 function SS.LayoutLevelButton()
-	local b = levelButton;
+	local b = SS.levelButton;
 	if ( not b ) then return; end
 	local w, h = b:GetWidth() or 184, b:GetHeight() or 58;
 	if ( b.laidW == w and b.laidH == h ) then return; end

@@ -3,7 +3,7 @@ local function check(label, ok)
  if not ok then failures = failures + 1; print('MISMATCH '..label) end
 end
 SS.SetupEnd(true)
-local su, d = SS.ENV.SU, SS.DB()
+local su, d = SS.SU, SS.DB()
 for _, name in ipairs(SS.SETUP_ORDER) do check('registered setup element '..name, SS.ELEMENTS[name] and SS.ELEMENTS[name].title) end
 for _, entry in ipairs(SS.MOVABLE) do check('registered movable '..entry[1], SS.ELEMENTS[entry[1]]) end
 su.SetMode('SlimSuiteClockFrame','disabled','Clock')
@@ -56,6 +56,7 @@ rawset(_G,'UnitGetTotalAbsorbs',nil)
 check('unsupported party shields stay unknown', SS.AbsorbAmount('party1') == nil)
 
 local selected = d.language
+dofile('../SlimSuiteLocaleExtra.lua'); SS.LOCALE_CODES = nil   -- every language, as before login
 for _, code in ipairs({'enUS','esES','frFR','deDE','ptBR','itIT'}) do
  d.language=code; check('language selectable '..code, SS.LocaleCode()==code)
  for key in pairs(SS.LOCALE_TEXT.enUS) do check('translation key '..code..' '..key, type(SS.LOCALE_TEXT[code][key])=='string') end

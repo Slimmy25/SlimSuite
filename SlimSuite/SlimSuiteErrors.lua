@@ -1,4 +1,4 @@
--- Slim Suite's error log, in the style of Bug Grabber: every error in Slim Suite's own files (and the shared AZSKit) is
+-- Slim Suite's error log, in the style of Bug Grabber: every error in Slim Suite's own files (its kit included) is
 -- kept in SlimSuiteDB.errorLog, which the game saves between logins. /slimsuite errors opens it. Other addons' errors
 -- are left to the game (and to BugSack, if it is installed).
 -- recording lives in SlimSuiteCore.lua (SS.LogError); SS.ErrorLog() returns the current log
@@ -7,7 +7,7 @@
 local previousHandler = _ERRORMESSAGE;
 function _ERRORMESSAGE(msg)
 	local text = tostring(msg or "");
-	if ( SS and SS.LogError and (string.find(text, "SlimSuite", 1, true) or string.find(text, "AZSKit", 1, true)) ) then pcall(SS.LogError, msg); end
+	if ( SS and SS.LogError and (string.find(text, "SlimSuite", 1, true)) ) then pcall(SS.LogError, msg); end
 	if ( previousHandler ) then previousHandler(msg); end
 end
 

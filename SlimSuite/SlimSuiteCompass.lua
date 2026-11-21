@@ -1,5 +1,5 @@
 -- An optional bearing display. Positions come only from the published world data.
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 local frame=CreateFrame("Frame","SlimSuiteCompassFrame",UIParent);
 frame:SetWidth(380); frame:SetHeight(88); frame:SetPoint("TOP",UIParent,"TOP",0,-65); frame:Hide();
 SS.OwnLook(frame, function()
@@ -11,125 +11,125 @@ frame.track=frame:CreateTexture(nil,"BACKGROUND"); frame.track:SetTexture(.65,.5
 frame.track:SetPoint("TOPLEFT",frame,"TOPLEFT",16,-32); frame.track:SetPoint("TOPRIGHT",frame,"TOPRIGHT",-16,-32);
 frame.ticks={}; frame.markers={};
 function SS.CompassOffset(x,y,facing,width)
- local angle=(math.atan2 or math.atan)(y,x)-(facing or 0);
- while ( angle>math.pi ) do angle=angle-2*math.pi; end
- while ( angle< -math.pi ) do angle=angle+2*math.pi; end
- if ( math.abs(angle)>math.pi/2 ) then return; end
- return -angle/(math.pi/2)*math.max(0,width/2-20);
+	local angle=(math.atan2 or math.atan)(y,x)-(facing or 0);
+	while ( angle>math.pi ) do angle=angle-2*math.pi; end
+	while ( angle< -math.pi ) do angle=angle+2*math.pi; end
+	if ( math.abs(angle)>math.pi/2 ) then return; end
+	return -angle/(math.pi/2)*math.max(0,width/2-20);
 end
 -- The run clock in the bottom of the compass (setting: Run clock in the compass). It shows the same things as the
 -- movable run clock: the run time, the countdown to the next boss and the zone. The compass grows by one strip for it.
 function SS.UpdateCompassRunClock()
- local on = SS.DB().compassRunClock and true or false;
- if ( not frame.baseH ) then frame.baseH = frame:GetHeight() or 88; end
- local want = on and (frame.baseH + 22) or frame.baseH;
- if ( frame:GetHeight() ~= want ) then frame:SetHeight(want); end
- if ( not on ) then if ( frame.runStrip ) then frame.runStrip:Hide(); end return; end
- if ( not frame.runStrip ) then
-  local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
-  fs:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 10, 6); fs:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 6);
-  fs:SetJustifyH("CENTER"); frame.runStrip = fs;
- end
- local clock = getglobal("SlimSuiteClockFrame");
- local zone = (clock and clock.zone and clock.zone.GetText and clock.zone:GetText()) or "";
- local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
- local live = phase == "ready" or phase == "playing" or phase == "choosing" or phase == "paused";
- local runText, nextText = "--:--", "--:--";
- if ( live ) then
-  local elapsed = type(AZS_GetRunTime) == "function" and AZS_GetRunTime() or nil;
-  if ( phase == "ready" ) then elapsed = 0; end
-  runText = SS.ClockText(elapsed or 0);
-  local upcoming = {};
-  if ( type(AZS_GetUpcomingBosses) == "function" ) then
-   local ok, value = SS.Safe(AZS_GetUpcomingBosses);
-   if ( ok and type(value) == "table" ) then upcoming = value; end
-  end
-  local left = type(upcoming[1]) == "table" and upcoming[1].left or nil;
-  local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
-  if ( type(left) ~= "number" and run and type(run.nb) == "number" and run.nb >= 0 ) then left = run.nb; end
-  if ( type(left) == "number" and left >= 0 ) then nextText = SS.ClockText(math.ceil(left)); end
- elseif ( SS.Demoing("SlimSuiteClockFrame") and SS.demoClock ) then
-  runText = SS.ClockText(math.floor(SS.demoClock.run));
-  nextText = SS.ClockText(math.ceil(SS.demoClock.nextBoss));
- end
- local line = SS.T("Run") .. " " .. runText .. "   " .. SS.T("next boss in") .. " " .. nextText;
- if ( zone ~= "" ) then line = line .. "   " .. zone; end
- frame.runStrip:SetText(line); frame.runStrip:Show();
+	local on = SS.DB().compassRunClock and true or false;
+	if ( not frame.baseH ) then frame.baseH = frame:GetHeight() or 88; end
+	local want = on and (frame.baseH + 22) or frame.baseH;
+	if ( frame:GetHeight() ~= want ) then frame:SetHeight(want); end
+	if ( not on ) then if ( frame.runStrip ) then frame.runStrip:Hide(); end return; end
+	if ( not frame.runStrip ) then
+		local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
+		fs:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 10, 6); fs:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 6);
+		fs:SetJustifyH("CENTER"); frame.runStrip = fs;
+	end
+	local clock = getglobal("SlimSuiteClockFrame");
+	local zone = (clock and clock.zone and clock.zone.GetText and clock.zone:GetText()) or "";
+	local phase = type(AZS_GetPhase) == "function" and AZS_GetPhase() or nil;
+	local live = phase == "ready" or phase == "playing" or phase == "choosing" or phase == "paused";
+	local runText, nextText = "--:--", "--:--";
+	if ( live ) then
+		local elapsed = type(AZS_GetRunTime) == "function" and AZS_GetRunTime() or nil;
+		if ( phase == "ready" ) then elapsed = 0; end
+		runText = SS.ClockText(elapsed or 0);
+		local upcoming = {};
+		if ( type(AZS_GetUpcomingBosses) == "function" ) then
+			local ok, value = SS.Safe(AZS_GetUpcomingBosses);
+			if ( ok and type(value) == "table" ) then upcoming = value; end
+		end
+		local left = type(upcoming[1]) == "table" and upcoming[1].left or nil;
+		local run = type(AZS_RUN) == "table" and AZS_RUN or nil;
+		if ( type(left) ~= "number" and run and type(run.nb) == "number" and run.nb >= 0 ) then left = run.nb; end
+		if ( type(left) == "number" and left >= 0 ) then nextText = SS.ClockText(math.ceil(left)); end
+	elseif ( SS.Demoing("SlimSuiteClockFrame") and SS.demoClock ) then
+		runText = SS.ClockText(math.floor(SS.demoClock.run));
+		nextText = SS.ClockText(math.ceil(SS.demoClock.nextBoss));
+	end
+	local line = SS.T("Run") .. " " .. runText .. "   " .. SS.T("next boss in") .. " " .. nextText;
+	if ( zone ~= "" ) then line = line .. "   " .. zone; end
+	frame.runStrip:SetText(line); frame.runStrip:Show();
 end
 function SS.UpdateCompass()
- local d=SS.DB();
- SS.UpdateCompassRunClock();
- if ( (not SS.FeatureEnabled("SlimSuiteCompassFrame") and not d.unlocked) or d.vanillaUI ) then frame:Hide(); return; end
- local position=type(AZS_GetPlayerPosition)=="function" and AZS_GetPlayerPosition() or nil;
- if ( type(position)~="table" or type(position.x)~="number" or type(position.y)~="number" ) then
-  if d.unlocked then frame:Show(); else frame:Hide(); end
-  return;
- end
- local w,h=frame:GetWidth(),frame:GetHeight(); local rail=d.compassStyle~="free";
- if ( SS.StyleKeyFor("SlimSuiteCompassFrame") == "original" ) then
-  frame:SetBackdropColor(.02,.025,.035,rail and .65 or 0); frame:SetBackdropBorderColor(.55,.47,.27,rail and .7 or 0);
- elseif ( rail ) then SS.ThemePanel(frame);
- else frame:SetBackdropColor(0,0,0,0); frame:SetBackdropBorderColor(0,0,0,0); end
- if ( rail ) then frame.track:Show(); else frame.track:Hide(); end
- local heading=math.mod(360-math.deg(position.facing or 0),360); local first=math.floor((heading-90)/15)*15;
- for i=1,14 do
-  local text=frame.ticks[i];
-  if ( not text ) then
-   text=frame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall");
-   text.tick=frame:CreateTexture(nil,"OVERLAY"); text.tick:SetTexture(.8,.7,.45,.7); text.tick:SetWidth(1); text.tick:SetHeight(5);
-   frame.ticks[i]=text;
-  end
-  local degree=first+(i-1)*15; local x=(degree-heading)/90*(w/2-20);
-  if ( rail and math.abs(x)<w/2-15 ) then
-   local n=math.mod(degree,360); local cardinal=({[0]="N",[90]="E",[180]="S",[270]="W"})[n];
-   text:SetText(cardinal or tostring(n)); text:ClearAllPoints(); text:SetPoint("TOP",frame,"TOP",x,-19); text:Show(); text.tick:ClearAllPoints(); text.tick:SetPoint("TOP",frame,"TOP",x,-29); text.tick:Show();
-  else text:Hide(); text.tick:Hide(); end
- end
- local points=SlimSuiteWorld.PointsOfInterest(position,{minimapBosses=d.compassBosses~=false,minimapLairs=d.compassLairs~=false,minimapCaches=d.compassCaches~=false});
- local used=0; local occupied={};
- for _,point in ipairs(points) do
-  local x=SS.CompassOffset(point.x-position.x,point.y-position.y,position.facing,w);
-  if ( x ) then
-   local row;
-   for candidate=1,math.max(1,math.floor((h-38)/30)) do
-    local good=true; for _,prior in ipairs(occupied[candidate] or {}) do if ( math.abs(x-prior)<56 ) then good=false; end end
-    if ( good ) then row=candidate; break; end
-   end
-   if ( row ) then
-    occupied[row]=occupied[row] or {}; table.insert(occupied[row],x); used=used+1;
-    local marker=frame.markers[used];
-    if ( not marker ) then
-     marker=CreateFrame("Frame",nil,frame); marker:SetWidth(52); marker:SetHeight(28); marker:EnableMouse(true);
-     marker.icon=marker:CreateTexture(nil,"OVERLAY"); marker.icon:SetWidth(14); marker.icon:SetHeight(14); marker.icon:SetPoint("TOP",marker,"TOP",0,0);
-     marker.name=marker:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); marker.name:SetPoint("TOP",marker.icon,"BOTTOM",0,-1);
-     marker.pointer=marker:CreateTexture(nil,"OVERLAY"); marker.pointer:SetTexture("Interface\\Minimap\\MinimapArrow"); marker.pointer:SetWidth(8); marker.pointer:SetHeight(8); marker.pointer:SetPoint("BOTTOM",marker.icon,"TOP",0,0);
-     marker:SetScript("OnEnter",function() if ( GameTooltip ) then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(this.title,1,.82,.3); GameTooltip:AddLine(this.detail,1,1,1,1); GameTooltip:Show(); end end);
-     marker:SetScript("OnLeave",function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
-     frame.markers[used]=marker;
-    end
-    marker:ClearAllPoints(); marker:SetPoint("TOP",frame,"TOP",x,-(rail and 40 or 28)-(row-1)*30);
-    marker.icon:SetTexture(point.texture);
-    if ( point.raid ) then SlimSuiteWorld.SetRaidIcon(marker.icon,point.raid); else marker.icon:SetTexCoord(0,1,0,1); end
-    marker:SetAlpha(point.alpha or 1); marker.name:SetText(point.tip or ""); SS.FitText(marker.name,52,7,12,point.tip or "");
-    marker.title=point.tip or ""; local distance=math.sqrt((point.x-position.x)*(point.x-position.x)+(point.y-position.y)*(point.y-position.y));
-    marker.detail=tostring(math.floor(distance+.5)).." yd"..(point.sub and ("\n"..point.sub) or "");
-    if ( rail ) then marker.pointer:Hide(); else marker.pointer:Show(); end
-    marker:Show();
-   end
-  end
- end
- for i=used+1,table.getn(frame.markers) do frame.markers[i]:Hide(); end
- frame:Show(); if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(frame); end
+	local d=SS.DB();
+	SS.UpdateCompassRunClock();
+	if ( (not SS.FeatureEnabled("SlimSuiteCompassFrame") and not d.unlocked) or d.vanillaUI ) then frame:Hide(); return; end
+	local position=type(AZS_GetPlayerPosition)=="function" and AZS_GetPlayerPosition() or nil;
+	if ( type(position)~="table" or type(position.x)~="number" or type(position.y)~="number" ) then
+		if d.unlocked then frame:Show(); else frame:Hide(); end
+		return;
+	end
+	local w,h=frame:GetWidth(),frame:GetHeight(); local rail=d.compassStyle~="free";
+	if ( SS.StyleKeyFor("SlimSuiteCompassFrame") == "original" ) then
+		frame:SetBackdropColor(.02,.025,.035,rail and .65 or 0); frame:SetBackdropBorderColor(.55,.47,.27,rail and .7 or 0);
+	elseif ( rail ) then SS.ThemePanel(frame);
+	else frame:SetBackdropColor(0,0,0,0); frame:SetBackdropBorderColor(0,0,0,0); end
+	if ( rail ) then frame.track:Show(); else frame.track:Hide(); end
+	local heading=math.mod(360-math.deg(position.facing or 0),360); local first=math.floor((heading-90)/15)*15;
+	for i=1,14 do
+		local text=frame.ticks[i];
+		if ( not text ) then
+			text=frame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall");
+			text.tick=frame:CreateTexture(nil,"OVERLAY"); text.tick:SetTexture(.8,.7,.45,.7); text.tick:SetWidth(1); text.tick:SetHeight(5);
+			frame.ticks[i]=text;
+		end
+		local degree=first+(i-1)*15; local x=(degree-heading)/90*(w/2-20);
+		if ( rail and math.abs(x)<w/2-15 ) then
+			local n=math.mod(degree,360); local cardinal=({[0]="N",[90]="E",[180]="S",[270]="W"})[n];
+			text:SetText(cardinal or tostring(n)); text:ClearAllPoints(); text:SetPoint("TOP",frame,"TOP",x,-19); text:Show(); text.tick:ClearAllPoints(); text.tick:SetPoint("TOP",frame,"TOP",x,-29); text.tick:Show();
+		else text:Hide(); text.tick:Hide(); end
+	end
+	local points=SlimSuiteWorld.PointsOfInterest(position,{minimapBosses=d.compassBosses~=false,minimapLairs=d.compassLairs~=false,minimapCaches=d.compassCaches~=false});
+	local used=0; local occupied={};
+	for _,point in ipairs(points) do
+		local x=SS.CompassOffset(point.x-position.x,point.y-position.y,position.facing,w);
+		if ( x ) then
+			local row;
+			for candidate=1,math.max(1,math.floor((h-38)/30)) do
+				local good=true; for _,prior in ipairs(occupied[candidate] or {}) do if ( math.abs(x-prior)<56 ) then good=false; end end
+				if ( good ) then row=candidate; break; end
+			end
+			if ( row ) then
+				occupied[row]=occupied[row] or {}; table.insert(occupied[row],x); used=used+1;
+				local marker=frame.markers[used];
+				if ( not marker ) then
+					marker=CreateFrame("Frame",nil,frame); marker:SetWidth(52); marker:SetHeight(28); marker:EnableMouse(true);
+					marker.icon=marker:CreateTexture(nil,"OVERLAY"); marker.icon:SetWidth(14); marker.icon:SetHeight(14); marker.icon:SetPoint("TOP",marker,"TOP",0,0);
+					marker.name=marker:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); marker.name:SetPoint("TOP",marker.icon,"BOTTOM",0,-1);
+					marker.pointer=marker:CreateTexture(nil,"OVERLAY"); marker.pointer:SetTexture("Interface\\Minimap\\MinimapArrow"); marker.pointer:SetWidth(8); marker.pointer:SetHeight(8); marker.pointer:SetPoint("BOTTOM",marker.icon,"TOP",0,0);
+					marker:SetScript("OnEnter",function() if ( GameTooltip ) then GameTooltip:SetOwner(this,"ANCHOR_RIGHT"); GameTooltip:AddLine(this.title,1,.82,.3); GameTooltip:AddLine(this.detail,1,1,1,1); GameTooltip:Show(); end end);
+					marker:SetScript("OnLeave",function() if ( GameTooltip ) then GameTooltip:Hide(); end end);
+					frame.markers[used]=marker;
+				end
+				marker:ClearAllPoints(); marker:SetPoint("TOP",frame,"TOP",x,-(rail and 40 or 28)-(row-1)*30);
+				marker.icon:SetTexture(point.texture);
+				if ( point.raid ) then SlimSuiteWorld.SetRaidIcon(marker.icon,point.raid); else marker.icon:SetTexCoord(0,1,0,1); end
+				marker:SetAlpha(point.alpha or 1); marker.name:SetText(point.tip or ""); SS.FitText(marker.name,52,7,12,point.tip or "");
+				marker.title=point.tip or ""; local distance=math.sqrt((point.x-position.x)*(point.x-position.x)+(point.y-position.y)*(point.y-position.y));
+				marker.detail=tostring(math.floor(distance+.5)).." yd"..(point.sub and ("\n"..point.sub) or "");
+				if ( rail ) then marker.pointer:Hide(); else marker.pointer:Show(); end
+				marker:Show();
+			end
+		end
+	end
+	for i=used+1,table.getn(frame.markers) do frame.markers[i]:Hide(); end
+	frame:Show(); if ( SS.EnforceElementBounds ) then SS.EnforceElementBounds(frame); end
 end
 -- The compass is checked 10 times a second, but only redrawn when the player moves or turns (or every half second, as a safety net).
 local compassKey, compassAt = nil, 0;
 local function CompassTick()
- local p = type(AZS_GetPlayerPosition)=="function" and AZS_GetPlayerPosition() or nil;
- if ( type(p)~="table" or type(p.x)~="number" or type(p.y)~="number" ) then SS.UpdateCompass(); compassKey = nil; return; end
- local now = GetTime();
- local key = math.floor(p.x*5)..","..math.floor(p.y*5)..","..math.floor((p.facing or 0)*57.3*2)..","..SS.DB().compassStyle..","..(SS.DB().unlocked and 1 or 0)..","..(SS.DB().compassBosses and 1 or 0)..","..(SS.DB().compassLairs and 1 or 0)..","..(SS.DB().compassCaches and 1 or 0)..(SS.DB().compassRunClock and math.floor(now) or "");
- if ( key == compassKey and now - compassAt < 0.5 ) then return; end
- compassKey, compassAt = key, now;
- SS.UpdateCompass();
+	local p = type(AZS_GetPlayerPosition)=="function" and AZS_GetPlayerPosition() or nil;
+	if ( type(p)~="table" or type(p.x)~="number" or type(p.y)~="number" ) then SS.UpdateCompass(); compassKey = nil; return; end
+	local now = GetTime();
+	local key = math.floor(p.x*5)..","..math.floor(p.y*5)..","..math.floor((p.facing or 0)*57.3*2)..","..SS.DB().compassStyle..","..(SS.DB().unlocked and 1 or 0)..","..(SS.DB().compassBosses and 1 or 0)..","..(SS.DB().compassLairs and 1 or 0)..","..(SS.DB().compassCaches and 1 or 0)..(SS.DB().compassRunClock and math.floor(now) or "");
+	if ( key == compassKey and now - compassAt < 0.5 ) then return; end
+	compassKey, compassAt = key, now;
+	SS.UpdateCompass();
 end
 SS.Every("compass",0.1,CompassTick);

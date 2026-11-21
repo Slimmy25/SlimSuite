@@ -1,7 +1,7 @@
 local bad=0
 local function check(label,ok) if not ok then bad=bad+1; print("MISMATCH "..label) end end
 SS.SetupEnd(true)
-local d=SS.DB(); local su=SS.ENV.SU
+local d=SS.DB(); local su=SS.SU
 SetCVar("CombatDamage","1")
 su.SetMode("SlimSuiteCombatTextFrame","enabled","Combat text"); SS.SetWorldCombatMode("off")
 check("log-only mode suppresses real native damage",GetCVar("CombatDamage")=="0")

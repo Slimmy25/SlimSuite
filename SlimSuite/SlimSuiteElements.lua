@@ -32,8 +32,8 @@ SS.ELEMENTS = {
 	SlimSuitePartyLines = {},
 	SlimSuitePlayerCard = {},
 	SlimSuiteStatCounterFrame = { feature = "statCounter" },
- SlimSuiteAchievementsButton = {feature="achievementButton",optional=true,title="Side achievements",label="Side achievements",text="Open your unofficial side objectives."},
- SlimSuiteLuckFrame = {feature="luckPanel",optional=true,title="Legendary luck",label="Legendary luck",text="Estimated legendary card chances from the supplied luck model."},
+	SlimSuiteAchievementsButton = {feature="achievementButton",optional=true,title="Side achievements",label="Side achievements",text="Open your unofficial side objectives."},
+	SlimSuiteLuckFrame = {feature="luckPanel",optional=true,title="Legendary luck",label="Legendary luck",text="Estimated legendary card chances from the supplied luck model."},
 	CharacterFrame = {},
 	TalentFrame = {},
 	SlimSuiteCompassFrame = { feature = "compassOn", title = "Compass", text = "Bearings to known bosses, lairs and caches. Choose a rail or free markers." },
@@ -130,25 +130,25 @@ SS.ELEMENTS["SlimSuitePartyLines"].owner = "PartyMemberFrame1";
 SS.ELEMENTS["SlimSuiteItemRowFrame"].owner = "SlimSuiteSpellRowFrame";
 SS.ELEMENT_COMPANIONS = { ChatFrame1 = { "ChatFrame1Tab", "ChatFrame1EditBox" }, SlimSuiteSpellRowFrame = { "SlimSuiteItemRowFrame" }, PlayerFrame = { "SlimSuiteProcMeter" } };
 SS.DISPLAY_ANCHORS = {
- SlimSuiteAchievementsButton={"TOPLEFT",.02,.35},
- SlimSuiteLuckFrame={"TOPLEFT",.68,.42},
- PlayerFrame = { "TOPLEFT", .02, .98 }, TargetFrame = { "TOPLEFT", .165, .98 },
- PartyMemberFrame1 = { "TOPLEFT", .02, .87 },
- SlimSuitePlayerCard = { "TOPLEFT", .02, .98 }, SlimSuiteTargetCard = { "TOPLEFT", .165, .98 },
- SlimSuitePartyLines = { "TOPLEFT", .02, .87 },
- SlimSuiteBossFrames = { "TOP", .5, .92 }, SlimSuiteClockFrame = { "TOP", .5, .995 },
- BuffFrame = { "TOPRIGHT", .88, .985 }, MinimapCluster = { "TOPRIGHT", .995, .995 },
- SlimSuiteLocalClockFrame = { "TOPRIGHT", .965, .80 },
- SlimSuiteMeterFrame = { "BOTTOMLEFT", .70, 0 }, SlimSuiteStoredLevelsButton = { "CENTER", .5, .23 },
- SlimSuiteTallyFrame = { "BOTTOM", .5, .006 }, MainMenuBar = { "BOTTOM", .5, 0 },
- MainMenuExpBar = { "BOTTOM", .5, .049 }, SlimSuiteSpellRowFrame = { "TOPLEFT", .275, .38 },
- SlimSuiteItemRowFrame = { "TOPLEFT", .275, .34 }, ChatFrame1 = { "BOTTOMLEFT", .005, .17 },
- SlimSuiteAnnouncementFrame = { "CENTER", .5, .70 }, GameTooltip = { "BOTTOMRIGHT", .995, .005 }
+	SlimSuiteAchievementsButton={"TOPLEFT",.02,.35},
+	SlimSuiteLuckFrame={"TOPLEFT",.68,.42},
+	PlayerFrame = { "TOPLEFT", .02, .98 }, TargetFrame = { "TOPLEFT", .165, .98 },
+	PartyMemberFrame1 = { "TOPLEFT", .02, .87 },
+	SlimSuitePlayerCard = { "TOPLEFT", .02, .98 }, SlimSuiteTargetCard = { "TOPLEFT", .165, .98 },
+	SlimSuitePartyLines = { "TOPLEFT", .02, .87 },
+	SlimSuiteBossFrames = { "TOP", .5, .92 }, SlimSuiteClockFrame = { "TOP", .5, .995 },
+	BuffFrame = { "TOPRIGHT", .88, .985 }, MinimapCluster = { "TOPRIGHT", .995, .995 },
+	SlimSuiteLocalClockFrame = { "TOPRIGHT", .965, .80 },
+	SlimSuiteMeterFrame = { "BOTTOMLEFT", .70, 0 }, SlimSuiteStoredLevelsButton = { "CENTER", .5, .23 },
+	SlimSuiteTallyFrame = { "BOTTOM", .5, .006 }, MainMenuBar = { "BOTTOM", .5, 0 },
+	MainMenuExpBar = { "BOTTOM", .5, .049 }, SlimSuiteSpellRowFrame = { "TOPLEFT", .275, .38 },
+	SlimSuiteItemRowFrame = { "TOPLEFT", .275, .34 }, ChatFrame1 = { "BOTTOMLEFT", .005, .17 },
+	SlimSuiteAnnouncementFrame = { "CENTER", .5, .70 }, GameTooltip = { "BOTTOMRIGHT", .995, .005 }
 };
 for name, anchor in pairs(SS.DISPLAY_ANCHORS) do SS.ELEMENTS[name].anchor = anchor; end
 
 -- WIP features do not appear in setup or register movable handles.
 if not SS.AchievementsAvailable() then
- for i=table.getn(SS.MOVABLE),1,-1 do if SS.MOVABLE[i][1]=="SlimSuiteAchievementsButton" then table.remove(SS.MOVABLE,i); end end
- for i=table.getn(SS.SETUP_ORDER),1,-1 do if SS.SETUP_ORDER[i]=="SlimSuiteAchievementsButton" then table.remove(SS.SETUP_ORDER,i); end end
+	for i=table.getn(SS.MOVABLE),1,-1 do if SS.MOVABLE[i][1]=="SlimSuiteAchievementsButton" then table.remove(SS.MOVABLE,i); end end
+	for i=table.getn(SS.SETUP_ORDER),1,-1 do if SS.SETUP_ORDER[i]=="SlimSuiteAchievementsButton" then table.remove(SS.SETUP_ORDER,i); end end
 end

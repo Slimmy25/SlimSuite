@@ -1,5 +1,5 @@
 -- checks for the 1.10 review fixes
-local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
+local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS[want] end if n == want then return v end i = i + 1 end end
 SU = upvalue(SS.SetupHide, "SU")
 local bad = 0
 local function check(label, ok) if not ok then bad = bad + 1; print("  MISMATCH " .. label) end end
@@ -109,7 +109,7 @@ for _, e in ipairs(SU.elements) do if e.frame == "SlimSuiteCombatTextFrame" then
 check("combat text is listed while off", listed)
 SU.SetMode("SlimSuiteCombatTextFrame", "enabled", "Combat text"); SS.SetUnlocked(true, true); Tick(2)
 check("turning it on turns the box on", SS.DB().combatTextBox == true)
-check("and it has a green handle", SS.ENV.handles.SlimSuiteCombatTextFrame and SS.ENV.handles.SlimSuiteCombatTextFrame:IsShown())
+check("and it has a green handle", SS.handles.SlimSuiteCombatTextFrame and SS.handles.SlimSuiteCombatTextFrame:IsShown())
 print("list problems: " .. bad)
 -- the element list: two columns, and it can be dragged
 local cols = {}

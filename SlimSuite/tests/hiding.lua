@@ -1,5 +1,5 @@
 -- Hide feature and the Disabled state hide every element, whether the UI is locked or being edited
-local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS.ENV and SS.ENV[want] end if n == want then return v end i = i + 1 end end
+local function upvalue(fn, want) local i = 1 while true do local n, v = debug.getupvalue(fn, i) if not n then return SS[want] end if n == want then return v end i = i + 1 end end
 SU = upvalue(SS.SetupHide, "SU")
 local bad = 0
 local function check(label, ok) if not ok then bad = bad + 1; print("  MISMATCH " .. label) end end
@@ -21,7 +21,7 @@ for _, state in ipairs({ "locked", "editing" }) do
 	end
 end
 -- the minimap is hidden outright when disabled (fading leaves the game's map picture showing) and comes back after
-SS.SetUnlocked(false, true); SU.SetMode("MinimapCluster", "disabled", "Minimap"); Tick(8)
+SS.SetUnlocked(false, true); SU.SetMode("MinimapCluster", "disabled", "Minimap"); Tick(12)   -- the minimap check runs once a second
 check("disabled minimap is hidden outright", MinimapCluster.shown == false)
 SU.SetMode("MinimapCluster", "enabled", "Minimap"); Tick(8)
 check("minimap comes back when turned on", MinimapCluster.shown ~= false)

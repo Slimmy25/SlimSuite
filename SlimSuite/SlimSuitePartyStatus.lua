@@ -4,7 +4,7 @@
 --   * a downed teammate's world position comes from AZS_GetDownedPartyMembers(), so their distance is exact;
 --   * a standing teammate's position is not exposed, so their distance is the client's range check, shown as a band;
 --   * revive progress is only known for the teammate *you* are reviving (AZS_GetRevive().reviving / rshare).
-if ( setfenv ) then setfenv(1, SS.ENV); end
+local K, SU, NAME = SS.Kit, SS.SU, SS.NAME;   -- the three names every Slim Suite file uses (SlimSuiteCore.lua)
 
 local OUT_OF_RANGE_ALPHA = 0.6;
 local GREY = { 0.45, 0.45, 0.45 };
