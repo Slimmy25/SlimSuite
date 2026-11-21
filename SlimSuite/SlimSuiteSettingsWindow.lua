@@ -478,6 +478,7 @@ SS.HELP = {
 	"/slim: the settings window.  /slim edit: move and size the UI (/slim lock when done).  /slim setup: the guided setup.",
 	"/slim quick: six questions that set Slim Suite up for how you play.",
 	"/slim demo: Demo Mode on or off.  /slim levelup: Slim Suite's Level Up button or the game's own.",
+	"/slim positions: write where every element sits (position, size, scale) to the action log.",
 	"/slim layout: manage named profiles and import/export layouts.  /slim layout save <name>, load <name>, delete <name>, list.",
 	"/slim hud: recommended positions for this display.",
 	"/slim reset places, /slim reset all: back to where everything started.",
@@ -531,6 +532,19 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 			end
 		end
 		K.Print(NAME, "frame sizes are in the action log: /slimsuite log");
+	elseif ( cmd == "positions" or cmd == "where" ) then
+		-- where every element is on screen, to copy a layout: left and bottom edges, size and scale, in screen units
+		SS.LogAction("Element positions (left, bottom, width x height, scale; screen " .. math.floor((UIParent:GetWidth() or 0) + 0.5) .. " x " .. math.floor((UIParent:GetHeight() or 0) + 0.5) .. "):");
+		for _, m in ipairs(SS.MOVABLE) do
+			local name = SS.Shown and SS.Shown(m[1]) or m[1];
+			local f = getglobal(name);
+			if ( f and f.GetLeft and f:GetLeft() and f.IsShown and f:IsShown() ) then
+				local s = (f.GetEffectiveScale and f:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1);
+				SS.LogAction(string.format("  %s (%s): %d, %d, %d x %d, scale %.2f", m[2], name, f:GetLeft() * s, f:GetBottom() * s,
+					(f:GetWidth() or 0) * s, (f:GetHeight() or 0) * s, f:GetScale() or 1));
+			end
+		end
+		K.Print(NAME, "element positions are in the action log: /slimsuite log");
 	elseif ( cmd == "hud" or cmd == "recommend" ) then
 		SS.ShowHUDRecommendation();
 	elseif ( cmd == "mouse" ) then

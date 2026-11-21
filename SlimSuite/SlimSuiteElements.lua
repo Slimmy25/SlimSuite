@@ -33,6 +33,7 @@ SS.ELEMENTS = {
 	SlimSuitePlayerCard = {},
 	SlimSuiteStatCounterFrame = { feature = "statCounter" },
  SlimSuiteAchievementsButton = {feature="achievementButton",optional=true,title="Side achievements",label="Side achievements",text="Open your unofficial side objectives."},
+ SlimSuiteInfoDrawer = {feature="infoDrawer",optional=true,title="Info drawer",label="Info drawer",text="A read-only panel of run numbers: your damage per second, legendary luck and a few stats."},
  SlimSuiteLuckFrame = {feature="luckPanel",optional=true,title="Legendary luck",label="Legendary luck",text="Estimated legendary card chances from the supplied luck model."},
 	CharacterFrame = {},
 	TalentFrame = {},
@@ -64,7 +65,7 @@ SS.MOVABLE = { { "PlayerFrame", "Player" }, { "TargetFrame", "Target" }, { "Part
 	{ "SlimSuiteReviveFrame", "Revive bar" },
 	{ "SlimSuiteLocalClockFrame", "Local clock" },
 	{ "SlimSuitePlayerCard", "Player (new style)" }, { "SlimSuiteTargetCard", "Target (new style)" },
-	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" }, {"SlimSuiteLuckFrame","Legendary luck"}, {"SlimSuiteAchievementsButton","Side achievements"}, { "CharacterFrame", "Character" }, { "TalentFrame", "Talents" } };
+	{ "SlimSuiteCombatTextFrame", "Combat text" }, { "SlimSuiteStatCounterFrame", "Stats" }, { "SlimSuiteCompassFrame", "Compass" }, {"SlimSuiteLuckFrame","Legendary luck"}, {"SlimSuiteInfoDrawer","Info drawer"}, {"SlimSuiteAchievementsButton","Side achievements"}, { "CharacterFrame", "Character" }, { "TalentFrame", "Talents" } };
 SS.ELEMENTS["PlayerFrame"].label = "Player";
 SS.ELEMENTS["TargetFrame"].label = "Target";
 SS.ELEMENTS["PartyMemberFrame1"].label = "Party";
@@ -93,7 +94,7 @@ SS.ELEMENTS["TalentFrame"].title = "Talents"; SS.ELEMENTS["TalentFrame"].text = 
 SS.ELEMENTS["SlimSuiteTargetCard"].label = "Target (new style)";
 SS.ELEMENTS["SlimSuiteCombatTextFrame"].label = "Combat text";
 SS.ELEMENTS["SlimSuiteStatCounterFrame"].label = "Stats";
-SS.SETUP_ORDER = { "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip", "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteTallyFrame", "SlimSuiteAnnouncementFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton", "CharacterFrame", "TalentFrame" };
+SS.SETUP_ORDER = { "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip", "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteTallyFrame", "SlimSuiteAnnouncementFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteInfoDrawer", "SlimSuiteAchievementsButton", "CharacterFrame", "TalentFrame" };
 SS.ELEMENTS["PlayerFrame"].title = "Unit frame"; SS.ELEMENTS["PlayerFrame"].text = "Your hero's frame: health, power and level. Drag the green handle to place it; its size and scale are below.";
 SS.ELEMENTS["PartyMemberFrame1"].title = "Party frames"; SS.ELEMENTS["PartyMemberFrame1"].text = "Your friends' frames in co-op. They show now even if you're alone, so you can place them. Choose a column or a row, face plates or thin lines, and whether you join them.";
 SS.ELEMENTS["MainMenuBar"].title = "Action bar"; SS.ELEMENTS["MainMenuBar"].text = "Your spells. Drag to place it; its size, and turning it upright, are below.";
@@ -132,6 +133,7 @@ SS.ELEMENT_COMPANIONS = { ChatFrame1 = { "ChatFrame1Tab", "ChatFrame1EditBox" },
 SS.DISPLAY_ANCHORS = {
  SlimSuiteAchievementsButton={"TOPLEFT",.02,.35},
  SlimSuiteLuckFrame={"TOPLEFT",.68,.42},
+ SlimSuiteInfoDrawer={"TOPLEFT",.8,.55},
  PlayerFrame = { "TOPLEFT", .02, .98 }, TargetFrame = { "TOPLEFT", .165, .98 },
  PartyMemberFrame1 = { "TOPLEFT", .02, .87 },
  SlimSuitePlayerCard = { "TOPLEFT", .02, .98 }, SlimSuiteTargetCard = { "TOPLEFT", .165, .98 },

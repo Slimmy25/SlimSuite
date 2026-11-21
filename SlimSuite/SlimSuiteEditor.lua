@@ -57,6 +57,7 @@ end
 -- turn an element on or off: its frame (and the frames that move with it) and its handle
 SU.FEATURES = {
  SlimSuiteAchievementsButton=function(v) SS.DB().achievementButton=v; if SS.UpdateAchievementButton then SS.UpdateAchievementButton(); end end,
+ SlimSuiteInfoDrawer=function(v) SS.DB().infoDrawer=v; if SS.UpdateInfoDrawer then SS.UpdateInfoDrawer(); end end,
  SlimSuiteLuckFrame=function(v) SS.DB().luckPanel=v; if SS.UpdateLuck then SS.UpdateLuck(); end end,
 	SlimSuiteCompassFrame = function(v) SS.DB().compassOn=v; if ( SS.UpdateCompass ) then SS.UpdateCompass(); end end,
 	SlimSuiteStatCounterFrame = function(v)

@@ -110,6 +110,9 @@ local SAMPLE = { { range = "<10 yd" }, { range = "17 yd", grey = true, revive = 
 function SS.UpdatePartyStatus()
 	local d = SS.DB();
 	local classic = SS.Look("PartyMemberFrame1") ~= "thin";
+	-- a hidden party (Hide feature, or the element set to Disabled) is left alone: its fade must not be undone here
+	local mode = d.elementModes and d.elementModes.PartyMemberFrame1;
+	if ( (d.muted and d.muted.PartyMemberFrame1) or mode == "disabled" ) then classic = false; end
 	local downed, revive;
 	local A = API();
 	for i = 1, 4 do
@@ -142,7 +145,8 @@ function SS.UpdatePartyStatus()
 				s.revive:SetValue(progress); s.revive.text:SetText(math.floor(progress * 100) .. "%"); s.revive:Show();
 			else s.revive:Hide(); end
 		elseif ( f and f.slimStatus ) then
-			SetGrey(i, false); f:SetAlpha(1);
+			SetGrey(i, false);
+			if ( classic ) then f:SetAlpha(1); end
 			f.slimStatus.range:Hide(); f.slimStatus.revive:Hide();
 		end
 	end

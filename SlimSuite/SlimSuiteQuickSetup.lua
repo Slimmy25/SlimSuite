@@ -78,7 +78,7 @@ local function Build()
 	win.question:SetPoint("TOP", win, "TOP", 0, -40); win.question:SetWidth(560);
 	win.note = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall");
 	win.note:SetPoint("BOTTOM", win, "BOTTOM", 0, 48); win.note:SetWidth(540);
-	win.note:SetText("The built-in designs are AI-generated demos of what Slim Suite can do. Change anything afterwards in HUD Edit.");
+	win.note:SetText("Change anything afterwards in HUD Edit.");
 	win.note:Hide();
 	win.answers = {};
 	for i = 1, 6 do

@@ -662,12 +662,31 @@ revive.bar:SetStatusBarColor(0.25, 0.85, 0.35);
 revive.bar:SetMinMaxValues(0, 1);
 revive.text = revive.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
 revive.text:SetPoint("CENTER", revive.bar, "CENTER", 0, 0);
+
+-- Vertical: the bar fills from the bottom up and its words sit above it. Turning it swaps the frame's width and
+-- height (and the saved size), so a 220 x 26 bar becomes 26 x 220.
+function SS.ReviveVertical() return SS.DB().orientations and SS.DB().orientations.SlimSuiteReviveFrame == "vertical"; end
+function SS.ApplyReviveOrientation()
+	local vertical = SS.ReviveVertical() and true or false;
+	local w, h = revive:GetWidth() or 220, revive:GetHeight() or 26;
+	if ( (vertical and w > h) or (not vertical and h > w) ) then
+		revive:SetWidth(h); revive:SetHeight(w);
+		local saved = SS.DB().sizes and SS.DB().sizes.SlimSuiteReviveFrame;
+		if ( type(saved) == "table" and saved.w and saved.h ) then saved.w, saved.h = h, w; end
+	end
+	if ( revive.bar.SetOrientation ) then revive.bar:SetOrientation(vertical and "VERTICAL" or "HORIZONTAL"); end
+	revive.text:ClearAllPoints();
+	if ( vertical ) then revive.text:SetPoint("BOTTOM", revive, "TOP", 0, 2);
+	else revive.text:SetPoint("CENTER", revive.bar, "CENTER", 0, 0); end
+	revive.vertical = vertical;
+end
 revive:Hide();
 
 local function UpdateRevive()
 	local d = DB();
 	if ( not SS.FeatureEnabled("SlimSuiteReviveFrame") ) then revive:Hide(); SS.HideNative("revive", false); return; end
 	SS.HideNative("revive", true);
+	if ( revive.vertical ~= (SS.ReviveVertical() and true or false) ) then SS.ApplyReviveOrientation(); end
 	local r = A.Call("AZS_GetRevive");
 	local progress, label;
 	if ( type(r) == "table" ) then

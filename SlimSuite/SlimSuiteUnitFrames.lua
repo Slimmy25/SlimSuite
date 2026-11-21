@@ -220,7 +220,13 @@ function SS.RefreshCard(f)
 	if ( mode == "disabled" or (setupActive and not SS.SetupShows(el)) ) then f:Hide(); return; end
 	SS.Safe(SS.LayoutCard, f);
 	local unit = f.unit;
-	if ( not f.nativeArt ) then SS.Safe(SS.UpdateCardModel, f, unit); end
+	if ( not f.nativeArt ) then SS.Safe(SS.UpdateCardModel, f, unit);
+	elseif ( f.portrait and SetPortraitTexture and UnitExists(unit) ) then
+		-- the round face inside the frame's ring, refreshed only when the unit changes
+		local who = UnitName(unit);
+		if ( f.portraitFor ~= who ) then f.portraitFor = who; SS.Safe(SetPortraitTexture, f.portrait, unit); end
+		f.portrait:Show();
+	elseif ( f.portrait ) then f.portraitFor = nil; f.portrait:Hide(); end
 	if ( not UnitExists(unit) ) then
 		if ( unit == "target" and SS.Previewing("TargetFrame") ) then
 			local t = SU.SAMPLE_TARGET;
@@ -364,9 +370,15 @@ function SS.MakeCards()
 		local art = getglobal(unit == "player" and "PlayerFrameTexture" or "TargetFrameTexture");
 		-- the classic 232 x 100 unit frame art. Azeroth Survivors draws its own frames with a different texture, so
 		-- copying that frame's art and coordinates gave a broken, cut-off picture on the card: use the classic sheet.
-		f.art = f:CreateTexture(nil, "BACKGROUND"); f.art:SetAllPoints(f);
+		f.art = f:CreateTexture(nil, "BORDER"); f.art:SetAllPoints(f);
 		f.art:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame");
 		if ( unit == "player" ) then f.art:SetTexCoord(1, 0.09375, 0, 0.78125); else f.art:SetTexCoord(0.09375, 1, 0, 0.78125); end
+		-- the face in the ring, where the game's own frames put it (64 x 64, 42 in from the ring's side)
+		f.portrait = f:CreateTexture(nil, "BACKGROUND");
+		f.portrait:SetWidth(64); f.portrait:SetHeight(64);
+		if ( unit == "player" ) then f.portrait:SetPoint("TOPLEFT", f, "TOPLEFT", 42, -12);
+		else f.portrait:SetPoint("TOPRIGHT", f, "TOPRIGHT", -42, -12); end
+		f.portrait:Hide();
 		-- the game's own scale for these frames, used until the player changes this card's scale
 		if ( SS.DB().scales[name] == nil and native and native.GetScale ) then SS.DB().scales[name] = native:GetScale() or 1; end
 		f.art:Show();
@@ -416,8 +428,10 @@ function SS.ApplyNewFrames()
 	local cp, ct = getglobal("SlimSuitePlayerCard"), getglobal("SlimSuiteTargetCard");
 	if ( not setupActive ) then
 		local P, T = getglobal("PlayerFrame"), getglobal("TargetFrame");
-		if ( P and P.SetAlpha ) then P:SetAlpha(SS.UsesCard("PlayerFrame") and 0 or 1); end
-		if ( T and T.SetAlpha ) then T:SetAlpha(SS.UsesCard("TargetFrame") and 0 or 1); end
+		-- a frame hidden with Hide feature stays hidden
+		local muted = SS.DB().muted or {};
+		if ( P and P.SetAlpha ) then P:SetAlpha((SS.UsesCard("PlayerFrame") or muted.PlayerFrame) and 0 or 1); end
+		if ( T and T.SetAlpha ) then T:SetAlpha((SS.UsesCard("TargetFrame") or muted.TargetFrame) and 0 or 1); end
 	end
 	if ( cp ) then SS.RefreshCard(cp); end
 	if ( ct ) then SS.RefreshCard(ct); end

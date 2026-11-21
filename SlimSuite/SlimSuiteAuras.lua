@@ -98,7 +98,7 @@ function SS.LayoutBoundedAuras(buttons, plate, portrait, nextFrame, side)
 		end
 	end
 	local room=math.max(0,side=="below" and base-limit or limit-base);
-	local width,height=0,0;
+	local width,height,iconOnly=0,0,0;
 	for _,button in ipairs(buttons) do
 		SS.RestoreAuraButton(button);
 		button.slimAuraOriginal={scale=button:GetScale() or 1,alpha=button:GetAlpha() or 1,mouse=not button.IsMouseEnabled or button:IsMouseEnabled()};
@@ -118,12 +118,23 @@ function SS.LayoutBoundedAuras(buttons, plate, portrait, nextFrame, side)
 		button:SetScale(button.slimAuraOriginal.scale*shrink);
 		width=math.max(width,math.max((button:GetWidth() or 16)*scale+margin,tw)*shrink);
 		height=math.max(height,((button:GetHeight() or 16)*scale+th)*shrink);
+		iconOnly=math.max(iconOnly,(button:GetHeight() or 16)*scale*shrink);
+		button.slimAuraHasText=th>0;
 	end
 	local columns=math.max(0,math.floor((right-left+margin)/math.max(1,width+margin)));
 	local rows=math.min(2,math.max(0,math.floor((room+margin)/math.max(1,height+margin))));
 	local capacity=columns*rows;
 	local usedRows=columns>0 and math.min(rows,math.ceil(count/columns)) or 0;
 	local bottom=side=="below" and base-usedRows*(height+margin)+margin or base;
+	-- above the frame: the row nearest the frame sits right on it. Room for a timer under those icons is only kept when
+	-- one of them has a timer; otherwise the empty strip under them is closed up (it read as a gap above the frame).
+	if ( side~="below" and usedRows>0 and columns>0 ) then
+		local lastRow=usedRows-1; local timed=false;
+		for i,button in ipairs(buttons) do
+			if ( math.floor((i-1)/columns)==lastRow and button.slimAuraHasText ) then timed=true; end
+		end
+		if ( not timed ) then bottom=bottom-math.max(0,height-iconOnly); end
+	end
 	local layout={left=left,right=right,bottom=bottom,top=bottom+math.max(0,usedRows*(height+margin)-margin),columns=columns,rows=usedRows,shown=0,hidden=0};
 	for i,button in ipairs(buttons) do
 		local row=columns>0 and math.floor((i-1)/columns) or 0;

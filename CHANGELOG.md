@@ -2,6 +2,22 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.84
+A new Console A design in Quick setup for controller and handheld players, a read-only info drawer, and the AI-generated demo designs are gone.
+
+- New Console A design (preset 4): the XP bar across the whole bottom edge with all seven action buttons (the racial one included) on it, your frame bottom-left and your target bottom-right just above the XP bar, large thin party lines, the compass at the top in place of the minimap, up to five encounter bars top-right and the info drawer under them.
+- New Info drawer element: a read-only panel showing your damage per second, legendary chance, luck and a few stats. Turn it on and place it in HUD Edit like any other element.
+- The revive bar can stand upright: a new "Vertical" option in its menu fills it from the bottom up, with its text above.
+- The XP bar has a new "Stretch across the whole screen" option that keeps it full width on any resolution.
+- Encounter bars have a new "Most bars shown" option (All, 3 or 5). With a limit set, each bar keeps its height and the frame grows downward as more bosses arrive.
+- Presets now have five numbered slots, so a design can keep its place in the list.
+- Removed the five AI-generated demo designs (Classic Plus, Centered, Info Column, Minimal, Controller / Handheld) and the note about them. Quick setup now offers the designs made by hand.
+- The new-style player and target cards show your face in the frame's ring.
+- Hide feature and Disabled now stay hidden for the party frames, the legendary luck panel and the game's player and target frames, which were being shown again by their own updates.
+- "Show every button at all times" keeps empty action buttons visible: the game's own drag events no longer hide them again, and the racial 7th button is included.
+- New /slim positions command writes where every element sits (position, size and scale) to the action log.
+- Buffs joined above your frame sit tighter on it: the empty strip kept under the bottom row for timers is closed up when those buffs have no timer.
+
 ## 1.83
 Fixes for the demo designs: the player and target cards show their art properly, and nothing covers the chat.
 

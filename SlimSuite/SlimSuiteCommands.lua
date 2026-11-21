@@ -111,7 +111,7 @@ SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "mu
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
 	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "matchBuildSizes", "hideBuildSpells", "hideBuildItems", "xpHideBorder", "statCounter", "statDisplayMode", "clockContextAbove", "worldCombatMode", "keepCombatLog", "cardEdgeHUD", "compassOn", "luckPanel", "achievementButton", "compassStyle", "compassBosses", "compassLairs", "compassCaches", "minimapSquare", "minimapTransparent",
-	"tooltipCustom", "plainBar", "showRacialAbility", "xpSegments", "showAbsorbs",
+	"tooltipCustom", "plainBar", "showRacialAbility", "xpSegments", "xpFullWidth", "showAbsorbs",
 	"enemyNameplates", "modernEnemyFrames", "enemyBossesOnly", "enemyPlateDebuffs",
 	"encounterBarThickness", "encounterNameAlign", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion",
 	"targetAuraSide", "targetDebuffs", "clockDetached", "showEmptyActionSlots", "cooldowns",

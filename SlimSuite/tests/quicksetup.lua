@@ -15,28 +15,49 @@ d.enemyBossesOnly = true; Tick(3)
 check("a setting changed afterwards stays changed", d.enemyBossesOnly == true)
 SS.ApplyQuickAnswers({ 1, 1, 2, 1, 1, 1 }); Tick(3)
 check("answers can be applied again", SS.PanelStyleKey() == "original" and d.modernEnemyFrames == false and d.deathSound == false)
--- presets: the five built-in designs are offered; your own come first and a broken one is skipped
-check("five built-in designs offered", table.getn(SS.UsablePresets()) == 5)
-local saved = SS.LayoutText(SS.LayoutSnapshot())
-SS.PRESETS = { { "Test design", "For the test.", saved }, { "Broken", "Bad text.", "nonsense" } }
-local list = SS.UsablePresets()
-check("your preset first, broken skipped, still five", table.getn(list) == 5 and list[1][1] == "Test design")
+-- presets: none ship yet, so Quick setup starts with the questions; designs added later are offered (at most 5)
+check("one design shipped: Console A", table.getn(SS.UsablePresets()) == 1 and SS.UsablePresets()[1][1] == "Console A")
 SS.OpenQuickSetup(); Tick(1)
 check("the preset question comes first", win.question:GetText() == "Would you like to use a pre-set design?")
+check("Console applies", SS.ApplyPreset(SS.UsablePresets()[1])); Tick(3)
+local cd = SS.DB()
+check("Console: big thin party lines", cd.partyLook == "thin" and cd.scales.SlimSuitePartyLines == 2.4)
+check("Console: compass on, minimap off", SS.FeatureEnabled("SlimSuiteCompassFrame") and cd.elementModes.MinimapCluster == "disabled")
+check("Console: up to five encounter bars pinned top-right", cd.encounterMax == 5 and cd.places.SlimSuiteBossFrames.point == "TOPRIGHT")
+check("Console: info drawer on, under the bars", SS.FeatureEnabled("SlimSuiteInfoDrawer") and cd.places.SlimSuiteInfoDrawer.point == "TOPRIGHT")
+check("Console: player bottom-left, target bottom-right", cd.places.SlimSuitePlayerCard.point == "BOTTOMLEFT" and cd.places.SlimSuiteTargetCard.point == "BOTTOMRIGHT")
+SS.StartDemoMode(); Tick(5)
+check("info drawer shows its numbers in Demo Mode", getglobal("SlimSuiteInfoDrawer").shown ~= false and table.getn(SS.InfoDrawerLines()) >= 2)
+SS.StopDemoMode(); Tick(2)
+local shipped = SS.BUILTIN_PRESETS
+local saved = SS.LayoutText(SS.LayoutSnapshot())
+SS.PRESETS = { { "Test design", "For the test.", saved }, { "Broken", "Bad text.", "nonsense" } }
+SS.BUILTIN_PRESETS = {}
+for i = 1, 6 do table.insert(SS.BUILTIN_PRESETS, { "Spec " .. i, "A test spec.", { keys = { enemyBossesOnly = true },
+	places = { { "SlimSuiteClockFrame", 0.5, 0.95 } } } }) end
+local list = SS.UsablePresets()
+check("exported design first, broken skipped, at most five", table.getn(list) == 5 and list[1][1] == "Test design")
+SS.OpenQuickSetup(); Tick(1)
+check("with designs the preset question comes first", win.question:GetText() == "Would you like to use a pre-set design?")
 d.enemyBossesOnly = false
-check("applying your preset puts its layout back", SS.ApplyPreset(list[1]) and SS.DB().enemyBossesOnly == true)
-SS.PRESETS = {}
-local sl, sr, sb, st = SS.ScreenBounds()
-for _, p in ipairs(SS.BUILTIN_PRESETS) do
-	local errs = SS.errorCount or 0
-	check(p[1] .. " applies", SS.ApplyPreset(p)); Tick(3)
-	for _, at in ipairs(p[3].places) do local name = at[1]
-		local pl = SS.DB().places[name]
-		check(p[1] .. ": " .. name .. " placed on screen", pl and pl.x >= sl and pl.y >= sb and pl.x < sr and pl.y < st)
-	end
-	for k, v in pairs(p[3].keys) do check(p[1] .. ": " .. k, SS.DB()[k] == v) end
-end
-check("controller design is large and high contrast", SS.DB().accessibilityLargeText == true and SS.DB().scales.SlimSuitePlayerCard == 1.2)
+check("applying an exported design puts its layout back", SS.ApplyPreset(list[1]) and SS.DB().enemyBossesOnly == true)
+d.enemyBossesOnly = false
+check("applying a written-out design sets its options and places", SS.ApplyPreset(list[2]) and SS.DB().enemyBossesOnly == true and SS.DB().places.SlimSuiteClockFrame ~= nil)
+SS.PRESETS = {}; SS.BUILTIN_PRESETS = shipped
+-- the revive bar turns upright: its size swaps and it stays upright after the layout is drawn again
+local rv = getglobal("SlimSuiteReviveFrame")
+SS.DB().orientations.SlimSuiteReviveFrame = nil; SS.ApplyReviveOrientation()
+local w0, h0 = rv:GetWidth(), rv:GetHeight()
+SS.DB().orientations.SlimSuiteReviveFrame = "vertical"; SS.ApplyReviveOrientation(); if PlaceAll then PlaceAll() end; Tick(2)
+check("revive bar turns upright", rv:GetHeight() > rv:GetWidth() and rv:GetWidth() == h0)
+SS.DB().orientations.SlimSuiteReviveFrame = "horizontal"; SS.ApplyReviveOrientation(); Tick(2)
+check("revive bar turns back", rv:GetWidth() == w0 and rv:GetHeight() == h0)
+-- numbered slots: a design asking for slot 4 is fourth, loose ones fill the free places before it
+SS.PRESETS = { { "Mine", "x", SS.LayoutText(SS.LayoutSnapshot()), slot = 5 } }
+SS.BUILTIN_PRESETS = { { "Loose", "x", { places = {} } }, { "Four", "x", { places = {} }, slot = 4 } }
+local l = SS.UsablePresets()
+check("slots: loose first, then 4, then 5", table.getn(l) == 3 and l[1][1] == "Loose" and l[2][1] == "Four" and l[3][1] == "Mine" and l[2].picture == "preset4")
+SS.PRESETS = {}; SS.BUILTIN_PRESETS = shipped
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end
 if #ERRORS > 0 then bad = bad + 1 end
 print("quick setup problems: " .. bad)

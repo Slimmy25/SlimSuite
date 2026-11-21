@@ -2,87 +2,50 @@
 -- To add one: arrange the HUD the way you want, open /slim layout, export the layout and paste its text
 -- (it starts with "SSL1;") as the third value below. Name and description are what players see.
 -- Its picture is textures/quick/preset<n>.tga (n = its place among the filled-in presets): python3 tools/quick-image.py shot.jpg preset1
--- A preset with no text is skipped; the built-in designs below fill the remaining places.
+-- A preset with no text is skipped. Designs written out below as specs (SS.BUILTIN_PRESETS) come after these.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 
--- Built-in designs, used until you add your own (yours go first; at most 5 are offered in all).
--- "places" lists elements in order of importance as { name, x, y }: x, y is where the CENTRE of the element goes, in
--- fractions of the screen (0,0 bottom left; 1,1 top right; across a centred 16:9 area on wider screens), so the
--- design fits any resolution. When the real sizes make two elements overlap on a screen, the less important one
--- (later in the list) is moved clear of it.
--- These five are AI-generated demo designs, made to show what Slim Suite can do. To decide what a typical UI should
--- feature, common layouts from WoW Forever, retail WoW and Azeroth Survivors were cross-referenced; the designs and
--- all of this code are new and Slim Suite's own.
+-- Designs made by hand for Slim Suite. Up to 5 are offered in Quick setup; none yet. Each entry:
+-- { "Name", "One line players see.", spec } where spec holds the design's options and places:
+--   style = "original" | "meter" | "tooltip"; keys = { option = value, ... }; orientations, scales = { element = ... };
+--   places = { { element, x, y }, ... }: x, y is where the CENTRE of the element goes, in fractions of the screen
+--   (0,0 bottom left; 1,1 top right; across a centred 16:9 area on wider screens), or { element, dx, y, fromCentre = true }
+--   for a distance in UI units from the middle. Listed in order of importance: when real sizes make two elements overlap,
+--   the later one is moved clear. on / off = { element, ... } turns elements on or back to the game's own.
+-- tests/presetreview.lua lays every design out on ten screen sizes and checks nothing overlaps or leaves the screen.
 SS.BUILTIN_PRESETS = {
-	-- the game as it is, with only the essentials added: the game's own frames, borders and nameplates
-	{ "Classic Plus", "The game's own frames and look, with just the encounter bars and run clock added.", {
-		style = "original",
-		keys = { playerLook = "classic", targetLook = "classic", partyLook = "classic", partyFaces = true,
-			replaceEncounters = true, replaceClock = true, replaceTally = false, modernEnemyFrames = false,
-			encounterBarThickness = "standard", encounterNameAlign = "left" },
-		places = { { "SlimSuiteBossFrames", 0.5, 0.83 }, { "SlimSuiteClockFrame", 0.27, 0.95 } } } },
-	-- flat and modern, everything pulled toward the middle-bottom, target mirrors you, plates over every enemy
-	{ "Centered", "Flat modern frames: you and your target mirrored over the bars, your party in a row beneath, plates on every enemy.", {
+	-- The console / controller layout: frames in the corners, a large compass in place of the minimap, a big
+	-- party, up to five encounter bars top-right and a read-only info drawer under them.
+	{ "Console A", "For a controller or handheld: big party lines, the compass instead of the minimap, frames in the corners.", slot = 4, {
 		style = "tooltip",
-		keys = { playerLook = "new", targetLook = "new", partyLook = "thin", mirrorTarget = true, buffsOnPlayer = true,
-			replaceEncounters = true, replaceClock = true, replaceTally = true, tallyVertical = false,
-			modernEnemyFrames = true, enemyBossesOnly = false, enemyPlateGroup = true, plateWidth = 130, plateBarHeight = 8,
-			encounterBarThickness = "standard", encounterNameAlign = "center", partyDistance = true, partyDimFar = true },
-		orientations = { PartyMemberFrame1 = "horizontal" },
-		scales = { ChatFrame1 = 0.7, SlimSuitePartyLines = 1.0 },
-		places = { { "MainMenuBar", 0.5, 0.05 }, { "SlimSuitePlayerCard", -200, 0.225, fromCentre = true }, { "SlimSuiteTargetCard", 200, 0.225, fromCentre = true },
-			{ "SlimSuitePartyLines", 0.5, 0.13 }, { "SlimSuiteBossFrames", 0.5, 0.83 }, { "SlimSuiteClockFrame", 0.25, 0.95 },
-			{ "SlimSuiteTallyFrame", 0.25, 0.89 }, { "ChatFrame1", 0.12, 0.09 } } } },
-	-- gold-trimmed and information-heavy: run info stacked on the left, the action bar standing up on the right
-	{ "Info Column", "Gold-trimmed: clock, bosses, tally, stats and meter stacked down the left; the action bar stands up on the right.", {
-		style = "meter",
-		keys = { playerLook = "new", targetLook = "new", partyLook = "classic", partyFaces = true,
-			replaceEncounters = true, replaceClock = true, replaceTally = true, tallyVertical = false, moveMeter = true,
-			statCounter = true, modernEnemyFrames = true, enemyBossesOnly = true, encounterBarThickness = "thick",
-			encounterNameAlign = "left" },
-		orientations = { MainMenuBar = "vertical" },
-		scales = { ChatFrame1 = 0.7 },
-		places = { { "MainMenuBar", 0.97, 0.45 }, { "SlimSuitePlayerCard", -130, 0.21, fromCentre = true }, { "SlimSuiteTargetCard", 130, 0.21, fromCentre = true },
-			{ "SlimSuiteClockFrame", 0.1, 0.93 }, { "SlimSuiteBossFrames", 0.1, 0.72 }, { "SlimSuiteTallyFrame", 0.1, 0.56 },
-			{ "SlimSuiteStatCounterFrame", 0.1, 0.51 }, { "SlimSuiteMeterFrame", 0.1, 0.33 }, { "ChatFrame1", 0.12, 0.08 },
-			{ "PartyMemberFrame1", 0.88, 0.3 } },
-		on = { "SlimSuiteStatCounterFrame" } } },
-	-- nearly nothing: you join your party as one thin line, small target, small plates on bosses only
-	{ "Minimal", "Almost nothing on screen, all pushed to the edges: you and your party as one thin line, a small target off to the side.", {
-		style = "tooltip",
-		keys = { partyIncludesSelf = true, playerLook = "party", partyLook = "thin", targetLook = "new",
-			replaceEncounters = true, replaceClock = false, replaceTally = false, modernEnemyFrames = true, enemyBossesOnly = true,
-			plateWidth = 80, plateBarHeight = 5, plateHpText = false, encounterBarThickness = "compact", xpHideBorder = true,
-			compassOn = false, luckPanel = false, statCounter = false, achievementButton = false, partyDistance = false },
-		orientations = { PartyMemberFrame1 = "horizontal", MainMenuBar = "vertical" },
-		scales = { SlimSuiteTargetCard = 0.75, ChatFrame1 = 0.7, SlimSuiteBossFrames = 0.85 },
-		places = { { "MainMenuBar", 0.97, 0.45 }, { "SlimSuitePartyLines", 0.5, 0.05 }, { "SlimSuiteTargetCard", 0.8, 0.5 },
-			{ "SlimSuiteBossFrames", 0.5, 0.88 }, { "ChatFrame1", 0.1, 0.07 } },
-		off = { "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteStatCounterFrame", "SlimSuiteAchievementsButton" } } },
-	-- big, high contrast and readable from the couch, with a compass and large combat text
-	{ "Controller / Handheld", "Big and high contrast for a handheld or the couch: you and your target either side of your hero, party across the top.", {
-		style = "tooltip",
-		keys = { playerLook = "new", targetLook = "new", partyLook = "thin", replaceEncounters = true, replaceClock = true,
-			modernEnemyFrames = true, enemyBossesOnly = false, plateWidth = 140, plateBarHeight = 10, plateNameSize = "large",
-			accessibilityLargeText = true, accessibilityContrast = true, partyGreyDead = true, partyDistance = true,
-			partyDimFar = true, compassOn = true, encounterBarThickness = "thick" },
-		orientations = { PartyMemberFrame1 = "horizontal" },
-		scales = { SlimSuitePlayerCard = 1.2, SlimSuiteTargetCard = 1.2, SlimSuitePartyLines = 1.4,
-			SlimSuiteBossFrames = 1.15, ChatFrame1 = 0.7 },
-		places = { { "MainMenuBar", 0.5, 0.06 }, { "SlimSuitePlayerCard", 0.18, 0.5 }, { "SlimSuiteTargetCard", 0.82, 0.5 },
-			{ "SlimSuitePartyLines", 0.5, 0.92 }, { "SlimSuiteCompassFrame", 0.5, 0.82 }, { "BuffFrame", 0.16, 0.67 },
-			{ "SlimSuiteBossFrames", 0.88, 0.25 }, { "SlimSuiteClockFrame", 0.14, 0.86 },
-			{ "ChatFrame1", 0.12, 0.08 } },
-		on = { "SlimSuiteCompassFrame" } } },
+		keys = { playerLook = "new", targetLook = "new", partyLook = "thin", replaceEncounters = true, encounterMax = 5,
+			encounterBarThickness = "thick", compassOn = true, infoDrawer = true, partyGreyDead = true, partyDistance = true,
+			partyDimFar = true, xpFullWidth = true, xpSegments = true, showRacialAbility = true, showEmptyActionSlots = true },
+		orientations = { PartyMemberFrame1 = "vertical", SlimSuiteBossFrames = "horizontal", MainMenuExpBar = "horizontal",
+			MainMenuBar = "horizontal" },
+		scales = { SlimSuitePlayerCard = 1.25, SlimSuiteTargetCard = 1.25, SlimSuitePartyLines = 2.4, MainMenuExpBar = 1,
+			ChatFrame1 = 0.7 },
+		sizes = { SlimSuiteBossFrames = { 260, 250 } },
+		-- bottom up: the XP bar along the very bottom edge, all seven action buttons (the racial one included) on it,
+		-- your frame and the target's in the corners just above the XP bar
+		places = { { "MainMenuExpBar", 0, 0, anchor = "BOTTOM" }, { "MainMenuBar", 0, 15, anchor = "BOTTOM" },
+			{ "SlimSuitePlayerCard", 16, 22, anchor = "BOTTOMLEFT" }, { "SlimSuiteTargetCard", -16, 22, anchor = "BOTTOMRIGHT" },
+			{ "SlimSuiteBossFrames", -16, -16, anchor = "TOPRIGHT" }, { "SlimSuiteInfoDrawer", -16, -282, anchor = "TOPRIGHT" },
+			{ "SlimSuitePartyLines", 16, 176, anchor = "BOTTOMLEFT" }, { "ChatFrame1", 16, 296, anchor = "BOTTOMLEFT" },
+			{ "BuffFrame", 16, -16, anchor = "TOPLEFT" }, { "SlimSuiteCompassFrame", 0.5, 0.93 } },
+		on = { "SlimSuiteCompassFrame", "SlimSuiteInfoDrawer" },
+		hide = { "MinimapCluster" } } },
 };
 
 -- where the game's own frames sit when a design does not move them: designs keep clear of these
 -- { name, width, height, corner } with corner "TOPRIGHT", "BOTTOMLEFT" or "BOTTOM"
 SS.PRESET_RESERVED = { { "MinimapCluster", 200, 200, "TOPRIGHT" }, { "BuffFrame", 320, 110, "TOPRIGHT", 205 },
-	{ "ChatFrame1", 440, 130, "BOTTOMLEFT", 0, 90 }, { "MainMenuBar", 620, 60, "BOTTOM" } };
+	{ "ChatFrame1", 440, 130, "BOTTOMLEFT", 0, 90 }, { "MainMenuBar", 320, 60, "BOTTOM" } };   -- the action bar measured from an in-game screenshot
 
--- your own designs: exported layout text from /slim layout (starts with "SSL1;"). These come before the built-in ones.
+-- designs as exported layout text from /slim layout (starts with "SSL1;"). These come first.
 SS.PRESETS = {
+	-- Slot 5: the console layout arranged by hand in game, to compare with slot 4. Paste its exported text here.
+	-- { "Console B", "One line about this design.", "SSL1;...", slot = 5 },
 	-- { "Name", "One line about this design.", "SSL1;..." },
 	-- { "Name", "One line about this design.", "SSL1;..." },
 	-- { "Name", "One line about this design.", "SSL1;..." },
@@ -128,6 +91,7 @@ function SS.BuildPresetLayout(spec)
 	-- the game's own frames that this design leaves where they are
 	local moved = {};
 	for _, at in ipairs(spec.places or {}) do moved[at[1]] = true; end
+	for _, name in ipairs(spec.hide or {}) do moved[name] = true; end
 	for _, res in ipairs(SS.PRESET_RESERVED) do
 		if ( not moved[res[1]] ) then
 			local w, h, dx, dy = res[2], res[3], res[5] or 0, res[6] or 0;
@@ -138,7 +102,26 @@ function SS.BuildPresetLayout(spec)
 			table.insert(placed, r);
 		end
 	end
+	for k, v in pairs(spec.sizes or {}) do layout.sizes[k] = { w = v[1], h = v[2] }; end
+	-- pinned elements first: { element, dx, dy, anchor = "TOPRIGHT" } holds that corner of the element to the same
+	-- corner of the screen, dx, dy UI units in (so a frame that grows, like the encounter bars, grows away from it)
 	for _, at in ipairs(spec.places or {}) do
+		if ( at.anchor ) then
+			local name, a = at[1], at.anchor;
+			local w, h = SS.PresetElementSize(name, spec.scales and spec.scales[name] or 1);
+			if ( spec.sizes and spec.sizes[name] ) then w, h = spec.sizes[name][1] * (spec.scales and spec.scales[name] or 1), spec.sizes[name][2] * (spec.scales and spec.scales[name] or 1); end
+			if ( name == "MainMenuExpBar" and spec.keys and spec.keys.xpFullWidth ) then w = sr - sl; end
+			local right, left = string.find(a, "RIGHT") ~= nil, string.find(a, "LEFT") ~= nil;
+			local top, bottom = string.find(a, "TOP") ~= nil, string.find(a, "BOTTOM") ~= nil;
+			local x = right and (sr + at[2] - w) or (left and (sl + at[2]) or ((sl + sr - w) / 2 + at[2]));
+			local y = top and (st + at[3] - h) or (bottom and (sb + at[3]) or ((sb + st - h) / 2 + at[3]));
+			local r = { name = name, w = w, h = h, pinned = true, x = x, y = y };
+			table.insert(placed, r);
+			layout.places[name] = { relative = "UIParent", point = a, relativePoint = a, dx = at[2], dy = at[3] };
+			layout.elementModes[name] = "enabled";
+		end
+	end
+	for _, at in ipairs(spec.places or {}) do if ( not at.anchor ) then
 		local name = at[1];
 		local w, h = SS.PresetElementSize(name, spec.scales and spec.scales[name] or 1);
 		-- an element the design turns on its side takes its turned size
@@ -175,9 +158,10 @@ function SS.BuildPresetLayout(spec)
 		table.insert(placed, r);
 		layout.places[name] = { x = r.x, y = r.y, coordinateSpace = "uiParent", screen = { left = sl, bottom = sb, width = sw, height = sh } };
 		layout.elementModes[name] = "enabled";
-	end
+	end end
 	for _, name in ipairs(spec.on or {}) do layout.elementModes[name] = "enabled"; end
 	for _, name in ipairs(spec.off or {}) do layout.elementModes[name] = "default"; end
+	for _, name in ipairs(spec.hide or {}) do layout.elementModes[name] = "disabled"; end
 	return layout, placed;
 end
 
@@ -188,17 +172,28 @@ local function Parse(text)
 end
 
 -- the presets that are filled in and can be read, at most 5
+-- Presets fill five numbered slots. An entry with slot = n takes that place; the rest fill the free places in order
+-- (exported layouts first, then written-out designs). Empty slots are skipped, so the list has no gaps.
 function SS.UsablePresets()
-	local out = {};
+	local slots, loose = {}, {};
+	local function Usable(p, builtin)
+		if ( type(p) ~= "table" or type(p[1]) ~= "string" ) then return false; end
+		if ( builtin ) then return type(p[3]) == "table"; end
+		return type(p[3]) == "string" and p[3] ~= "" and Parse(p[3]) and true or false;
+	end
 	local function Add(p, builtin)
-		if ( table.getn(out) >= 5 or type(p) ~= "table" or type(p[1]) ~= "string" ) then return; end
-		if ( builtin and type(p[3]) ~= "table" ) then return; end
-		if ( not builtin and (type(p[3]) ~= "string" or p[3] == "" or not Parse(p[3])) ) then return; end
-		p.picture = "preset" .. (table.getn(out) + 1);   -- textures/quick/preset<n>.tga, made with tools/quick-image.py
-		table.insert(out, p);
+		if ( not Usable(p, builtin) ) then return; end
+		local n = tonumber(p.slot);
+		if ( n and n >= 1 and n <= 5 and not slots[n] ) then slots[n] = p; else table.insert(loose, p); end
 	end
 	for _, p in ipairs(SS.PRESETS or {}) do Add(p, false); end
 	for _, p in ipairs(SS.BUILTIN_PRESETS or {}) do Add(p, true); end
+	for n = 1, 5 do if ( not slots[n] and table.getn(loose) > 0 ) then slots[n] = table.remove(loose, 1); end end
+	local out = {};
+	for n = 1, 5 do
+		local p = slots[n];
+		if ( p ) then p.picture = "preset" .. n; table.insert(out, p); end   -- textures/quick/preset<n>.tga
+	end
 	return out;
 end
 

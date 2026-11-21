@@ -178,6 +178,13 @@ function SS.EncounterVertical()
 	return SS.DB().orientations.SlimSuiteBossFrames == "vertical";
 end
 
+-- the most encounter bars shown at once (Most bars shown): nil shows every one
+function SS.EncounterMost()
+	local most = tonumber(SS.DB().encounterMax);
+	if ( most and most >= 1 ) then return math.floor(most); end
+	return nil;
+end
+
 function SS.EncounterBarThickness()
 	local value = SS.DB().encounterBarThickness;
 	if ( value == "compact" ) then return 8; end
@@ -398,6 +405,12 @@ function SS.UpdateEncounterRows(list)
 	local cardWidth = math.max(minCardWidth, (frameWidth - (padding * 2) - ((across - 1) * gap)) / across);
 	frameWidth = across * cardWidth + ((across - 1) * gap) + (padding * 2);
 	local frameHeight = type(configured) == "table" and configured.h or (vertical and 252 or (count * 48));
+	-- with a most-bars limit, the saved height is the room for that many rows: each row keeps its share, so one boss
+	-- takes one row's height and the frame grows (down from where it is pinned) as more arrive
+	local most = SS.EncounterMost();
+	if ( most and not vertical and type(configured) == "table" and configured.h ) then
+		frameHeight = math.max(42, (configured.h - padding * 2) / most) * count + padding * 2;
+	end
 	local minimumHeight = vertical and cardMinH or math.max(count * (24 + padding + barThickness + 4) + padding * 2, cardMinH);
 	frameHeight = math.max(minimumHeight, frameHeight);
 	bossFrame:SetWidth(frameWidth);
@@ -575,6 +588,12 @@ function SS.UpdateBossFrames()
 	-- player had the native boss frames enabled. Visibility of the original HUD must not gate ours.
 	if ( live ) then
 		local list = SS.EncounterList();
+		local most = SS.EncounterMost();
+		if ( most and table.getn(list) > most ) then
+			local kept = {}; for i = 1, most do kept[i] = list[i]; end
+			for i = most + 1, table.getn(encounterRows) do if ( encounterRows[i] ) then encounterRows[i]:Hide(); end end
+			list = kept;
+		end
 		local height = SS.UpdateEncounterRows(list);
 		if ( height > 0 ) then
 			bossFrame:SetHeight(height);
@@ -853,6 +872,11 @@ function SS.MinSize(name)
 		return 92, 24;
 	elseif ( name == "SlimSuiteAchievementsButton" ) then
   return 120,28;
+	elseif ( name == "SlimSuiteReviveFrame" ) then
+		if ( SS.DB().orientations and SS.DB().orientations.SlimSuiteReviveFrame == "vertical" ) then return 14, 80; end
+		return 80, 14;
+	elseif ( name == "SlimSuiteInfoDrawer" ) then
+		return 160, 60;
 	elseif ( name == "SlimSuiteLuckFrame" ) then
   return 240,170;
  elseif ( name == "SlimSuiteCompassFrame" ) then
@@ -897,6 +921,13 @@ function SS.ApplySize(name, f)
 		local mw,mh=SS.MinSize(name); s.w,s.h=math.max(s.w,mw),math.max(s.h,mh);
 		f:SetWidth(s.w);
 		f:SetHeight(s.h);
+	end
+	-- Stretch across the whole screen: the XP bar is as wide as the screen at its scale, on any resolution
+	if ( name == "MainMenuExpBar" and SS.DB().xpFullWidth and SS.ScreenBounds ) then
+		local l, r = SS.ScreenBounds();
+		local sc = tonumber(SS.DB().scales.MainMenuExpBar) or 1;
+		if ( r and l and r > l and sc > 0 ) then f:SetWidth((r - l) / sc); end
+		if ( SS.LayoutXpSegments ) then SS.Safe(SS.LayoutXpSegments); end
 	end
 	if ( name == "SlimSuiteClockFrame" ) then SS.ApplyClockLayout(); end
 	if ( name == "MainMenuBar" and ApplyMovableOrientation ) then ApplyMovableOrientation(name); end
@@ -1245,18 +1276,27 @@ function SS.ApplyBuffOrientation()
 	buffLayoutApplying = false;
 end
 
+-- Show empty buttons: the game keeps a per-button grid count that its own drag events raise and lower, so a grid
+-- shown once can be undone by the game. This is checked every quarter second (from the tally ticker): with the
+-- setting on, any button whose count has dropped to 0 is given the grid again; with it off, only the grid Slim Suite
+-- added is taken back.
 ApplyActionSlotGrid = function()
 	local on = SS.DB().showEmptyActionSlots and true or false;
-	if ( on == actionSlotsGridApplied ) then return; end
-	local action = on and ActionButton_ShowGrid or ActionButton_HideGrid;
-	if ( type(action) ~= "function" ) then return; end -- retry later once the game action buttons are available
-	local found = false;
-	for i = 1, 6 do
+	if ( type(ActionButton_ShowGrid) ~= "function" or type(ActionButton_HideGrid) ~= "function" ) then return; end
+	for i = 1, 7 do
 		local button = getglobal("ActionButton" .. i);
-		-- the game's grid functions work on `this` (the button), so run them as the button, with it passed too
-		if ( button ) then SS.RunAs(button, action, button); found = true; end
+		if ( button ) then
+			-- the game's grid functions work on `this` (the button), so run them as the button, with it passed too
+			if ( on and (tonumber(button.showgrid) or 0) < 1 ) then
+				SS.RunAs(button, ActionButton_ShowGrid, button); button.slimGrid = true;
+			elseif ( on and button.slimGrid and button.Show and button.IsShown and not button:IsShown() ) then
+				button:Show();
+			elseif ( not on and button.slimGrid ) then
+				button.slimGrid = nil; SS.RunAs(button, ActionButton_HideGrid, button);
+			end
+		end
 	end
-	if ( found ) then actionSlotsGridApplied = on; end
+	actionSlotsGridApplied = on;
 end
 
 CaptureActionBarLayout = function()

@@ -117,7 +117,7 @@ end
 local SECTIONS = {
  { key = "original", title = "Original Unit Frames", names = { "CharacterFrame", "TalentFrame", "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip" } },
  { key = "aethus", title = "Aethus Design", names = { "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame" } },
- { key = "custom", title = "Custom Design", names = { "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteLuckFrame", "SlimSuiteCompassFrame", "SlimSuiteAchievementsButton" } },
+ { key = "custom", title = "Custom Design", names = { "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteLuckFrame", "SlimSuiteInfoDrawer", "SlimSuiteCompassFrame", "SlimSuiteAchievementsButton" } },
  { key = "other", title = "Other", names = {} },
 };
 
@@ -216,6 +216,7 @@ local HELP = {
  SlimSuiteCombatTextFrame = "Floating numbers for damage and healing. Options: placement.",
  SlimSuiteStatCounterFrame = "Your run stats in one place. Options: placement.",
  SlimSuiteCompassFrame = "Bearings to known bosses, lairs and caches. Options: a rail or free markers, and the run clock.",
+ SlimSuiteInfoDrawer = "A read-only panel of run numbers: damage per second, legendary chance and a few stats. Nothing in it is clickable.",
  SlimSuiteLuckFrame = "Estimated chances for legendary cards from the luck model. Options: placement.",
  SlimSuiteAchievementsButton = "Side objectives you can open. Options: placement.",
  CharacterFrame = "Your character sheet, opened with C. Options: placement.",

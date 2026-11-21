@@ -73,8 +73,8 @@ function SS.LuckProgress()
 end
 function SS.UpdateLuck()
  local data=SS.LuckProgress();
- if (not SS.FeatureEnabled("SlimSuiteLuckFrame") and not SS.IsEditing("SlimSuiteLuckFrame")) or SS.DB().vanillaUI then frame:Hide(); return; end
- if SS.IsEditing("SlimSuiteLuckFrame") then frame:SetAlpha(1); else ApplyFeatureMute("SlimSuiteLuckFrame"); end
+ if (not SS.FeatureEnabled("SlimSuiteLuckFrame") and not SS.IsEditing("SlimSuiteLuckFrame")) or SS.DB().vanillaUI or (SS.DB().elementModes.SlimSuiteLuckFrame == "disabled" and not setupActive) then frame:Hide(); return; end
+ if SS.IsEditing("SlimSuiteLuckFrame") and not SS.DB().muted.SlimSuiteLuckFrame and (setupActive or SS.DB().elementModes.SlimSuiteLuckFrame ~= "disabled") then frame:SetAlpha(1); else ApplyFeatureMute("SlimSuiteLuckFrame"); end
  local luck,level=data.luck,data.level; local base=SS.LegendaryChance(luck,level);
  local w=frame:GetWidth();
  frame.title:SetText(SS.T("Legendary luck"));

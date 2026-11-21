@@ -163,7 +163,7 @@ SS.DEFAULTS = {
 	replaceClock = false, replaceEncounters = false, replaceTally = false, replaceBanners = false,
 	camera = true, plainBar = false, cooldowns = false, bossMarks = true, deathMarks = true, prePullMarks = false,
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
-	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, luckPanel = false, achievementButton = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
+	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, luckPanel = false, infoDrawer = false, achievementButton = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
 	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, robloxDeathSound = false, matchHaloSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchVictorySound = false, finalBossSound = false, finalBossSounds = {}, teammateDeathSound = "same", lowHealthSound = false,
 	bossHitmarkerSound = false, bossWhipSound = false, bossGotchaSound = false, chestOpenSound = false, reviveSound = false, hideTarget = false, mirrorTarget = false,
@@ -172,7 +172,7 @@ SS.DEFAULTS = {
 	modernEnemyFrames = false, enemyBossesOnly = true, enemyPlateDebuffs = false,
 	platerStyle = true, plateWidth = 110, plateBarHeight = 7, plateNameSize = "normal", plateHpText = true, plateBorder = true,
 	plateColorEnemy = "Red", plateColorElite = "Gold", plateColorBoss = "Purple",
-	showRacialAbility = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
+	showRacialAbility = false, xpFullWidth = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, gridSnap = false, raidRow = true, layoutPerCharacter = false,
 	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false, enemyPlateGroup = true, uiStyle = "original", azStatsHideBar = true,
@@ -735,7 +735,7 @@ SS.STYLE_NAMES = { original = "Original", meter = "RPG", tooltip = "New School" 
 SS.LOOK_ELEMENTS = { "SlimSuitePartyLines", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteBossFrames",
  "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame",
  "SlimSuiteLocalClockFrame", "SlimSuitePlayerCard", "SlimSuiteTargetCard", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame",
- "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton", "SlimSuiteProcMeter" };
+ "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteInfoDrawer", "SlimSuiteAchievementsButton", "SlimSuiteProcMeter" };
 function SS.IsLookElement(name)
  for i = 1, table.getn(SS.LOOK_ELEMENTS) do if ( SS.LOOK_ELEMENTS[i] == name ) then return true; end end
  return false;
