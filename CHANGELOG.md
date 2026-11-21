@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.86
+Better tracking for elements that won't stay hidden, and designs no longer leave elements in an unset state.
+
+- Hide feature clicks are written to the action log (/slim log), with a check one second later of whether the element really faded out, to find what undoes it.
+- Applying a preset design sets every element it doesn't mention to the game's default, instead of leaving it unset.
+
 ## 1.85
 Quick setup gets a second console design, Console B, in preset slot 5, to compare with Console A.
 

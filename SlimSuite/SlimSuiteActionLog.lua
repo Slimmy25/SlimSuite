@@ -98,6 +98,23 @@ local function Wrap(name, describe)
 	end
 end
 Wrap("OpenHUDEdit", function() return "HUD Edit opened"; end);
+-- Hide feature: what was clicked, and a second later whether the element really is faded out (to find what undoes it)
+local hideCheck;
+Wrap("ToggleFeatureMute", function(name)
+	local muted = SS.DB().muted[name] and true or false;
+	hideCheck = { name = name, muted = muted, at = GetTime() + 1 };
+	return "Hide feature " .. (muted and "on" or "off") .. ": " .. tostring(name);
+end);
+SS.Every("hideCheck", 0.5, function()
+	if ( not hideCheck or GetTime() < hideCheck.at ) then return; end
+	local c = hideCheck; hideCheck = nil;
+	local f = getglobal(c.name);
+	if ( not f ) then SS.LogAction("  check: no frame named " .. tostring(c.name)); return; end
+	local alpha = f.GetAlpha and f:GetAlpha() or -1;
+	local visible = f.IsVisible and f:IsVisible() and alpha > 0;
+	SS.LogAction(string.format("  check after 1s: %s shown=%s alpha=%.2f (%s)", c.name, tostring(f.IsShown and f:IsShown()), alpha,
+		(c.muted and visible) and "STILL VISIBLE" or "as expected"));
+end);
 Wrap("CloseHUDEdit", function() return "HUD Edit closed"; end);
 -- only a real change is logged (the same state set again is not news)
 local setUnlocked = SS.SetUnlocked;

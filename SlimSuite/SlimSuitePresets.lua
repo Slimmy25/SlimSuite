@@ -163,6 +163,11 @@ function SS.BuildPresetLayout(spec)
 	for _, name in ipairs(spec.on or {}) do layout.elementModes[name] = "enabled"; end
 	for _, name in ipairs(spec.off or {}) do layout.elementModes[name] = "default"; end
 	for _, name in ipairs(spec.hide or {}) do layout.elementModes[name] = "disabled"; end
+	-- every element the design does not mention is set to the game's own (Default), never left blank: a blank one was
+	-- later read from old saved data as "on", so opening the setup turned a dozen elements back on by itself
+	for name in pairs(SS.ELEMENTS) do
+		if ( layout.elementModes[name] == nil ) then layout.elementModes[name] = "default"; end
+	end
 	return layout, placed;
 end
 
