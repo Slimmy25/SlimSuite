@@ -25,6 +25,20 @@ SS.SetUnlocked(false, true); SU.SetMode("MinimapCluster", "disabled", "Minimap")
 check("disabled minimap is hidden outright", MinimapCluster.shown == false)
 SU.SetMode("MinimapCluster", "enabled", "Minimap"); Tick(8)
 check("minimap comes back when turned on", MinimapCluster.shown ~= false)
+-- joined build rows hide and turn off together
+SS.SetUnlocked(false, true); SS.DB().buildRowsAttached = true
+SS.DB().muted.SlimSuiteSpellRowFrame = nil; SS.DB().muted.SlimSuiteItemRowFrame = nil
+SS.ToggleFeatureMute("SlimSuiteSpellRowFrame"); Tick(4)
+check("hiding the spell row hides the joined rings / trinkets row", SS.DB().muted.SlimSuiteItemRowFrame == true and SlimSuiteItemRowFrame:GetAlpha() == 0)
+SS.ToggleFeatureMute("SlimSuiteItemRowFrame"); Tick(4)
+check("showing either shows both", not SS.DB().muted.SlimSuiteSpellRowFrame and not SS.DB().muted.SlimSuiteItemRowFrame)
+SU.SetMode("SlimSuiteItemRowFrame", "disabled", "x"); Tick(4)
+check("turning one off turns the joined one off", SU.Mode("SlimSuiteSpellRowFrame") == "disabled")
+SU.SetMode("SlimSuiteSpellRowFrame", "enabled", "x"); Tick(4)
+check("turning one on turns both on", SU.Mode("SlimSuiteItemRowFrame") == "enabled")
+SS.DB().buildRowsAttached = false; SU.SetMode("SlimSuiteSpellRowFrame", "disabled", "x"); Tick(4)
+check("detached rows stay separate", SU.Mode("SlimSuiteItemRowFrame") == "enabled")
+SS.DB().buildRowsAttached = true; SU.SetMode("SlimSuiteSpellRowFrame", "enabled", "x")
 print("errors: " .. #ERRORS)
 print("hiding problems: " .. bad)
 if bad > 0 or #ERRORS > 0 then error("hiding regressions") end

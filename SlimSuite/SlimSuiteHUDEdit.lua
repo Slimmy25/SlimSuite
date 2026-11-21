@@ -550,7 +550,7 @@ function SS.OpenHUDEdit()
  local searchLabel = hud:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall");
  searchLabel:SetPoint("TOPLEFT", hud, "TOPLEFT", 12, -136); searchLabel:SetText(SS.T("Search"));
  local search = CreateFrame("EditBox", "SlimSuiteHUDSearch", hud, "InputBoxTemplate");
- search:SetWidth(220); search:SetHeight(18);
+ search:SetWidth(SS.QUICK_SETUP_ON and 220 or 286); search:SetHeight(18);
  search:SetPoint("TOPLEFT", hud, "TOPLEFT", 64, -133);
  search:SetAutoFocus(false);
  search:SetScript("OnTextChanged", function()
@@ -572,6 +572,7 @@ function SS.OpenHUDEdit()
 
  hud.quick = K.Button(hud, "Quick", 62, function() if ( SS.OpenQuickSetup ) then SS.OpenQuickSetup(); end end);
  hud.quick:SetPoint("TOPLEFT", hud, "TOPLEFT", 290, -131);
+ if ( not SS.QUICK_SETUP_ON ) then hud.quick:Hide(); end   -- Quick setup is put away for now
  hud.quick:SetScript("OnEnter", function() GameTooltip:SetOwner(this, "ANCHOR_TOP"); GameTooltip:SetText("Quick setup"); GameTooltip:AddLine("Six questions about how you play. Your answers set the matching options once; you can still change each one here afterwards.", 1, 1, 1, 1); GameTooltip:Show(); end);
  hud.quick:SetScript("OnLeave", function() GameTooltip:Hide(); end);
  hud.setup = K.Button(hud, SS.T("Setup"), 100, function() SetupAllDisabled(); end);

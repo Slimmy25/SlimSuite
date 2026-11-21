@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.87
+Joined elements now hide and turn off together, and Quick setup is put away for now in favour of HUD Edit.
+
+- Hiding or turning off the build spell row also hides or turns off the worn rings / trinkets row while the two are joined, and the other way round. Showing or turning on either one brings back both.
+- The same goes for any element pinned to another one. Detached rows stay separate.
+- Quick setup and its preset designs are hidden for now: the Quick button in HUD Edit and /slim quick are gone, and HUD Edit's search box uses the space.
+
 ## 1.86
 Better tracking for elements that won't stay hidden, and designs no longer leave elements in an unset state.
 

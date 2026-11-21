@@ -1077,9 +1077,39 @@ ApplyFeatureMute = function(name)
 	end
 end;
 
+-- Elements joined to this one right now: the build spell row and the worn rings / trinkets row while they are
+-- joined, and any element whose saved place is pinned to another one. Hiding or turning off one of them does the same
+-- to the others, so a joined set never comes apart half shown.
+function SS.JoinedElements(name)
+	local d, out, seen = SS.DB(), {}, { [name] = true };
+	local function Add(n) if ( n and not seen[n] and SS.ELEMENTS and SS.ELEMENTS[n] ) then seen[n] = true; table.insert(out, n); end end
+	if ( d.buildRowsAttached ~= false ) then
+		if ( name == "SlimSuiteSpellRowFrame" ) then Add("SlimSuiteItemRowFrame"); end
+		if ( name == "SlimSuiteItemRowFrame" ) then Add("SlimSuiteSpellRowFrame"); end
+	end
+	local i = 0;
+	local queue = { name };
+	while ( i < table.getn(queue) ) do
+		i = i + 1;
+		local current = queue[i];
+		for other, p in pairs(d.places or {}) do
+			local buildPair = (other == "SlimSuiteItemRowFrame" or other == "SlimSuiteSpellRowFrame") and (p and (p.relative == "SlimSuiteItemRowFrame" or p.relative == "SlimSuiteSpellRowFrame"));
+			if ( type(p) == "table" and p.relative and SS.ELEMENTS and SS.ELEMENTS[other] and not (buildPair and d.buildRowsAttached == false) ) then
+				if ( p.relative == current and not seen[other] ) then Add(other); table.insert(queue, other); end
+				if ( other == current and SS.ELEMENTS[p.relative] and not seen[p.relative] ) then Add(p.relative); table.insert(queue, p.relative); end
+			end
+		end
+	end
+	return out;
+end
+
 function SS.ToggleFeatureMute(name)
 	SS.DB().muted[name] = not SS.DB().muted[name];
 	ApplyFeatureMute(name);
+	for _, other in ipairs(SS.JoinedElements(name)) do
+		SS.DB().muted[other] = SS.DB().muted[name];
+		ApplyFeatureMute(other);
+	end
 	if ( sizeMenu and sizeMenu.muteButton ) then
 		sizeMenu.muteButton:SetText(SS.DB().muted[name] and "Show feature" or "Hide feature");
 	end

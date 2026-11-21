@@ -4,6 +4,10 @@
 -- Open it from HUD Edit's "Quick" button or with /slimsuite quick.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 
+-- Quick setup and the preset designs are put away for now: no button or command opens them. The code stays so they
+-- can come back by setting this to true.
+SS.QUICK_SETUP_ON = false;
+
 local EXTRAS = { "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton", "SlimSuiteStatCounterFrame" };
 local SOME_SOUNDS = { "deathSound", "reviveSound", "finalBossSound", "matchVictorySound" };
 local MORE_SOUNDS = { "lowHealthSound", "bossHitmarkerSound", "chestOpenSound", "matchStartSound", "matchLossSound" };

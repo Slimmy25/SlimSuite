@@ -279,6 +279,14 @@ function SS.ApplyElementModes()
 end
 
 function SU.SetMode(frame, mode, title)
+	-- turning a joined element off or on does the same to the elements joined to it
+	if ( (mode == "disabled" or mode == "enabled") and not SU.joining and SS.JoinedElements ) then
+		SU.joining = true;
+		for _, other in ipairs(SS.JoinedElements(frame)) do
+			if ( SU.Mode(other) ~= mode ) then SS.Safe(SU.SetMode, other, mode, SS.ELEMENTS[other] and SS.ELEMENTS[other].title); end
+		end
+		SU.joining = false;
+	end
 	if ( mode ~= "enabled" and mode ~= "disabled" and mode ~= "default" ) then mode = "default"; end
 	local d = SS.DB();
 	d.elementModes = d.elementModes or {};

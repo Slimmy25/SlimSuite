@@ -476,7 +476,6 @@ end
 
 SS.HELP = {
 	"/slim: the settings window.  /slim edit: move and size the UI (/slim lock when done).  /slim setup: the guided setup.",
-	"/slim quick: six questions that set Slim Suite up for how you play.",
 	"/slim demo: Demo Mode on or off.  /slim levelup: Slim Suite's Level Up button or the game's own.",
 	"/slim positions: write where every element sits (position, size, scale) to the action log.",
 	"/slim layout: manage named profiles and import/export layouts.  /slim layout save <name>, load <name>, delete <name>, list.",
@@ -558,7 +557,7 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 		SS.SetUnlocked(false);
 	elseif ( cmd == "setup" ) then
 		SS.StartSetup(true);
-	elseif ( cmd == "quick" ) then
+	elseif ( cmd == "quick" and SS.QUICK_SETUP_ON ) then
 		SS.OpenQuickSetup();
 	elseif ( cmd == "demo" ) then
 		SS.ToggleDemoMode();
