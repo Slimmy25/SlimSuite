@@ -362,12 +362,11 @@ function SS.MakeCards()
 		f:SetWidth(232); f:SetHeight(100); f:SetFrameStrata("MEDIUM");
 		local native = getglobal(unit == "player" and "PlayerFrame" or "TargetFrame");
 		local art = getglobal(unit == "player" and "PlayerFrameTexture" or "TargetFrameTexture");
+		-- the classic 232 x 100 unit frame art. Azeroth Survivors draws its own frames with a different texture, so
+		-- copying that frame's art and coordinates gave a broken, cut-off picture on the card: use the classic sheet.
 		f.art = f:CreateTexture(nil, "BACKGROUND"); f.art:SetAllPoints(f);
-		f.art:SetTexture((art and art.GetTexture and art:GetTexture()) or "Interface\\TargetingFrame\\UI-TargetingFrame");
-		if ( art and art.GetTexCoord ) then
-			local ok, a, b, c, d, e, g, h, i = SS.Safe(function() return art:GetTexCoord(); end);
-			if ( ok and a ) then f.art:SetTexCoord(a, b, c, d, e, g, h, i); end
-		end
+		f.art:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame");
+		if ( unit == "player" ) then f.art:SetTexCoord(1, 0.09375, 0, 0.78125); else f.art:SetTexCoord(0.09375, 1, 0, 0.78125); end
 		-- the game's own scale for these frames, used until the player changes this card's scale
 		if ( SS.DB().scales[name] == nil and native and native.GetScale ) then SS.DB().scales[name] = native:GetScale() or 1; end
 		f.art:Show();

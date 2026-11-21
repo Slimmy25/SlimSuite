@@ -36,7 +36,7 @@ for _, p in ipairs(SS.BUILTIN_PRESETS) do
 	end
 	for k, v in pairs(p[3].keys) do check(p[1] .. ": " .. k, SS.DB()[k] == v) end
 end
-check("controller design is large and high contrast", SS.DB().accessibilityLargeText == true and SS.DB().scales.MainMenuBar == 1.2)
+check("controller design is large and high contrast", SS.DB().accessibilityLargeText == true and SS.DB().scales.SlimSuitePlayerCard == 1.2)
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end
 if #ERRORS > 0 then bad = bad + 1 end
 print("quick setup problems: " .. bad)

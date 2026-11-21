@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.83
+Fixes for the demo designs: the player and target cards show their art properly, and nothing covers the chat.
+
+- The new-style player and target cards use the standard unit-frame art, so they no longer show a broken, cut-off picture.
+- The Controller / Handheld design no longer turns on the combat text box, which covered the chat.
+- Enemy plates with large names are tall enough for the name, so stacked plates like "Plagued Ghoul x11" fit their box.
+- The Controller / Handheld and Minimal designs keep the action bar at its normal size, so it no longer splits apart.
+
 ## 1.82
 The five demo designs in Quick setup are now far more different from each other, each built around its own idea.
 

@@ -92,7 +92,7 @@ local function ApplyPlaterLayout(f)
 	local key = w .. ":" .. h .. ":" .. nameSize .. ":" .. (border and "b" or "n");
 	if ( f.platerKey == key ) then return; end
 	f.platerKey = key;
-	f:SetWidth(w + 12); f:SetHeight(h + 28);
+	f:SetWidth(w + 12); f:SetHeight(h + 28 + (nameSize == "large" and 8 or (nameSize == "normal" and 2 or 0)));   -- room for the name's font
 	f.health:ClearAllPoints(); f.health:SetPoint("BOTTOM", f, "BOTTOM", 0, 14);
 	f.health:SetWidth(w); f.health:SetHeight(h);
 	f.name:ClearAllPoints(); f.name:SetPoint("BOTTOM", f.health, "TOP", 0, 3); f.name:SetWidth(w + 12);
