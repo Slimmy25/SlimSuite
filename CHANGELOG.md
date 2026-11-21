@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.80
+New Quick setup asks how you play and sets Slim Suite up for you, party frames show who is down and how far away they are, and stacked enemy plates no longer overlap.
+
+- Quick setup (the Quick button in HUD Edit, or /slim quick): six short questions about look, how much on screen, group play, enemy plates, sounds and text size. Your answers set the matching options once; every option can still be changed by hand afterwards.
+- Quick setup can offer up to five preset designs first, and each answer and preset can show an in-game picture.
+- Party frames turn grey when a member is down or dead, show a revive bar on the teammate you are reviving, show their distance in yards at the top left of their face, and dim slightly when they are out of range. Each can be turned off in the party frame's right-click menu.
+- Stacked enemy plates for different monsters no longer sit on top of each other, and normal and elite monsters with the same name get separate plates.
+
 ## 1.79
 Stacked enemy plates are easier to spot.
 

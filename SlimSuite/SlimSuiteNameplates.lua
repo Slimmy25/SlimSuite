@@ -180,12 +180,12 @@ local function ReadCatalog()
 			if ( type(entry) == "table" and entry.anchorId and entry.state == "alive" ) then
 				local kind = entry.kind;
 				if ( grouping and (kind == "enemy" or kind == "elite") and type(entry.name) == "string" ) then
-					local group = groups[entry.name];
+					local group = groups[entry.name .. "|" .. kind];
 					if ( group ) then
 						group.count = group.count + 1; table.insert(group.members, entry.unitId);
 					elseif ( accepted < 64 and not current[entry.anchorId] ) then
 						group = { anchorId = entry.anchorId, name = entry.name, kind = kind, count = 1, members = { entry.unitId } };
-						groups[entry.name] = group; current[entry.anchorId] = group; accepted = accepted + 1;
+						groups[entry.name .. "|" .. kind] = group; current[entry.anchorId] = group; accepted = accepted + 1;
 					end
 				elseif ( not d.enemyBossesOnly or kind == "boss" or kind == "finalBoss" or kind == "guardian" ) then
 					if ( current[entry.anchorId] or accepted < 64 ) then
@@ -244,12 +244,25 @@ local function ProjectPlates()
 	-- Missing/stale projections must not leave a nameplate floating at its last screen position.
 	for _, record in pairs(plates) do record.frame:Hide(); end
 	if ( not ok or type(projection) ~= "table" or projection.frameCurrent == false ) then return; end
+	-- monster-type plates that land on top of each other are pushed up so each type keeps its own readable box
+	local placed = {};
 	for i = 1, table.getn(projection.entries or {}) do
 		local projected = projection.entries[i];
 		local record = plates[projected.anchorId];
 		if ( record and record.visible and projected.state == "onScreen" and type(projected.x) == "number" and type(projected.y) == "number" ) then
 			local scale = SS.EffectiveScale(record.frame);
-			record.frame:ClearAllPoints(); record.frame:SetPoint("BOTTOM", WorldFrame, "BOTTOMLEFT", projected.x / scale, projected.y / scale + 10); record.frame:Show();
+			local x, y = projected.x / scale, projected.y / scale + 10;
+			local w, h = record.frame:GetWidth() or 0, record.frame:GetHeight() or 0;
+			local moved = true; local tries = 0;
+			while ( moved and tries < 12 ) do
+				moved = false; tries = tries + 1;
+				for j = 1, table.getn(placed) do
+					local o = placed[j];
+					if ( math.abs(o.x - x) < (o.w + w) / 2 and y < o.y + o.h and o.y < y + h ) then y = o.y + o.h + 2; moved = true; end
+				end
+			end
+			table.insert(placed, { x = x, y = y, w = w, h = h });
+			record.frame:ClearAllPoints(); record.frame:SetPoint("BOTTOM", WorldFrame, "BOTTOMLEFT", x, y); record.frame:Show();
 		end
 	end
 end

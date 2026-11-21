@@ -569,6 +569,10 @@ function SS.OpenHUDEdit()
  rows = {};
  for _, name in ipairs(SS.HUDOrder()) do BuildRow(child, name); end
 
+ hud.quick = K.Button(hud, "Quick", 62, function() if ( SS.OpenQuickSetup ) then SS.OpenQuickSetup(); end end);
+ hud.quick:SetPoint("TOPLEFT", hud, "TOPLEFT", 290, -131);
+ hud.quick:SetScript("OnEnter", function() GameTooltip:SetOwner(this, "ANCHOR_TOP"); GameTooltip:SetText("Quick setup"); GameTooltip:AddLine("Six questions about how you play. Your answers set the matching options once; you can still change each one here afterwards.", 1, 1, 1, 1); GameTooltip:Show(); end);
+ hud.quick:SetScript("OnLeave", function() GameTooltip:Hide(); end);
  hud.setup = K.Button(hud, SS.T("Setup"), 100, function() SetupAllDisabled(); end);
  hud.setup:SetPoint("BOTTOM", hud, "BOTTOM", 0, 10);
  hud.setup:SetScript("OnEnter", function() GameTooltip:SetOwner(this, "ANCHOR_TOP"); GameTooltip:SetText(SS.T("Setup")); GameTooltip:AddLine("Hides every element, including the game's own. Then turn on the ones you want, one at a time.", 1, 1, 1, true); GameTooltip:Show(); end);
