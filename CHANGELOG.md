@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.92
+Each element group in the Interface settings can be closed, and has its own On, Off, Default and Reset for every element in it.
+
+- Click a group's name (Aethus creations, My creations, Default WoW / Blizzard ideas) or its + / - to close or open the whole group. A search still finds elements in a closed group.
+- On, Off, Default and Reset buttons on each group's line change every element in that group at once, lined up with the elements' own buttons below. Each press is one step in Undo / Redo, and hovering a button says what it does.
+
 ## 1.91
 Each group of elements shows how many are On, such as 3/5, and moving an element can no longer change its size.
 

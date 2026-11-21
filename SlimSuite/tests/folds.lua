@@ -99,6 +99,20 @@ SS.searchText = "dps"; SS.LayoutPage(page)
 local meter; for _, r in ipairs(page.rows) do if r.kind == "fold" and r.element == "SlimSuiteMeterFrame" then meter = r end end
 check("searching dps finds the damage meter", meter and meter.searchOpen)
 SS.searchText = ""; SS.LayoutPage(page)
+-- the element groups: close one, and its buttons change every element in it with one Undo
+local aethus; for _, r in ipairs(page.rows) do if r.kind == "head" and r.count == "aethus" then aethus = r end end
+check("each group has On, Off, Default and Reset", aethus and aethus.groupButtons and table.getn(aethus.groupButtons) == 4)
+SS.closedGroups = {}; SS.LayoutPage(page)
+local c = aethus.click:GetScript("OnClick"); this = aethus.click; c(); Tick(1)
+check("clicking a group's name closes it", SS.closedGroups.aethus and not (enc and enc.b:IsShown()))
+this = aethus.click; c(); Tick(1)
+check("and opens it again", not SS.closedGroups.aethus and enc.b:IsShown())
+local hist0 = SS.historyPos
+local onB = aethus.groupButtons[1]; local onF = onB:GetScript("OnClick"); this = onB; onF(); Tick(2)
+check("group On turns every element in it on", SU.Mode("SlimSuiteBossFrames") == "enabled" and SU.Mode("SlimSuiteMeterFrame") == "enabled")
+check("as one Undo step", SS.history[SS.historyPos] and string.find(SS.history[SS.historyPos].what, "All enabled", 1, true) ~= nil)
+SS.Undo(); Tick(2)
+check("Undo puts the whole group back", SU.Mode("SlimSuiteBossFrames") ~= "enabled" or SU.Mode("SlimSuiteMeterFrame") ~= "enabled")
 check("group count reads on/total", string.find(SS.SectionCount("aethus"), "^%d+/%d+$") ~= nil)
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print(e) end
 print("fold problems: " .. bad)

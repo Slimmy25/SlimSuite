@@ -38,6 +38,7 @@ function SS.LayoutPage(page)
 			elseif ( not (SS.openFolds and SS.openFolds[r.fold.title] and SS.FoldCanOpen(r.fold)) ) then show[i] = false; end
 		end
 		if ( r.kind == "fold" ) then show[i] = (not q) or (hit[r] and true or false); r.searchOpen = q and hit[r] and true; end
+		if ( r.group and not q and SS.closedGroups and SS.closedGroups[r.group.count] ) then show[i] = false; end
 		if ( show[i] and r.kind ~= "head" ) then page.matchCount = page.matchCount + 1; end
 	end
 	local y = page.startY;
@@ -50,8 +51,26 @@ function SS.LayoutPage(page)
 				if ( show[j] ) then any = true; break; end
 			end
 			if ( r.count and SS.SectionCount ) then r.fs:SetText(r.label .. "  |cffbbbbbb" .. SS.SectionCount(r.count) .. " " .. SS.T("on") .. "|r"); end
-			r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", r.deathHeader and 240 or 8, y);
-			if ( any ) then r.fs:Show(); y = y - 24; else r.fs:Hide(); end
+			if ( r.groupButtons ) then
+				-- a group of elements: + / - to open or close it, and On / Off / Default / Reset for all of them at once
+				any = any or not q or false;
+				local closed = SS.closedGroups and SS.closedGroups[r.count];
+				if ( any ) then
+					r.sign:SetText(closed and not q and "+" or "-");
+					r.sign:ClearAllPoints(); r.sign:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y - 1); r.sign:Show();
+					r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 22, y - 3); r.fs:Show();
+					r.click:ClearAllPoints(); r.click:SetPoint("TOPLEFT", parent, "TOPLEFT", 6, y + 2); r.click:Show();
+					for j, gb in ipairs(r.groupButtons) do
+						gb:ClearAllPoints(); gb:SetPoint("TOPLEFT", parent, "TOPLEFT", 238 + (j - 1) * 58, y + 2); gb:Show();
+					end
+					y = y - 28;
+				else
+					r.sign:Hide(); r.fs:Hide(); r.click:Hide(); for _, gb in ipairs(r.groupButtons) do gb:Hide(); end
+				end
+			else
+				r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT", parent, "TOPLEFT", r.deathHeader and 240 or 8, y);
+				if ( any ) then r.fs:Show(); y = y - 24; else r.fs:Hide(); end
+			end
 		elseif ( show[i] ) then
 			local rowHeight = 28;
 			if ( r.kind == "button" ) then
@@ -275,6 +294,7 @@ function SS.WinBuild()
 		local page = { parent = parent, rows = {}, startY = startY, after = after, module=module };
 		local up = nil;
 		local fold = nil;   -- the open/close section the next rows belong to
+		local group = nil;  -- the element group (Aethus creations, ...) the next rows belong to
 		for i = 1, table.getn(entries) do
 			local row = entries[i];
 			local before = table.getn(page.rows);
@@ -321,9 +341,32 @@ function SS.WinBuild()
 				fold = r; up = nil;
 			elseif ( row.head ) then
 				fold = nil;
-				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
+				local fs = parent:CreateFontString(nil, "OVERLAY", row.members and "GameFontNormal" or "GameFontNormalLarge");
 				fs:SetText(SS.T(row.head)); fs:SetTextColor(1, 1, 1);
-				table.insert(page.rows, { kind = "head", fs = fs, label = SS.T(row.head), count = row.count });
+				local r = { kind = "head", fs = fs, label = SS.T(row.head), count = row.count };
+				group = nil;
+				if ( row.members ) then
+					-- one of the element groups: click its name to open or close it; its buttons change every element in it
+					group = r;
+					local key, label, members = row.count, SS.T(row.head), row.members;
+					r.sign = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
+					r.click = CreateFrame("Button", nil, parent); r.click:SetWidth(228); r.click:SetHeight(22);
+					r.click:SetScript("OnClick", function()
+						SS.closedGroups = SS.closedGroups or {};
+						SS.closedGroups[key] = not SS.closedGroups[key] or nil;
+						SS.LayoutPage(page);
+					end);
+					SS.AddTip(r.click, function() return string.format(SS.T("Click to open or close %s."), label); end);
+					r.groupButtons = {};
+					for j, m in ipairs({ { "On", "enabled" }, { "Off", "disabled" }, { "Default", "default" }, { "Reset", "reset" } }) do
+						local mode = m[2];
+						local gb = K.Button(parent, SS.T(m[1]), 56, function() SS.SetGroupMode(members, mode, label); SS.LayoutPage(page); end);
+						gb:SetHeight(22);
+						SS.AddTip(gb, function() return string.format(SS.T(SS.GROUP_TIP_TEXT[mode]), label); end);
+						r.groupButtons[j] = gb;
+					end
+				end
+				table.insert(page.rows, r);
 				up = nil;
 			elseif row.deathMatrix then
 				local title=parent:CreateFontString(nil,"OVERLAY","GameFontNormal"); title:SetText(SS.T("Your Death Sound")); table.insert(page.rows,{kind="head",fs=title});
@@ -392,6 +435,9 @@ function SS.WinBuild()
 			if ( fold and not row.fold ) then
 				for j = before + 1, table.getn(page.rows) do page.rows[j].fold = fold; end
 			end
+			if ( group and not row.head ) then
+				for j = before + 1, table.getn(page.rows) do page.rows[j].group = group; end
+			end
 		end
 		for _,r in ipairs(page.rows) do
 			if r.cb then r.cb.cond=function() return SS.ModuleEnabled(module); end end
@@ -417,7 +463,7 @@ function SS.WinBuild()
 		for _,g in ipairs(GROUPS) do
 			local names={};
 			for _,name in ipairs(order) do if (groupOf[name] or "other")==g[1] and name~="SlimSuiteEditGrid" then table.insert(names,name); end end
-			if table.getn(names)>0 then table.insert(grouped,{head=g[2],count=g[1]}); for _,n in ipairs(names) do table.insert(grouped,n); end end
+			if table.getn(names)>0 then table.insert(grouped,{head=g[2],count=g[1],members=names}); for _,n in ipairs(names) do table.insert(grouped,n); end end
 		end
 		for _,name in ipairs(grouped) do
 			if type(name)=="table" then table.insert(out,name); end
@@ -1002,6 +1048,37 @@ function SS.ResetElementAll(name, label)
 	if ( SS.lastOpacity ) then SS.lastOpacity[name] = true; end
 	if ( SlimSuiteWorld and SlimSuiteWorld.ApplyOnTop ) then SS.Safe(SlimSuiteWorld.ApplyOnTop); end
 	SS.RecordChange((label or name) .. " > Reset", before, Snapshot(name), function(snap) Restore(name, snap); end);
+end
+
+-- A whole group at once (the buttons on Aethus creations, My creations, ...): one entry in Undo / Redo for all of it
+SS.GROUP_TIP_TEXT = {
+	enabled = "On: turn on every element in %s.",
+	disabled = "Off: hide every element in %s.",
+	default = "Default: give every element in %s back to the game.",
+	reset = "Reset: put every element in %s back where it started (Undo brings them back).",
+};
+function SS.SetGroupMode(members, mode, label)
+	local before, after = {}, {};
+	SS.replaying = true;    -- the single entry below stands for all of them
+	for _, name in ipairs(members) do
+		if ( mode == "reset" ) then
+			before[name] = Snapshot(name);
+			SS.Safe(SS.ResetElementAll, name, name);
+			after[name] = Snapshot(name);
+		else
+			before[name] = SU.Mode(name);
+			if ( before[name] ~= mode ) then SS.Safe(SU.SetMode, name, mode, SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end
+			after[name] = mode;
+		end
+	end
+	SS.replaying = nil;
+	local apply;
+	if ( mode == "reset" ) then
+		apply = function(map) for name, snap in pairs(map) do Restore(name, snap); end end;
+	else
+		apply = function(map) for name, m in pairs(map) do if ( SU.Mode(name) ~= m ) then SS.Safe(SU.SetMode, name, m, SS.ELEMENTS[name] and SS.ELEMENTS[name].title); end end end;
+	end
+	SS.RecordChange(label .. " > " .. (mode == "reset" and "Reset all" or ("All " .. mode)), before, after, apply);
 end
 
 -- Warnings for settings that undo each other, said once each time they become true
