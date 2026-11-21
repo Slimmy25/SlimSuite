@@ -38,6 +38,8 @@ function SS.LayoutPage(page)
 			elseif ( not (SS.openFolds and SS.openFolds[r.fold.title] and SS.FoldCanOpen(r.fold)) ) then show[i] = false; end
 		end
 		if ( r.kind == "fold" ) then show[i] = (not q) or (hit[r] and true or false); r.searchOpen = q and hit[r] and true; end
+		if ( r.kind == "fold" and r.when and not r.when() ) then show[i] = false; end
+		if ( r.fold and r.fold.when and not r.fold.when() ) then show[i] = false; end
 		if ( r.group and not q and SS.closedGroups and SS.closedGroups[r.group.count] ) then show[i] = false; end
 		if ( show[i] and r.kind ~= "head" ) then page.matchCount = page.matchCount + 1; end
 	end
@@ -300,7 +302,7 @@ function SS.WinBuild()
 			local before = table.getn(page.rows);
 			if ( row.fold ) then
 				-- an element's section: its name as a button that opens and closes the settings under it
-				local r = { kind = "fold", title = SS.T(row.fold), element = row.element };
+				local r = { kind = "fold", title = SS.T(row.fold), element = row.element, when = row.when };
 				r.sign = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
 				r.b = K.Button(parent, "", 204, function()
 					if ( not SS.FoldCanOpen(r) ) then return; end
@@ -462,7 +464,7 @@ function SS.WinBuild()
 		local grouped={};
 		for _,g in ipairs(GROUPS) do
 			local names={};
-			for _,name in ipairs(order) do if (groupOf[name] or "other")==g[1] and name~="SlimSuiteEditGrid" then table.insert(names,name); end end
+			for _,name in ipairs(order) do if (groupOf[name] or "other")==g[1] and name~="SlimSuiteEditGrid" and not (SS.STYLE_ONLY and SS.STYLE_ONLY[name]) then table.insert(names,name); end end
 			if table.getn(names)>0 then table.insert(grouped,{head=g[2],count=g[1],members=names}); for _,n in ipairs(names) do table.insert(grouped,n); end end
 		end
 		for _,name in ipairs(grouped) do
@@ -471,7 +473,7 @@ function SS.WinBuild()
 			local ok,checks=SS.Safe(SU.ChecksFor,name);
 			if element and name~="SlimSuiteEditGrid" then
 				if not ok or type(checks)~="table" then checks={}; end
-				table.insert(out,{fold=element.label or element.title or name,element=name});
+				table.insert(out,{fold=element.label or element.title or name,element=name,when=SS.ElementListed and SS.ListedCheck(name) or nil});
 				for _,e in ipairs(checks) do
 					if type(e)=="table" and type(e[1])=="string" and e[2] and e[3] then
 						table.insert(out,{e[1],e[2],e[3],choice=e.choice,short=e.short,when=type(e[4])=="function" and e[4] or nil});

@@ -116,11 +116,21 @@ end
 -- The element groups, in the order they are shown. Anything not listed falls into Other.
 local SECTIONS = {
 	{ key = "original", title = "Original Unit Frames", names = { "CharacterFrame", "TalentFrame", "PlayerFrame", "PartyMemberFrame1", "MainMenuBar", "TargetFrame", "MainMenuExpBar", "BuffFrame", "MinimapCluster", "ChatFrame1", "GameTooltip" } },
-	{ key = "aethus", title = "Aethus Design", names = { "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame" } },
+	{ key = "aethus", title = "Aethus Design", names = { "SlimSuiteStoredLevelsButton", "SlimSuiteSpellRowFrame", "SlimSuiteMeterFrame", "SlimSuiteClockFrame", "SlimSuiteBossFrames", "SlimSuiteAnnouncementFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame", "SlimSuiteLocalClockFrame", "SlimSuiteItemRowFrame" } },
 	{ key = "custom", title = "Custom Design", names = { "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteLuckFrame", "SlimSuiteCompassFrame", "SlimSuiteAchievementsButton" } },
 	{ key = "other", title = "Other", names = {} },
 };
-SS.ELEMENT_SECTIONS = SECTIONS;   -- the Interface settings group its element sections the same way
+SS.ELEMENT_SECTIONS = SECTIONS;
+-- Looks of another element, not elements of their own: the thin party lines and the new-style player and target
+-- cards are styles of the game's party, player and target frames (chosen in those elements' settings).
+SS.STYLE_ONLY = { SlimSuitePartyLines = true, SlimSuitePlayerCard = true, SlimSuiteTargetCard = true };
+-- The worn rings / trinkets row is part of the build row until it is detached.
+function SS.ListedCheck(name) return function() return SS.ElementListed(name); end; end
+function SS.ElementListed(name)
+ if ( SS.STYLE_ONLY[name] or name == "SlimSuiteEditGrid" ) then return false; end
+ if ( name == "SlimSuiteItemRowFrame" and SS.DB().buildRowsAttached ) then return false; end
+ return true;
+end   -- the Interface settings group its element sections the same way
 
 -- Which section an element belongs to; anything not listed goes to Other.
 local function SectionOf(name)
@@ -133,7 +143,7 @@ end
 function SS.SectionCount(key)
 	local on, all = 0, 0;
 	for name in pairs(SS.ELEMENTS or {}) do
-		if ( name ~= "SlimSuiteEditGrid" and SectionOf(name) == key ) then
+		if ( SS.ElementListed(name) and SectionOf(name) == key ) then
 			all = all + 1; if ( SU.Mode(name) == "enabled" ) then on = on + 1; end
 		end
 	end

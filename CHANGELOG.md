@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.94
+The element groups list only real elements: looks are part of the element they style.
+
+- Party is listed with the game's own frames (Default WoW / Blizzard ideas), where it belongs.
+- The thin party lines and the new-style player and target cards are no longer listed as elements of their own: they are looks of the party, player and target frames, chosen in those elements' settings.
+- Worn rings / trinkets is part of the build spell row and only gets its own entry (under Aethus creations) once it is detached.
+- The "Other" group is gone, and the On counts follow the same rules.
+
 ## 1.93
 Elements are now sized like the game's own interface, by the game's UI Scale and resolution.
 

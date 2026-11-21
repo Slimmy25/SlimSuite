@@ -10,7 +10,7 @@ check("the Interface page has element sections", page ~= nil)
 local folds, mini = 0, nil
 for _, r in ipairs(page and page.rows or {}) do if r.kind == "fold" then folds = folds + 1; if r.title == "Minimap" then mini = r end end end
 print("sections", folds)
-local all = 0; for name in pairs(SS.ELEMENTS) do if name ~= "SlimSuiteEditGrid" then all = all + 1 end end
+local all = 0; for name in pairs(SS.ELEMENTS) do if name ~= "SlimSuiteEditGrid" and not SS.STYLE_ONLY[name] then all = all + 1 end end
 check("every element has a section (" .. folds .. " of " .. all .. ")", folds >= all - 1)
 check("a Minimap section", mini ~= nil)
 local inside = {}; for _, r in ipairs(page.rows) do if r.fold == mini then table.insert(inside, r) end end
