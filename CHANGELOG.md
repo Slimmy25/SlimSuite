@@ -2,6 +2,14 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.85
+Quick setup gets a second console design, Console B, in preset slot 5, to compare with Console A.
+
+- New Console B design (preset 5): the console layout arranged by hand in game, with huge party lines, upright boss bars top-right, a large action bar and the XP bar across the whole screen. The minimap, run clock, legendary luck, stats panel and build rows are off in it.
+- Upright encounter bars follow "Most bars shown": with it set to 5, each bar is narrowed so all five fit in the room four used to take. Console B now shows up to five.
+- Demo Mode and HUD Edit show five sample bosses instead of four.
+- A disabled minimap is now hidden completely. Before, only its border faded and the map itself stayed on screen.
+
 ## 1.84
 A new Console A design in Quick setup for controller and handheld players, a read-only info drawer, and the AI-generated demo designs are gone.
 

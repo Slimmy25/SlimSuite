@@ -20,6 +20,11 @@ for _, state in ipairs({ "locked", "editing" }) do
 		end
 	end
 end
+-- the minimap is hidden outright when disabled (fading leaves the game's map picture showing) and comes back after
+SS.SetUnlocked(false, true); SU.SetMode("MinimapCluster", "disabled", "Minimap"); Tick(8)
+check("disabled minimap is hidden outright", MinimapCluster.shown == false)
+SU.SetMode("MinimapCluster", "enabled", "Minimap"); Tick(8)
+check("minimap comes back when turned on", MinimapCluster.shown ~= false)
 print("errors: " .. #ERRORS)
 print("hiding problems: " .. bad)
 if bad > 0 or #ERRORS > 0 then error("hiding regressions") end

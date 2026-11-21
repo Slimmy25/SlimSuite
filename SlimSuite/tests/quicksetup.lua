@@ -16,7 +16,10 @@ check("a setting changed afterwards stays changed", d.enemyBossesOnly == true)
 SS.ApplyQuickAnswers({ 1, 1, 2, 1, 1, 1 }); Tick(3)
 check("answers can be applied again", SS.PanelStyleKey() == "original" and d.modernEnemyFrames == false and d.deathSound == false)
 -- presets: none ship yet, so Quick setup starts with the questions; designs added later are offered (at most 5)
-check("one design shipped: Console A", table.getn(SS.UsablePresets()) == 1 and SS.UsablePresets()[1][1] == "Console A")
+local shippedList = SS.UsablePresets()
+check("two designs shipped: Console A then Console B", table.getn(shippedList) == 2 and shippedList[1][1] == "Console A" and shippedList[2][1] == "Console B" and shippedList[2].picture == "preset5")
+check("Console B applies as exported, fitted to this screen", SS.ApplyPreset(shippedList[2]) and SS.DB().scales.MainMenuBar == 1.85 and SS.DB().orientations.SlimSuiteBossFrames == "vertical" and SS.DB().places.SlimSuiteTargetCard.x > 512); Tick(3)
+check("Console B: minimap, run clock, luck, stats and build rows off; XP bar full width", SS.DB().elementModes.MinimapCluster == "disabled" and SS.DB().elementModes.SlimSuiteLuckFrame == "disabled" and SS.DB().elementModes.SlimSuiteClockFrame == "disabled" and SS.DB().elementModes.SlimSuiteStatCounterFrame == "disabled" and SS.DB().elementModes.SlimSuiteSpellRowFrame == "disabled" and SS.DB().xpFullWidth == true)
 SS.OpenQuickSetup(); Tick(1)
 check("the preset question comes first", win.question:GetText() == "Would you like to use a pre-set design?")
 check("Console applies", SS.ApplyPreset(SS.UsablePresets()[1])); Tick(3)
@@ -58,6 +61,14 @@ SS.BUILTIN_PRESETS = { { "Loose", "x", { places = {} } }, { "Four", "x", { place
 local l = SS.UsablePresets()
 check("slots: loose first, then 4, then 5", table.getn(l) == 3 and l[1][1] == "Loose" and l[2][1] == "Four" and l[3][1] == "Mine" and l[2].picture == "preset4")
 SS.PRESETS = {}; SS.BUILTIN_PRESETS = shipped
+-- upright encounter cards with Most bars shown = 5: all five sample bosses fit where four default cards used to
+SS.DB().orientations.SlimSuiteBossFrames = "vertical"; SS.DB().sizes.SlimSuiteBossFrames = nil; SS.DB().encounterMax = 5; SS.DB().replaceEncounters = true; SS.DB().elementModes.SlimSuiteBossFrames = "enabled"
+SS.SetUnlocked(true, true); Tick(5)
+local bf = getglobal("SlimSuiteBossFrames")
+local pad = SS.FramePadding("SlimSuiteBossFrames")
+local room = 4 * 48 + 3 * (10 + pad) + pad * 2
+check("five upright cards fit in four cards' room (" .. tostring(bf:GetWidth()) .. " of " .. room .. ")", table.getn(SS.BOSS_SAMPLE) == 5 and bf:GetWidth() <= room + 1)
+SS.DB().encounterMax = nil; SS.SetUnlocked(false, true); Tick(2)
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end
 if #ERRORS > 0 then bad = bad + 1 end
 print("quick setup problems: " .. bad)

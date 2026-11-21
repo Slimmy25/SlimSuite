@@ -154,7 +154,7 @@ end
 SU.CARD_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 	tile = true, tileSize = 16, edgeSize = 10, insets = { left = 2, right = 2, top = 2, bottom = 2 } };
 SU.BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar";
-SS.BOSS_SAMPLE = { { "Hogger", 60 }, { "Mr. Smite", 40 }, { "Edwin VanCleef", 85 }, { "Cookie", 100 } };   -- real bosses of the first zones
+SS.BOSS_SAMPLE = { { "Hogger", 60 }, { "Mr. Smite", 40 }, { "Edwin VanCleef", 85 }, { "Cookie", 100 }, { "Captain Greenskin", 70 } };   -- real bosses of the first zones
 
 -- The new-school player and target frames: cards in the party frames' look, showing name, health and power.
 -- They are only shown while the design is on; the game's own frames are made transparent (not removed) meanwhile.

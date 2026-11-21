@@ -403,6 +403,13 @@ function SS.UpdateEncounterRows(list)
 	if ( frameWidth > screen * 0.9 ) then frameWidth = across * defaultCardWidth + ((across - 1) * gap) + (padding * 2); end   -- an old, too-wide saved size
 	frameWidth = math.min(math.max(minimumFrameWidth, frameWidth), screen * 0.9);
 	local cardWidth = math.max(minCardWidth, (frameWidth - (padding * 2) - ((across - 1) * gap)) / across);
+	-- upright cards with a most-bars limit: every card is sized for that many, so the limit fits in the room four
+	-- default cards (or the saved width) take; fewer bosses just leave the later places empty
+	local mostAcross = SS.EncounterMost();
+	if ( vertical and mostAcross ) then
+		local room = type(configured) == "table" and configured.w or (4 * defaultCardWidth + 3 * gap + padding * 2);
+		cardWidth = math.max(minCardWidth, (room - padding * 2 - (mostAcross - 1) * gap) / mostAcross);
+	end
 	frameWidth = across * cardWidth + ((across - 1) * gap) + (padding * 2);
 	local frameHeight = type(configured) == "table" and configured.h or (vertical and 252 or (count * 48));
 	-- with a most-bars limit, the saved height is the room for that many rows: each row keeps its share, so one boss

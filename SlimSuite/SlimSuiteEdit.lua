@@ -223,6 +223,22 @@ end
 -- have no mask API at all, so this is checked and reported rather than assumed.
 -- the square mask is Slim Suite's own full-size white square: the game's tiny 8x8 white texture cuts the whole map out
 SlimSuiteMinimapMask = { round = "Textures\\MinimapMask", square = "Interface\\AddOns\\SlimSuite\\textures\\MinimapSquare" };
+-- A disabled minimap is hidden outright: the map picture is drawn by the game itself and ignores fading, so making the
+-- minimap see-through (how other elements are hidden) left the map showing. Checked every second; while the setup is
+-- open it stays visible so it can be turned on again.
+function SS.EnforceMinimapDisabled()
+	if ( not MinimapCluster ) then return; end
+	local off = SS.DB().elementModes.MinimapCluster == "disabled" and not setupActive;
+	if ( off ) then
+		if ( MinimapCluster:IsShown() ) then MinimapCluster:Hide(); end
+		SS.minimapHiddenByUs = true;
+	elseif ( SS.minimapHiddenByUs ) then
+		SS.minimapHiddenByUs = nil;
+		MinimapCluster:Show(); if ( Minimap ) then Minimap:Show(); end
+	end
+end
+SS.Every("minimapDisabled", 1, function() SS.Safe(SS.EnforceMinimapDisabled); end);
+
 function SS.ApplyMinimapShape()
 	if ( not Minimap ) then return false; end
 	if ( SS.DB().elementModes.MinimapCluster == "enabled" ) then

@@ -113,7 +113,7 @@ SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf",
 	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "matchBuildSizes", "hideBuildSpells", "hideBuildItems", "xpHideBorder", "statCounter", "statDisplayMode", "clockContextAbove", "worldCombatMode", "keepCombatLog", "cardEdgeHUD", "compassOn", "luckPanel", "achievementButton", "compassStyle", "compassBosses", "compassLairs", "compassCaches", "minimapSquare", "minimapTransparent",
 	"tooltipCustom", "plainBar", "showRacialAbility", "xpSegments", "xpFullWidth", "showAbsorbs",
 	"enemyNameplates", "modernEnemyFrames", "enemyBossesOnly", "enemyPlateDebuffs",
-	"encounterBarThickness", "encounterNameAlign", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion",
+	"encounterBarThickness", "encounterNameAlign", "encounterMax", "accessibilityContrast", "accessibilityLargeText", "accessibilityReduceMotion",
 	"targetAuraSide", "targetDebuffs", "clockDetached", "showEmptyActionSlots", "cooldowns",
 	"partyMemberBuffs", "localClock24", "localClockBackground", "showGuardianFlag",
 	"tallyBossKills", "tallyBackground", "zoneLine", "encounterDebuffs", "procMeter",
@@ -213,7 +213,10 @@ local layoutStrings = { worldCombatMode=true, compassStyle=true, statDisplayMode
 	encounterNameAlign=true, targetAuraSide=true };
 local function ValidLayoutLeaf(root, keys, value)
 	local depth = table.getn(keys);
-	if ( depth == 1 ) then return type(value) == (layoutStrings[root] and "string" or "boolean"); end
+	if ( depth == 1 ) then
+		if ( root == "encounterMax" ) then return type(value) == "number" and value >= 1 and value <= 20; end   -- Most bars shown
+		return type(value) == (layoutStrings[root] and "string" or "boolean");
+	end
 	if ( root == "elementModes" ) then return depth == 2 and (value == "enabled" or value == "disabled" or value == "default"); end
 	if ( root == "orientations" ) then return depth == 2 and (value == "horizontal" or value == "vertical"); end
 	if ( root == "muted" or root == "enabledElements" or root == "frameDefault" or root == "statHidden" ) then return depth == 2 and type(value) == "boolean"; end
@@ -893,7 +896,7 @@ function SS.StopDemoMode()
 	SS.demoState, SS.demoClock = nil, nil;
 	if ( SlimSuiteWorld ) then SlimSuiteWorld.demoPins = nil; end
 	SS.TALLY_SAMPLE.kills, SS.TALLY_SAMPLE.gold, SS.TALLY_SAMPLE.chest, SS.TALLY_SAMPLE.bosses, SS.TALLY_SAMPLE.guardians = 1284, 356, 120, 2, 3;
-	SS.BOSS_SAMPLE[1][2], SS.BOSS_SAMPLE[2][2], SS.BOSS_SAMPLE[3][2], SS.BOSS_SAMPLE[4][2] = 60, 40, 85, 100;
+	SS.BOSS_SAMPLE[1][2], SS.BOSS_SAMPLE[2][2], SS.BOSS_SAMPLE[3][2], SS.BOSS_SAMPLE[4][2], SS.BOSS_SAMPLE[5][2] = 60, 40, 85, 100, 70;
 	if ( demoGlint ) then demoGlint:Hide(); end
 	SetDemoXP(false);
 	SS.demoPartyOrient = nil;
