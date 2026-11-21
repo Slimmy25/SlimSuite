@@ -2,6 +2,16 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.82
+The five demo designs in Quick setup are now far more different from each other, each built around its own idea.
+
+- Classic Plus: the game's own frames and look, with just boss bars and a run clock added.
+- Centered: everything low and central, you and your target mirrored over the action bars, your party in a row beneath.
+- Info Column: run info, stats and the damage meter stacked down the left, the action bar standing up on the right.
+- Minimal: almost nothing on screen, everything pushed to the edges, you and your party as one thin line.
+- Controller / Handheld: big, high-contrast frames, you and your target either side of your hero, party across the top.
+- Every design was checked on ten screen sizes, from 4:3 to ultrawide and the Steam Deck, so nothing overlaps and the middle stays clear.
+
 ## 1.81
 Quick setup now comes with five demo designs that show what Slim Suite can do: Classic Plus, Centered, Info Column, Minimal, and Controller / Handheld. They're AI-generated: common layouts from WoW Forever, retail WoW and Azeroth Survivors were cross-referenced to work out what a typical UI should include, and each design was built new for Slim Suite.
 
