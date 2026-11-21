@@ -352,8 +352,10 @@ function SU.ChecksFor(frame)
 	local out = {};
 	-- "Movable?" is no longer offered: everything is movable by default, and the element's own switch covers it
 	for _, c in ipairs(frame and list[frame] or {}) do table.insert(out, c); end
-	-- every element has its own opacity, 0 to 100%
+	-- every element has its own opacity, 0 to 100%, and its own choice of sitting over the level-up / new-item cards
 	if ( frame and SS.ELEMENTS and SS.ELEMENTS[frame] and frame ~= "SlimSuiteEditGrid" ) then
+		table.insert(out, { "Show over the level-up / new-item cards", function() return SS.OnTopFor and SS.OnTopFor(frame); end,
+			function(v) if ( SS.SetOnTopFor ) then SS.SetOnTopFor(frame, v); end end, short = "Over the cards" });
 		table.insert(out, { "Opacity", function() return SS.ElementOpacity(frame); end, function(v) SS.SetElementOpacity(frame, v); end,
 			choice = SS.OPACITY_CHOICES, short = "Opacity" });
 	end

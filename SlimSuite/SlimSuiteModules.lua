@@ -1,7 +1,7 @@
 -- Category masters pause only SlimSuite features; installed addons are never changed.
 if ( setfenv ) then setfenv(1, SS.ENV); end
 SS.MODULE_ORDER={"ui","nameplates","gameplay","chat","sounds","misc"};
-SS.MODULE_TITLES={elements="Elements",ui="Interface",nameplates="Nameplates",gameplay="Gameplay",chat="Chat",sounds="Sound",misc="Accessibility"};
+SS.MODULE_TITLES={elements="Elements",ui="Interface",nameplates="Nameplates",gameplay="Gameplay",chat="Chat",sounds="Sound",misc="Accessibility",changelog="Changelog"};
 local groups={
  gameplay={"camera","bossMarks","prePullMarks","deathMarks","raidRow","minimapCaches","minimapBosses","minimapLairs","showGuardianFlag","floatingText","worldCombatMode"},
  nameplates={"modernEnemyFrames","enemyBossesOnly","enemyPlateDebuffs","enemyPlateGroup","platerStyle","plateWidth","plateBarHeight","plateNameSize","plateHpText","plateBorder","plateColorEnemy","plateColorElite","plateColorBoss"},
@@ -106,3 +106,15 @@ function SS.SetModuleEnabled(id,on)
  SS.RefreshToggles();
  if SS.RefreshModuleHub then SS.RefreshModuleHub(); end
 end
+
+-- The page on/off switch is retired. A page someone had switched off is switched back on once, with the settings it
+-- had before, so nothing stays paused with no way to turn it back on.
+SS.Every("retirePageSwitch", 2, function()
+ local d=SS.DB(); if not d or not d.modules then return; end
+ SS.Stop("retirePageSwitch");
+ if d.pageSwitchRetired then return; end
+ d.pageSwitchRetired=true;
+ for _,id in ipairs(SS.MODULE_ORDER) do
+  if d.modules[id]==false then SS.Safe(SS.SetModuleEnabled,id,true); d.modules[id]=nil; end
+ end
+end);

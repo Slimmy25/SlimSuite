@@ -629,13 +629,48 @@ local onTopApplied, onTopAPI = {}, nil;
 local function ApplyOnTopFrame(f, on)
 	if ( f and onTopApplied[f] ~= on and SS.Safe(AZS_SetOnTopOfScreens, f, on) ) then onTopApplied[f] = on; end
 end
+-- Each element can be set on its own (its right-click menu, its section): over the cards or under them. An element
+-- with no choice of its own follows the global setting.
+function SS.OnTopFor(name)
+	local own = DB().onTop and DB().onTop[name];
+	if ( own ~= nil ) then return own and true or false; end
+	return DB().onTopOfScreens and true or false;
+end
+function SS.SetOnTopFor(name, on)
+	local d = DB(); d.onTop = d.onTop or {};
+	d.onTop[name] = on and true or false;
+	SS.Safe(W.ApplyOnTop);
+end
+local function ElementFrames(name)
+	local out, seen = {}, {};
+	local function Add(n) local f = n and getglobal(n); if ( f and not seen[f] ) then seen[f] = true; table.insert(out, f); end end
+	Add(SS.Shown and SS.Shown(name) or name); Add(name);
+	if ( name == "PartyMemberFrame1" ) then
+		for i = 2, 4 do Add("PartyMemberFrame" .. i); end
+		Add("SlimSuitePartyLines"); Add("SlimSuitePartySelfFrame");
+	elseif ( name == "PlayerFrame" ) then Add("SlimSuitePlayerCard");
+	elseif ( name == "TargetFrame" ) then Add("SlimSuiteTargetCard");
+	elseif ( name == "MinimapCluster" ) then Add("SlimSuiteMinimapBar");
+	elseif ( name == "MainMenuBar" ) then Add("SlimSuiteStoreLevelsToggle"); end
+	return out;
+end
 function W.ApplyOnTop()
 	if ( not A.Has("AZS_SetOnTopOfScreens") ) then return; end
 	if ( onTopAPI ~= AZS_SetOnTopOfScreens ) then onTopApplied, onTopAPI = {}, AZS_SetOnTopOfScreens; end
 	local on = DB().onTopOfScreens and true or false;
+	local done, listed = {}, {};
+	for i = 1, table.getn(ON_TOP) do local f = getglobal(ON_TOP[i]); if ( f ) then listed[f] = true; end end
+	for name in pairs(SS.ELEMENTS or {}) do
+		local own = SS.OnTopFor(name);
+		for _, f in ipairs(ElementFrames(name)) do
+			-- the game's own frames are only handed to the game when lifted (or to put back one that was lifted)
+			if ( own or listed[f] or onTopApplied[f] ~= nil ) then ApplyOnTopFrame(f, own); end
+			done[f] = true;
+		end
+	end
 	for i = 1, table.getn(ON_TOP) do
 		local f = getglobal(ON_TOP[i]);
-		ApplyOnTopFrame(f, on);
+		if ( f and not done[f] ) then ApplyOnTopFrame(f, on); end
 	end
 	for i = 1, 64 do
 		local f = getglobal("SlimSuiteEnemyNameplate" .. i);

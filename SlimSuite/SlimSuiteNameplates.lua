@@ -26,7 +26,7 @@ local function OverlayActive()
 end
 local PLATE_BACKDROP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
  tile = true, tileSize = 16, edgeSize = 10, insets = { left=2, right=2, top=2, bottom=2 } };
--- Plater-style plates: a slim health bar with the name above it. Colours are chosen in the settings.
+-- Slim plates: a slim health bar with the name above it. Colours are chosen in the settings.
 local PLATE_COLORS = { Red = { 0.86, 0.18, 0.14 }, Gold = { 0.95, 0.78, 0.22 }, Purple = { 0.66, 0.36, 0.92 },
  Green = { 0.35, 0.84, 0.36 }, Blue = { 0.3, 0.62, 1 }, White = { 0.94, 0.94, 0.94 } };
 local NAME_FONTS = { small = "GameFontNormalSmall", normal = "GameFontNormal", large = "GameFontNormalLarge" };

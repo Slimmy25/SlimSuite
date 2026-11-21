@@ -120,6 +120,7 @@ local SECTIONS = {
  { key = "custom", title = "Custom Design", names = { "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame", "SlimSuiteLuckFrame", "SlimSuiteCompassFrame", "SlimSuiteAchievementsButton" } },
  { key = "other", title = "Other", names = {} },
 };
+SS.ELEMENT_SECTIONS = SECTIONS;   -- the Interface settings group its element sections the same way
 
 -- Which section an element belongs to; anything not listed goes to Other.
 local function SectionOf(name)

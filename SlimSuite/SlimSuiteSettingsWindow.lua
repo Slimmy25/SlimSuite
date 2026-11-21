@@ -19,11 +19,26 @@ end
 function SS.LayoutPage(page)
 	local rows, parent = page.rows, page.parent;
 	local show = {};
+	-- while searching, every element section with a match opens by itself (only for as long as the search lasts)
+	local q = SS.searchText and SS.searchText ~= "";
+	local hit = {};
+	if ( q ) then
+		for i = 1, table.getn(rows) do
+			local r = rows[i];
+			if ( r.kind == "fold" and SS.RowMatches(r) ) then hit[r] = "title";
+			elseif ( r.fold and not hit[r.fold] and not (r.up and not r.up()) and SS.RowMatches(r) ) then hit[r.fold] = true; end
+		end
+	end
+	page.matchCount = 0;
 	for i = 1, table.getn(rows) do
 		local r = rows[i];
 		show[i] = not (r.up and not r.up()) and SS.RowMatches(r);
-		if ( r.fold and not (SS.openFolds and SS.openFolds[r.fold.title] and SS.FoldCanOpen(r.fold)) ) then show[i] = false; end
-		if ( r.kind == "fold" ) then show[i] = true; end
+		if ( r.fold ) then
+			if ( q ) then show[i] = SS.FoldCanOpen(r.fold) and not (r.up and not r.up()) and (show[i] or hit[r.fold] == "title");
+			elseif ( not (SS.openFolds and SS.openFolds[r.fold.title] and SS.FoldCanOpen(r.fold)) ) then show[i] = false; end
+		end
+		if ( r.kind == "fold" ) then show[i] = (not q) or (hit[r] and true or false); r.searchOpen = q and hit[r] and true; end
+		if ( show[i] and r.kind ~= "head" ) then page.matchCount = page.matchCount + 1; end
 	end
 	local y = page.startY;
 	for i = 1, table.getn(rows) do
@@ -51,13 +66,17 @@ function SS.LayoutPage(page)
 				rowHeight = 30;
 			elseif ( r.kind == "fold" ) then
 				local can = SS.FoldCanOpen(r);
-				local open = can and SS.openFolds and SS.openFolds[r.title];
-				r.b:SetText((not can and "    " or (open and "-  " or "+  ")) .. r.title);
-				r.b:ClearAllPoints(); r.b:SetPoint("TOPLEFT", parent, "TOPLEFT", 14, y + 2); r.b:Show();
+				local open = can and ((SS.openFolds and SS.openFolds[r.title]) or r.searchOpen);
+				r.y = y;
+				-- the + / - sits outside the button, to the left of the name
+				r.b:SetText(r.title);
+				r.sign:SetText(can and (open and "-" or "+") or "");
+				r.sign:ClearAllPoints(); r.sign:SetPoint("TOPLEFT", parent, "TOPLEFT", 16, y - 1); r.sign:Show();
+				r.b:ClearAllPoints(); r.b:SetPoint("TOPLEFT", parent, "TOPLEFT", 30, y + 2); r.b:Show();
 				local current = r.element and SU.Mode(r.element);
 				for j, mb in ipairs(r.modes or {}) do
-					mb:ClearAllPoints(); mb:SetPoint("TOPLEFT", parent, "TOPLEFT", 240 + (j - 1) * 66, y + 2); mb:Show();
-					if ( mb.mode == current ) then mb:LockHighlight(); else mb:UnlockHighlight(); end
+					mb:ClearAllPoints(); mb:SetPoint("TOPLEFT", parent, "TOPLEFT", 238 + (j - 1) * 58, y + 2); mb:Show();
+					if ( mb.mode and mb.mode == current ) then mb:LockHighlight(); else mb:UnlockHighlight(); end
 				end
 				rowHeight = 26;
 			elseif r.kind=="deathmatrix" then
@@ -78,7 +97,7 @@ function SS.LayoutPage(page)
 			y = y - rowHeight;
 		else
 			if ( r.kind == "elementmode" ) then r.fs:Hide(); for j = 1, 3 do r.buttons[j].b:Hide(); end
-			elseif ( r.kind == "button" or r.kind == "fold" ) then r.b:Hide(); for _, mb in ipairs(r.modes or {}) do mb:Hide(); end
+			elseif ( r.kind == "button" or r.kind == "fold" ) then r.b:Hide(); if ( r.kind == "fold" ) then r.searchOpen = nil; end if ( r.sign ) then r.sign:Hide(); end for _, mb in ipairs(r.modes or {}) do mb:Hide(); end
 			elseif ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); if r.preview then r.preview:Hide(); end end
 		end
 	end
@@ -105,11 +124,30 @@ SS.searchText = "";
 function SS.RowMatches(r)
 	local q = SS.searchText;
 	if ( not q or q == "" or r.kind == "head" ) then return true; end
-	local t = "";
-	if ( r.cb and r.cb.label and r.cb.label.GetText ) then t = r.cb.label:GetText() or "";
-	elseif ( r.fs and r.fs.GetText ) then t = r.fs:GetText() or ""; end
-	return string.find(string.lower(t), q, 1, true) ~= nil;
+	local t = r.full or r.title or "";
+	if ( r.full == nil and r.title == nil ) then
+		if ( r.cb and r.cb.label and r.cb.label.GetText ) then t = r.cb.label:GetText() or "";
+		elseif ( r.fs and r.fs.GetText ) then t = r.fs:GetText() or ""; end
+	end
+	t = string.lower(t);
+	if ( string.find(t, q, 1, true) ) then return true; end
+	-- buzz words: a word opens its whole family (hide finds hidden, remove and off, size finds scale and width, ...)
+	if ( string.len(q) >= 3 ) then
+		for _, family in ipairs(SS.SEARCH_WORDS) do
+			local hit = false;
+			for _, word in ipairs(family) do if ( string.find(word, q, 1, true) == 1 ) then hit = true; break; end end
+			if ( hit ) then for _, word in ipairs(family) do if ( string.find(t, word, 1, true) ) then return true; end end end
+		end
+	end
+	return false;
 end
+SS.SEARCH_WORDS = {
+	{ "hide", "hidden", "remove", "off", "disable" }, { "opacity", "transparent", "see-through", "fade" },
+	{ "move", "position", "place", "join", "anchor" }, { "size", "bigger", "smaller", "scale", "width", "height" },
+	{ "clock", "time", "timer" }, { "boss", "guardian", "lair" }, { "sound", "audio", "music", "preview" },
+	{ "party", "group", "team", "raid" }, { "map", "minimap", "compass" }, { "cards", "level-up", "new-item" },
+	{ "buff", "aura", "debuff" }, { "enemy", "nameplate", "plate", "monster" },
+};
 function SS.RelayoutAllPages()
 	if ( not SS.pages ) then return; end
 	for i = 1, table.getn(SS.pages) do SS.LayoutPage(SS.pages[i]); end
@@ -186,26 +224,39 @@ function SS.WinBuild()
  local search=CreateFrame("EditBox","SlimSuiteSettingsSearch",win,"InputBoxTemplate");
  search:SetWidth(150); search:SetHeight(20); search:SetPoint("TOPRIGHT",win,"TOPRIGHT",-22,-30);
  search:SetAutoFocus(false); search:SetMaxLetters(40);
- search:SetScript("OnTextChanged",function() SS.searchText=string.lower(this:GetText() or ""); SS.RelayoutAllPages(); end);
+ search:SetScript("OnTextChanged",function()
+  SS.searchText=string.lower(this:GetText() or ""); SS.RelayoutAllPages();
+  -- nothing here matches: go to the first page that has something
+  local views=SS.settingsViews; local cur=views and SS.currentModule and views[SS.currentModule];
+  if SS.searchText~="" and cur and (cur.page.matchCount or 0)==0 then
+   for _,id in ipairs(SS.MODULE_ORDER) do if views[id] and (views[id].page.matchCount or 0)>0 then SS.OpenModulePage(id); break; end end
+  end
+ end);
+ SS.AddTip(search,"Search: type a word (hide, clock, boss, size, party...) and every setting about it opens.");
  search:SetScript("OnEscapePressed",function() this:SetText(""); this:ClearFocus(); end);
- local hero=K.Hero(win,380); hero:SetWidth(430); hero:SetPoint("TOPLEFT",win,"TOPLEFT",20,-30);
- K.Icon(hero.icon,"INV_Misc_Gear_02"); hero.heading:SetText("Slim Suite"); hero.line:SetText(SS.T("Choose a module to open its settings."));
- hero.version=hero:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); hero.version:SetPoint("TOPRIGHT",hero,"TOPRIGHT",-9,-8); hero.version:SetText("v"..SS.AddonVersion());
- local hub=CreateFrame("Frame","SlimSuiteModuleHub",win); hub:SetPoint("TOPLEFT",win,"TOPLEFT",14,-60); hub:SetWidth(182); hub:SetHeight(430);
+ -- the search box says what it is; the version sits quietly in the bottom bar
+ local searchLabel=win:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); searchLabel:SetPoint("RIGHT",search,"LEFT",-8,0); searchLabel:SetText(SS.T("Search"));
+ local version=win:CreateFontString(nil,"OVERLAY","GameFontDisableSmall"); version:SetPoint("BOTTOM",win,"BOTTOM",60,18); version:SetText("v"..SS.AddonVersion());
+ local hub=CreateFrame("Frame","SlimSuiteModuleHub",win); hub:SetPoint("TOPLEFT",win,"TOPLEFT",14,-34); hub:SetWidth(182); hub:SetHeight(470);
  -- the one primary category: every subcategory below is a part of Slim Suite
- local band=CreateFrame("Frame",nil,hub); band:SetPoint("TOPLEFT",hub,"TOPLEFT",0,0); band:SetWidth(182); band:SetHeight(24);
- band:SetBackdrop({bgFile="Interface\\Buttons\\WHITE8X8",edgeSize=1}); band:SetBackdropColor(0.12,0.11,0.16,0.95);
- local bandText=band:CreateFontString(nil,"OVERLAY","GameFontNormal"); bandText:SetPoint("LEFT",band,"LEFT",8,0); bandText:SetText("Slim Suite");
+ -- (no band: the window's own title already says Slim Suite)
  local title=win:CreateFontString(nil,"OVERLAY","GameFontNormalLarge"); title:SetPoint("TOPLEFT",win,"TOPLEFT",214,-34); title:SetTextColor(1,1,1);
  local rule=win:CreateTexture(nil,"ARTWORK"); rule:SetTexture("Interface\\Buttons\\WHITE8X8"); rule:SetVertexColor(0.5,0.5,0.55,0.8); rule:SetPoint("TOPLEFT",win,"TOPLEFT",214,-58); rule:SetWidth(470); rule:SetHeight(1);
  local closeButton=K.Button(win,"Close",90,function() win:Hide(); end); closeButton:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,12);
  -- Defaults resets the category on the page; Reset ALL asks first, then wipes the whole addon
- local defaultsButton=K.Button(win,"Defaults",100,function() if SS.currentModule then SS.ResetCategory(SS.currentModule); end end); defaultsButton:SetPoint("BOTTOMLEFT",win,"BOTTOMLEFT",22,12);
+ local defaultsButton=K.Button(win,"Defaults",100,function() if SS.currentModule and SS.currentModule~="changelog" then SS.ResetCategory(SS.currentModule); end end); defaultsButton:SetPoint("BOTTOMLEFT",win,"BOTTOMLEFT",22,12);
  local resetAllButton=K.Button(win,"Reset ALL",110,function() SS.ConfirmResetAll(); end); resetAllButton:SetPoint("LEFT",defaultsButton,"RIGHT",8,0); SS.settingsTitle=title;
- SS.moduleHubButtons={}; local views={}; local current;
+ SS.moduleHubButtons={}; local views={}; local current; SS.settingsViews=views;
+ local undo=K.Button(win,"Undo",70,function() SS.Undo(); end); undo:SetPoint("LEFT",resetAllButton,"RIGHT",16,0);
+ local redo=K.Button(win,"Redo",70,function() SS.Redo(); end); redo:SetPoint("LEFT",undo,"RIGHT",6,0);
+ SS.undoButton, SS.redoButton = undo, redo;
+ SS.AddTip(undo,function() local c=SS.history[SS.historyPos]; return c and (SS.T("Undo")..": "..c.what) or SS.T("Nothing to undo"); end);
+ SS.AddTip(redo,function() local c=SS.history[SS.historyPos+1]; return c and (SS.T("Redo")..": "..c.what) or SS.T("Nothing to redo"); end);
+ SS.RefreshHistoryButtons();
  local back=K.Button(win,"Back",75,function() SS.OpenModulePage(nil); end); back:SetPoint("TOPLEFT",win,"TOPLEFT",20,-102); back:Hide();
  local master=SS.Check(win,"Module enabled",-100,function() return current and SS.ModuleEnabled(current); end,function(v) if current then SS.SetModuleEnabled(current,v); end end);
  master:ClearAllPoints(); master:SetPoint("TOPLEFT",win,"TOPLEFT",214,-62); master.moduleControl=true; master.label:SetWidth(330); master.label:SetHeight(28);
+ SS.AddTip(master,"Off pauses everything on this page. Nothing is lost: turn it back on and your settings return.");
 	local function AddRows(parent, entries, startY, after, module)
 		SS.pages = SS.pages or {};
 		local page = { parent = parent, rows = {}, startY = startY, after = after, module=module };
@@ -217,7 +268,8 @@ function SS.WinBuild()
 			if ( row.fold ) then
 				-- an element's section: its name as a button that opens and closes the settings under it
 				local r = { kind = "fold", title = SS.T(row.fold), element = row.element };
-				r.b = K.Button(parent, "", 220, function()
+				r.sign = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
+				r.b = K.Button(parent, "", 204, function()
 					if ( not SS.FoldCanOpen(r) ) then return; end
 					SS.openFolds = SS.openFolds or {};
 					SS.openFolds[r.title] = not SS.openFolds[r.title];
@@ -228,17 +280,29 @@ function SS.WinBuild()
 				-- On, Off and Default for the element itself; its settings open only while it is On
 				r.modes = {};
 				if ( row.element ) then
+					local name, label = row.element, r.title;
 					for j, m in ipairs({ { "On", "enabled" }, { "Off", "disabled" }, { "Default", "default" } }) do
 						local mode = m[2];
-						local mb = K.Button(parent, SS.T(m[1]), 62, function()
+						local mb = K.Button(parent, SS.T(m[1]), 56, function()
+							local before = SU.Mode(name);
 							SU.SetMode(row.element, mode, SS.ELEMENTS[row.element] and SS.ELEMENTS[row.element].title);
-							SS.openFolds = SS.openFolds or {};
-							SS.openFolds[r.title] = (mode == "enabled") and true or nil;
+							if ( before ~= mode ) then
+								SS.RecordChange(label .. " > On/Off/Default", before, mode, function(v)
+									SU.SetMode(name, v, SS.ELEMENTS[name] and SS.ELEMENTS[name].title);
+								end);
+							end
+							-- On does not open the section by itself; Off and Default close it
+							if ( mode ~= "enabled" and SS.openFolds ) then SS.openFolds[r.title] = nil; end
 							SS.LayoutPage(page);
 						end);
 						mb:SetHeight(22); mb.mode = mode;
+						SS.AddTip(mb, SS.MODE_TIPS[mode](label));
 						r.modes[j] = mb;
 					end
+					local rb = K.Button(parent, SS.T("Reset"), 56, function() SS.ResetElementAll(name, label); SS.LayoutPage(page); end);
+					rb:SetHeight(22);
+					SS.AddTip(rb, SS.MODE_TIPS.reset(label));
+					r.modes[4] = rb;
 				end
 				table.insert(page.rows, r);
 				fold = r; up = nil;
@@ -295,7 +359,19 @@ function SS.WinBuild()
 			else
 				local label, lead = row[1], 0;
 				if ( string.find(label, "^%s") ) then lead = 22; label = string.gsub(label, "^%s+", ""); end
-				local r = { lead = lead, up = (lead > 0) and up or nil };
+				-- a short label in the list; the full sentence is in the hover text and still found by the search
+				local full = label;
+				label = row.short or SS.SHORT_LABELS[full] or full;
+				-- every change is kept for Undo / Redo and written to the action log
+				local get, set = row[2], row[3];
+				local what = (fold and fold.title and (fold.title .. " > ") or "") .. label;
+				local copy = {}; for k, v in pairs(row) do copy[k] = v; end
+				copy[3] = function(v)
+					local ok, b = SS.Safe(get); set(v); local ok2, a = SS.Safe(get);
+					if ( ok and ok2 and b ~= a and (a or b) ) then SS.RecordChange(what, b, a, set); end
+				end;
+				row = copy;
+				local r = { lead = lead, up = (lead > 0) and up or nil, full = SS.T(full) .. " " .. label };
 				if ( row.choice ) then
 					r.kind = "choice";
 					r.fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
@@ -304,10 +380,12 @@ function SS.WinBuild()
 					r.b.entry = row; r.b:SetPoint("LEFT", r.fs, "RIGHT", 10, 0);
 					r.b:SetText(SS.ChoiceText(row));
 					r.b:SetScript("OnShow", function() if ( this.entry ) then this:SetText(SS.ChoiceText(this.entry)); end end);
+					if ( label ~= full ) then SS.AddTip(r.b, SS.T(full)); end
 					if ( lead == 0 ) then up = nil; end
 				else
 					r.kind = "check";
 					r.cb = SS.Check(parent, label, startY, row[2], row[3], lead);
+					if ( label ~= full ) then SS.AddTip(r.cb, SS.T(full)); end
 					if ( r.cb.label ) then r.cb.label:SetTextColor(1, 0.82, 0); end
 					up = row[2];
 				end
@@ -334,15 +412,26 @@ function SS.WinBuild()
   for _,name in ipairs(SS.SETUP_ORDER or {}) do if not seen[name] then seen[name]=true; table.insert(order,name); end end
   for _,m in ipairs(SS.MOVABLE or {}) do if SS.ELEMENTS[m[1]] and not seen[m[1]] then seen[m[1]]=true; table.insert(order,m[1]); end end
   for name in pairs(SS.ELEMENTS) do if not seen[name] then seen[name]=true; table.insert(order,name); end end
-  for _,name in ipairs(order) do
-   local element=SS.ELEMENTS[name];
+  -- grouped: Aethus creations, my creations, then the default WoW / Blizzard ones (anything unlisted last)
+  local groupOf={};
+  for _,sec in ipairs(SS.ELEMENT_SECTIONS or {}) do for _,n in ipairs(sec.names or {}) do groupOf[n]=sec.key; end end
+  local GROUPS={{"aethus","Aethus creations"},{"custom","My creations"},{"original","Default WoW / Blizzard ideas"},{"other","Other"}};
+  local grouped={};
+  for _,g in ipairs(GROUPS) do
+   local names={};
+   for _,name in ipairs(order) do if (groupOf[name] or "other")==g[1] and name~="SlimSuiteEditGrid" then table.insert(names,name); end end
+   if table.getn(names)>0 then table.insert(grouped,{head=g[2]}); for _,n in ipairs(names) do table.insert(grouped,n); end end
+  end
+  for _,name in ipairs(grouped) do
+   if type(name)=="table" then table.insert(out,name); end
+   local element=type(name)=="string" and SS.ELEMENTS[name];
    local ok,checks=SS.Safe(SU.ChecksFor,name);
    if element and name~="SlimSuiteEditGrid" then
     if not ok or type(checks)~="table" then checks={}; end
     table.insert(out,{fold=element.label or element.title or name,element=name});
     for _,e in ipairs(checks) do
      if type(e)=="table" and type(e[1])=="string" and e[2] and e[3] then
-      table.insert(out,{e[1],e[2],e[3],choice=e.choice,when=type(e[4])=="function" and e[4] or nil});
+      table.insert(out,{e[1],e[2],e[3],choice=e.choice,short=e.short,when=type(e[4])=="function" and e[4] or nil});
      end
     end
    end
@@ -354,6 +443,15 @@ function SS.WinBuild()
 			{"HUD Edit Mode (move, resize and turn elements on or off)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v, true); if ( v ) then SS.OpenHUDEdit(); else SS.CloseHUDEdit(); end end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
 			{elementSections = true},
+			-- settings that join one element into another: turning one on makes an element leave its own place
+			{head="Optional combined that hide elements"},
+			{"Join the party yourself: your player frame leaves and you become the first party member", function() return SS.DB().partyIncludesSelf; end, function(v) SS.SetPartySelf(v); end},
+			{"Mirror Target: the target frame joins your player frame as one mirrored pair", function() return SS.DB().mirrorTarget and SS.DB().combineTarget; end, function(v) SS.SetMirrorTarget(v); end},
+			{"Party frames join the player frame (and move with it)", function() return SS.PartyPosition(); end, function(v) SS.SetPartyPosition(v); end,
+			 choice={{"No (anywhere)","free"},{"Under the player frame","below"},{"Above the player frame","above"}}},
+			{"Buffs leave their own place and join the player frame", function() return SS.BuffsPlace(); end, function(v) SS.SetBuffsPlace(v); end, choice=SS.BUFF_PLACES},
+			{"Worn rings / trinkets row joins the build spell row", function() return SS.DB().buildRowsAttached; end, function(v) if ( (v and true or false) ~= (SS.DB().buildRowsAttached and true or false) ) then SS.ToggleBuildRowsAttached(); end end},
+			{"Local clock stays inside the minimap (off: its own movable clock)", function() return not SS.DB().clockDetached; end, function(v) SS.SetClockDetached(not v); end, when=function() return SS.DB().replaceLocalClock; end},
 			{button = "Profiles & import/export", onClick = function() SS.ShowLayoutWindow(); end},
 			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
 			{head="Everywhere"},
@@ -361,7 +459,7 @@ function SS.WinBuild()
 			{"Show green absorb amounts on player and party frames (when the client exposes them)", function() return SS.DB().showAbsorbs; end, function(v) SS.DB().showAbsorbs = v and true or false; SS.Safe(SS.UpdateAbsorbMarkers); end},
 			worldEntry,
 			{"Build and stats beside card choices",function() return SS.DB().cardEdgeHUD~=false; end,function(v) SS.DB().cardEdgeHUD=v; end},
-			{"Show Slim Suite above the level-up and new-item cards", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
+			{"Show every element above the level-up and new-item cards (each element can still be set on its own)", function() return SS.DB().onTopOfScreens; end, function(v) SS.DB().onTopOfScreens = v; SS.DB().onTop = {}; if ( SlimSuiteWorld ) then SlimSuiteWorld.ApplyOnTop(); end end}
  };
  local otherEntries={
 			{"Language (reload UI)", function() return SS.DB().language or "auto"; end,
@@ -389,7 +487,7 @@ function SS.WinBuild()
 			{"Only show bosses and lair guardians on modern enemy frames", function() return SS.DB().enemyBossesOnly; end, function(v) SS.SetEnemyPlateBossesOnly(v); end},
 			{"Group identical monsters into one plate (e.g. Spider x34)", function() return SS.DB().enemyPlateGroup ~= false; end, function(v) SS.DB().enemyPlateGroup = v and true or false; SS.Safe(SS.UpdateEnemyNameplates); end},
 			{"Show boss and lair debuffs and remaining time on enemy nameplates (native or modern)", function() return SS.DB().enemyPlateDebuffs; end, function(v) SS.SetEnemyPlateDebuffs(v); end},
-			{"Plater-style nameplates: slim health bar with the name above", function() return SS.DB().platerStyle ~= false; end, function(v) SS.DB().platerStyle = v and true or false; SS.Safe(SS.UpdateEnemyNameplates); end},
+			{"Slim nameplates: slim health bar with the name above", function() return SS.DB().platerStyle ~= false; end, function(v) SS.DB().platerStyle = v and true or false; SS.Safe(SS.UpdateEnemyNameplates); end},
 			{"Health text under the bar", function() return SS.DB().plateHpText ~= false; end, function(v) SS.DB().plateHpText = v and true or false; SS.Safe(SS.UpdateEnemyNameplates); end},
 			{"Black border around the bar", function() return SS.DB().plateBorder ~= false; end, function(v) SS.DB().plateBorder = v and true or false; SS.Safe(SS.UpdateEnemyNameplates); end},
 			{"Plate width", function() return SS.DB().plateWidth or 110; end, function(v) SS.DB().plateWidth = v; SS.Safe(SS.UpdateEnemyNameplates); end,
@@ -470,14 +568,36 @@ function SS.WinBuild()
  for i,id in ipairs(SS.MODULE_ORDER) do
   local module=id;
   local open=K.Button(hub,SS.T(SS.MODULE_TITLES[id]),170,function() SS.OpenModulePage(module); end);
-  open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-30-(i-1)*40); SS.sidebarButtons=SS.sidebarButtons or {}; SS.sidebarButtons[id]=open;
+  open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-(i-1)*40); SS.sidebarButtons=SS.sidebarButtons or {}; SS.sidebarButtons[id]=open;
   SU.Flatten(open);
   -- the on/off switch for each module is the Module enabled line at the top of its page
   local toggle=K.Button(hub,"",10,function() SS.SetModuleEnabled(module,not SS.ModuleEnabled(module)); end);
   toggle:Hide(); SS.moduleHubButtons[id]=toggle;
   local scroll,child=K.Scroll("SlimSuiteModule_"..id,win,480);
-  scroll:SetPoint("TOPLEFT",win,"TOPLEFT",214,-112); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,34);
+  scroll:SetPoint("TOPLEFT",win,"TOPLEFT",214,-70); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,34);
   local page=AddRows(child,entries[id],-8,nil,id); views[id]={scroll=scroll,page=page};
+ end
+ -- Changelog, under Accessibility: every release from the first to now, read only
+ do
+  local n=table.getn(SS.MODULE_ORDER)+1;
+  local open=K.Button(hub,SS.T("Changelog"),170,function() SS.OpenModulePage("changelog"); end);
+  open:SetHeight(34); open:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-(n-1)*40); SS.sidebarButtons.changelog=open; SU.Flatten(open);
+  local scroll,child=K.Scroll("SlimSuiteModule_changelog",win,480);
+  scroll:SetPoint("TOPLEFT",win,"TOPLEFT",214,-70); scroll:SetPoint("BOTTOMRIGHT",win,"BOTTOMRIGHT",-22,34);
+  local page={rows={},parent=child,matchCount=0};
+  local y=-8;
+  for _,s in ipairs(SS.CHANGELOG or {}) do
+   local fs=child:CreateFontString(nil,"OVERLAY","GameFontHighlight"); fs:SetJustifyH("LEFT");
+   local parts={"|cffffd100"..s.v.."|r"};
+   if s.summary~="" then table.insert(parts,s.summary); end
+   for _,item in ipairs(s.items) do table.insert(parts,"|cffffd100-|r "..item); end
+   fs:SetText(table.concat(parts,"\n"));
+   fs:SetPoint("TOPLEFT",child,"TOPLEFT",8,y);
+   y=y-SS.WrappedLabelHeight(fs,440)-14;
+   table.insert(page.rows,{kind="text",fs=fs});
+  end
+  child:SetHeight(math.max(20,-y+12));
+  scroll:Hide(); views.changelog={scroll=scroll,page=page};
  end
  SS.RefreshElementModes=function()
   for _,view in pairs(views) do
@@ -503,10 +623,10 @@ function SS.WinBuild()
   if ( not id or not views[id] ) then id = SS.MODULE_ORDER[1]; end
   current=id; SS.currentModule=id;
   for _,view in pairs(views) do view.scroll:Hide(); end
-  hub:Show(); back:Hide(); master:Show(); master.label:Show(); views[id].scroll:Show();
+  hub:Show(); back:Hide(); views[id].scroll:Show();
   title:SetText(SS.T(SS.MODULE_TITLES[id]));
-  master.label:SetText(SS.T("Module enabled"));
-  if ( id=="elements" ) then master:Hide(); master.label:Hide(); else master:Show(); master.label:Show(); end
+  master.label:SetText(SS.T("Use Slim Suite's").." "..SS.T(SS.MODULE_TITLES[id]).." "..SS.T("features"));
+  master:Hide(); master.label:Hide();   -- the page on/off switch is retired: every element has its own On / Off
   SS.RefreshElementModes();
   for sid, b2 in pairs(SS.sidebarButtons or {}) do SU.PaintFlat(b2, sid == id, {1, 0.82, 0.2}); end
   SS.RefreshToggles(); SS.RefreshModuleHub();
@@ -558,6 +678,10 @@ function SS.ToggleMouseProbe()
 end
 
 SS.HELP = {
+	"Getting started: /slim opens the settings. Under Interface > Elements each element has On, Off, Default and Reset; the + next to its name opens its settings.",
+	"Type a word in the search box at the top (hide, clock, boss, size, party...) and every setting about it opens.",
+	"In HUD Edit Mode, right-click any element and choose Open in settings to jump straight to it.",
+	"Undo and Redo at the bottom of the settings (or /slim undo, /slim redo) step through your last 25 changes. /slim log shows every change.",
 	"/slim: the settings window.  /slim edit: move and size the UI (/slim lock when done).  /slim setup: the guided setup.",
 	"/slim demo: Demo Mode on or off.  /slim levelup: Slim Suite's Level Up button or the game's own.",
 	"/slim positions: write where every element sits (position, size, scale) to the action log.",
@@ -576,7 +700,9 @@ SlashCmdList["SLIMSUITE"] = function(msg)
 	cmd = string.lower(cmd or "");
 	rest = string.lower(rest or "");
 	local d = SS.DB();
-	if ( cmd == "help" or cmd == "?" ) then
+	if ( cmd == "undo" ) then SS.Undo();
+	elseif ( cmd == "redo" ) then SS.Redo();
+	elseif ( cmd == "help" or cmd == "?" ) then
 		for _, line in ipairs(SS.HELP) do K.Print(NAME, line); end
 	elseif ( cmd == "hide" and rest == "" ) then
 		if ( table.getn(d.words) == 0 ) then K.Print(NAME, "no words are hidden. /slim hide <words> hides chat lines with them.");
@@ -783,3 +909,184 @@ function SS.ResetEverything()
 	if ( ReloadUI ) then ReloadUI(); end
 end
 
+
+-- ---------------------------------------------------------------- hover text, short labels, undo / redo, warnings
+function SS.AddTip(w, text)
+	if ( not w or not w.SetScript ) then return; end
+	local enter, leave = w:GetScript("OnEnter"), w:GetScript("OnLeave");
+	w:SetScript("OnEnter", function()
+		if ( enter ) then enter(); end
+		local t = text; if ( type(t) == "function" ) then t = t(); end
+		if ( t and GameTooltip ) then GameTooltip:SetOwner(this, "ANCHOR_RIGHT"); GameTooltip:SetText(SS.T(t), 1, 1, 1, 1, 1); GameTooltip:Show(); end
+	end);
+	w:SetScript("OnLeave", function() if ( leave ) then leave(); end if ( GameTooltip ) then GameTooltip:Hide(); end end);
+end
+SS.MODE_TIPS = {
+	enabled = function(n) return "On: use Slim Suite's " .. n .. ". Its settings open with the + next to its name."; end,
+	disabled = function(n) return "Off: hide " .. n .. " completely."; end,
+	default = function(n) return "Default: give " .. n .. " back to the game, as it looks without Slim Suite."; end,
+	reset = function(n) return "Reset: put " .. n .. " back where it started: its place, size, opacity and cards setting (Undo brings it back)."; end,
+};
+SS.SHORT_LABELS = {
+	["Buffs leave their own place and join the player frame"] = "Buffs join the player frame",
+	["Group identical monsters into one plate (e.g. Spider x34)"] = "Group identical monsters",
+	["HUD Edit Mode (move, resize and turn elements on or off)"] = "HUD Edit Mode",
+	["Hide 'Who dares to enter my lair' (English game text only)"] = "Hide the lair greeting",
+	["Hide the Oogax Q opening line (English game text only)"] = "Hide Oogax's opening line",
+	["Hide the bar's artwork (only the spell squares stay)"] = "Hide the bar's artwork",
+	["Join the party yourself: your player frame leaves and you become the first party member"] = "Join the party yourself",
+	["Local clock stays inside the minimap (off: its own movable clock)"] = "Clock inside the minimap",
+	["Mark pulled bosses and Guardians (Skull, X, Circle, Star)"] = "Mark pulled bosses",
+	["Mirror Target: the target frame joins your player frame as one mirrored pair"] = "Mirror Target",
+	["Only show bosses and lair guardians on modern enemy frames"] = "Modern frames: bosses only",
+	["Party frames join the player frame (and move with it)"] = "Party joins the player frame",
+	["Slim nameplates: slim health bar with the name above"] = "Slim nameplates",
+	["Raid-mark row when the mouse is over a party member (in a group)"] = "Raid marks on party hover",
+	["Run clock at the bottom of the compass (run time, next boss, zone)"] = "Run clock under the compass",
+	["Run clock in the compass (run time, next boss, zone)"] = "Run clock in the compass",
+	["Separate the local clock from the minimap (use Slim Suite's own)"] = "Separate local clock",
+	["Show boss and lair debuffs and remaining time on enemy nameplates (native or modern)"] = "Boss debuffs on nameplates",
+	["Show every element above the level-up and new-item cards (each element can still be set on its own)"] = "Everything over the level-up cards",
+	["Show green absorb amounts on player and party frames (when the client exposes them)"] = "Absorb amounts",
+	["Show lairs on the minimap, with their 3:00 refill timer"] = "Lairs and refill timer",
+	["Show the game's nearest Guardian lair flag on minimap"] = "Guardian lair flag",
+	["Teammate revive sound (when you helped revive them)"] = "Teammate revive sound",
+	["Worn rings / trinkets row joins the build spell row"] = "Rings / trinkets join spells",
+	["Show over the level-up / new-item cards"] = "Over the level-up cards",
+};
+
+-- the last 25 changes, each with the value before and after; the action log keeps the full trail
+SS.HISTORY_MAX = 25; SS.history = {}; SS.historyPos = 0;
+local function Said(v)
+	if ( v == nil ) then return "default"; elseif ( v == true ) then return "on"; elseif ( v == false ) then return "off";
+	elseif ( type(v) == "table" ) then return "saved values"; end
+	return tostring(v);
+end
+function SS.RefreshHistoryButtons()
+	local u, r = SS.undoButton, SS.redoButton;
+	if ( u ) then if ( SS.historyPos > 0 ) then u:Enable(); else u:Disable(); end end
+	if ( r ) then if ( SS.history[SS.historyPos + 1] ) then r:Enable(); else r:Disable(); end end
+end
+function SS.RecordChange(what, before, after, apply)
+	if ( SS.replaying ) then return; end
+	while ( table.getn(SS.history) > SS.historyPos ) do table.remove(SS.history); end
+	table.insert(SS.history, { what = what, before = before, after = after, apply = apply });
+	while ( table.getn(SS.history) > SS.HISTORY_MAX ) do table.remove(SS.history, 1); end
+	SS.historyPos = table.getn(SS.history);
+	if ( SS.LogAction ) then SS.LogAction("[change] " .. what .. ": " .. Said(before) .. " -> " .. Said(after)); end
+	SS.RefreshHistoryButtons();
+	SS.Safe(SS.CheckWarnings);
+end
+local function Replay(c, value, word)
+	SS.replaying = true; SS.Safe(c.apply, value); SS.replaying = nil;
+	if ( SS.LogAction ) then SS.LogAction("[" .. word .. "] " .. c.what .. ": back to " .. Said(value)); end
+	K.Print(NAME, SS.T(word) .. ": " .. c.what .. " (" .. Said(value) .. ")");
+	SS.RefreshHistoryButtons(); SS.RelayoutAllPages();
+	if ( SS.RefreshToggles ) then SS.Safe(SS.RefreshToggles); end
+	SS.Safe(SS.CheckWarnings);
+end
+function SS.Undo()
+	local c = SS.history[SS.historyPos];
+	if ( not c ) then K.Print(NAME, SS.T("nothing to undo.")); return; end
+	SS.historyPos = SS.historyPos - 1; Replay(c, c.before, "Undo");
+end
+function SS.Redo()
+	local c = SS.history[SS.historyPos + 1];
+	if ( not c ) then K.Print(NAME, SS.T("nothing to redo.")); return; end
+	SS.historyPos = SS.historyPos + 1; Replay(c, c.after, "Redo");
+end
+
+-- Reset an element: its place, size, scale, padding, layout, opacity and over-the-cards choice. Undo puts them back.
+local RESET_TABLES = { "places", "sizes", "scales", "padding", "orientations", "opacity", "onTop" };
+local function Copy(v) if ( type(v) ~= "table" ) then return v; end local t = {}; for k, x in pairs(v) do t[k] = Copy(x); end return t; end
+local function Snapshot(name)
+	local d, snap = SS.DB(), {};
+	for _, key in ipairs(RESET_TABLES) do snap[key] = d[key] and Copy(d[key][name]); end
+	return snap;
+end
+local function Restore(name, snap)
+	local d = SS.DB();
+	for _, key in ipairs(RESET_TABLES) do d[key] = d[key] or {}; d[key][name] = Copy(snap[key]); end
+	SS.Safe(SS.Place, name); SS.Safe(SS.ApplySize, name, getglobal(name));
+	if ( SS.lastOpacity ) then SS.lastOpacity[name] = true; end
+	if ( SlimSuiteWorld and SlimSuiteWorld.ApplyOnTop ) then SS.Safe(SlimSuiteWorld.ApplyOnTop); end
+end
+function SS.ResetElementAll(name, label)
+	local before = Snapshot(name);
+	SS.Safe(SS.ResetElement, name);
+	local d = SS.DB();
+	if ( d.opacity ) then d.opacity[name] = nil; end
+	if ( d.onTop ) then d.onTop[name] = nil; end
+	if ( SS.lastOpacity ) then SS.lastOpacity[name] = true; end
+	if ( SlimSuiteWorld and SlimSuiteWorld.ApplyOnTop ) then SS.Safe(SlimSuiteWorld.ApplyOnTop); end
+	SS.RecordChange((label or name) .. " > Reset", before, Snapshot(name), function(snap) Restore(name, snap); end);
+end
+
+-- Warnings for settings that undo each other, said once each time they become true
+local warned = {};
+function SS.CheckWarnings()
+	local d, list = SS.DB(), {};
+	local function Title(n) local e = SS.ELEMENTS and SS.ELEMENTS[n]; return e and (e.label or e.title) or n; end
+	for name in pairs(SS.ELEMENTS or {}) do
+		if ( SU.Mode(name) == "enabled" and SS.ElementOpacity and SS.ElementOpacity(name) == 0 ) then
+			list["opacity" .. name] = Title(name) .. " is On but at 0% opacity, so it can't be seen.";
+		end
+	end
+	if ( d.partyIncludesSelf and SU.Mode("PartyMemberFrame1") == "disabled" ) then
+		list.partyself = "Join the party yourself is on, but the party frames are Off, so your player frame has nowhere to go.";
+	end
+	if ( d.mirrorTarget and d.combineTarget and SU.Mode("PlayerFrame") == "disabled" ) then
+		list.mirror = "Mirror Target joins the target frame to your player frame, but the player frame is Off.";
+	end
+	if ( SS.PartyPosition and SS.PartyPosition() ~= "free" and SU.Mode("PlayerFrame") == "disabled" ) then
+		list.partyjoin = "The party frames are joined to the player frame, but the player frame is Off.";
+	end
+	if ( d.replaceLocalClock and not d.clockDetached and SU.Mode("MinimapCluster") == "disabled" ) then
+		list.clock = "The local clock sits inside the minimap, and the minimap is Off, so the clock is hidden too.";
+	end
+	for key, text in pairs(list) do
+		if ( not warned[key] ) then
+			K.Print(NAME, "|cffffd000" .. SS.T("Heads up") .. ":|r " .. SS.T(text));
+			if ( SS.LogAction ) then SS.LogAction("[warning] " .. text); end
+		end
+	end
+	warned = list;
+end
+
+-- Right-click > Open in settings: the settings open on the element's section, opened, scrolled to and flashing
+function SS.OpenElementSettings(name)
+	name = SS.Element and SS.Element(name) or name;
+	if ( not (SS.ELEMENTS and SS.ELEMENTS[name]) ) then return false; end
+	local w = getglobal("SlimSuiteFrame");
+	if ( not (w and w:IsShown()) ) then SS.Toggle(); end
+	if ( SS.OpenModulePage ) then SS.OpenModulePage("ui"); end
+	local view = SS.settingsViews and SS.settingsViews.ui;
+	if ( not view ) then return false; end
+	local row;
+	for _, r in ipairs(view.page.rows) do if ( r.kind == "fold" and r.element == name ) then row = r; break; end end
+	if ( not row ) then return false; end
+	if ( SU.Mode(name) == "enabled" ) then SS.openFolds = SS.openFolds or {}; SS.openFolds[row.title] = true; end
+	SS.LayoutPage(view.page);
+	SS.Safe(function()
+		if ( view.scroll.UpdateScrollChildRect ) then view.scroll:UpdateScrollChildRect(); end
+		local most = view.scroll.GetVerticalScrollRange and view.scroll:GetVerticalScrollRange() or 0;
+		view.scroll:SetVerticalScroll(math.max(0, math.min(most, -(row.y or 0) - 30)));
+	end);
+	local untilTime, lit = GetTime() + 3, false;
+	SS.Every("settingsFlash", 0.25, function()
+		if ( GetTime() > untilTime ) then row.b:UnlockHighlight(); SS.Stop("settingsFlash"); return; end
+		lit = not lit; if ( lit ) then row.b:LockHighlight(); else row.b:UnlockHighlight(); end
+	end);
+	return true;
+end
+
+-- the first time Slim Suite loads, one line points to /slim help
+local tipFrame = CreateFrame("Frame");
+tipFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
+tipFrame:SetScript("OnEvent", function()
+	local d = SS.DB();
+	if ( d and not d.seenHelpTip ) then
+		d.seenHelpTip = true;
+		K.Print(NAME, SS.T("New to Slim Suite? Type /slim help for a quick start, or /slim to open the settings."));
+	end
+end);

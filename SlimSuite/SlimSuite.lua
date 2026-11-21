@@ -180,7 +180,7 @@ SS.DEFAULTS = {
 	tallyContext = true,
 };
 SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
-	"itemRowSeen", "modules", "moduleSettings", "statHidden", "chatOffsets", "words", "layouts", "enabledElements", "elementModes", "opacity" };
+	"itemRowSeen", "modules", "moduleSettings", "statHidden", "chatOffsets", "words", "layouts", "enabledElements", "elementModes", "opacity", "onTop" };
 function SS.PrepareDB(d)
 	for key, value in pairs(SS.DEFAULTS) do if ( d[key] == nil ) then d[key] = value; end end
 	for i = 1, table.getn(SS.DEFAULT_TABLES) do

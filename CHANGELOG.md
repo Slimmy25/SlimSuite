@@ -2,6 +2,23 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.90
+A new list shows every setting that joins one element into another, each element can sit over the level-up cards on its own, and the settings gain a smarter search, Reset, Undo / Redo and hover help.
+
+- New "Optional combined that hide elements" section in the Interface settings (/slimsuite), listing each combination and which element leaves its own place when it's on: joining the party yourself, Mirror Target, party frames joined to the player frame, buffs joined to the player frame, the worn rings / trinkets row joined to the build spells, and the local clock inside the minimap.
+- Every element has a new "Show over the level-up / new-item cards" setting, in its right-click menu and its section, so each one can sit over the cards or under them on its own. The global setting in the Interface settings sets every element at once.
+- The element sections in the Interface settings are grouped into Aethus creations, My creations and Default WoW / Blizzard ideas. The + / - now sits to the left of each name, outside the button, and pressing On no longer opens the section by itself.
+- The search box at the top of the settings understands buzz words: typing hide, clock, boss, size, party and so on opens every matching element section while you type, and jumps to the page with matches.
+- Each element has a Reset button next to Default. It puts back its place, size, opacity and cards setting.
+- Hover text on On, Off, Default and Reset says what each one does. Long setting names are shortened, with the full sentence in the hover text.
+- Undo and Redo buttons at the bottom of the settings (and /slim undo, /slim redo) step through the last 25 changes. Every change, undo and warning is written to the action log (/slim log) with its value before and after.
+- Warnings in chat when settings undo each other, such as an element On at 0% opacity, or the local clock inside a minimap that is Off.
+- In HUD Edit Mode, an element's right-click menu has Open in settings, which opens its section in the settings, scrolled to and flashing.
+- The first time Slim Suite loads, one chat line points to /slim help, which now starts with a short getting-started guide.
+- The settings window's header is cleaned up. The old "Choose a module to open its settings" card, which overlapped the page title, is gone. So is the second "Slim Suite" bar above the sidebar. The version moved to the bottom bar, the search box is labelled Search, and the "Module enabled" switch at the top of each page is removed, since every element has its own On / Off. A page that was switched off is switched back on once, with its earlier settings.
+- A Changelog page in the settings, under Accessibility, lists every release from the first to this one, oldest first.
+- "Plater-style nameplates" is renamed "Slim nameplates", so it no longer borrows another addon's name.
+
 ## 1.89
 HUD Edit Mode replaces Toggle UI Settings, every element's settings are now in the settings window, and every element has its own opacity.
 

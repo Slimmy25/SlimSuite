@@ -107,7 +107,7 @@ end);
 -- A layout is everything about where the UI sits and how it looks: places, sizes, scales, padding, layouts, hidden
 -- elements and the frame looks. Layouts are saved by name (/slim layout save <name>), loaded again, shared as one line
 -- of text (the Layouts window), and can be kept apart for each character.
-SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes", "frameDefault", "minimap", "statHidden", "opacity" };
+SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes", "frameDefault", "minimap", "statHidden", "opacity", "onTop" };
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
 	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "matchBuildSizes", "hideBuildSpells", "hideBuildItems", "xpHideBorder", "statCounter", "statDisplayMode", "clockContextAbove", "worldCombatMode", "keepCombatLog", "cardEdgeHUD", "compassOn", "luckPanel", "achievementButton", "compassStyle", "compassBosses", "compassLairs", "compassCaches", "minimapSquare", "minimapTransparent",
@@ -219,7 +219,7 @@ local function ValidLayoutLeaf(root, keys, value)
 	end
 	if ( root == "elementModes" ) then return depth == 2 and (value == "enabled" or value == "disabled" or value == "default"); end
 	if ( root == "orientations" ) then return depth == 2 and (value == "horizontal" or value == "vertical"); end
-	if ( root == "muted" or root == "enabledElements" or root == "frameDefault" or root == "statHidden" ) then return depth == 2 and type(value) == "boolean"; end
+	if ( root == "muted" or root == "enabledElements" or root == "frameDefault" or root == "statHidden" or root == "onTop" ) then return depth == 2 and type(value) == "boolean"; end
 	if ( root == "opacity" ) then return depth == 2 and type(value) == "number" and value >= 0 and value <= 100; end
 	if ( root == "scales" or root == "padding" ) then return depth == 2 and type(value) == "number" and (root == "scales" and value > 0 and value <= 10 or root == "padding" and value >= 0 and value <= 1000); end
 	if ( root == "sizes" ) then return depth == 3 and (keys[3] == "w" or keys[3] == "h") and type(value) == "number" and value > 0 and value <= 100000; end

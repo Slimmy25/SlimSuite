@@ -1016,6 +1016,10 @@ function SS.PrepareSizeTools(name, label)
 			SS.OpenSizeMenu(sizeMenu.element or sizeTarget, sizeMenu.label);
 		end);
 		Row("last", { { muteButton, "TOPLEFT", 10, 0 }, { reset, "TOPRIGHT", -10, 0 } });
+		local openSettings = K.Button(sizeMenu, "Open in settings", 186, function()
+			if ( sizeMenu.element and SS.OpenElementSettings ) then SS.OpenElementSettings(sizeMenu.element); end
+		end);
+		Row("settings", { { openSettings, "TOPLEFT", 10, 0 } });
 	end
 	sizeTarget = SS.Shown(name);
 	sizeMenu.element, sizeMenu.label = name, label;
@@ -1027,6 +1031,7 @@ function SS.PrepareSizeTools(name, label)
 	local rows = sizeMenu.rows;
 	rows.width.on, rows.height.on = not fixedArt, not fixedArt and name ~= "GameTooltip";   -- a tooltip is as tall as its text
 	rows.scale.on, rows.last.on = true, true;
+	rows.settings.on = SS.ELEMENTS and SS.ELEMENTS[name] and name ~= "SlimSuiteEditGrid" and true or false;
 	sizeMenuScaleInput:SetText(tostring(math.max(20, math.min(200, math.floor((SS.DB().scales[sizeTarget] or 1) * 100 + 0.5)))));
 	-- the other elements that turn have "vertical" among their settings, so it is not offered twice
 	rows.layout.on = name == "SlimSuiteTallyFrame" or name == "SlimSuiteClockFrame" or name == "BuffFrame";
