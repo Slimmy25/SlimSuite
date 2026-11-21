@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.93
+Elements are now sized like the game's own interface, by the game's UI Scale and resolution.
+
+- New and existing layouts no longer get an extra Slim Suite size per screen shape (the 4:3, 16:9, 21:9 ... templates). Each element is its own size (1, unless you resized it) inside the game's UI Scale, exactly like the default interface. Change the game's UI Scale to make everything bigger or smaller.
+- Where elements start on a new layout still follows the screen shape.
+
 ## 1.92
 Each element group in the Interface settings can be closed, and has its own On, Off, Default and Reset for every element in it.
 

@@ -28,7 +28,7 @@ for pass=1,3 do
   local second=SS.DisplayElementScale("SlimSuiteClockFrame",1.25)
   check("scale stable", first==second and first>0)
   check("player target separation", context.scale*232 < context.width*(.165-.02))
-  check("user scale preserved", math.abs(first/context.scale-1.25)<.0001)
+  check("user scale preserved: the game's own UI scale, no extra per-display size", math.abs(first-1.25)<.0001)
   SS.DB().frameDefault.SlimSuiteClockFrame=true
   check("Default state preserved", SS.DisplayElementScale("SlimSuiteClockFrame",1.25)==1.25)
  end

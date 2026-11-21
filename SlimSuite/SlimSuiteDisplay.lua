@@ -43,11 +43,10 @@ function SS.DisplayEnabled(name)
 	end
 	return SU and SU.Mode and SU.Mode(element)=="enabled";
 end
+-- Elements are sized like the game's own interface: their own scale (1 unless resized) inside the game's UI Scale
+-- and resolution, with no extra Slim Suite size per screen shape. (Placement by screen fractions still applies.)
 function SS.DisplayElementScale(name, base)
-	if ( not SS.DISPLAY_ANCHORS[name] or not SS.ScreenBounds or not SS.DisplayEnabled(name) ) then return base; end
-	local d=SS.DB();
-	if ( d.frameDefault and d.frameDefault[name] ) then return base; end
-	return base * SS.DisplayContext().scale;
+	return base;
 end
 function SS.PlaceDisplayDefault(name, frame)
 	local a=SS.DISPLAY_ANCHORS[name]; if ( not a or not SS.DisplayEnabled(name) ) then return false; end
