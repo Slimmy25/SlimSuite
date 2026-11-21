@@ -252,8 +252,8 @@ function SS.WinBuild()
 					r.fs:SetText(SS.T(label)); r.fs:SetTextColor(1, 0.82, 0);
 					r.b = SS.ChoiceButton(parent, 200);
 					r.b.entry = row; r.b:SetPoint("LEFT", r.fs, "RIGHT", 10, 0);
-					r.b:SetText(SS.ChoiceText(row) .. "  v");
-					r.b:SetScript("OnShow", function() if ( this.entry ) then this:SetText(SS.ChoiceText(this.entry) .. "  v"); end end);
+					r.b:SetText(SS.ChoiceText(row));
+					r.b:SetScript("OnShow", function() if ( this.entry ) then this:SetText(SS.ChoiceText(this.entry)); end end);
 					if ( lead == 0 ) then up = nil; end
 				else
 					r.kind = "check";
@@ -273,8 +273,6 @@ function SS.WinBuild()
 	end
  local worldEntry=SS.WorldCombatEntry();
  local uiEntries={
-			{head="Other addons"},
-			{"Azeroth Stats: hide its top bar (runs /azstats bar once)", function() return SS.DB().azStatsHideBar; end, function(v) SS.SetAzStatsHideBar(v); end},
 			{head="Setup"},
 			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v, true); if ( v ) then SS.OpenHUDEdit(); else SS.CloseHUDEdit(); end end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},

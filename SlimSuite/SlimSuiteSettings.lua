@@ -63,7 +63,7 @@ end
 function SS.RefreshChoices()
 	for i = 1, table.getn(SS.choiceButtons) do
 		local b = SS.choiceButtons[i];
-		if ( b.entry ) then b:SetText(SS.ChoiceText(b.entry) .. "  v"); end
+		if ( b.entry ) then b:SetText(SS.ChoiceText(b.entry)); end
 	end
 end
 function SS.ChoiceButton(parent, width)
@@ -119,7 +119,7 @@ function SS.RowKind(cb, e, where)
 		cb.choiceBtn:ClearAllPoints();
 		if ( where == "below" ) then cb.choiceBtn:SetPoint("TOPLEFT", cb.label, "BOTTOMLEFT", -2, -3);
 		else cb.choiceBtn:SetPoint("LEFT", cb.label, "RIGHT", 8, 0); end
-		cb.choiceBtn:SetText(SS.ChoiceText(e) .. "  v");
+		cb.choiceBtn:SetText(SS.ChoiceText(e));
 		cb.choiceBtn:Show();
 	elseif ( cb.choiceBtn ) then
 		cb.choiceBtn:Hide(); cb.choiceBtn.entry = nil;

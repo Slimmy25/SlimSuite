@@ -40,7 +40,7 @@ This resolution is used only after native `finalboss`/`kind="final"` classificat
 
 ## Preview interruption
 
-The inspected client exposes `PlaySoundFile`, `PlayMusic` and `StopMusic`, but no `StopSound` or `PauseSound`; the native QA sample also reports those globals as nil. Using music for previews would take over native music and depend on its settings, so that workaround is not used.
+The inspected client exposes `PlaySoundFile`, `PlayMusic` and `StopMusic`, but no `StopSound` or `PauseSound`; the native QA sample also reports those globals as nil. Sound previews therefore play on the music channel (PlayMusic / StopMusic) so they can be paused and replaced; the game's music pauses meanwhile. With music turned off or at zero volume, previews fall back to the effects channel and its one-at-a-time queue.
 
 Where an actual stop handle exists, a new preview stops the previous one first. A stop error or explicit failure keeps the current preview active. Otherwise only the latest request is queued until the current tracked clip finishes. Selecting the active clip cancels a pending replacement. The queue prevents deliberate overlap; it is not true pause/resume or real-time native playback detection.
 

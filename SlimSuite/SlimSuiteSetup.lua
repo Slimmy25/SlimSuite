@@ -783,7 +783,7 @@ function SU.Build()
 	SU.bar.profilePanel.Refresh();
 	SU.bar.elementsButton = K.Button(SU.bar, "Elements", 110, function() SU.ToggleElementBox(); end);
 	SU.bar.elementsButton:SetPoint("TOPRIGHT", SU.bar, "TOPRIGHT", -8, -36);
-	SU.bar.presetButton = K.Button(SU.bar, SS.T("Presets") .. "  v", 110, function()
+	SU.bar.presetButton = K.Button(SU.bar, SS.T("Presets"), 110, function()
 		local p = SU.bar.profilePanel;
 		if ( p:IsShown() ) then p:Hide(); else SU.PlaceProfiles(); p.Refresh(); p:Show(); end
 	end);

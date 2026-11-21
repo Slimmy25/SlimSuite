@@ -2,6 +2,13 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.88
+Slim Suite no longer changes other addons, dropdown buttons lose their trailing "v", and sound previews can be paused.
+
+- Removed the "Other addons" section and its Azeroth Stats option, which ran Azeroth Stats' /azstats bar command to hide its top bar. Slim Suite no longer changes Azeroth Stats' settings.
+- Dropdown buttons (option choices, Chain to, Presets) no longer end in a "v".
+- Sound previews can be paused: the button stops the preview at once, and starting another preview stops the one playing. Previews now play on the music channel (the game's music pauses for a moment); with music off they play as before.
+
 ## 1.87
 Joined elements now hide and turn off together, and Quick setup is put away for now in favour of HUD Edit.
 

@@ -359,7 +359,7 @@ local function ElementPanel()
  panel.Refresh = function()
   local name = panel.name; if ( not name ) then return; end
   local link = SS.DB().hudChains and SS.DB().hudChains[name];
-  panel.chain:SetText(SS.T("Chain to") .. ": " .. (link and Label(link.to) or SS.T("None")) .. "  v");
+  panel.chain:SetText(SS.T("Chain to") .. ": " .. (link and Label(link.to) or SS.T("None")));
   panel.side:SetText(SS.T((link and link.side == "behind") and "Behind" or "Ahead"));
   if ( link ) then panel.side:Show(); panel.unchain:Show(); else panel.side:Hide(); panel.unchain:Hide(); end
  end;

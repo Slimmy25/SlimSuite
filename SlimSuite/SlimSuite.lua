@@ -175,7 +175,7 @@ SS.DEFAULTS = {
 	showRacialAbility = false, xpFullWidth = false, showEditGrid = false, gridCenterVertical = true, gridCenterHorizontal = true,
 	tallyVertical = true, tallyBossKills = true, tallyBackground = true, showEmptyActionSlots = false,
 	buildRowsAttached = true, replaceBuildRows = false, anchorSnap = false, gridSnap = false, raidRow = true, layoutPerCharacter = false,
-	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false, enemyPlateGroup = true, uiStyle = "original", azStatsHideBar = true,
+	encounterBarThickness = "standard", encounterNameAlign = "center", accessibilityContrast = false, enemyPlateGroup = true, uiStyle = "original", 
 	accessibilityLargeText = false, accessibilityReduceMotion = false,
 	tallyContext = true,
 };
@@ -627,14 +627,34 @@ end
 local soundPreviewHandle;
 SS.previewUntil=0;
 function SS.PreviewActive(key)
- if SS.previewKey and GetTime()>=SS.previewUntil then SS.previewKey=nil; soundPreviewHandle=nil; end
- return SS.previewKey and (not key or key==SS.previewKey);
+ if SS.previewKey and GetTime()>=SS.previewUntil then
+  if SS.previewOnMusic and type(StopMusic)=="function" then SS.Safe(StopMusic); end   -- music loops: end it on time
+  SS.previewKey=nil; soundPreviewHandle=nil; SS.previewOnMusic=nil;
+ end
+ return SS.previewKey~=nil and (key==nil or SS.previewKey==key);
+end
+-- The client has no StopSound, so a sound started with PlaySoundFile cannot be cut short. Previews therefore play on
+-- the music channel (PlayMusic / StopMusic), which can be stopped at any moment: pause stops the preview, and a new
+-- preview stops the one before it. The game's own music pauses meanwhile and returns afterwards. With the game's music
+-- turned off or at zero volume nothing would be heard there, so previews fall back to the effects channel (and the old
+-- one-at-a-time queue).
+function SS.PreviewOnMusic()
+ if type(PlayMusic)~="function" or type(StopMusic)~="function" then return false; end
+ if type(GetCVar)=="function" then
+  local enabled=GetCVar("EnableMusic"); local volume=tonumber(GetCVar("MusicVolume"));
+  if enabled=="0" or (volume and volume<=0) then return false; end
+ end
+ return true;
 end
 function SS.CanStopPreview()
- return SS.PreviewActive() and soundPreviewHandle and type(StopSound)=="function";
+ return SS.PreviewActive() and (SS.previewOnMusic or (soundPreviewHandle and type(StopSound)=="function")) and true or false;
 end
 function SS.StopPreview()
  if not SS.PreviewActive() then return true; end
+ if SS.previewOnMusic then
+  SS.Safe(StopMusic);
+  SS.previewOnMusic=nil; soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
+ end
  if not soundPreviewHandle or type(StopSound)~="function" then return false; end
  local ok,result=SS.Safe(StopSound,soundPreviewHandle); if not ok or result==false then return false; end
  soundPreviewHandle=nil; SS.previewKey=nil; SS.previewUntil=0; return true;
@@ -767,11 +787,16 @@ function SS.PreviewSound(key)
  if not SS.StopPreview() then SS.previewNext=not same and key or nil; return; end
  SS.previewNext=nil;
  if same then return; end
+ local length=(SS.SOUND_DURATIONS and SS.SOUND_DURATIONS[key]) or 5;
+ if SS.PreviewOnMusic() then
+  local ok=SS.Safe(PlayMusic,path);
+  if ok then SS.previewOnMusic=true; soundPreviewHandle=nil; SS.previewKey=key; SS.previewUntil=GetTime()+length; return; end
+ end
  local ok,played,handle=SS.Safe(PlaySoundFile,path);
  -- Legacy clients may return nothing despite playing successfully.
  if ok and played~=false then
   soundPreviewHandle=handle; SS.previewKey=key;
-  SS.previewUntil=GetTime()+((SS.SOUND_DURATIONS and SS.SOUND_DURATIONS[key]) or 5);
+  SS.previewUntil=GetTime()+length;
  end
 end
 -- Legacy effects have no pause/stop API. Keep only the latest requested preview and
@@ -1608,35 +1633,3 @@ function SS.LayoutLevelButton()
 	b.glow:SetWidth(w * 1.24); b.glow:SetHeight(h * 1.41);
 end
 
--- ---------------------------------------------------------------- Other addons: Azeroth Stats
--- Azeroth Stats (Maidenquinn) documents /azstats bar as a visibility command that toggles its top bar. It documents no
--- setting for that and no state we can read back, so this runs the command once per account, never on every login.
--- Ticking the box again runs it once more; unticking does nothing.
-function SS.RunAzStatsBarCommand()
-	if not SS.DB().azStatsHideBar or SS.DB().azStatsBarSent then return false; end
-	local handler;
-	for name, fn in pairs(SlashCmdList or {}) do
-		local first = getglobal("SLASH_" .. name .. "1");
-		if first == "/azstats" then handler = fn; break; end
-	end
-	if not handler then return false; end
-	local ok = SS.Safe(handler, "bar");
-	if ok then SS.DB().azStatsBarSent = true; end
-	return ok and true or false;
-end
-function SS.SetAzStatsHideBar(on)
-	SS.DB().azStatsHideBar = on and true or false;
-	SS.DB().azStatsBarSent = nil;   -- ticking it again runs the command again
-	if on then SS.RunAzStatsBarCommand(); end
-end
-local azStatsEvents = CreateFrame("Frame");
-azStatsEvents:RegisterEvent("PLAYER_ENTERING_WORLD");
-local azStatsTries = 0;
-azStatsEvents:SetScript("OnEvent", function()
-	-- try a few times while the addon finishes loading, then stop (it is not installed, or it has run)
-	SS.Every("azStatsBar", 2, function()
-		azStatsTries = azStatsTries + 1;
-		SS.RunAzStatsBarCommand();
-		if SS.DB().azStatsBarSent or not SS.DB().azStatsHideBar or azStatsTries >= 10 then SS.Stop("azStatsBar"); end
-	end);
-end);

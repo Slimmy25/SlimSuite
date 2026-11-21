@@ -69,6 +69,21 @@ local pad = SS.FramePadding("SlimSuiteBossFrames")
 local room = 4 * 48 + 3 * (10 + pad) + pad * 2
 check("five upright cards fit in four cards' room (" .. tostring(bf:GetWidth()) .. " of " .. room .. ")", table.getn(SS.BOSS_SAMPLE) == 5 and bf:GetWidth() <= room + 1)
 SS.DB().encounterMax = nil; SS.SetUnlocked(false, true); Tick(2)
+-- sound previews play on the music channel, so pause stops them and a new preview replaces the old one
+local played, stops = {}, 0
+SetCVar("EnableMusic", "1"); SetCVar("MusicVolume", "0.5")
+PlayMusic = function(path) table.insert(played, path) end
+StopMusic = function() stops = stops + 1 end
+local keys = {}; for k in pairs(SS.SOUND_FILES) do table.insert(keys, k) if table.getn(keys) == 2 then break end end
+SS.PreviewSound(keys[1]); Tick(1)
+check("a preview plays and can be stopped", table.getn(played) == 1 and SS.PreviewActive(keys[1]) and SS.CanStopPreview())
+SS.PreviewSound(keys[2]); Tick(1)
+check("a new preview stops the one before it", stops >= 1 and table.getn(played) == 2 and SS.PreviewActive(keys[2]) and not SS.PreviewActive(keys[1]))
+SS.PreviewSound(keys[2]); Tick(1)
+check("clicking the playing preview pauses it", not SS.PreviewActive())
+PlayMusic, StopMusic = nil, nil
+SetCVar("EnableMusic", "0")
+check("with the game's music off, previews use the effects channel", not SS.PreviewOnMusic())
 print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end
 if #ERRORS > 0 then bad = bad + 1 end
 print("quick setup problems: " .. bad)
