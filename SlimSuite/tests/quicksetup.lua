@@ -15,15 +15,29 @@ d.enemyBossesOnly = true; Tick(3)
 check("a setting changed afterwards stays changed", d.enemyBossesOnly == true)
 SS.ApplyQuickAnswers({ 1, 1, 2, 1, 1, 1 }); Tick(3)
 check("answers can be applied again", SS.PanelStyleKey() == "original" and d.modernEnemyFrames == false and d.deathSound == false)
--- presets: none filled in means no preset page; a filled one is offered and applies its layout
-check("no presets: nothing offered", table.getn(SS.UsablePresets()) == 0)
+-- presets: the five built-in designs are offered; your own come first and a broken one is skipped
+check("five built-in designs offered", table.getn(SS.UsablePresets()) == 5)
 local saved = SS.LayoutText(SS.LayoutSnapshot())
 SS.PRESETS = { { "Test design", "For the test.", saved }, { "Broken", "Bad text.", "nonsense" } }
-check("a filled preset is offered, a broken one skipped", table.getn(SS.UsablePresets()) == 1)
+local list = SS.UsablePresets()
+check("your preset first, broken skipped, still five", table.getn(list) == 5 and list[1][1] == "Test design")
 SS.OpenQuickSetup(); Tick(1)
 check("the preset question comes first", win.question:GetText() == "Would you like to use a pre-set design?")
 d.enemyBossesOnly = false
-check("applying a preset puts its layout back", SS.ApplyPreset(SS.UsablePresets()[1]) and SS.DB().enemyBossesOnly == true)
+check("applying your preset puts its layout back", SS.ApplyPreset(list[1]) and SS.DB().enemyBossesOnly == true)
 SS.PRESETS = {}
+local sl, sr, sb, st = SS.ScreenBounds()
+for _, p in ipairs(SS.BUILTIN_PRESETS) do
+	local errs = SS.errorCount or 0
+	check(p[1] .. " applies", SS.ApplyPreset(p)); Tick(3)
+	for _, at in ipairs(p[3].places) do local name = at[1]
+		local pl = SS.DB().places[name]
+		check(p[1] .. ": " .. name .. " placed on screen", pl and pl.x >= sl and pl.y >= sb and pl.x < sr and pl.y < st)
+	end
+	for k, v in pairs(p[3].keys) do check(p[1] .. ": " .. k, SS.DB()[k] == v) end
+end
+check("controller design is large and high contrast", SS.DB().accessibilityLargeText == true and SS.DB().scales.MainMenuBar == 1.2)
+print("errors: " .. #ERRORS); for _, e in ipairs(ERRORS) do print("  " .. e) end
+if #ERRORS > 0 then bad = bad + 1 end
 print("quick setup problems: " .. bad)
 if bad > 0 then error("quick setup regressions") end

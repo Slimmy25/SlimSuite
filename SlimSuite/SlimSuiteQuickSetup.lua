@@ -76,6 +76,10 @@ local function Build()
 	win.count:SetPoint("TOPRIGHT", win, "TOPRIGHT", -34, -16);
 	win.question = win:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
 	win.question:SetPoint("TOP", win, "TOP", 0, -40); win.question:SetWidth(560);
+	win.note = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall");
+	win.note:SetPoint("BOTTOM", win, "BOTTOM", 0, 48); win.note:SetWidth(540);
+	win.note:SetText("The built-in designs are AI-generated demos of what Slim Suite can do. Change anything afterwards in HUD Edit.");
+	win.note:Hide();
 	win.answers = {};
 	for i = 1, 6 do
 		local b = K.Button(win, "", 150, function()
@@ -125,9 +129,10 @@ local function Build()
 end
 
 Show = function()
+	if ( win.note ) then win.note:Hide(); end
 	local total = table.getn(SS.QUICK_QUESTIONS);
 	if ( step == 0 ) then
-		win.count:SetText(""); win.question:SetText("Would you like to use a pre-set design?");
+		win.count:SetText(""); win.question:SetText("Would you like to use a pre-set design?"); win.note:Show();
 		win.summary:Hide(); win.finish:Hide();
 		local n = table.getn(presets);
 		for i = 1, 6 do

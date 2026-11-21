@@ -2,6 +2,12 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.81
+Quick setup now comes with five demo designs that show what Slim Suite can do: Classic Plus, Centered, Info Column, Minimal, and Controller / Handheld. They're AI-generated: common layouts from WoW Forever, retail WoW and Azeroth Survivors were cross-referenced to work out what a typical UI should include, and each design was built new for Slim Suite.
+
+- Each design fits any screen, from 4:3 to ultrawide and the Steam Deck, and keeps the middle of the screen clear for the fight.
+- Your own exported layouts can be added as presets and are shown before the demo designs.
+
 ## 1.80
 New Quick setup asks how you play and sets Slim Suite up for you, party frames show who is down and how far away they are, and stacked enemy plates no longer overlap.
 
