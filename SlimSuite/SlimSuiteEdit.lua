@@ -237,7 +237,33 @@ function SS.EnforceMinimapDisabled()
 		MinimapCluster:Show(); if ( Minimap ) then Minimap:Show(); end
 	end
 end
-SS.Every("minimapDisabled", 1, function() SS.Safe(SS.EnforceMinimapDisabled); end);
+SS.Every("minimapDisabled", 1, function() SS.Safe(SS.EnforceMinimapDisabled); SS.Safe(SS.ApplyMinimapExtras); end);
+
+-- Optional minimap parts to hide: the day / night (sun and moon) button, the zone name with its X button, and the
+-- + / - zoom buttons. They are faded out and made unclickable (not hidden, so the round / square layouts that place
+-- them keep working), checked every second; turning an option off brings the part back.
+SS.MINIMAP_EXTRAS = {
+	minimapHideDayNight = { "GameTimeFrame" },
+	minimapHideZone = { "MinimapZoneTextButton", "MinimapBorderTop", "MinimapToggleButton" },
+	minimapHideZoom = { "MinimapZoomIn", "MinimapZoomOut" },
+};
+function SS.ApplyMinimapExtras()
+	local d = SS.DB();
+	for key, names in pairs(SS.MINIMAP_EXTRAS) do
+		local hide = d[key] and true or false;
+		for _, n in ipairs(names) do
+			local f = getglobal(n);
+			if ( f and f.SetAlpha ) then
+				if ( hide ) then
+					f:SetAlpha(0); if ( f.EnableMouse ) then f:EnableMouse(false); end
+					f.slimExtraHidden = true;
+				elseif ( f.slimExtraHidden ) then
+					f.slimExtraHidden = nil; f:SetAlpha(1); if ( f.EnableMouse ) then f:EnableMouse(true); end
+				end
+			end
+		end
+	end
+end
 
 function SS.ApplyMinimapShape()
 	if ( not Minimap ) then return false; end
@@ -514,6 +540,12 @@ function SS.SetMinimapSquare(on)
 	end
 end
 
+-- The transparent minimap option is retired (per-element Opacity replaces it): anyone who had it on gets the
+-- normal minimap back once.
+SS.Every("retireTransparentMinimap", 2, function()
+	if ( SS.DB().minimapTransparent and SS.SetMinimapTransparent ) then SS.Safe(SS.SetMinimapTransparent, false); end
+	SS.Stop("retireTransparentMinimap");
+end);
 function SS.SetMinimapTransparent(on)
 	SS.DB().minimapTransparent = on and true or false;
 	SS.Safe(SS.ApplyMinimapShape);

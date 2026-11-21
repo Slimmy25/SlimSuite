@@ -1272,8 +1272,11 @@ local function GatherPins(space, options)
 			local kind=entry.kind; local guardian=kind=="guardian";
 			if ( (kind=="boss" or kind=="finalBoss" or kind=="final" or (guardian and awake[id])) and SameSpace(entry,space) ) then
 				local name=entry.name or names[id] or SS.T("Boss");
-				table.insert(result,{x=entry.x,y=entry.y,size=15,texture=RAID_ICONS,raid=W.MarkFor(id) or 8,
-				 tip=name,label=name,category="boss",unitId=id,anchorId=entry.anchorId,
+				-- Bosses on the map: their raid mark (or a plain red dot), with or without their name beside it
+				local icons, named = d.minimapBossIcons ~= false, d.minimapBossNames ~= false;
+				table.insert(result,{x=entry.x,y=entry.y,size=icons and 15 or 9,texture=icons and RAID_ICONS or "Interface\\Buttons\\WHITE8X8",
+				 raid=icons and (W.MarkFor(id) or 8) or nil,r=not icons and 0.9 or nil,g=not icons and 0.15 or nil,b=not icons and 0.15 or nil,
+				 tip=name,label=named and name or nil,category="boss",unitId=id,anchorId=entry.anchorId,
 				 grey=phase=="ready",alpha=phase=="ready" and .45 or 1,sub=phase=="ready" and SS.T("Not yet available") or nil});
 			end
 		end

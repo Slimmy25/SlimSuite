@@ -2,6 +2,18 @@
 
 Newest first. Each release's notes on GitHub are taken from its section here.
 
+## 1.89
+HUD Edit Mode replaces Toggle UI Settings, every element's settings are now in the settings window, and every element has its own opacity.
+
+- The "Toggle UI Settings" checkbox is now "HUD Edit Mode", at the top of the Interface settings. Ticking it opens HUD Edit; unticking it closes HUD Edit and locks the UI.
+- Removed the separate HUD Edit Mode button further down, and the "Recommended HUD preset" button.
+- New Elements section in the Interface settings (/slimsuite): every element is listed with On, Off and Default buttons. Choosing On opens its section, which holds every setting from its right-click menu; an element that is Off or Default stays closed.
+- Every element has a new Opacity setting, from 100% (solid) to 0%, set separately for each element in its right-click menu and its section. Hiding or turning an element off still hides it completely.
+- The minimap settings are reorganised: a Square / Circle choice, show or separate the local clock, caches, bosses (with new options to show their raid icon and their name), lairs and their refill timer, and turning off the game's nearest Guardian lair flag.
+- New minimap options to hide the day / night (sun and moon) button, the zone name and its X button, and the + / - zoom buttons, in the minimap's section, its right-click menu and the Gameplay settings.
+- Removed the info drawer element entirely.
+- Removed the Transparent minimap option; per-element Opacity replaces it. Anyone who had it on gets the normal minimap back.
+
 ## 1.88
 Slim Suite no longer changes other addons, dropdown buttons lose their trailing "v", and sound previews can be paused.
 

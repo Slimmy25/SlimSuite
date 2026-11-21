@@ -28,7 +28,7 @@ function SU.Steps()
    table.insert(steps, { frame=name, title=title, text=element.text });
   end
  end
- table.insert(steps, { title="All set", text="That's everything. Press Finish to lock the UI. You can move anything again with Toggle UI Settings. Done closes the list." });
+ table.insert(steps, { title="All set", text="That's everything. Press Finish to lock the UI. You can move anything again with HUD Edit Mode. Done closes the list." });
  if ( SS.TranslateRecord ) then for i=1,table.getn(steps) do SS.TranslateRecord(steps[i]); end end
  return steps;
 end

@@ -6,7 +6,7 @@ local function check(label, ok) if not ok then bad = bad + 1; print("  MISMATCH 
 local REAL = { MainMenuBar = { 300, 50 }, SlimSuitePlayerCard = { 232, 100 }, SlimSuiteTargetCard = { 232, 100 },
 	PlayerFrame = { 232, 100 }, TargetFrame = { 232, 100 }, PartyMemberFrame1 = { 140, 250 }, SlimSuitePartyLines = { 90, 42 },
 	SlimSuiteBossFrames = { 520, 192 }, SlimSuiteClockFrame = { 220, 54 }, SlimSuiteTallyFrame = { 252, 28 },
-	BuffFrame = { 300, 100 }, ChatFrame1 = { 430, 120 }, SlimSuiteCompassFrame = { 380, 88 }, SlimSuiteSpellRowFrame = { 240, 76 }, SlimSuiteMeterFrame = { 250, 180 }, SlimSuiteStatCounterFrame = { 150, 28 }, SlimSuiteCombatTextFrame = { 120, 60 }, SlimSuiteInfoDrawer = { 220, 150 }, MainMenuExpBar = { 1024, 13 } }
+	BuffFrame = { 300, 100 }, ChatFrame1 = { 430, 120 }, SlimSuiteCompassFrame = { 380, 88 }, SlimSuiteSpellRowFrame = { 240, 76 }, SlimSuiteMeterFrame = { 250, 180 }, SlimSuiteStatCounterFrame = { 150, 28 }, SlimSuiteCombatTextFrame = { 120, 60 }, MainMenuExpBar = { 1024, 13 } }
 SS.PresetElementSize = function(name, scale) local s = REAL[name] or { 100, 40 }; return s[1] * scale, s[2] * scale end
 -- UI units are 768 tall; width follows the aspect ratio
 local SCREENS = { { 1024, 768, "4:3" }, { 1280, 720, "720p" }, { 1280, 800, "Steam Deck" }, { 1366, 768, "laptop" },

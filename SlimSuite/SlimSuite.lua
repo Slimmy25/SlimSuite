@@ -163,7 +163,7 @@ SS.DEFAULTS = {
 	replaceClock = false, replaceEncounters = false, replaceTally = false, replaceBanners = false,
 	camera = true, plainBar = false, cooldowns = false, bossMarks = true, deathMarks = true, prePullMarks = false,
 	encounterDebuffs = true, onTopOfScreens = false, replaceRevive = false, procMeter = false, combatTextBox = false,
-	minimapCaches = false, minimapBosses = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, luckPanel = false, infoDrawer = false, achievementButton = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
+	minimapCaches = false, minimapBosses = false, minimapBossIcons = true, minimapBossNames = true, minimapHideDayNight = false, minimapHideZone = false, minimapHideZoom = false, minimapLairs = false, minimapTransparent = false, zoneLine = true, clockContextAbove = true, statDisplayMode = "total", worldCombatMode = "off", cardEdgeHUD = true, compassOn = false, luckPanel = false, achievementButton = false, compassBosses = true, compassLairs = true, compassCaches = true, compassStyle = "rail", replaceLocalClock = false,
 	clockDetached = false, combineTarget = false, gatherButtons = false, gatherSide = "left", minimapBar = false,
 	partyIncludesSelf = false, floatingText = false, deathSound = false, legoDeathSound = false, duckDeathSound = false, robloxDeathSound = false, matchHaloSound = false, matchLossSound = false, matchWastedSound = false, matchStartSound = false, matchVictorySound = false, finalBossSound = false, finalBossSounds = {}, teammateDeathSound = "same", lowHealthSound = false,
 	bossHitmarkerSound = false, bossWhipSound = false, bossGotchaSound = false, chestOpenSound = false, reviveSound = false, hideTarget = false, mirrorTarget = false,
@@ -180,7 +180,7 @@ SS.DEFAULTS = {
 	tallyContext = true,
 };
 SS.DEFAULT_TABLES = { "places", "sizes", "scales", "muted", "padding", "orientations", "lockPanelPosition",  "itemRowEquipped",
-	"itemRowSeen", "modules", "moduleSettings", "statHidden", "chatOffsets", "words", "layouts", "enabledElements", "elementModes" };
+	"itemRowSeen", "modules", "moduleSettings", "statHidden", "chatOffsets", "words", "layouts", "enabledElements", "elementModes", "opacity" };
 function SS.PrepareDB(d)
 	for key, value in pairs(SS.DEFAULTS) do if ( d[key] == nil ) then d[key] = value; end end
 	for i = 1, table.getn(SS.DEFAULT_TABLES) do
@@ -755,7 +755,7 @@ SS.STYLE_NAMES = { original = "Original", meter = "RPG", tooltip = "New School" 
 SS.LOOK_ELEMENTS = { "SlimSuitePartyLines", "SlimSuiteMeterFrame", "SlimSuiteStoredLevelsButton", "SlimSuiteBossFrames",
  "SlimSuiteAnnouncementFrame", "SlimSuiteSpellRowFrame", "SlimSuiteItemRowFrame", "SlimSuiteTallyFrame", "SlimSuiteReviveFrame",
  "SlimSuiteLocalClockFrame", "SlimSuitePlayerCard", "SlimSuiteTargetCard", "SlimSuiteCombatTextFrame", "SlimSuiteStatCounterFrame",
- "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteInfoDrawer", "SlimSuiteAchievementsButton", "SlimSuiteProcMeter" };
+ "SlimSuiteCompassFrame", "SlimSuiteLuckFrame", "SlimSuiteAchievementsButton", "SlimSuiteProcMeter" };
 function SS.IsLookElement(name)
  for i = 1, table.getn(SS.LOOK_ELEMENTS) do if ( SS.LOOK_ELEMENTS[i] == name ) then return true; end end
  return false;

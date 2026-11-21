@@ -245,7 +245,7 @@ function SU.ChecksFor(frame)
 		function(v) SS.SetTargetHidden(v); end }; end
 	local function ShowClock() return { "Show the local clock", function() return SS.DB().replaceLocalClock; end,
 		function(v) SS.SetLocalClockOn(v); end, short = "Show the local clock", xref = true }; end
-	local function DetachClock() return { "Detach the clock from the minimap (its own button up top)", function() return SS.DB().clockDetached; end,
+	local function DetachClock() return { "Separate the local clock from the minimap (use Slim Suite's own)", function() return SS.DB().clockDetached; end,
 		function(v) SS.SetClockDetached(v); end, function() return SS.DB().replaceLocalClock; end, short = "Detach from minimap", xref = true }; end
 	local function VerticalRow(name) return { "Vertical (off: horizontal)", function() return SS.CurrentOrientation(name) == "vertical"; end,
 		function(v) SS.SetBuildOrientation(name, v); end, short = "Vertical", xref = true }; end
@@ -266,13 +266,25 @@ function SU.ChecksFor(frame)
 			{ "Show the target's buffs and debuffs", short = "Target's buffs and debuffs", function() return SS.DB().targetDebuffs; end, function(v) SS.DB().targetDebuffs = v; end },
 			TargetBuffsPlace() },
 		BuffFrame = { BuffsPlace() },
-		MinimapCluster = { { "Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end },
-			{ "Transparent minimap (round or square, no borders)", function() return SS.DB().minimapTransparent; end, function(v) SS.SetMinimapTransparent(v); end },
+		MinimapCluster = {
+			{ "Minimap shape", function() return SS.DB().minimapSquare and "square" or "circle"; end, function(v) SS.SetMinimapSquare(v == "square"); end,
+				choice = { { "Square", "square" }, { "Circle", "circle" } }, short = "Shape" },
 			ShowClock(), DetachClock(),
-			{ "Show caches on the minimap", short = "Caches", function() return SS.DB().minimapCaches; end, function(v) SS.DB().minimapCaches = v and true or false; end },
-			{ "Show bosses on the minimap", short = "Bosses", function() return SS.DB().minimapBosses; end, function(v) SS.DB().minimapBosses = v and true or false; end },
+			{ "Show caches on the map", short = "Caches", function() return SS.DB().minimapCaches; end, function(v) SS.DB().minimapCaches = v and true or false; end },
+			{ "Show bosses on the map", short = "Bosses", function() return SS.DB().minimapBosses; end, function(v) SS.DB().minimapBosses = v and true or false; end },
+			{ "   Show their raid icon", short = "Boss raid icons", function() return SS.DB().minimapBossIcons ~= false; end,
+				function(v) SS.DB().minimapBossIcons = v and true or false; end, function() return SS.DB().minimapBosses; end },
+			{ "   Show their name", short = "Boss names", function() return SS.DB().minimapBossNames ~= false; end,
+				function(v) SS.DB().minimapBossNames = v and true or false; end, function() return SS.DB().minimapBosses; end },
 			{ "Show lairs and their refill timer", short = "Lairs", function() return SS.DB().minimapLairs; end, function(v) SS.DB().minimapLairs = v and true or false; end },
-			{ "The game's nearest Guardian lair flag", short = "Guardian lair flag", function() return SS.DB().showGuardianFlag; end, function(v) SS.DB().showGuardianFlag = v and true or false; SS.ApplyGuardianFlag(); end },
+			{ "Turn off the game's nearest Guardian lair flag", short = "No Guardian lair flag", function() return not SS.DB().showGuardianFlag; end,
+				function(v) SS.DB().showGuardianFlag = not v; SS.ApplyGuardianFlag(); end },
+{ "Hide the day / night (sun and moon) button", short = "No sun / moon", function() return SS.DB().minimapHideDayNight; end,
+				function(v) SS.DB().minimapHideDayNight = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end },
+			{ "Hide the zone name and its X button", short = "No zone name", function() return SS.DB().minimapHideZone; end,
+				function(v) SS.DB().minimapHideZone = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end },
+			{ "Hide the + / - zoom buttons", short = "No zoom buttons", function() return SS.DB().minimapHideZoom; end,
+				function(v) SS.DB().minimapHideZoom = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end },
 			{ "Slim Suite's gear button", short = "Gear button", function() local m = SS.DB().minimap; return not (type(m) == "table" and m.hide); end,
 				function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (type(m) == "table" and m.hide and true or false) == (v and true or false) ) then SS.Mini.Toggle(); end end end } },
 		SlimSuiteClockFrame = { { "Location and difficulty above the clock", function() return SS.DB().clockContextAbove~=false; end, function(v) SS.DB().clockContextAbove=v; SS.ApplyClockLayout(); SS.UpdateClock(); end }, { "Show location and difficulty", short = "Zone and Heroic affixes", function() return SS.DB().zoneLine; end, function(v) SS.DB().zoneLine = v; end }, { "Run clock at the bottom of the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end, xref = true, short = "Run clock at the bottom" } },
@@ -340,7 +352,57 @@ function SU.ChecksFor(frame)
 	local out = {};
 	-- "Movable?" is no longer offered: everything is movable by default, and the element's own switch covers it
 	for _, c in ipairs(frame and list[frame] or {}) do table.insert(out, c); end
+	-- every element has its own opacity, 0 to 100%
+	if ( frame and SS.ELEMENTS and SS.ELEMENTS[frame] and frame ~= "SlimSuiteEditGrid" ) then
+		table.insert(out, { "Opacity", function() return SS.ElementOpacity(frame); end, function(v) SS.SetElementOpacity(frame, v); end,
+			choice = SS.OPACITY_CHOICES, short = "Opacity" });
+	end
 	return out;
 end
+
+-- Opacity, per element: 100% is fully solid (the default), 0% is invisible. It is applied every quarter second to the
+-- element (all four party frames for the party), unless the element is hidden or turned off, which always wins.
+SS.OPACITY_CHOICES = {};
+for pct = 100, 0, -10 do table.insert(SS.OPACITY_CHOICES, { pct .. "%", pct }); end
+function SS.ElementOpacity(name)
+	local d = SS.DB(); local v = d.opacity and tonumber(d.opacity[name]);
+	if ( v and v >= 0 and v <= 100 ) then return v; end
+	return 100;
+end
+function SS.SetElementOpacity(name, pct)
+	local d = SS.DB(); d.opacity = d.opacity or {};
+	pct = tonumber(pct) or 100;
+	d.opacity[name] = (pct < 100) and math.max(0, pct) or nil;
+	SS.lastOpacity = SS.lastOpacity or {}; SS.lastOpacity[name] = true;   -- applied (or set back to solid) once now
+	SS.Safe(SS.ApplyOpacity);
+end
+local function OpacityFrames(name)
+	if ( name == "PartyMemberFrame1" ) then
+		local out = {};
+		for i = 1, 4 do local f = getglobal("PartyMemberFrame" .. i); if ( f ) then table.insert(out, f); end end
+		local lines = getglobal("SlimSuitePartyLines"); if ( lines ) then table.insert(out, lines); end
+		return out;
+	end
+	local f = getglobal(SS.Shown and SS.Shown(name) or name) or getglobal(name);
+	return f and { f } or {};
+end
+function SS.ApplyOpacity()
+	local d = SS.DB(); SS.lastOpacity = SS.lastOpacity or {};
+	for name in pairs(SS.ELEMENTS or {}) do
+		local pct = SS.ElementOpacity(name);
+		local hidden = (d.muted and (d.muted[name] or d.muted[SS.Shown and SS.Shown(name) or name])) or (d.elementModes and d.elementModes[name] == "disabled");
+		-- only elements given an opacity are touched, and one set back to 100% is restored once
+		if ( not hidden and (pct < 100 or SS.lastOpacity[name]) ) then
+			for _, f in ipairs(OpacityFrames(name)) do
+				if ( f.SetAlpha ) then
+					local base = (name == "PartyMemberFrame1" and f.slimDimmed) and 0.6 or 1;
+					f:SetAlpha(base * pct / 100);
+				end
+			end
+			SS.lastOpacity[name] = (pct < 100) and pct or nil;
+		end
+	end
+end
+SS.Every("elementOpacity", 0.25, function() SS.Safe(SS.ApplyOpacity); end);
 
 -- the game's own frames and every Slim Suite frame: hidden by alpha during setup, restored when it ends

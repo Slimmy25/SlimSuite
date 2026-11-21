@@ -10,12 +10,20 @@ function SS.WrappedLabelHeight(label, width)
 	end
 	height = math.max(20, height); label:SetHeight(height); return height;
 end
+-- an element's section can be opened only while the element is On (no element: always)
+function SS.FoldCanOpen(r)
+	if ( not r or not r.element ) then return true; end
+	return SU.Mode(r.element) == "enabled";
+end
+
 function SS.LayoutPage(page)
 	local rows, parent = page.rows, page.parent;
 	local show = {};
 	for i = 1, table.getn(rows) do
 		local r = rows[i];
 		show[i] = not (r.up and not r.up()) and SS.RowMatches(r);
+		if ( r.fold and not (SS.openFolds and SS.openFolds[r.fold.title] and SS.FoldCanOpen(r.fold)) ) then show[i] = false; end
+		if ( r.kind == "fold" ) then show[i] = true; end
 	end
 	local y = page.startY;
 	for i = 1, table.getn(rows) do
@@ -41,6 +49,17 @@ function SS.LayoutPage(page)
 				r.b:ClearAllPoints(); r.b:SetPoint("TOPLEFT", parent, "TOPLEFT", 26, y + 2);
 				r.b:Show();
 				rowHeight = 30;
+			elseif ( r.kind == "fold" ) then
+				local can = SS.FoldCanOpen(r);
+				local open = can and SS.openFolds and SS.openFolds[r.title];
+				r.b:SetText((not can and "    " or (open and "-  " or "+  ")) .. r.title);
+				r.b:ClearAllPoints(); r.b:SetPoint("TOPLEFT", parent, "TOPLEFT", 14, y + 2); r.b:Show();
+				local current = r.element and SU.Mode(r.element);
+				for j, mb in ipairs(r.modes or {}) do
+					mb:ClearAllPoints(); mb:SetPoint("TOPLEFT", parent, "TOPLEFT", 240 + (j - 1) * 66, y + 2); mb:Show();
+					if ( mb.mode == current ) then mb:LockHighlight(); else mb:UnlockHighlight(); end
+				end
+				rowHeight = 26;
 			elseif r.kind=="deathmatrix" then
     r.fs:ClearAllPoints(); r.fs:SetPoint("TOPLEFT",parent,"TOPLEFT",48,y-5); r.fs:SetWidth(170); r.fs:Show();
     r.cb:ClearAllPoints(); r.cb:SetPoint("TOPLEFT",parent,"TOPLEFT",250,y); r.cb:Show(); r.cb.label:Hide();
@@ -59,7 +78,7 @@ function SS.LayoutPage(page)
 			y = y - rowHeight;
 		else
 			if ( r.kind == "elementmode" ) then r.fs:Hide(); for j = 1, 3 do r.buttons[j].b:Hide(); end
-			elseif ( r.kind == "button" ) then r.b:Hide();
+			elseif ( r.kind == "button" or r.kind == "fold" ) then r.b:Hide(); for _, mb in ipairs(r.modes or {}) do mb:Hide(); end
 			elseif ( r.kind == "choice" ) then r.fs:Hide(); r.b:Hide(); else r.cb:Hide(); r.cb.label:Hide(); if r.preview then r.preview:Hide(); end end
 		end
 	end
@@ -191,9 +210,40 @@ function SS.WinBuild()
 		SS.pages = SS.pages or {};
 		local page = { parent = parent, rows = {}, startY = startY, after = after, module=module };
 		local up = nil;
+		local fold = nil;   -- the open/close section the next rows belong to
 		for i = 1, table.getn(entries) do
 			local row = entries[i];
-			if ( row.head ) then
+			local before = table.getn(page.rows);
+			if ( row.fold ) then
+				-- an element's section: its name as a button that opens and closes the settings under it
+				local r = { kind = "fold", title = SS.T(row.fold), element = row.element };
+				r.b = K.Button(parent, "", 220, function()
+					if ( not SS.FoldCanOpen(r) ) then return; end
+					SS.openFolds = SS.openFolds or {};
+					SS.openFolds[r.title] = not SS.openFolds[r.title];
+					SS.LayoutPage(page);
+				end);
+				r.b:SetHeight(22);
+				if ( r.b.GetFontString and r.b:GetFontString() ) then r.b:GetFontString():SetJustifyH("LEFT"); end
+				-- On, Off and Default for the element itself; its settings open only while it is On
+				r.modes = {};
+				if ( row.element ) then
+					for j, m in ipairs({ { "On", "enabled" }, { "Off", "disabled" }, { "Default", "default" } }) do
+						local mode = m[2];
+						local mb = K.Button(parent, SS.T(m[1]), 62, function()
+							SU.SetMode(row.element, mode, SS.ELEMENTS[row.element] and SS.ELEMENTS[row.element].title);
+							SS.openFolds = SS.openFolds or {};
+							SS.openFolds[r.title] = (mode == "enabled") and true or nil;
+							SS.LayoutPage(page);
+						end);
+						mb:SetHeight(22); mb.mode = mode;
+						r.modes[j] = mb;
+					end
+				end
+				table.insert(page.rows, r);
+				fold = r; up = nil;
+			elseif ( row.head ) then
+				fold = nil;
 				local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
 				fs:SetText(SS.T(row.head)); fs:SetTextColor(1, 1, 1);
 				table.insert(page.rows, { kind = "head", fs = fs });
@@ -261,7 +311,11 @@ function SS.WinBuild()
 					if ( r.cb.label ) then r.cb.label:SetTextColor(1, 0.82, 0); end
 					up = row[2];
 				end
+				if ( row.when ) then r.up = row.when; end
 				table.insert(page.rows, r);
+			end
+			if ( fold and not row.fold ) then
+				for j = before + 1, table.getn(page.rows) do page.rows[j].fold = fold; end
 			end
 		end
 		for _,r in ipairs(page.rows) do
@@ -272,12 +326,35 @@ function SS.WinBuild()
 		return page;
 	end
  local worldEntry=SS.WorldCombatEntry();
+ -- every element's right-click settings, each under its own name that opens and closes
+ local function ElementSections()
+  local out={};
+  -- the setup's order first, then any element it does not list (in the order elements can be moved)
+  local order,seen={}, {};
+  for _,name in ipairs(SS.SETUP_ORDER or {}) do if not seen[name] then seen[name]=true; table.insert(order,name); end end
+  for _,m in ipairs(SS.MOVABLE or {}) do if SS.ELEMENTS[m[1]] and not seen[m[1]] then seen[m[1]]=true; table.insert(order,m[1]); end end
+  for name in pairs(SS.ELEMENTS) do if not seen[name] then seen[name]=true; table.insert(order,name); end end
+  for _,name in ipairs(order) do
+   local element=SS.ELEMENTS[name];
+   local ok,checks=SS.Safe(SU.ChecksFor,name);
+   if element and name~="SlimSuiteEditGrid" then
+    if not ok or type(checks)~="table" then checks={}; end
+    table.insert(out,{fold=element.label or element.title or name,element=name});
+    for _,e in ipairs(checks) do
+     if type(e)=="table" and type(e[1])=="string" and e[2] and e[3] then
+      table.insert(out,{e[1],e[2],e[3],choice=e.choice,when=type(e[4])=="function" and e[4] or nil});
+     end
+    end
+   end
+  end
+  return out;
+ end
  local uiEntries={
 			{head="Setup"},
-			{"Toggle UI Settings (drag, resize and scale)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v, true); if ( v ) then SS.OpenHUDEdit(); else SS.CloseHUDEdit(); end end},
+			{"HUD Edit Mode (move, resize and turn elements on or off)", function() return SS.DB().unlocked; end, function(v) SS.SetUnlocked(v, true); if ( v ) then SS.OpenHUDEdit(); else SS.CloseHUDEdit(); end end},
 			{button = "Demo Mode", onClick = function() SS.ToggleDemoMode(); end},
+			{elementSections = true},
 			{button = "Profiles & import/export", onClick = function() SS.ShowLayoutWindow(); end},
-			{button = "Recommended HUD preset", onClick = function() SS.ShowHUDRecommendation(); end},
 			{"Keep a separate layout for each character", function() return SS.DB().layoutPerCharacter; end, function(v) SS.SetLayoutPerCharacter(v); end},
 			{head="Everywhere"},
 			{"Run clock in the compass (run time, next boss, zone)", function() return SS.DB().compassRunClock; end, function(v) SS.DB().compassRunClock = v and true or false; SS.Safe(SS.UpdateCompass); end},
@@ -337,10 +414,14 @@ function SS.WinBuild()
 			{head="Minimap"},
 			{"Show caches on the minimap", function() return SS.DB().minimapCaches; end, function(v) SS.DB().minimapCaches = v; end},
 			{"Show bosses on the minimap", function() return SS.DB().minimapBosses; end, function(v) SS.DB().minimapBosses = v; end},
+			{"   Show their raid icon", function() return SS.DB().minimapBossIcons ~= false; end, function(v) SS.DB().minimapBossIcons = v and true or false; end},
+			{"   Show their name", function() return SS.DB().minimapBossNames ~= false; end, function(v) SS.DB().minimapBossNames = v and true or false; end},
 			{"Show lairs on the minimap, with their 3:00 refill timer", function() return SS.DB().minimapLairs; end, function(v) SS.DB().minimapLairs = v; end},
 			{"Show the game's nearest Guardian lair flag on minimap", function() return SS.DB().showGuardianFlag; end, function(v) SS.DB().showGuardianFlag = v; SS.ApplyGuardianFlag(); end},
-			{"Square minimap (off: round)", function() return SS.DB().minimapSquare; end, function(v) SS.SetMinimapSquare(v); end},
-			{"Transparent minimap (round or square, no borders)", function() return SS.DB().minimapTransparent; end, function(v) SS.SetMinimapTransparent(v); end},
+			{"Minimap shape", function() return SS.DB().minimapSquare and "square" or "circle"; end, function(v) SS.SetMinimapSquare(v == "square"); end, choice={{"Square","square"},{"Circle","circle"}}},
+			{"Hide the day / night (sun and moon) button", function() return SS.DB().minimapHideDayNight; end, function(v) SS.DB().minimapHideDayNight = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end},
+			{"Hide the zone name and its X button", function() return SS.DB().minimapHideZone; end, function(v) SS.DB().minimapHideZone = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end},
+			{"Hide the + / - zoom buttons", function() return SS.DB().minimapHideZoom; end, function(v) SS.DB().minimapHideZoom = v and true or false; SS.Safe(SS.ApplyMinimapExtras); end},
 			{"Minimap button", function() local m = SS.DB().minimap; return not (m and m.hide); end, function(v) if ( SS.Mini ) then local m = SS.DB().minimap; if ( (m and m.hide and true or false) == v ) then SS.Mini.Toggle(); end end end},
 			{head="Deaths and spells"},
 			{"Mark where a downed friend can be revived", function() return SS.DB().deathMarks; end, function(v) SS.DB().deathMarks = v; end},
@@ -363,7 +444,12 @@ function SS.WinBuild()
  if SS.AchievementsAvailable() then local achievements=K.Button(hub,SS.T("Side achievements"),170,function() SS.OpenAchievements(); end); achievements:SetPoint("TOPLEFT",hub,"TOPLEFT",4,-300); end;
  local entries={chat={},sounds={},ui={},gameplay={},misc={},nameplates={}};
 
- for _,row in ipairs(uiEntries) do table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
+ for _,row in ipairs(uiEntries) do
+  if row.elementSections then
+   table.insert(entries.ui,{head="Elements"});
+   for _,r in ipairs(ElementSections()) do table.insert(entries.ui,r); end
+  else table.insert(entries[row==worldEntry and "gameplay" or "ui"],row); end
+ end
  local category="misc";
  for _,row in ipairs(otherEntries) do
   if row.head then
@@ -379,7 +465,6 @@ function SS.WinBuild()
  table.insert(entries.gameplay,{"Hide the Map button on the minimap", function() return SS.DB().hideMapButton; end, function(v) SS.DB().hideMapButton = v and true or false; SS.ApplyBagMapButtons(); end});
  if SS.AchievementsAvailable() then 
  table.insert(entries.gameplay,{button="Side achievements",onClick=function() SS.OpenAchievements(); end}); end;
- table.insert(entries.ui,{button="HUD Edit Mode",onClick=function() SS.OpenHUDEdit(); end});
  table.insert(entries.ui,{button="Reset positions",onClick=function() SS.ResetPlaces(); end});
  table.insert(entries.ui,{button="Reset all UI",onClick=function() SS.ResetUI(); end});
  for i,id in ipairs(SS.MODULE_ORDER) do

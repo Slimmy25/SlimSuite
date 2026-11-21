@@ -27,11 +27,7 @@ local cd = SS.DB()
 check("Console: big thin party lines", cd.partyLook == "thin" and cd.scales.SlimSuitePartyLines == 2.4)
 check("Console: compass on, minimap off", SS.FeatureEnabled("SlimSuiteCompassFrame") and cd.elementModes.MinimapCluster == "disabled")
 check("Console: up to five encounter bars pinned top-right", cd.encounterMax == 5 and cd.places.SlimSuiteBossFrames.point == "TOPRIGHT")
-check("Console: info drawer on, under the bars", SS.FeatureEnabled("SlimSuiteInfoDrawer") and cd.places.SlimSuiteInfoDrawer.point == "TOPRIGHT")
 check("Console: player bottom-left, target bottom-right", cd.places.SlimSuitePlayerCard.point == "BOTTOMLEFT" and cd.places.SlimSuiteTargetCard.point == "BOTTOMRIGHT")
-SS.StartDemoMode(); Tick(5)
-check("info drawer shows its numbers in Demo Mode", getglobal("SlimSuiteInfoDrawer").shown ~= false and table.getn(SS.InfoDrawerLines()) >= 2)
-SS.StopDemoMode(); Tick(2)
 local shipped = SS.BUILTIN_PRESETS
 local saved = SS.LayoutText(SS.LayoutSnapshot())
 SS.PRESETS = { { "Test design", "For the test.", saved }, { "Broken", "Bad text.", "nonsense" } }

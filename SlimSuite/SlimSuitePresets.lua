@@ -15,11 +15,11 @@ if ( setfenv ) then setfenv(1, SS.ENV); end
 -- tests/presetreview.lua lays every design out on ten screen sizes and checks nothing overlaps or leaves the screen.
 SS.BUILTIN_PRESETS = {
 	-- The console / controller layout: frames in the corners, a large compass in place of the minimap, a big
-	-- party, up to five encounter bars top-right and a read-only info drawer under them.
+	-- party, up to five encounter bars top-right.
 	{ "Console A", "For a controller or handheld: big party lines, the compass instead of the minimap, frames in the corners.", slot = 4, {
 		style = "tooltip",
 		keys = { playerLook = "new", targetLook = "new", partyLook = "thin", replaceEncounters = true, encounterMax = 5,
-			encounterBarThickness = "thick", compassOn = true, infoDrawer = true, partyGreyDead = true, partyDistance = true,
+			encounterBarThickness = "thick", compassOn = true, partyGreyDead = true, partyDistance = true,
 			partyDimFar = true, xpFullWidth = true, xpSegments = true, showRacialAbility = true, showEmptyActionSlots = true },
 		orientations = { PartyMemberFrame1 = "vertical", SlimSuiteBossFrames = "horizontal", MainMenuExpBar = "horizontal",
 			MainMenuBar = "horizontal" },
@@ -30,10 +30,10 @@ SS.BUILTIN_PRESETS = {
 		-- your frame and the target's in the corners just above the XP bar
 		places = { { "MainMenuExpBar", 0, 0, anchor = "BOTTOM" }, { "MainMenuBar", 0, 15, anchor = "BOTTOM" },
 			{ "SlimSuitePlayerCard", 16, 22, anchor = "BOTTOMLEFT" }, { "SlimSuiteTargetCard", -16, 22, anchor = "BOTTOMRIGHT" },
-			{ "SlimSuiteBossFrames", -16, -16, anchor = "TOPRIGHT" }, { "SlimSuiteInfoDrawer", -16, -282, anchor = "TOPRIGHT" },
+			{ "SlimSuiteBossFrames", -16, -16, anchor = "TOPRIGHT" },
 			{ "SlimSuitePartyLines", 16, 176, anchor = "BOTTOMLEFT" }, { "ChatFrame1", 16, 296, anchor = "BOTTOMLEFT" },
 			{ "BuffFrame", 16, -16, anchor = "TOPLEFT" }, { "SlimSuiteCompassFrame", 0.5, 0.93 } },
-		on = { "SlimSuiteCompassFrame", "SlimSuiteInfoDrawer" },
+		on = { "SlimSuiteCompassFrame" },
 		hide = { "MinimapCluster" } } },
 };
 

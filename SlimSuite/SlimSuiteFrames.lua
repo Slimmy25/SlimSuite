@@ -882,8 +882,6 @@ function SS.MinSize(name)
 	elseif ( name == "SlimSuiteReviveFrame" ) then
 		if ( SS.DB().orientations and SS.DB().orientations.SlimSuiteReviveFrame == "vertical" ) then return 14, 80; end
 		return 80, 14;
-	elseif ( name == "SlimSuiteInfoDrawer" ) then
-		return 160, 60;
 	elseif ( name == "SlimSuiteLuckFrame" ) then
   return 240,170;
  elseif ( name == "SlimSuiteCompassFrame" ) then

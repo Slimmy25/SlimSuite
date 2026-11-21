@@ -138,7 +138,8 @@ function SS.UpdatePartyStatus()
 			grey = grey and d.partyGreyDead ~= false;
 			SetGrey(i, grey);
 			if ( grey ) then KeepGrey(i); end
-			f:SetAlpha((far and d.partyDimFar ~= false and not grey) and OUT_OF_RANGE_ALPHA or 1);
+			f.slimDimmed = (far and d.partyDimFar ~= false and not grey) and true or nil;
+			f:SetAlpha((f.slimDimmed and OUT_OF_RANGE_ALPHA or 1) * (SS.ElementOpacity and SS.ElementOpacity("PartyMemberFrame1") or 100) / 100);
 			if ( d.partyDistance ~= false and text ~= "" ) then s.range:SetText(text); s.range:Show(); else s.range:Hide(); end
 			if ( progress and progress > 0 ) then
 				progress = math.max(0, math.min(1, progress));

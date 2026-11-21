@@ -107,7 +107,7 @@ end);
 -- A layout is everything about where the UI sits and how it looks: places, sizes, scales, padding, layouts, hidden
 -- elements and the frame looks. Layouts are saved by name (/slim layout save <name>), loaded again, shared as one line
 -- of text (the Layouts window), and can be kept apart for each character.
-SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes", "frameDefault", "minimap", "statHidden" };
+SS.LAYOUT_TABLES = { "places", "sizes", "scales", "padding", "orientations", "muted", "chatOffsets", "enabledElements", "elementModes", "frameDefault", "minimap", "statHidden", "opacity" };
 SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf", "combineTarget", "mirrorTarget",
 	"hideTarget", "buffsOnTarget", "buffsOnTargetSide", "buffsOnPlayer", "buffsOnPlayerSide", "partyLocked", "partyLockAbove",
 	"partyFaces", "cardPortraits", "tallyVertical", "tallyContext", "buffCustomLayout", "buffGrowthDirection", "buildRowsAttached", "matchBuildSizes", "hideBuildSpells", "hideBuildItems", "xpHideBorder", "statCounter", "statDisplayMode", "clockContextAbove", "worldCombatMode", "keepCombatLog", "cardEdgeHUD", "compassOn", "luckPanel", "achievementButton", "compassStyle", "compassBosses", "compassLairs", "compassCaches", "minimapSquare", "minimapTransparent",
@@ -117,7 +117,7 @@ SS.LAYOUT_KEYS = { "playerLook", "targetLook", "partyLook", "partyIncludesSelf",
 	"targetAuraSide", "targetDebuffs", "clockDetached", "showEmptyActionSlots", "cooldowns",
 	"partyMemberBuffs", "localClock24", "localClockBackground", "showGuardianFlag",
 	"tallyBossKills", "tallyBackground", "zoneLine", "encounterDebuffs", "procMeter",
-	"minimapCaches", "minimapBosses", "minimapLairs", "combatTextBox", "ctHeals", "ctCrits", "ctIcons", "ctLong", "ctPop",
+	"minimapCaches", "minimapBosses", "minimapBossIcons", "minimapBossNames", "minimapHideDayNight", "minimapHideZone", "minimapHideZoom", "minimapLairs", "combatTextBox", "ctHeals", "ctCrits", "ctIcons", "ctLong", "ctPop",
 	"replaceClock", "replaceEncounters", "replaceTally", "replaceBanners", "replaceBuildRows", "replaceRevive", "replaceLocalClock", "moveLevelButton", "moveMeter" };
 function SS.CopyTable(t)
 	local out = {};
@@ -220,6 +220,7 @@ local function ValidLayoutLeaf(root, keys, value)
 	if ( root == "elementModes" ) then return depth == 2 and (value == "enabled" or value == "disabled" or value == "default"); end
 	if ( root == "orientations" ) then return depth == 2 and (value == "horizontal" or value == "vertical"); end
 	if ( root == "muted" or root == "enabledElements" or root == "frameDefault" or root == "statHidden" ) then return depth == 2 and type(value) == "boolean"; end
+	if ( root == "opacity" ) then return depth == 2 and type(value) == "number" and value >= 0 and value <= 100; end
 	if ( root == "scales" or root == "padding" ) then return depth == 2 and type(value) == "number" and (root == "scales" and value > 0 and value <= 10 or root == "padding" and value >= 0 and value <= 1000); end
 	if ( root == "sizes" ) then return depth == 3 and (keys[3] == "w" or keys[3] == "h") and type(value) == "number" and value > 0 and value <= 100000; end
 	if ( root == "minimap" ) then
